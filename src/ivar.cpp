@@ -464,27 +464,18 @@ int main(int argc, char* argv[]){
     }
     g_args.prefix = get_filename_without_extension(g_args.prefix,".tsv");
     // Read files from list
-    char **files = new char*[100];
-    int nfiles = 100, ctr = 0;
+    std::vector<char*> files;
     std::string line;
     if (!g_args.file_list.empty()){	// File list supplied
       std::ifstream file_fin = std::ifstream(g_args.file_list);
       while (std::getline(file_fin, line)){
-	files[ctr] = strdup(line.c_str());
-	if(ctr == nfiles - 1){
-	  nfiles += 100;
-	  *files = (char*) realloc(*files, nfiles * (sizeof(char*)));
-	}
-	ctr++;
+	files.push_back(strdup(line.c_str()));
       }
       file_fin.close();
-      nfiles = (nfiles > ctr) ? ctr : nfiles;
-      res = common_variants(g_args.prefix, g_args.min_threshold, files, nfiles);
-      // Free files, nfiles
-      for (int i = 0; i < nfiles; ++i) {
-	free(files[i]);
+      res = common_variants(g_args.prefix, g_args.min_threshold, files.data(), files.size());
+      for (char* fname: files) {
+	free(fname);
       }
-      free(files);
     } else {
       res = common_variants(g_args.prefix, g_args.min_threshold, argv + optind, argc - optind);
     }
