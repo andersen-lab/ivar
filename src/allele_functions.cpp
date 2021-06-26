@@ -6,189 +6,222 @@
 
 #include "allele_functions.h"
 
-void print_allele_depths(std::vector<allele> ad){
+void print_allele_depths(std::vector<allele> ad) {
   std::cout << "AD Size: " << ad.size() << " " << std::endl;
-  for(std::vector<allele>::iterator it = ad.begin(); it != ad.end(); ++it) {
+
+  for (std::vector<allele>::iterator it = ad.begin(); it != ad.end(); ++it) {
     std::cout << "Nuc: " << it->nuc << std::endl;;
     std::cout << "Depth: " << it->depth << std::endl;
-      std::cout << "Reverse: " << it->reverse <<std::endl;
+    std::cout << "Reverse: " << it->reverse <<std::endl;
     std::cout << "Qual: " << (uint16_t) it->mean_qual << std::endl;
     std::cout << "Beg: " << it->beg << std::endl;
     std::cout << "End: " << it->end << std::endl;
   }
 }
 
-int check_allele_exists(std::string n, std::vector<allele> ad){
-  for(std::vector<allele>::iterator it = ad.begin(); it != ad.end(); ++it) {
-    if(it->nuc.compare(n) == 0){
+int check_allele_exists(std::string n, std::vector<allele> ad) {
+  for (std::vector<allele>::iterator it = ad.begin(); it != ad.end(); ++it) {
+    if (it->nuc.compare(n) == 0) {
       return it - ad.begin();
     }
   }
+
   return -1;
 }
 
-int find_ref_in_allele(std::vector<allele> ad, char ref){
+int find_ref_in_allele(std::vector<allele> ad, char ref) {
   std::string ref_s(1, ref);
   std::vector<allele>::iterator it = ad.begin();
-  while(it < ad.end()){
-    if(it->nuc.compare(ref_s) == 0)
+
+  while (it < ad.end()) {
+    if (it->nuc.compare(ref_s) == 0)
       return (it - ad.begin());
+
     it++;
   }
+
   return -1;
 }
 
-std::vector<allele> update_allele_depth(char ref,std::string bases, std::string qualities, uint8_t min_qual){
+std::vector<allele> update_allele_depth(char ref,std::string bases, std::string qualities, uint8_t min_qual) {
   std::vector<allele> ad;
   std::string indel;
+
   uint32_t i = 0, n =0, j = 0, q_ind = 0;
+
   bool beg, end;
   uint8_t q;
-  while (i < bases.length()){
+
+  while (i < bases.length()) {
     beg = false;
     end = false;
-    if(bases[i] == '^'){
+
+    if (bases[i] == '^') {
       i += 2;			// Skip mapping quality as well (i+1) - 33
       continue;
     }
-    if(bases[i] == '$'){
+
+    if (bases[i] == '$') {
       i++;
       continue;
     }
+
     q = qualities[q_ind] - 33;
     std::string b;
     allele tmp;
     bool forward= true;
-    switch(bases[i]){
-    case '.':
-      b = ref;
-      end = (bases[i+1] == '$');
-      beg = (bases[i+1] == '^');
-      break;
-    case ',':
-      b = ref;
-      forward = false;
-      end = (bases[i+1] == '$');
-      beg = (bases[i+1] == '^');
-      break;
-    case '*':
-      b = bases[i];
-      break;
-    case '+': case '-':
-      j = i+1;
-      while(isdigit(bases[j])){
-	j++;
-      }
-      j = j - (i+1);
-      n = stoi(bases.substr(i+1, j));
-      indel = bases.substr(i+1+j, n);
-      transform(indel.begin(), indel.end(), indel.begin(),::toupper);
-      b = bases[i] + indel;	// + for Insertion and - for Deletion
-      i += n + j;
-      if(indel[0]>=97 && indel[0] <= 122)
-	forward=false;
-      q = min_qual;		// For insertions and deletion ust use minimum quality.
-      break;
-    default:
-      int asc_val = bases[i];
-      if(asc_val >= 65 && asc_val <= 90){
-	b = bases[i];
-      } else if(bases[i]>=97 && bases[i]<=122){
-	b = bases[i] - ('a' - 'A');
-	forward = false;
-      }
-      end = (bases[i+1] == '$');
-      beg = (bases[i+1] == '^');
+
+    switch(bases[i]) {
+      case '.':
+        b = ref;
+
+        end = (bases[i+1] == '$');
+        beg = (bases[i+1] == '^');
+        break;
+      case ',':
+        b = ref;
+        forward = false;
+
+        end = (bases[i+1] == '$');
+        beg = (bases[i+1] == '^');
+        break;
+      case '*':
+        b = bases[i];
+        break;
+      case '+': case '-':
+        j = i+1;
+
+        while (isdigit(bases[j])) {
+          j++;
+        }
+
+        j = j - (i+1);
+        n = stoi(bases.substr(i+1, j));
+        indel = bases.substr(i+1+j, n);
+        transform(indel.begin(), indel.end(), indel.begin(),::toupper);
+
+        b = bases[i] + indel;	// + for Insertion and - for Deletion
+
+        i += n + j;
+
+        if (indel[0]>=97 && indel[0] <= 122)
+          forward=false;
+
+        q = min_qual;		// For insertions and deletion ust use minimum quality.
+        break;
+      default:
+        int asc_val = bases[i];
+
+        if (asc_val >= 65 && asc_val <= 90) {
+          b = bases[i];
+        } else if (bases[i]>=97 && bases[i]<=122) {
+          b = bases[i] - ('a' - 'A');
+          forward = false;
+        }
+
+        end = (bases[i+1] == '$');
+        beg = (bases[i+1] == '^');
     }
+
     int ind = check_allele_exists(b, ad);
-    if(q >= min_qual){
-      if (ind==-1){
-	tmp.nuc = b;
-	tmp.depth = 1;
-	tmp.tmp_mean_qual = q;
-	if(!forward)
-	  tmp.reverse = 1;
-	else
-	  tmp.reverse = 0;
-	if(beg)
-	  tmp.beg = 1;
-	else
-	  tmp.beg = 0;
-	if(end)
-	  tmp.end = 1;
-	else
-	  tmp.end = 0;
-	ad.push_back(tmp);
+
+    if (q >= min_qual) {
+      if (ind==-1) {
+        tmp.nuc = b;
+        tmp.depth = 1;
+        tmp.tmp_mean_qual = q;
+
+        if (!forward)
+          tmp.reverse = 1;
+        else
+          tmp.reverse = 0;
+        if (beg)
+          tmp.beg = 1;
+        else
+          tmp.beg = 0;
+        if (end)
+          tmp.end = 1;
+        else
+          tmp.end = 0;
+
+        ad.push_back(tmp);
       } else {
-	ad.at(ind).tmp_mean_qual = (ad.at(ind).tmp_mean_qual * ad.at(ind).depth + q)/(ad.at(ind).depth + 1);
-	ad.at(ind).depth += 1;
-	if(beg)
-	  ad.at(ind).beg += 1;
-	if(end)
-	  ad.at(ind).end += 1;
-	if(!forward)
-	  ad.at(ind).reverse += 1;
+        ad.at(ind).tmp_mean_qual = (ad.at(ind).tmp_mean_qual * ad.at(ind).depth + q)/(ad.at(ind).depth + 1);
+        ad.at(ind).depth += 1;
+
+        if (beg)
+          ad.at(ind).beg += 1;
+        if (end)
+          ad.at(ind).end += 1;
+        if (!forward)
+          ad.at(ind).reverse += 1;
       }
     }
+
     i++;
-    if(b[0] !='+' && b[0]!='-')
+
+    if (b[0] !='+' && b[0]!='-')
       q_ind++;
   }
-  for(std::vector<allele>::iterator it = ad.begin(); it!=ad.end(); ++it){
+
+  for (std::vector<allele>::iterator it = ad.begin(); it!=ad.end(); ++it) {
     it->mean_qual = (uint8_t) it->tmp_mean_qual;
   }
-  if(ad.size() > 0)
+
+  if (ad.size() > 0)
     std::sort(ad.begin(), ad.end());
+
   return ad;
 }
 
-int get_index(char a){
-  switch(a){
-  case'Y':
-    a = 0;
-    break;
-  case'R':
-    a = 1;
-    break;
-  case'W':
-    a = 2;
-    break;
-  case'S':
-    a = 3;
-    break;
-  case'K':
-    a = 4;
-    break;
-  case'M':
-    a = 5;
-    break;
-  case'A':
-    a = 6;
-    break;
-  case'T':
-    a = 7;
-    break;
-  case'G':
-    a = 8;
-    break;
-  case'C':
-    a = 9;
-    break;
-  case'D':
-    a = 10;
-    break;
-  case'V':
-    a = 11;
-    break;
-  case'H':
-    a = 12;
-    break;
-  case'B':
-    a = 13;
-    break;
-  default:
-    a = -1;
+int get_index(char a) {
+  switch(a) {
+    case 'Y':
+      a = 0;
+      break;
+    case 'R':
+      a = 1;
+      break;
+    case 'W':
+      a = 2;
+      break;
+    case 'S':
+      a = 3;
+      break;
+    case 'K':
+      a = 4;
+      break;
+    case 'M':
+      a = 5;
+      break;
+    case 'A':
+      a = 6;
+      break;
+    case 'T':
+      a = 7;
+      break;
+    case 'G':
+      a = 8;
+      break;
+    case 'C':
+      a = 9;
+      break;
+    case 'D':
+      a = 10;
+      break;
+    case 'V':
+      a = 11;
+      break;
+    case 'H':
+      a = 12;
+      break;
+    case 'B':
+      a = 13;
+      break;
+    default:
+      a = -1;
   }
+
   return (int) a;
 }
 
@@ -212,9 +245,10 @@ H N H N N H H H N H N N H N
 B N N B B N N B B B N N N B
 
  */
-char gt2iupac(char a, char b){
-  if(a == '*' || b == '*')
+char gt2iupac(char a, char b) {
+  if (a == '*' || b == '*')
     return 'N';
+
   static const char iupac[14][14] = {
     {'Y', 'N', 'H', 'B', 'B', 'H', 'H', 'Y', 'B', 'Y', 'N', 'N', 'H', 'B'},
     {'N', 'R', 'D', 'V', 'D', 'V', 'R', 'D', 'R', 'V', 'D', 'V', 'N', 'N'},
@@ -231,13 +265,17 @@ char gt2iupac(char a, char b){
     {'H', 'N', 'H', 'N', 'N', 'H', 'H', 'H', 'N', 'H', 'N', 'N', 'H', 'N'},
     {'B', 'N', 'N', 'B', 'B', 'N', 'N', 'B', 'B', 'B', 'N', 'N', 'N', 'B'}
   };
+
   if ( a>='a' ) a -= 'a' - 'A';
   if ( b>='a' ) b -= 'a' - 'A';
+
   int _a, _b;
   _a = get_index(a);
   _b = get_index(b);
-  if(_a == -1 || _b == -1)
+
+  if (_a == -1 || _b == -1)
     return 'N';
+
   return iupac[_a][_b];
 }
 
@@ -263,13 +301,15 @@ char gt2iupac(char a, char b){
     ['CCA', 'CCT', 'CCG', 'CCC']]]
  */
 
-char codon2aa(char n1, char n2, char n3){
+char codon2aa(char n1, char n2, char n3) {
   if ( n1>='a' ) n1 -= 'a' - 'A';
   if ( n2>='a' ) n2 -= 'a' - 'A';
   if ( n3>='a' ) n3 -= 'a' - 'A';
+
   int _n1 = get_index(n1),
     _n2 = get_index(n2),
     _n3 = get_index(n3);
+
   static const char iupac_aa[4][4][4] = {
     {
       {'K', 'N', 'K', 'N'},	// 'AAA', 'AAT', 'AAG', 'AAC'
@@ -296,7 +336,9 @@ char codon2aa(char n1, char n2, char n3){
       {'P', 'P', 'P', 'P'}	// 'CCA', 'CCT', 'CCG', 'CCC'
     }
   };
-  if((_n1 < 6) || (_n1 > 9) || (_n2 < 6) || (_n2 > 9) || (_n3 < 6) || (_n3 > 9))
+
+  if ((_n1 < 6) || (_n1 > 9) || (_n2 < 6) || (_n2 > 9) || (_n3 < 6) || (_n3 > 9))
     return 'X';
+    
   return iupac_aa[_n1-6][_n2-6][_n3-6];
 }
