@@ -1,59 +1,61 @@
 #include "interval_tree.h"
 
 // Constructor for initializing an Interval Tree
-IntervalTree::IntervalTree(){
+IntervalTree::IntervalTree() {
   _root = NULL;
 }
 
 // A utility function to insert a new Interval Search Tree Node
 // This is similar to BST Insert.  Here the low value of interval
 // is used tomaintain BST property
-void IntervalTree::insert(ITNode *root, Interval data){
+void IntervalTree::insert(ITNode *root, Interval data) {
   // Base case: Tree is empty, new node becomes root
-  if(root == NULL){
+  if (root == NULL) {
     root = new ITNode(data);
     _root = root;
   } else {
     // Get low value of interval at root
     int l = root->data->low;
+
     // If root's low value is greater, then new interval goes to
     // left subtree
-    if (data.low < l){
-      if(!root->left){
-	ITNode *tmpNode = new ITNode(data);
-	//std::cout << data.low << ":" << data.high << "->insertLeft" << std::endl;
-	root->left = tmpNode;
+    if (data.low < l) {
+      if (!root->left) {
+        ITNode *tmpNode = new ITNode(data);
+        //std::cout << data.low << ":" << data.high << "->insertLeft" << std::endl;
+        root->left = tmpNode;
       } else {
-	insert(root->left, data);
+        insert(root->left, data);
       }
-    }
-    else {
-      if(!root->right){
-	ITNode *tmpNode = new ITNode(data);
-	//std::cout << data.low << ":" << data.high << "->insertRight" << std::endl;
-	root->right = tmpNode;
+    } else {
+      if (!root->right) {
+        ITNode *tmpNode = new ITNode(data);
+        //std::cout << data.low << ":" << data.high << "->insertRight" << std::endl;
+        root->right = tmpNode;
       } else {
-	insert(root->right, data);
+        insert(root->right, data);
       }
     }
   }
+
   // update max value of ancestor node
-  if(root->max < data.high)
+  if (root->max < data.high)
     root->max = data.high;
 }
 
 
 // A utility function to check if the 1st interval envelops the second
-bool doEnvelop(Interval i1, Interval i2){
-  if(i1.low <= i2.low && i1.high >= i2.high)
+bool doEnvelop(Interval i1, Interval i2) {
+  if (i1.low <= i2.low && i1.high >= i2.high)
     return true;
+
   return false;
 }
 
 
 // The main function that searches an interval i in a given
 // Interval Tree.
-bool IntervalTree::envelopSearch(ITNode *root, Interval i){
+bool IntervalTree::envelopSearch(ITNode *root, Interval i) {
   // Base Case, tree is empty
   //std::cout << root->data->low << ":" << root->data->high << std::endl;
   if (root == NULL) return false;
@@ -73,54 +75,58 @@ bool IntervalTree::envelopSearch(ITNode *root, Interval i){
 }
 
 // A helper function for inorder traversal of the tree
-void IntervalTree::inOrder(ITNode *root){
+void IntervalTree::inOrder(ITNode *root) {
   if (root == NULL) return;
+
   inOrder(root->left);
+
   cout << "[" << root->data->low << ", " << root->data->high << "]"
        << " max = " << root->max << endl;
+       
   inOrder(root->right);
 }
 
 // A stand-alone function to create a tree containing the coordinates of each amplicon
 // based on user-specified primer pairs
-IntervalTree populate_amplicons(std::string pair_info_file, std::vector<primer> primers){
+IntervalTree populate_amplicons(std::string pair_info_file, std::vector<primer> primers) {
   int amplicon_start = -1;
   int amplicon_end = -1;
   IntervalTree tree = IntervalTree();
   populate_pair_indices(primers, pair_info_file);
+
   for (auto & p : primers) {
-    if (p.get_strand() == '+')
-      {
-	if (p.get_pair_indice() != -1){
-	  amplicon_start = p.get_start();
-	  amplicon_end = primers[p.get_pair_indice()].get_end() + 1;
-	  tree.insert(Interval(amplicon_start, amplicon_end));
-	}
+    if (p.get_strand() == '+') {
+      if (p.get_pair_indice() != -1) {
+        amplicon_start = p.get_start();
+        amplicon_end = primers[p.get_pair_indice()].get_end() + 1;
+        tree.insert(Interval(amplicon_start, amplicon_end));
       }
+    }
   }
+  
   return tree;
 }
 
 
 /*
 // Simple access functions to retrieve node's interval data
-Interval ITNode::getData()const{
+Interval ITNode::getData()const {
 return data;
 }
 // Simple access functions to retrieve node's left child
-ITNode ITNode::getLeft()const{
+ITNode ITNode::getLeft()const {
 return left;
 }
 // Simple access functions to retrieve node's right child
-ITNode ITNode::getRight()const{
+ITNode ITNode::getRight()const {
 return right;
 }
 // Simple access functions to set node's left child
-void ITNode::setLeft(ITNode *node){
+void ITNode::setLeft(ITNode *node) {
 left = node;
 }
 // Simple access functions to set node's right child
-void ITNode::setRight(ITNode *node){
+void ITNode::setRight(ITNode *node) {
 right = node;
 }
 
