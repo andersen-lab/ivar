@@ -96,6 +96,9 @@ std::vector<primer> populate_from_file(std::string path, int32_t offset = 0){
     int ctr = 0;
     primer p;
     p.set_strand(0);		// Set strand to NULL
+    p.set_start(0);		// Initialize primer variables
+    p.set_end(0);
+    p.set_score(-1); 
     while(std::getline(lineStream,cell,'\t')){
       switch(ctr){
       case 0:
