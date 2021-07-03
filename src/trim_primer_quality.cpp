@@ -85,97 +85,169 @@ double mean_quality(uint8_t *a, int s, int e) {
   return m;
 }
 
+//inputs: bam1_t: all information about one alignment, qual_threshold: quality threshold, sliding_window: size of sliding window which is used to calculate average quality.
+//outputs: cigar_: a struct that contain all cigar string information
 cigar_ quality_trim(bam1_t* r, uint8_t qual_threshold, uint8_t sliding_window) {
+  
   bool reverse = false;
-
+  
+  //ncigar: an array of unsigned 32bit integers, in total there are r->core.n_cigar + 1 such integer, (number of CIGAR operations + 1)
   uint32_t *ncigar = (uint32_t*) malloc(sizeof(uint32_t) * (r->core.n_cigar + 1)), // Maximum edit is one more element with soft mask
+    // cigar: the CIGAR array (an array of unsigned 32bit integers)
     *cigar = bam_get_cigar(r);
+  // qual: query quality array
   uint8_t *qual = bam_get_qual(r);
   int32_t start_pos;
-
+  
+  //BAM_FPAIRED: 0000,0001
+  //core.flag: a uint16_t bitwise flag
+  //((r->core.flag&BAM_FPAIRED) != 0) is equal to (r->core.flag != XXXXXXX0)
+  //bam_is_rev(r): (((b)->core.flag&BAM_FREVERSE) != 0)
+  //BAM_FREVERSE = 0001,0000 (16)
+  //Thus (bam_is_rev(r)) is equal to (r->core.flag != XXX0XXXX)
+  //Enter the if block if r is paired and reversed
   if (((r->core.flag&BAM_FPAIRED) != 0) && bam_is_rev(r)) {
+    //r->core.l_qseq is the length of the query sequence (read)
+    //reverse is set to true and the entire qual array (core.l_qseq) is reversed
     reverse = true;
     reverse_qual(qual, r->core.l_qseq);
   }
-
+  
   double m = 60;
   int del_len, cig, temp;
   uint32_t i = 0, j = 0;
-
+  
   cigar_ t;
+  //init_cigar(&t): t->cigar=NULL; t->free_cig=false; t->nlength=0; t->start_pos=0;
   init_cigar(&t);
-
+  
+  //if sliding_window > the length of the query sequence, make the sliding_window = the length of the query sequence
   if (0 > r->core.l_qseq - sliding_window)
     sliding_window = (uint32_t)r->core.l_qseq;
 
+  //when i is less than the length of the query sequence
   while (i < (uint32_t)r->core.l_qseq) {
+    
+    //get the average quality of qual[i, i+sliding_window]
     m = mean_quality(qual, i, i+sliding_window);
 
+    //exit loop if mean_quality less than quality threshold
     if (m < qual_threshold)
       break;
 
     i++;
 
+    //if the get to the end of the sequence, adjust sliding window so that the last few bases could be included
     if (i > (uint32_t)r->core.l_qseq - sliding_window)
       sliding_window--;
   }
 
-  // Reverse qual back.
+  //Reverse qual back.
+  //At first, the qual is reversed for the mean_quality loop, and after looping it is reversed back
+  //TODO: But in this method, never use qual again, so there is no need to reverse it back
   if (reverse) {
     reverse_qual(qual, r->core.l_qseq);
   }
 
+  //An example to show what is i and del_len
+  //0 1 2 3 4 5 6 7 8 9 10
+  //0 1 2 3 i 5 6 7 8 9 10
+  //window example: 012 123 23i 3i5
+  //unqualified window: i56
+  //i==4; r->core.l_qseq==11; del_len == r->core.l_qseq - i == 7;
+  //but because the reverse analysis, after reversed it back, it becomes
+  //0 1 2 3 4 5 6 7 8 9 10
+  //10 9 8 7 6 5 i 3 2 1 0
+  //now the i’s position is 7, which is equal to del_len
+ 
   del_len = r->core.l_qseq - i;
+  
+  //cigar: CIGAR array; r->core.pos: 0-based leftmost coordinate; r->core.n_cigar: number of CIGAR operations; start_pos: Number of bases from 3' end for reverse reads.
+  //start_pos: del_len’s position on reference coordinate
   start_pos = get_pos_on_reference(cigar, r->core.n_cigar, del_len, r->core.pos); // For reverse reads need to set core->pos.
 
+  //TODO: In what situation will start_pos <= r->core.pos?
   if (reverse && start_pos <= r->core.pos) {
     free(ncigar);
-
     t.cigar = cigar;
     t.free_cig = false;
     t.nlength = r->core.n_cigar;
     t.start_pos = r->core.pos;
-
     return t;
   }
 
   int32_t n;
   i = 0;
 
+  //TODO: can this be simplified into if(!reverse){reverse_cigar(cigar, r->core.n_cigar)} ?
   if (reverse) {
     reverse_cigar(cigar, r->core.n_cigar);
   }
-
   reverse_cigar(cigar, r->core.n_cigar); // Reverse cigar and trim the beginning of read.
 
+  //i,j starts at 0
+  //while i is less than the total number of operation on this cigar string
   while (i < r->core.n_cigar) {
+    
+    //if del_len is 0, copy every unchanged cigar operations into ncigar[]
     if (del_len == 0) {
       ncigar[j] = cigar[i];
       i++;
       j++;
       continue;
     }
-
+    
+    //cig: cigar[i]&BAM_CIGAR_MASK = cigar[i]&0xf
+    //cig: what is the operation on this cigar string, eg. the ‘M’ in the ‘6M’ (Matches)
     cig  = bam_cigar_op(cigar[i]);
+    //n: cigar[i]>>BAM_CIGAR_SHIFT = cigar[i]>>4
+    //n: How long is the operation on this cigar string, eg. the ‘6’ in the ‘6M’ (There are 6 matches)
     n = bam_cigar_oplen(cigar[i]);
 
+    //”Consume” means that it is not a gap of query, so the base index of the query is advanced by 1
     if ((bam_cigar_type(cig) & 1)) { // Consumes Query
+      //if the length of the delete windows is greater than the length of operations
       if (del_len >= n ) {
+        //((n)<<BAM_CIGAR_SHIFT|(BAM_CSOFT_CLIP))
+	      //#define BAM_CSOFT_CLIP  4, BAM_CIGAR_SHIFT 4
+        //bam_cigar_gen: return a single cigar operation and its length in proper format
         ncigar[j] = bam_cigar_gen(n, BAM_CSOFT_CLIP);
       } else if (del_len < n) {
+        //((del_len)<<BAM_CIGAR_SHIFT|(BAM_CSOFT_CLIP))
         ncigar[j] = bam_cigar_gen(del_len, BAM_CSOFT_CLIP);
       }
 
       j++;
+      
+      //set n and del_len to correct number according to the result of (n > del_len)
+      //n - del_len is max iff n >= del_len
+      //if n >= del_len
+      //set n to n - del_len
+      //else
+      //set n to 0
       temp = n;
-
       n = std::max(n - del_len, 0);
+      //if temp >= del_len (temp is the n before)
+      //set del_len to 0
+      //else
+      //set del_len to del_len - temp
       del_len = std::max(del_len - temp, 0);
-
+      //if n has not be consumed by del_len, let n-del_len be the length of operation cig
       if (n > 0) {
         ncigar[j] = bam_cigar_gen(n, cig);
         j++;
       }
+      
+      //TODO: the previous sevens lines code in other format:
+//       if(n>del_len){
+//         n = n - del_len;
+//         del_len = 0;
+//         ncigar[j] = bam_cigar_gen(n, cig);
+//         j++;
+//       }else{
+//         del_len = del_len-n;
+//         n = 0;
+//       }
     }
 
     i++;
@@ -205,7 +277,9 @@ void print_cigar(uint32_t *cigar, int nlength) {
 }
 
 cigar_ primer_trim(bam1_t *r, bool &isize_flag, int32_t new_pos, bool unpaired_rev = false) {
+  //ncigar: an array of unsigned 32bit integers, in total there are r->core.n_cigar + 1 such integer, (number of CIGAR operations + 1)
   uint32_t *ncigar = (uint32_t*) malloc(sizeof(uint32_t) * (r->core.n_cigar + 1)), // Maximum edit is one more element with soft mask
+    
     *cigar = bam_get_cigar(r);
 
   uint32_t i = 0, j = 0;
