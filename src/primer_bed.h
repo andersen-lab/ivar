@@ -40,7 +40,7 @@ class primer {
   void set_indice(int16_t i);
   void set_read_count(uint32_t rc);
   void add_read_count(uint32_t rc);
-  bool operator == (const primer& p) const{
+  bool operator == (const primer& p) const {
     return (indice == p.get_indice()) ? true : false;
   }
 

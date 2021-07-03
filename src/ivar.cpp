@@ -19,28 +19,28 @@
 const std::string VERSION = "1.3.1";
 
 struct args_t {
-  std::string bam;		// -i
-  std::string bed;		// -b
-  std::string text;		// -t
-  std::string seq_id; // -i for consensus
-  std::string prefix;		// -p
-  std::string ref;		// -r
-  std::string region;		// -R
-  uint8_t min_qual;		// -q
-  uint8_t sliding_window;	// -s
-  double min_threshold;	// -t
-  int min_length;		// -m
-  std::string f1;		// -1
-  std::string f2;		// -2
-  std::string adp_path;	// -a
-  uint8_t min_depth;		// -m
-  char gap;			// -n
-  bool keep_min_coverage;	// -k
+  std::string bam;		          // -i
+  std::string bed;		          // -b
+  std::string text;		          // -t
+  std::string seq_id;           // -i for consensus
+  std::string prefix;		        // -p
+  std::string ref;		          // -r
+  std::string region;		        // -R
+  uint8_t min_qual;		          // -q
+  uint8_t sliding_window;      	// -s
+  double min_threshold;	        // -t
+  int min_length;		            // -m
+  std::string f1;		            // -1
+  std::string f2;		            // -2
+  std::string adp_path;	        // -a
+  uint8_t min_depth;		        // -m
+  char gap;			                // -n
+  bool keep_min_coverage;	      // -k
   std::string primer_pair_file;	// -f
-  int32_t primer_offset; // -x
-  std::string file_list;		// -f
-  bool write_no_primers_flag;	// -e
-  std::string gff;		// -g
+  int32_t primer_offset;        // -x
+  std::string file_list;		    // -f
+  bool write_no_primers_flag;	  // -e
+  std::string gff;		          // -g
   bool keep_for_reanalysis;     // -k
 } g_args;
 
@@ -176,11 +176,12 @@ static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
 
 std::string get_filename_without_extension(std::string f, std::string ext){
-  if(ext.length() > f.length())	// If extension longer than filename
+  if (ext.length() > f.length())	// If extension longer than filename
     return f;
-  if(f.substr(f.length()-ext.length(), ext.length()).compare(ext) == 0){
+
+  if (f.substr(f.length()-ext.length(), ext.length()).compare(ext) == 0)
     return f.substr(0,f.length()-ext.length());
-  }
+
   return f;
 }
 
@@ -192,30 +193,36 @@ std::string get_filename_without_extension(std::string f, std::string ext){
  */
 
 int main(int argc, char* argv[]){
-  if(argc == 1){
+  if (argc == 1) {
     print_usage();
     return -1;
   }
+
   std::stringstream cl_cmd;
   cl_cmd << "@PG\tID:ivar-" << argv[1]  <<  "\tPN:ivar\tVN:" << VERSION << "\tCL:" << argv[0] << " ";
+
   for (int i = 1; i < argc; ++i) {
     cl_cmd << argv[i];
-    if(i != argc-1)
+    if (i != argc-1)
       cl_cmd << " ";
   }
+
   cl_cmd << "\n\0";
   std::string cmd(argv[1]);
-  if(cmd.compare("-v") == 0){
+
+  if (cmd.compare("-v") == 0) {
     print_version_info();
     return 0;
   }
+
   int opt = 0, res = 0;
   // Sift arg by 1 for getopt
   argv[1] = argv[0];
   argv++;
   argc--;
+
   // ivar trim
-  if (cmd.compare("trim") == 0){
+  if (cmd.compare("trim") == 0) {
     g_args.min_qual = 20;
     g_args.sliding_window = 4;
     g_args.min_length = 30;
@@ -225,113 +232,121 @@ int main(int argc, char* argv[]){
     g_args.primer_pair_file = "";
     g_args.primer_offset = 0;
     opt = getopt( argc, argv, trim_opt_str);
-    while( opt != -1 ) {
+
+    while ( opt != -1 ) {
       switch( opt ) {
-      case 'i':
-	g_args.bam = optarg;
-	break;
-      case 'b':
-	g_args.bed = optarg;
-	break;
-      case 'f':
-  g_args.primer_pair_file = optarg;
-  break;
-      case 'x':
-  g_args.primer_offset = std::stoi(optarg);
-  break;
-      case 'p':
-	g_args.prefix = optarg;
-	break;
-      case 'm':
-	g_args.min_length = std::stoi(optarg);
-	break;
-      case 'q':
-	g_args.min_qual = std::stoi(optarg);
-	break;
-      case 's':
-	g_args.sliding_window = std::stoi(optarg);
-	break;
-      case 'e':
-	g_args.write_no_primers_flag = true;
-	break;
-      case 'k':
-        g_args.keep_for_reanalysis = true;
-        break;
-      case 'h':
-      case '?':
-	print_trim_usage();
-	return -1;
-	break;
+        case 'i':
+          g_args.bam = optarg;
+          break;
+        case 'b':
+          g_args.bed = optarg;
+          break;
+        case 'f':
+          g_args.primer_pair_file = optarg;
+          break;
+        case 'x':
+          g_args.primer_offset = std::stoi(optarg);
+          break;
+        case 'p':
+          g_args.prefix = optarg;
+          break;
+        case 'm':
+          g_args.min_length = std::stoi(optarg);
+          break;
+        case 'q':
+          g_args.min_qual = std::stoi(optarg);
+          break;
+        case 's':
+          g_args.sliding_window = std::stoi(optarg);
+          break;
+        case 'e':
+          g_args.write_no_primers_flag = true;
+          break;
+        case 'k':
+          g_args.keep_for_reanalysis = true;
+          break;
+        case 'h':
+        case '?':
+          print_trim_usage();
+          return -1;
       }
       opt = getopt( argc, argv, trim_opt_str);
     }
-    if(g_args.bam.empty() || g_args.prefix.empty()){
+
+    if (g_args.bam.empty() || g_args.prefix.empty()) {
       print_trim_usage();
       return -1;
     }
+
     g_args.prefix = get_filename_without_extension(g_args.prefix,".bam");
     res = trim_bam_qual_primer(g_args.bam, g_args.bed, g_args.prefix, g_args.region, g_args.min_qual, g_args.sliding_window, cl_cmd.str(), g_args.write_no_primers_flag, g_args.keep_for_reanalysis, g_args.min_length, g_args.primer_pair_file, g_args.primer_offset);
   }
+
   // ivar variants
-  else if (cmd.compare("variants") == 0){
+  else if (cmd.compare("variants") == 0) {
     g_args.min_qual = 20;
     g_args.min_threshold = 0.03;
     g_args.min_depth = 0;
     g_args.ref = "";
     g_args.gff = "";
+
     opt = getopt( argc, argv, variants_opt_str);
     while( opt != -1 ) {
       switch( opt ) {
-      case 'p':
-	g_args.prefix = optarg;
-	break;
-      case 't':
-	g_args.min_threshold = atof(optarg);
-	break;
-      case 'q':
-	g_args.min_qual = std::stoi(optarg);
-	break;
-      case 'm':
-	g_args.min_depth = std::stoi(optarg);
-	break;
-      case 'r':
-	g_args.ref = optarg;
-	break;
-      case 'g':
-	g_args.gff = optarg;
-	break;
-      case 'h':
-      case '?':
-	print_variants_usage();
-	return 0;
-	break;
+        case 'p':
+          g_args.prefix = optarg;
+          break;
+        case 't':
+          g_args.min_threshold = atof(optarg);
+          break;
+        case 'q':
+          g_args.min_qual = std::stoi(optarg);
+          break;
+        case 'm':
+          g_args.min_depth = std::stoi(optarg);
+          break;
+        case 'r':
+          g_args.ref = optarg;
+          break;
+        case 'g':
+          g_args.gff = optarg;
+          break;
+        case 'h':
+        case '?':
+          print_variants_usage();
+          return 0;
       }
       opt = getopt( argc, argv, variants_opt_str);
     }
-    if(g_args.prefix.empty()){
+
+    if (g_args.prefix.empty()) {
       print_variants_usage();
       return -1;
     }
-    if(g_args.gff.empty())
+
+    if (g_args.gff.empty())
       std::cout << "A GFF file containing the open reading frames (ORFs) has not been provided. Amino acid translation will not be done." << std::endl;
-    if(g_args.ref.empty())
+
+    if (g_args.ref.empty())
       std::cout << "A reference sequence has not been supplied. Amino acid translation will not be done." << std::endl;
-    if(!g_args.gff.empty() && g_args.ref.empty()){ // GFF specified but no reference then exit
+
+    if (!g_args.gff.empty() && g_args.ref.empty()) { // GFF specified but no reference then exit
       std::cout << "Please specify reference (using -r) based on which the GFF file was computed." << std::endl;
       print_variants_usage();
       return -1;
     }
+
     g_args.prefix = get_filename_without_extension(g_args.prefix,".tsv");
     g_args.min_threshold = (g_args.min_threshold < 0 || g_args.min_threshold > 1) ? 0.03: g_args.min_threshold;
-    if(isatty(STDIN_FILENO)){
+
+    if (isatty(STDIN_FILENO)) {
       std::cout << "Please pipe mpileup into `ivar variants` command.\n\n";
       print_variants_usage();
       return -1;
     }
+
     res = call_variants_from_plup(std::cin, g_args.prefix, g_args.min_qual, g_args.min_threshold, g_args.min_depth, g_args.ref, g_args.gff);
-  }
-  // ivar consensus
-  else if (cmd.compare("consensus") == 0){
+  } else if (cmd.compare("consensus") == 0) { // ivar consensus
     opt = getopt( argc, argv, consensus_opt_str);
     g_args.seq_id = "";
     g_args.min_threshold = 0;
@@ -339,219 +354,239 @@ int main(int argc, char* argv[]){
     g_args.gap = 'N';
     g_args.min_qual = 20;
     g_args.keep_min_coverage = true;
+
     while( opt != -1 ) {
       switch( opt ) {
-      case 't':
-	g_args.min_threshold = atof(optarg);
-	break;
-      case 'i':
-	g_args.seq_id = optarg;
-	break;
-      case 'p':
-	g_args.prefix = optarg;
-	break;
-      case 'm':
-	g_args.min_depth = std::stoi(optarg);
-	break;
-      case 'n':
-	g_args.gap = optarg[0];
-	break;
-      case 'q':
-	g_args.min_qual = std::stoi(optarg);
-	break;
-      case 'k':
-	g_args.keep_min_coverage = false;
-      case 'g':
-	break;
-      case 'h':
-      case '?':
-	print_consensus_usage();
-	return 0;
-	break;
+        case 't':
+          g_args.min_threshold = atof(optarg);
+          break;
+        case 'i':
+          g_args.seq_id = optarg;
+          break;
+        case 'p':
+          g_args.prefix = optarg;
+          break;
+        case 'm':
+          g_args.min_depth = std::stoi(optarg);
+          break;
+        case 'n':
+          g_args.gap = optarg[0];
+          break;
+        case 'q':
+          g_args.min_qual = std::stoi(optarg);
+          break;
+        case 'k':
+          g_args.keep_min_coverage = false;
+        case 'g':
+          break;
+        case 'h':
+        case '?':
+          print_consensus_usage();
+          return 0;
       }
       opt = getopt( argc, argv, consensus_opt_str);
     }
-    if(g_args.prefix.empty()){
+
+    if (g_args.prefix.empty()) {
       print_consensus_usage();
       return -1;
     }
-    if(isatty(STDIN_FILENO)){
+
+    if (isatty(STDIN_FILENO)) {
       std::cout << "Please pipe mpileup into `ivar consensus` command.\n\n";
       print_consensus_usage();
       return -1;
     }
+
     g_args.prefix = get_filename_without_extension(g_args.prefix,".fa");
     g_args.prefix = get_filename_without_extension(g_args.prefix,".fasta");
     g_args.gap = (g_args.gap != 'N' && g_args.gap != '-') ? 'N' : g_args.gap; // Accept only N or -
+
     std::cout <<"Minimum Quality: " << (uint16_t) g_args.min_qual << std::endl;
     std::cout << "Threshold: " << g_args.min_threshold << std::endl;
     std::cout << "Minimum depth: " << (unsigned) g_args.min_depth << std::endl;
-    if(!g_args.keep_min_coverage)
+
+    if (!g_args.keep_min_coverage)
       std::cout << "Regions with depth less than minimum depth will not added to consensus" << std::endl;
     else
       std::cout << "Regions with depth less than minimum depth covered by: " << g_args.gap << std::endl;
+    
     res = call_consensus_from_plup(std::cin, g_args.seq_id, g_args.prefix, g_args.min_qual, g_args.min_threshold, g_args.min_depth, g_args.gap, g_args.keep_min_coverage);
-  } else if (cmd.compare("removereads") == 0){
+  } else if (cmd.compare("removereads") == 0) {
     opt = getopt( argc, argv, removereads_opt_str);
     while( opt != -1 ) {
       switch( opt ) {
-      case 'i':
-	g_args.bam = optarg;
-	break;
-      case 't':
-	g_args.text = optarg;
-	break;
-      case 'b':
-	g_args.bed = optarg;
-	break;
-      case 'p':
-	g_args.prefix = optarg;
-	break;
-      case 'h':
-      case '?':
-	print_removereads_usage();
-	return 0;
-	break;
+        case 'i':
+          g_args.bam = optarg;
+          break;
+        case 't':
+          g_args.text = optarg;
+          break;
+        case 'b':
+          g_args.bed = optarg;
+          break;
+        case 'p':
+          g_args.prefix = optarg;
+          break;
+        case 'h':
+        case '?':
+          print_removereads_usage();
+          return 0;
       }
       opt = getopt( argc, argv, removereads_opt_str);
     }
-    if(g_args.bam.empty() || g_args.prefix.empty() || g_args.bed.empty() || g_args.text.empty()){
+
+    if (g_args.bam.empty() || g_args.prefix.empty() || g_args.bed.empty() || g_args.text.empty()) {
       print_removereads_usage();
       return -1;
     }
+
     std::string s;
     std::vector<std::string> amp;
     std::ifstream fin(g_args.text.c_str());
-    while(getline(fin, s, '\t' ) ){
+    while (getline(fin, s, '\t' ) ) {
       amp.push_back(s);
     }
     fin.close();
+
     g_args.prefix = get_filename_without_extension(g_args.prefix,".bam");
     res = rmv_reads_from_amplicon(g_args.bam, g_args.region, g_args.prefix, amp, g_args.bed, cl_cmd.str());
-  } else if(cmd.compare("filtervariants") == 0){
+  } else if (cmd.compare("filtervariants") == 0) {
     opt = getopt( argc, argv, filtervariants_opt_str);
     g_args.min_threshold = 1;
-    while( opt != -1 ) {
+    while ( opt != -1 ) {
       switch( opt ) {
-      case 'p':
-	g_args.prefix = optarg;
-	break;
-      case 't':
-	g_args.min_threshold = atof(optarg);
-	break;
-      case 'f':
-	g_args.file_list = optarg;
-	break;
-      case 'h':
-      case '?':
-	print_filtervariants_usage();
-	return 0;
-	break;
+        case 'p':
+          g_args.prefix = optarg;
+          break;
+        case 't':
+          g_args.min_threshold = atof(optarg);
+          break;
+        case 'f':
+          g_args.file_list = optarg;
+          break;
+        case 'h':
+        case '?':
+          print_filtervariants_usage();
+          return 0;
       }
       opt = getopt( argc, argv, filtervariants_opt_str);
     }
-    if(g_args.min_threshold < 0 || g_args.min_threshold > 1){
+
+    if (g_args.min_threshold < 0 || g_args.min_threshold > 1) {
       print_filtervariants_usage();
       return -1;
     }
-    if(optind >= argc && g_args.file_list.empty()){
+
+    if (optind >= argc && g_args.file_list.empty()) {
       print_filtervariants_usage();
       return -1;
     }
-    if(g_args.prefix.empty()){
+
+    if (g_args.prefix.empty()) {
       print_filtervariants_usage();
       return -1;
     }
+
     g_args.prefix = get_filename_without_extension(g_args.prefix,".tsv");
+
     // Read files from list
     char **files = new char*[100];
     int nfiles = 100, ctr = 0;
     std::string line;
-    if (!g_args.file_list.empty()){	// File list supplied
+    if (!g_args.file_list.empty()) {	// File list supplied
       std::ifstream file_fin = std::ifstream(g_args.file_list);
-      while (std::getline(file_fin, line)){
-	files[ctr] = strdup(line.c_str());
-	if(ctr == nfiles - 1){
-	  nfiles += 100;
-	  *files = (char*) realloc(*files, nfiles * (sizeof(char*)));
-	}
-	ctr++;
+      while (std::getline(file_fin, line)) {
+        files[ctr] = strdup(line.c_str());
+
+        if(ctr == nfiles - 1){
+          nfiles += 100;
+          *files = (char*) realloc(*files, nfiles * (sizeof(char*)));
+        }
+
+        ctr++;
       }
       file_fin.close();
+
       nfiles = (nfiles > ctr) ? ctr : nfiles;
       res = common_variants(g_args.prefix, g_args.min_threshold, files, nfiles);
+
       // Free files, nfiles
       for (int i = 0; i < nfiles; ++i) {
-	free(files[i]);
+        free(files[i]);
       }
+
       free(files);
     } else {
       res = common_variants(g_args.prefix, g_args.min_threshold, argv + optind, argc - optind);
     }
-  } else if(cmd.compare("getmasked") == 0){
+  } else if (cmd.compare("getmasked") == 0) {
     opt = getopt( argc, argv, getmasked_opt_str);
     while( opt != -1 ) {
       switch( opt ) {
-      case 'i':
-	g_args.bam = optarg;
-	break;
-      case 'b':
-	g_args.bed = optarg;
-	break;
-      case 'f':
-	g_args.primer_pair_file = optarg;
-	break;
-      case 'p':
-	g_args.prefix = optarg;
-	break;
-      case 'h':
-      case '?':
-	print_getmasked_usage();
-	return 0;
-	break;
+        case 'i':
+          g_args.bam = optarg;
+          break;
+        case 'b':
+          g_args.bed = optarg;
+          break;
+        case 'f':
+          g_args.primer_pair_file = optarg;
+          break;
+        case 'p':
+          g_args.prefix = optarg;
+          break;
+        case 'h':
+        case '?':
+          print_getmasked_usage();
+          return 0;
       }
       opt = getopt( argc, argv, getmasked_opt_str);
     }
-    if(g_args.bed.empty() || g_args.bam.empty() || g_args.prefix.empty() || g_args.primer_pair_file.empty()){
+
+    if (g_args.bed.empty() || g_args.bam.empty() || g_args.prefix.empty() || g_args.primer_pair_file.empty()) {
       print_getmasked_usage();
       return -1;
     }
+
     g_args.prefix = get_filename_without_extension(g_args.prefix,".txt");
     res = get_primers_with_mismatches(g_args.bed, g_args.bam, g_args.prefix, g_args.primer_pair_file);
-  } else if (cmd.compare("trimadapter") == 0){
+  } else if (cmd.compare("trimadapter") == 0) {
     opt = getopt( argc, argv, trimadapter_opt_str);
     while( opt != -1 ) {
       switch( opt ) {
-      case '1':
-	g_args.f1 = optarg;
-	break;
-      case '2':
-	g_args.f2 = optarg;
-	break;
-      case 'p':
-	g_args.prefix = optarg;
-	break;
-      case 'a':
-	g_args.adp_path = optarg;
-	break;
-      case 'h':
-      case '?':
-	print_trimadapter_usage();
-	return 0;
-	break;
+        case '1':
+          g_args.f1 = optarg;
+          break;
+        case '2':
+          g_args.f2 = optarg;
+          break;
+        case 'p':
+          g_args.prefix = optarg;
+          break;
+        case 'a':
+          g_args.adp_path = optarg;
+          break;
+        case 'h':
+        case '?':
+          print_trimadapter_usage();
+          return 0;
       }
       opt = getopt( argc, argv, trimadapter_opt_str);
     }
-    if(g_args.f1.empty() || g_args.prefix.empty() || g_args.adp_path.empty()){
+
+    if (g_args.f1.empty() || g_args.prefix.empty() || g_args.adp_path.empty()) {
       print_trimadapter_usage();
       return -1;
     }
+
     res = trim_adapter(g_args.f1, g_args.f2, g_args.adp_path, g_args.prefix);
-  } else if(cmd.compare("version") == 0){
+  } else if (cmd.compare("version") == 0) {
     print_version_info();
   } else {
     std::cout << "Unknown command: \"" << cmd  << "\"" << std::endl << std::endl;
     print_usage();
   }
+  
   return res;
 }
