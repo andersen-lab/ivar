@@ -276,25 +276,39 @@ void print_cigar(uint32_t *cigar, int nlength) {
   std::cout << std::endl;
 }
 
+//inputs: bam1_t: all information about one alignment, isize_flag: true if iszie > read length, new_pos: a position on the reference genome, unpaired_rev: if the read is unpaired and reversed.
+//outputs: cigar_: a struct that contain all cigar string information
 cigar_ primer_trim(bam1_t *r, bool &isize_flag, int32_t new_pos, bool unpaired_rev = false) {
   //ncigar: an array of unsigned 32bit integers, in total there are r->core.n_cigar + 1 such integer, (number of CIGAR operations + 1)
   uint32_t *ncigar = (uint32_t*) malloc(sizeof(uint32_t) * (r->core.n_cigar + 1)), // Maximum edit is one more element with soft mask
-    
+    // cigar: the CIGAR array (an array of unsigned 32bit integers)
     *cigar = bam_get_cigar(r);
 
   uint32_t i = 0, j = 0;
   int max_del_len = 0, cig, temp, del_len = 0;
   bool reverse = false;
 
+  //BAM_FPAIRED: 0000,0001 (1), core.flag: a uint16_t bitwise flag. 
+  //((r->core.flag&BAM_FPAIRED) != 0): r->core.flag != XXXXXXX0
+  //isize_flag passed in by func. isize is a var in BGZF: Input SIZE (length of uncompressed data)
   if ((r->core.flag&BAM_FPAIRED) != 0 && isize_flag) { // If paired and isize > read length
+    //bam_is_rev(r): (((b)->core.flag&BAM_FREVERSE) != 0)
+    //BAM_FREVERSE = 0001,0000 (16)
+    //thus bam_is_rev(r): r->core.flag != XXX0XXXX\
+	  
+    //in both condition, max_del_len is set to the position of new_pos on query, after reversed or not after reversed
     if (bam_is_rev(r)) { // If -ve strand (?)
+      //max_del_len: (the 0-indexed position on the query string after all the cigar operations) - (the corresponding position of ‘new_pos’ (which is originally in reference coordinate) on query)
       max_del_len = bam_cigar2qlen(r->core.n_cigar, bam_get_cigar(r)) - get_pos_on_query(cigar, r->core.n_cigar, new_pos, r->core.pos) - 1;
+      //r->core.n_cigar: total number of cigar operations
+      //reverse the entire cigar and set reverse to true
       reverse_cigar(cigar, r->core.n_cigar);
       reverse = true;
     } else {
       max_del_len = get_pos_on_query(cigar, r->core.n_cigar, new_pos, r->core.pos);
     }
   } else {			// trim without considering pairing
+    //#define bam_is_rev(b): (((b)->core.flag&BAM_FREVERSE) != 0)
     if (unpaired_rev) {
       max_del_len = bam_cigar2qlen(r->core.n_cigar, bam_get_cigar(r)) - get_pos_on_query(cigar, r->core.n_cigar, new_pos, r->core.pos) - 1;
       reverse_cigar(cigar, r->core.n_cigar);
@@ -303,6 +317,7 @@ cigar_ primer_trim(bam1_t *r, bool &isize_flag, int32_t new_pos, bool unpaired_r
       max_del_len = get_pos_on_query(cigar, r->core.n_cigar, new_pos, r->core.pos);
     }
   }
+  //TODO: the two nested if can be compressed, will it helps accelerating performance?
 
   max_del_len = (max_del_len > 0) ? max_del_len : 0; // For cases where reads spans only primer region
   int32_t n, start_pos = 0, ref_add = 0;
@@ -311,29 +326,43 @@ cigar_ primer_trim(bam1_t *r, bool &isize_flag, int32_t new_pos, bool unpaired_r
   del_len = max_del_len;
 
   while (i < r->core.n_cigar) {
+    //directly enter this block if pos_start is true
     if (del_len == 0 && pos_start) { // No more bases on query to soft clip
       ncigar[j] = cigar[i];
       i++;
       j++;
       continue;
     }
-
+	  
+    //cig: cigar[i]&BAM_CIGAR_MASK = cigar[i]&0xf
+    //cig: what is the operation on this cigar string, eg. the ‘M’ in the ‘6M’ (Matches)
     cig  = bam_cigar_op(cigar[i]);
+    //n: cigar[i]>>BAM_CIGAR_SHIFT = cigar[i]>>4
+    //n: How long is the operation on this cigar string, eg. the ‘6’ in the ‘6M’ (There are 6 matches)
     n = bam_cigar_oplen(cigar[i]);
-
+	  
+    //TODO: in every situation where pos_start is set to true, del_len is already checked. Thus no needs to check del_len once again on the top if block
+    //if the cig operations consumes both query and reference, and del_len is 0, set pos_start to true, and directly enter the pos_start block
     if (del_len ==0 && (bam_cigar_type(cig) & 1) && (bam_cigar_type(cig) & 2)) { // After soft clipping of query complete, keep incrementing start_pos until first base that consumes both query and ref
       pos_start = true;
       continue;
     }
 
     ref_add = n;
-
+	  
+    //”Consume” means that it is not a gap of query, so the base index of the query is advanced by 1
     if ((bam_cigar_type(cig) & 1)) { // Consumes Query
+      //if the length of the delete windows is greater than the length of operations	    
       if (del_len >= n ) {
+	//((n)<<BAM_CIGAR_SHIFT|(BAM_CSOFT_CLIP))
+	//#define BAM_CSOFT_CLIP  4, BAM_CIGAR_SHIFT 4
+        //bam_cigar_gen: return a single cigar operation and its length in proper format	      
         ncigar[j] = bam_cigar_gen(n, BAM_CSOFT_CLIP);
       } else if (del_len < n && del_len > 0) {
+	//((del_len)<<BAM_CIGAR_SHIFT|(BAM_CSOFT_CLIP))	    
         ncigar[j] = bam_cigar_gen(del_len, BAM_CSOFT_CLIP);
       } else if (del_len == 0) {	// Adding insertions before start position of read
+	//if arrived here, cig does not consume reference but consumes query and del_len == 0	
         ncigar[j] = bam_cigar_gen(n, BAM_CSOFT_CLIP);
 
         j++;
@@ -341,18 +370,40 @@ cigar_ primer_trim(bam1_t *r, bool &isize_flag, int32_t new_pos, bool unpaired_r
 
         continue;
       }
-
+      //consumes query, so query index needs to increase
       j++;
-
+      //ref_add: how much should be add to the reference position	    
       ref_add = std::min(del_len, n);
+	    
+      //set n and del_len to correct number according to the result of (n > del_len)
+      //n - del_len is max iff n >= del_len
+      //if n >= del_len
+      //set n to n - del_len
+      //else
+      //set n to 0
       temp = n;
       n = std::max(n - del_len, 0);
+      //if temp >= del_len (temp is the n before)
+      //set del_len to 0
+      //else
+      //set del_len to del_len - temp
       del_len = std::max(del_len - temp, 0);
-
+      //if n has not be consumed by del_len, let n-del_len be the length of operation cig
       if (n > 0) {
         ncigar[j] = bam_cigar_gen(n, cig);
         j++;
       }
+      
+      //TODO: the previous sevens lines code in other format:
+//       if(n>del_len){
+//         n = n - del_len;
+//         del_len = 0;
+//         ncigar[j] = bam_cigar_gen(n, cig);
+//         j++;
+//       }else{
+//         del_len = del_len-n;
+//         n = 0;
+//       }	    
 
       // After soft clipping of query complete, keep incrementing start_pos until first base that consumes both query and ref
       if (del_len ==0 && (bam_cigar_type(ncigar[j-1]) & 1) && (bam_cigar_type(ncigar[j-1]) & 2)) { 
@@ -360,10 +411,11 @@ cigar_ primer_trim(bam1_t *r, bool &isize_flag, int32_t new_pos, bool unpaired_r
       }
     }
 
+    //TODO: the comment from original authors is weired, why not consume query?		  
     if ((bam_cigar_type(cig) & 2)) { // Consumes reference but not query
       start_pos += ref_add;
     }
-
+    //TODO: should it be inside the if block above? Since it could be the case that the reference is not consumed but i is increased.
     i++;
   }
 
