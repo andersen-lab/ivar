@@ -87,7 +87,7 @@ std::vector<allele> update_allele_depth(char ref,std::string bases, std::string 
       i += n + j;
       if(indel[0]>=97 && indel[0] <= 122)
 	forward=false;
-      q = min_qual;		// For insertions and deletion ust use minimum quality.
+      q = min_qual;		// For insertions and deletion use minimum quality.
       break;
     default:
       int asc_val = bases[i];
