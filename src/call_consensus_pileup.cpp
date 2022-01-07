@@ -104,7 +104,7 @@ ret_t get_consensus_allele(std::vector<allele> ad, uint8_t min_qual, double thre
     it++;
     ambg_n = 1;
     if(i > 0){
-      cur_threshold = threshold * (double) total_indel_depth;
+      cur_threshold = threshold * 0.3333 * (double) total_indel_depth;
     } else {
       cur_threshold =  threshold * (double)total_max_depth;
     }
