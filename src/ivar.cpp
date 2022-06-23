@@ -183,6 +183,7 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
+static const char *varpipeline_opt_str = "";
 
 std::string get_filename_without_extension(std::string f, std::string ext){
   if(ext.length() > f.length())	// If extension longer than filename
@@ -237,40 +238,40 @@ int main(int argc, char* argv[]){
     while( opt != -1 ) {
       switch( opt ) {
       case 'i':
-	g_args.bam = optarg;
-	break;
+        g_args.bam = optarg;
+        break;
       case 'b':
-	g_args.bed = optarg;
-	break;
+        g_args.bed = optarg;
+        break;
       case 'f':
-  g_args.primer_pair_file = optarg;
-  break;
+        g_args.primer_pair_file = optarg;
+        break;
       case 'x':
-  g_args.primer_offset = std::stoi(optarg);
-  break;
+        g_args.primer_offset = std::stoi(optarg);
+        break;
       case 'p':
-	g_args.prefix = optarg;
-	break;
+        g_args.prefix = optarg;
+        break;
       case 'm':
-	g_args.min_length = std::stoi(optarg);
-	break;
+        g_args.min_length = std::stoi(optarg);
+        break;
       case 'q':
-	g_args.min_qual = std::stoi(optarg);
-	break;
+        g_args.min_qual = std::stoi(optarg);
+        break;
       case 's':
-	g_args.sliding_window = std::stoi(optarg);
-	break;
+        g_args.sliding_window = std::stoi(optarg);
+        break;
       case 'e':
-	g_args.write_no_primers_flag = true;
-	break;
+        g_args.write_no_primers_flag = true;
+        break;
       case 'k':
         g_args.keep_for_reanalysis = true;
         break;
       case 'h':
       case '?':
-	print_trim_usage();
-	return -1;
-	break;
+        print_trim_usage();
+        return -1;
+        break;
       }
       opt = getopt( argc, argv, trim_opt_str);
     }
@@ -405,7 +406,9 @@ int main(int argc, char* argv[]){
     else
       std::cout << "Regions with depth less than minimum depth covered by: " << g_args.gap << std::endl;
     res = call_consensus_from_plup(std::cin, g_args.seq_id, g_args.prefix, g_args.min_qual, g_args.min_threshold, g_args.min_depth, g_args.gap, g_args.keep_min_coverage, g_args.min_insert_threshold);
-  } else if (cmd.compare("removereads") == 0){
+  }
+  // ivar removereads
+  else if (cmd.compare("removereads") == 0){
     opt = getopt( argc, argv, removereads_opt_str);
     while( opt != -1 ) {
       switch( opt ) {
@@ -443,7 +446,9 @@ int main(int argc, char* argv[]){
     g_args.prefix = get_filename_without_extension(g_args.prefix,".bam");
     res = rmv_reads_from_amplicon(g_args.bam, g_args.region, g_args.prefix, amp, g_args.bed, cl_cmd.str());
     
-  } else if(cmd.compare("filtervariants") == 0){
+  }
+  // ivar filtervariants
+  else if(cmd.compare("filtervariants") == 0){
     opt = getopt( argc, argv, filtervariants_opt_str);
     g_args.min_threshold = 1;
     while( opt != -1 ) {
@@ -503,7 +508,9 @@ int main(int argc, char* argv[]){
     } else {
       res = common_variants(g_args.prefix, g_args.min_threshold, argv + optind, argc - optind);
     }
-  } else if(cmd.compare("getmasked") == 0){
+  }
+  // ivar getmasked
+  else if(cmd.compare("getmasked") == 0){
     opt = getopt( argc, argv, getmasked_opt_str);
     while( opt != -1 ) {
       switch( opt ) {
@@ -533,7 +540,9 @@ int main(int argc, char* argv[]){
     }
     g_args.prefix = get_filename_without_extension(g_args.prefix,".txt");
     res = get_primers_with_mismatches(g_args.bed, g_args.bam, g_args.prefix, g_args.primer_pair_file);
-  } else if (cmd.compare("trimadapter") == 0){
+  }
+  // ivar trimadapter
+  else if (cmd.compare("trimadapter") == 0){
     opt = getopt( argc, argv, trimadapter_opt_str);
     while( opt != -1 ) {
       switch( opt ) {
@@ -562,9 +571,17 @@ int main(int argc, char* argv[]){
       return -1;
     }
     res = trim_adapter(g_args.f1, g_args.f2, g_args.adp_path, g_args.prefix);
-  } else if(cmd.compare("version") == 0){
+  }
+  // ivar variantspipeline
+  else if (cmd.compare("variantspipeline") == 0){
+    cout << "test";
+  }
+  // ivar version
+  else if(cmd.compare("version") == 0){
     print_version_info();
-  } else {
+  }
+  // unknown command
+  else {
     std::cout << "Unknown command: \"" << cmd  << "\"" << std::endl << std::endl;
     print_usage();
   }
