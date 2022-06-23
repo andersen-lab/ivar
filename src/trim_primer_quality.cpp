@@ -419,9 +419,10 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out, 
   IntervalTree amplicons;
   if(!pair_info.empty()){
     amplicons = populate_amplicons(pair_info, primers);
+    std::cout << "Amplicons detected: " << std::endl;
+    amplicons.inOrder();
   }
-  std::cout << "Amplicons detected: " << std::endl;
-  amplicons.inOrder();
+  
   if(bam.empty()){
     std::cout << "Bam file is empty." << std::endl;
     return -1;
