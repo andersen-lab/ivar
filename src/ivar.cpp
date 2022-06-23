@@ -574,7 +574,21 @@ int main(int argc, char* argv[]){
   }
   // ivar variantspipeline
   else if (cmd.compare("variantspipeline") == 0){
+    /*
+    Pipeline:
+    1. align reads for both replicates (bwa mem)
+    2. primer trimming for both replicates (ivar trim)
+    3. merge replicates (samtools merge)
+    4. get consensus sequence (samtools mpileup --> ivar consensus)
+    5a (if no reference). realign both replicates' reads to consensus and trim (bwa mem --> ivar trim)
+    5b. find mismatched primers (bwa mem --> ivar variants --> ivar getmasked)
+    6. remove reads with mismatched primers (ivar removereads)
+    7. call variants across both replicates (samtools mpileup --> ivar variants)
+    8. find intersection of variants (ivar filtervariants)
+    */
+
     cout << "test";
+
   }
   // ivar version
   else if(cmd.compare("version") == 0){
