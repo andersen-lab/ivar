@@ -183,7 +183,6 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
-static const char *varpipeline_opt_str = "";
 
 std::string get_filename_without_extension(std::string f, std::string ext){
   if(ext.length() > f.length())	// If extension longer than filename
@@ -571,24 +570,6 @@ int main(int argc, char* argv[]){
       return -1;
     }
     res = trim_adapter(g_args.f1, g_args.f2, g_args.adp_path, g_args.prefix);
-  }
-  // ivar variantspipeline
-  else if (cmd.compare("variantspipeline") == 0){
-    /*
-    Pipeline:
-    1. align reads for both replicates (bwa mem)
-    2. primer trimming for both replicates (ivar trim)
-    3. merge replicates (samtools merge)
-    4. get consensus sequence (samtools mpileup --> ivar consensus)
-    5a (if no reference). realign both replicates' reads to consensus and trim (bwa mem --> ivar trim)
-    5b. find mismatched primers (bwa mem --> ivar variants --> ivar getmasked)
-    6. remove reads with mismatched primers (ivar removereads)
-    7. call variants across both replicates (samtools mpileup --> ivar variants)
-    8. find intersection of variants (ivar filtervariants)
-    */
-
-    cout << "test";
-
   }
   // ivar version
   else if(cmd.compare("version") == 0){
