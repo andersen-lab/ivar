@@ -234,6 +234,7 @@ int main(int argc, char* argv[]){
     g_args.primer_pair_file = "";
     g_args.primer_offset = 0;
     opt = getopt( argc, argv, trim_opt_str);
+    bool has_bam = false;
     while( opt != -1 ) {
       switch( opt ) {
       case 'i':
