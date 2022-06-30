@@ -238,6 +238,7 @@ int main(int argc, char* argv[]){
       switch( opt ) {
       case 'i':
         g_args.bam = optarg;
+        bool has_bam = true;
         break;
       case 'b':
         g_args.bed = optarg;
@@ -271,6 +272,9 @@ int main(int argc, char* argv[]){
         print_trim_usage();
         return -1;
         break;
+      }
+      if (!has_bam) {
+        g_args.bam = std:cin;
       }
       opt = getopt( argc, argv, trim_opt_str);
     }
