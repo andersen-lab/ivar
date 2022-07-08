@@ -15,6 +15,9 @@
 #include "get_masked_amplicons.h"
 #include "suffix_tree.h"
 #include "get_common_variants.h"
+#include "htslib/hts.h"
+#include "htslib/sam.h"
+#include "htslib/bgzf.h"
 
 const std::string VERSION = "1.3.1";
 
@@ -193,6 +196,11 @@ std::string get_filename_without_extension(std::string f, std::string ext){
   return f;
 }
 
+samFile * read_input() {
+  samFile *in = hts_open("-", "r");
+  return in;
+}
+
 /*!
  Main Function
 
@@ -233,8 +241,8 @@ int main(int argc, char* argv[]){
     g_args.bed = "";
     g_args.primer_pair_file = "";
     g_args.primer_offset = 0;
-    opt = getopt( argc, argv, trim_opt_str);
     bool has_bam = false;
+    opt = getopt( argc, argv, trim_opt_str);
     while( opt != -1 ) {
       switch( opt ) {
       case 'i':
@@ -274,17 +282,14 @@ int main(int argc, char* argv[]){
         return -1;
         break;
       }
-      if (!has_bam) {
-        std::cin >> g_args.bam;
-      }
       opt = getopt( argc, argv, trim_opt_str);
     }
-    if(g_args.bam.empty() || g_args.prefix.empty()){
-      print_trim_usage();
-      return -1;
-    }
+//    if(g_args.bam.empty() || g_args.prefix.empty()){
+//      print_trim_usage();
+//      return -1;
+//    }
     g_args.prefix = get_filename_without_extension(g_args.prefix,".bam");
-    res = trim_bam_qual_primer(g_args.bam, g_args.bed, g_args.prefix, g_args.region, g_args.min_qual, g_args.sliding_window, cl_cmd.str(), g_args.write_no_primers_flag, g_args.keep_for_reanalysis, g_args.min_length, g_args.primer_pair_file, g_args.primer_offset);
+    res = trim_bam_qual_primer(has_bam, read_input(), g_args.bam, g_args.bed, g_args.prefix, g_args.region, g_args.min_qual, g_args.sliding_window, cl_cmd.str(), g_args.write_no_primers_flag, g_args.keep_for_reanalysis, g_args.min_length, g_args.primer_pair_file, g_args.primer_offset);
   }
   // ivar variants
   else if (cmd.compare("variants") == 0){
