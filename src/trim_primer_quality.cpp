@@ -403,7 +403,7 @@ bool amplicon_filter(IntervalTree amplicons, bam1_t* r){
   return amplicon_flag;
 }
 
-int trim_bam_qual_primer(bool has_bam, samFile * input, std::string bam, std::string bed, std::string bam_out, std::string region_, uint8_t min_qual, uint8_t sliding_window, std::string cmd, bool write_no_primer_reads, bool keep_for_reanalysis, int min_length = 30, std::string pair_info = "", int32_t primer_offset = 0) {
+int trim_bam_qual_primer(bool has_bam, std::string bam, std::string bed, std::string bam_out, std::string region_, uint8_t min_qual, uint8_t sliding_window, std::string cmd, bool write_no_primer_reads, bool keep_for_reanalysis, int min_length = 30, std::string pair_info = "", int32_t primer_offset = 0) {  
   int retval = 0;
   std::vector<primer> primers;
   int max_primer_len = 0;
@@ -422,18 +422,13 @@ int trim_bam_qual_primer(bool has_bam, samFile * input, std::string bam, std::st
     std::cout << "Amplicons detected: " << std::endl;
     amplicons.inOrder();
   }
-  
-//  if(bam.empty()){
-//    std::cout << "Bam file is empty." << std::endl;
-//    return -1;
-//  }
 
   bam_out += ".bam";
   samFile *in;
   if(has_bam) {
     in = hts_open(bam.c_str(), "r");
   } else {
-    in = input;
+    in = hts_open("-", "r");
   }
 
   BGZF *out = bgzf_open(bam_out.c_str(), "w");
@@ -442,11 +437,11 @@ int trim_bam_qual_primer(bool has_bam, samFile * input, std::string bam, std::st
     return -1;
   }
 
+std::cout << "done";
+return -1;
+
   //Load the index
   hts_idx_t *idx = sam_index_load(in, bam.c_str());
-
-  std::cout << "bye";
-  return -1;
   
   if(idx == NULL) {
     std::cout << "Building BAM index" << std::endl;
