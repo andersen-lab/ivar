@@ -499,7 +499,7 @@ int main(int argc, char* argv[]){
       for (int i = 0; i < nfiles; ++i) {
 	free(files[i]);
       }
-      free(files);
+      delete(files);
     } else {
       res = common_variants(g_args.prefix, g_args.min_threshold, argv + optind, argc - optind);
     }
