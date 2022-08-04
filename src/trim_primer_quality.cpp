@@ -437,13 +437,10 @@ int trim_bam_qual_primer(bool has_bam, std::string bam, std::string bed, std::st
     return -1;
   }
 
-std::cout << "done";
-return -1;
-
   //Load the index
   hts_idx_t *idx = sam_index_load(in, bam.c_str());
-  
-  if(idx == NULL) {
+
+  if((has_bam && idx == NULL) || !has_bam) {
     std::cout << "Building BAM index" << std::endl;
     if(sam_index_build2(bam.c_str(), 0, 0)< 0){
       std::cout << ("Unable to open or build BAM index.") << std::endl;
