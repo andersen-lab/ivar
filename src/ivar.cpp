@@ -29,7 +29,8 @@ struct args_t {
   uint8_t min_qual;		// -q
   uint8_t sliding_window;	// -s
   double min_threshold;	// -t
-  double min_insert_threshold; // -c
+  double insert_threshold; // -c
+  double snv_threshold; // -z
   int min_length;		// -m
   std::string f1;		// -1
   std::string f2;		// -2
@@ -120,6 +121,7 @@ void print_consensus_usage(){
     "                                        0.9 | Strict or bases that make up atleast 90% of the depth at a position\n"
     "                                          1 | Identical or bases that make up 100% of the depth at a position. Will have highest ambiguities\n"
     "           -c    Minimum insertion frequency threshold(0 - 1) to call consensus. (Default: 0.8)\n"
+    "           -z    Minimum threshold(0-1) for SNV insertion to call consensus. (Deagult: 0.8)\n"
     "                 Frequently used thresholds | Description\n"
     "                 ---------------------------|------------\n"
     "                                          0 | Allow insertion if it appears even once\n"
@@ -178,7 +180,7 @@ void print_version_info(){
 
 static const char *trim_opt_str = "i:b:f:x:p:m:q:s:ekh?";
 static const char *variants_opt_str = "p:t:q:m:r:g:h?";
-static const char *consensus_opt_str = "i:p:q:t:c:m:n:kh?";
+static const char *consensus_opt_str = "i:p:q:t:c:z:m:n:kh?";
 static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
@@ -348,14 +350,18 @@ int main(int argc, char* argv[]){
     g_args.gap = 'N';
     g_args.min_qual = 20;
     g_args.keep_min_coverage = true;
-    g_args.min_insert_threshold = 0.8;
+    g_args.insert_threshold = 0.8;
+    g_args.snv_threshold = 0.8;
     while( opt != -1 ) {
       switch( opt ) {
       case 't':
 	g_args.min_threshold = atof(optarg);
 	break;
       case 'c':
-	g_args.min_insert_threshold = atof(optarg);
+	g_args.insert_threshold = atof(optarg);
+	break;
+       case 'z':
+	g_args.snv_threshold = atof(optarg);
 	break;
        case 'i':
 	g_args.seq_id = optarg;
@@ -399,12 +405,13 @@ int main(int argc, char* argv[]){
     std::cout <<"Minimum Quality: " << (uint16_t) g_args.min_qual << std::endl;
     std::cout << "Threshold: " << g_args.min_threshold << std::endl;
     std::cout << "Minimum depth: " << (unsigned) g_args.min_depth << std::endl;
-    std::cout << "Minimum Insert Threshold: " << g_args.min_insert_threshold << std::endl;
+    std::cout << "Minimum SNV Threshold: " << g_args.snv_threshold << std::endl;
+    std::cout << "Minimum Insert Threshold: " << g_args.insert_threshold << std::endl;
     if(!g_args.keep_min_coverage)
       std::cout << "Regions with depth less than minimum depth will not added to consensus" << std::endl;
     else
       std::cout << "Regions with depth less than minimum depth covered by: " << g_args.gap << std::endl;
-    res = call_consensus_from_plup(std::cin, g_args.seq_id, g_args.prefix, g_args.min_qual, g_args.min_threshold, g_args.min_depth, g_args.gap, g_args.keep_min_coverage, g_args.min_insert_threshold);
+    res = call_consensus_from_plup(std::cin, g_args.seq_id, g_args.prefix, g_args.min_qual, g_args.min_threshold, g_args.min_depth, g_args.gap, g_args.keep_min_coverage, g_args.snv_threshold, g_args.insert_threshold);
   } else if (cmd.compare("removereads") == 0){
     opt = getopt( argc, argv, removereads_opt_str);
     while( opt != -1 ) {

@@ -76,17 +76,17 @@ int main() {
   for(int i = 0;i<size;i++){
     ad.at(i) = arr[i];
   }
-  s = get_consensus_allele(ad,20,.6, 'N', 0.6);
+  s = get_consensus_allele(ad,20,.6, 'N', 0.6, 0.6);
   std::cout << s.nuc << ": " << s.q << std::endl;
   success += (s.nuc.compare("A") == 0) ? 1: 0;
   success += (s.q.compare("?") == 0) ? 1 : 0;
-  s = get_consensus_allele(ad,20,.7, 'N', 1);
+  s = get_consensus_allele(ad,20,.7, 'N', 1, 1);
   std::cout << s.nuc << ": " << s.q << std::endl;
   success += (s.nuc.compare("N") == 0) ? 1: 0;
   success += (s.q.compare("?") == 0) ? 1 : 0;
   ad.erase(ad.begin() + 4, ad.begin()+5);
   ad.push_back(a6);
-  s = get_consensus_allele(ad,20,.7, 'N',1);
+  s = get_consensus_allele(ad,20,.7, 'N',1, 1);
   std::cout << s.nuc << ": " << s.q << std::endl;
   success += (s.nuc.compare("R") == 0) ? 1: 0;
   success += (s.q.compare("?") == 0) ? 1 : 0;

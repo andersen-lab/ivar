@@ -15,8 +15,9 @@ bool compare_allele_depth(const allele &a, const allele &b){
   return b.depth < a.depth;
 }
 
-ret_t get_consensus_allele(std::vector<allele> ad, uint8_t min_qual, double threshold, char gap, double min_insert_threshold){
-  //print_allele_depths(ad);
+ret_t get_consensus_allele(std::vector<allele> ad, uint8_t min_qual, double threshold, char gap, double min_insert_threshold, double insert_threshold){
+  //insert threshold refers to insertion > 1bp in length
+  //min insert threshold refers to 1bp SNV
   ret_t t;
   t.nuc=gap;
   t.q = min_qual+33;
@@ -32,7 +33,8 @@ ret_t get_consensus_allele(std::vector<allele> ad, uint8_t min_qual, double thre
   std::vector<allele> nuc_pos;
   allele tmp_a;
   char n;
-  uint32_t max_l = 0, max_depth = 0, tmp_depth = 0, cur_depth = 0, total_max_depth = 0, gap_depth = 0, total_indel_depth = 0;
+  
+  uint32_t max_l = 0, max_depth = 0, tmp_depth = 0, cur_depth = 0, total_max_depth = 0, gap_depth = 0, total_indel_depth = 0, insert_gap_depth=0;
   uint8_t ambg_n = 1, ctr = 0;
   double q = 0, tq = 0, cur_threshold = 0;
   std::vector<allele>::iterator it;
@@ -124,12 +126,22 @@ ret_t get_consensus_allele(std::vector<allele> ad, uint8_t min_qual, double thre
       //print_allele_depths(ad);
       //std::cout << "\n";
       //gap_depth = (total_indel_depth > cur_depth) ? total_indel_depth - cur_depth : 0;
+      //this describes the threshold for an SNV
       gap_depth = min_insert_threshold * total_max_depth;
-      //std::cout << max_depth << " " << gap_depth << " " << min_insert_threshold << " " << total_max_depth<<" \n";
-    }    
+      //this describes the threshold for an insertion > 1bp
+      insert_gap_depth = insert_threshold * total_max_depth;
+   }    
     else
       gap_depth = 0;			  // For first position of allele
-    if(n!='*' && max_depth >= gap_depth){ // TODO: Check what to do when equal.{
+
+    //if we have multiple insertions in a row, we handle it differently
+    if(max_l > 2 && n!='*' && max_depth >= insert_gap_depth){
+      t.nuc += n;
+      q += 0.5;			// For rounding before converting to int
+      t.q += (((uint8_t)q)+33);
+ 
+    }    
+    else if(max_l <= 2 && n!='*' && max_depth >= gap_depth){ // TODO: Check what to do when equal.
       t.nuc += n;
       q += 0.5;			// For rounding before converting to int
       t.q += (((uint8_t)q)+33);
@@ -138,7 +150,9 @@ ret_t get_consensus_allele(std::vector<allele> ad, uint8_t min_qual, double thre
   return t;
 }
 
-int call_consensus_from_plup(std::istream &cin, std::string seq_id, std::string out_file, uint8_t min_qual, double threshold, uint8_t min_depth, char gap, bool min_coverage_flag, double min_insert_threshold){
+int call_consensus_from_plup(std::istream &cin, std::string seq_id, std::string out_file, uint8_t min_qual, double threshold, uint8_t min_depth, char gap, bool min_coverage_flag, double min_insert_threshold, double insert_threshold){
+  // min_insert is for SNV insertion
+  // insert_threshold is for longer than 1bp insertions
   std::string line, cell;
   std::ofstream fout((out_file+".fa").c_str());
   std::ofstream tmp_qout((out_file+".qual.txt").c_str());
@@ -196,7 +210,7 @@ int call_consensus_from_plup(std::istream &cin, std::string seq_id, std::string 
     ret_t t;
     if(mdepth >= min_depth){
       ad = update_allele_depth(ref, bases, qualities, min_qual);
-      t = get_consensus_allele(ad, min_qual, threshold, gap, min_insert_threshold);
+      t = get_consensus_allele(ad, min_qual, threshold, gap, min_insert_threshold, insert_threshold);
       fout << t.nuc;
       tmp_qout << t.q;
     } else{

@@ -20,7 +20,7 @@ struct ret_t {
 };
 
 void format_alleles(std::vector<allele> &ad);
-int call_consensus_from_plup(std::istream &cin, std::string seq_id, std::string out_file, uint8_t min_qual, double threshold, uint8_t min_depth, char gap, bool min_coverage_flag, double min_insert_threshold);
-ret_t get_consensus_allele(std::vector<allele> ad, uint8_t min_qual, double threshold, char gap, double min_insert_threshold);
+int call_consensus_from_plup(std::istream &cin, std::string seq_id, std::string out_file, uint8_t min_qual, double threshold, uint8_t min_depth, char gap, bool min_coverage_flag, double min_insert_threshold, double insert_threshold);
+ret_t get_consensus_allele(std::vector<allele> ad, uint8_t min_qual, double threshold, char gap, double min_insert_threshold, double insert_threshold);
 
 #endif

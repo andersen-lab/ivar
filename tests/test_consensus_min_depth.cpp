@@ -7,7 +7,7 @@
 int call_cns_check_outfile(std::string input_id, std::string prefix, std::string cns, char gap, bool call_min_depth, int min_depth){
   std::string path = "../data/test.gap.sorted.mpileup";
   std::ifstream mplp(path);
-  call_consensus_from_plup(mplp, input_id, prefix, 20, 0, min_depth, gap, call_min_depth, 1);
+  call_consensus_from_plup(mplp, input_id, prefix, 20, 0, min_depth, gap, call_min_depth, 1, 1);
   std::ifstream outFile(prefix+".fa");
   std::string l;
   getline(outFile, l);		// Ignore first line

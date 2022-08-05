@@ -8,7 +8,7 @@ int call_cns_check_outfile(std::string seq_id, std::string prefix, char gap, boo
   std::string path = "../data/test.gap.sorted.mpileup";
   std::string expctd_hdr = "";
   std::ifstream mplp(path);
-  call_consensus_from_plup(mplp, seq_id, prefix, 20, 0, min_depth, gap, call_min_depth, 1);
+  call_consensus_from_plup(mplp, seq_id, prefix, 20, 0, min_depth, gap, call_min_depth, 1, 1);
   std::ifstream outFile(prefix+".fa");
   std::string l;
   getline(outFile, l);		// header
