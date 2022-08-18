@@ -403,7 +403,7 @@ bool amplicon_filter(IntervalTree amplicons, bam1_t* r){
   return amplicon_flag;
 }
 
-int trim_bam_qual_primer(bool has_bam, std::string bam, std::string bed, std::string bam_out, std::string region_, uint8_t min_qual, uint8_t sliding_window, std::string cmd, bool write_no_primer_reads, bool keep_for_reanalysis, int min_length = 30, std::string pair_info = "", int32_t primer_offset = 0) {  
+int trim_bam_qual_primer(bool has_bam, std::string bam, std::string bed, std::string bam_out, uint8_t min_qual, uint8_t sliding_window, std::string cmd, bool write_no_primer_reads, bool keep_for_reanalysis, int min_length = 30, std::string pair_info = "", int32_t primer_offset = 0) {  
   int retval = 0;
   std::vector<primer> primers;
   int max_primer_len = 0;
@@ -437,18 +437,6 @@ int trim_bam_qual_primer(bool has_bam, std::string bam, std::string bed, std::st
     return -1;
   }
 
-  //Load the index
-  hts_idx_t *idx = sam_index_load(in, bam.c_str());
-
-  if((has_bam && idx == NULL) || !has_bam) {
-    std::cout << "Building BAM index" << std::endl;
-    if(sam_index_build2(bam.c_str(), 0, 0)< 0){
-      std::cout << ("Unable to open or build BAM index.") << std::endl;
-      return -1;
-    } else {
-      idx = sam_index_load(in, bam.c_str());
-    }
-  }
   //Get the header
   bam_hdr_t *header = sam_hdr_read(in);
   if(header == NULL) {
@@ -461,44 +449,7 @@ int trim_bam_qual_primer(bool has_bam, std::string bam, std::string bed, std::st
     sam_close(in);
     return -1;
   }
-  // Get relevant region
-  int region_id = -1;
-  uint64_t unmapped, mapped, log_skip;
-  std::cout << std::endl << "Number of references in file: " << header->n_targets << std::endl;
-  for (int i = 0; i < header->n_targets; ++i){
-    std::cout << header->target_name[i] << std::endl;
-    if(region_.compare(std::string(header->target_name[i])) == 0){
-      region_id = i;
-    }
-    if(i==0){			// Reading only first reference
-      region_.assign(header->target_name[i]);
-      region_id = i;
-    }
-  }
-  std::cout << "Using Region: " << region_ << std::endl << std::endl;
-  // Get index stats
-  hts_idx_get_stat(idx, region_id, &mapped, &unmapped);
-  std::cout << "Found " << mapped << " mapped reads" << std::endl;
-  std::cout << "Found " << unmapped << " unmapped reads" << std::endl;
-  std::string hdr_text(header->text);
-  if (hdr_text.find(std::string("SO:coordinate")) != std::string::npos) {
-    std::cout << "Sorted By Coordinate" << std::endl; // Sort by coordinate
-  } else if(hdr_text.find(std::string("SO:queryname")) != std::string::npos) {
-    std::cout << "Sorted By Query Name" << std::endl; // Sort by name
-  } else {
-    std::cout << "Not sorted" << std::endl;
-  }
-  std::cout << "-------" << std::endl;
-  log_skip = (mapped + unmapped > 10) ? (mapped + unmapped)/10 : 2;
-  //Initialize iterator
-  hts_itr_t *iter = NULL;
-  //Move the iterator to the region we are interested in
-  iter  = sam_itr_querys(idx, header, region_.c_str());
-  if(header == NULL || iter == NULL) {
-    sam_close(in);
-    std::cout << "Unable to iterate to region within BAM/SAM." << std::endl;
-    return -1;
-  }
+
   //Initiate the alignment record
   bam1_t *aln = bam_init1();
   int ctr = 0;
@@ -516,7 +467,7 @@ int trim_bam_qual_primer(bool has_bam, std::string bam, std::string bed, std::st
   std::vector<primer>::iterator cit;
   bool primer_trimmed = false;
   //Iterate through reads
-  while(sam_itr_next(in, iter, aln) >= 0) {
+  while (sam_read1(in, header, aln) >= 0) {
     unmapped_flag = false;
     primer_trimmed = false;
     get_overlapping_primers(aln, primers, overlapping_primers);
@@ -630,61 +581,20 @@ int trim_bam_qual_primer(bool has_bam, std::string bam, std::string bed, std::st
       }
     }
     ctr++;
-    if(ctr % log_skip == 0){
-      std::cout << "Processed " << (ctr/log_skip) * 10 << "% reads ... " << std::endl;
-    }
   }
+  
   std::cout << std::endl << "-------" << std::endl;
   std::cout << "Results: " << std::endl;
   std::cout << "Primer Name" << "\t" << "Read Count" << std::endl;
   for(cit = primers.begin(); cit != primers.end(); ++cit) {
     std::cout << cit->get_name() << "\t" << cit->get_read_count() << std::endl;
   }
-  std::cout << std::endl << "Trimmed primers from " << round_int(primer_trim_count, mapped) << "% (" << primer_trim_count <<  ") of reads." << std::endl;
-  std::cout << round_int( low_quality, mapped) << "% (" << low_quality << ") of reads were quality trimmed below the minimum length of " << min_length << " bp and were ";
-  if (keep_for_reanalysis) {
-    std::cout << "marked as failed" << std::endl;
-  } else {
-    std::cout << "not written to file." << std::endl;
-  }
-  if(write_no_primer_reads){
-    std::cout << round_int(no_primer_counter, mapped) << "% ("  << no_primer_counter << ")"
-              << " of reads started outside of primer regions. Since the "
-              << (keep_for_reanalysis ? "-ek flags were " : "-e flag was ")
-              << "given, these reads were written to file";
-    std::cout << "." << std::endl;
-  } else if (primers.size() == 0) {
-    std::cout << round_int(no_primer_counter, mapped) << "% ("  << no_primer_counter << ") of reads started outside of primer regions. Since there were no primers found in BED file, these reads were written to file." << std::endl;
-  } else {
-    std::cout << round_int(no_primer_counter, mapped) << "% ("  << no_primer_counter
-              << ") of reads that started outside of primer regions were ";
-    if (keep_for_reanalysis) {
-      std::cout << "written to file and marked as failed";
-    } else {
-      std::cout << "not written to file";
-    }
-    std::cout << std::endl;
-  }
   if(unmapped_counter > 0){
     std::cout << unmapped_counter << " unmapped reads were not written to file." << std::endl;
-  }
-  if(amplicon_flag_ctr > 0){
-    std::cout << round_int(amplicon_flag_ctr, mapped) 
-              << "% (" << amplicon_flag_ctr 
-              << ") reads were ignored because they did not fall within an amplicon" 
-              << std::endl;
-  }
-  if(failed_frag_size > 0){
-    std::cout << round_int(failed_frag_size, mapped)
-              << "% (" << failed_frag_size
-              << ") of reads had their insert size smaller than their read length"
-              << std::endl;
   }
 
  error:
   if (retval) std::cout << "Not able to write to BAM" << std::endl;
-  hts_itr_destroy(iter);
-  hts_idx_destroy(idx);
   bam_destroy1(aln);
   bam_hdr_destroy(header);
   sam_close(in);

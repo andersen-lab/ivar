@@ -281,7 +281,7 @@ int main(int argc, char* argv[]){
     }
     
     g_args.prefix = get_filename_without_extension(g_args.prefix,".bam");
-    res = trim_bam_qual_primer(has_bam, g_args.bam, g_args.bed, g_args.prefix, g_args.region, g_args.min_qual, g_args.sliding_window, cl_cmd.str(), g_args.write_no_primers_flag, g_args.keep_for_reanalysis, g_args.min_length, g_args.primer_pair_file, g_args.primer_offset);
+    res = trim_bam_qual_primer(has_bam, g_args.bam, g_args.bed, g_args.prefix, g_args.min_qual, g_args.sliding_window, cl_cmd.str(), g_args.write_no_primers_flag, g_args.keep_for_reanalysis, g_args.min_length, g_args.primer_pair_file, g_args.primer_offset);
   }
   // ivar variants
   else if (cmd.compare("variants") == 0){
