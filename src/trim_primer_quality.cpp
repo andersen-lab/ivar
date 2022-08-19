@@ -403,7 +403,7 @@ bool amplicon_filter(IntervalTree amplicons, bam1_t* r){
   return amplicon_flag;
 }
 
-int trim_bam_qual_primer(bool has_bam, std::string bam, std::string bed, std::string bam_out, uint8_t min_qual, uint8_t sliding_window, std::string cmd, bool write_no_primer_reads, bool keep_for_reanalysis, int min_length = 30, std::string pair_info = "", int32_t primer_offset = 0) {  
+int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out, uint8_t min_qual, uint8_t sliding_window, std::string cmd, bool write_no_primer_reads, bool keep_for_reanalysis, int min_length = 30, std::string pair_info = "", int32_t primer_offset = 0) {  
   int retval = 0;
   std::vector<primer> primers;
   int max_primer_len = 0;
@@ -425,10 +425,10 @@ int trim_bam_qual_primer(bool has_bam, std::string bam, std::string bed, std::st
 
   bam_out += ".bam";
   samFile *in;
-  if(has_bam) {
-    in = hts_open(bam.c_str(), "r");
-  } else {
+  if(bam.empty()) {
     in = hts_open("-", "r");
+  } else {
+    in = hts_open(bam.c_str(), "r");
   }
 
   BGZF *out = bgzf_open(bam_out.c_str(), "w");
