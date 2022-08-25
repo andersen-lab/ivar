@@ -431,7 +431,13 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out, 
     in = hts_open(bam.c_str(), "r");
   }
 
-  BGZF *out = bgzf_open(bam_out.c_str(), "w");
+  BGZF *out;
+  if(bam_out.empty()) {
+    out = bgzf_open("-", "r");
+  } else {
+    out = bgzf_open(bam_out.c_str(), "w");
+  }
+
   if(in == NULL) {
     std::cout << ("Unable to open BAM file.") << std::endl;
     return -1;
