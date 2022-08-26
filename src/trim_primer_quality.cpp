@@ -154,10 +154,10 @@ cigar_ quality_trim(bam1_t* r, uint8_t qual_threshold, uint8_t sliding_window){
 
 void print_cigar(uint32_t *cigar, int nlength){
   for (int i = 0; i < nlength; ++i){
-    std::cout << ((cigar[i]) & BAM_CIGAR_MASK);
-    std::cout << "-" << ((cigar[i]) >> BAM_CIGAR_SHIFT) << " ";
+    std::cerr << ((cigar[i]) & BAM_CIGAR_MASK);
+    std::cerr << "-" << ((cigar[i]) >> BAM_CIGAR_SHIFT) << " ";
   }
-  std::cout << std::endl;
+  std::cerr << std::endl;
 }
 
 cigar_ primer_trim(bam1_t *r, bool &isize_flag, int32_t new_pos, bool unpaired_rev = false){
@@ -258,9 +258,9 @@ void replace_cigar(bam1_t *b, uint32_t n, uint32_t *cigar){
 
 void print_primers(std::vector<primer> primers){
   for(std::vector<primer>::iterator it = primers.begin(); it != primers.end(); ++it) {
-    std::cout << "Get Start " << it->get_start() << "\n";
-    std::cout << "Get End " << it->get_end() << "\n";
-    std::cout << "Index " << it->get_indice() << "\n";
+    std::cerr << "Get Start " << it->get_start() << "\n";
+    std::cerr << "Get End " << it->get_end() << "\n";
+    std::cerr << "Index " << it->get_indice() << "\n";
   }
 }
 
@@ -279,7 +279,7 @@ int binarySearch(std::vector<primer> primers, uint32_t item, int low, int high){
 }
 
 std::vector<primer> insertionSort(std::vector<primer> primers, uint32_t n){
-  //std::cout << "in insertion sort length: " << n << "\n";
+  //std::cerr << "in insertion sort length: " << n << "\n";
   uint32_t i = 0;
   int loc = 0;
   int j = 0;
@@ -314,20 +314,20 @@ void get_overlapping_primers(bam1_t* r, std::vector<primer> primers, std::vector
   //print_primers(primers);
   //sort it first
   std::vector<primer> test = insertionSort(primers, primers.size());  
-  //std::cout << test.size() << "\n";
+  //std::cerr << test.size() << "\n";
   //then we iterate and push what fits
   for(std::vector<primer>::iterator it = test.begin(); it != test.end(); ++it) {
     //if we've passed the end, we're going to find no more matches
     if(start_pos < it->get_start()){
-        //std::cout << "break start_pos: " << start_pos << " start:  " << it->get_end() << " end: " << it->get_start() << "\n";
+        //std::cerr << "break start_pos: " << start_pos << " start:  " << it->get_end() << " end: " << it->get_start() << "\n";
         break;
     }
     if(start_pos >= it->get_start() && start_pos <= it->get_end() && (strand == it->get_strand() || it->get_strand() == 0))
-      //std::cout << it->get_start() << " " << start_pos << "\n";
+      //std::cerr << it->get_start() << " " << start_pos << "\n";
       overlapped_primers.push_back(*it);
   }
   //print_primers(overlapped_primers);
-  //std::cout << "break\n";
+  //std::cerr << "break\n";
 }
 
 // For unpaired reads
@@ -410,7 +410,7 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out, 
   if(!bed.empty()){
     primers = populate_from_file(bed, primer_offset);
     if(primers.size() == 0){
-      std::cout << "Exiting." << std::endl;
+      std::cerr << "Exiting." << std::endl;
       return -1;
     }
   }
@@ -419,27 +419,27 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out, 
   IntervalTree amplicons;
   if(!pair_info.empty()){
     amplicons = populate_amplicons(pair_info, primers);
-    std::cout << "Amplicons detected: " << std::endl;
+    std::cerr << "Amplicons detected: " << std::endl;
     amplicons.inOrder();
   }
 
-  bam_out += ".bam";
   samFile *in;
   if(bam.empty()) {
-    in = hts_open("-", "r");
+    in = sam_open("-", "r");
   } else {
-    in = hts_open(bam.c_str(), "r");
+    in = sam_open(bam.c_str(), "r");
   }
 
-  BGZF *out;
+  samFile *out;
   if(bam_out.empty()) {
-    out = bgzf_open("-", "r");
+    out = sam_open("-", "w");
   } else {
-    out = bgzf_open(bam_out.c_str(), "w");
+    bam_out += ".bam";
+    out = sam_open(bam_out.c_str(), "w");
   }
 
   if(in == NULL) {
-    std::cout << ("Unable to open BAM file.") << std::endl;
+    std::cerr << ("Unable to open BAM file.") << std::endl;
     return -1;
   }
 
@@ -447,11 +447,11 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out, 
   bam_hdr_t *header = sam_hdr_read(in);
   if(header == NULL) {
     sam_close(in);
-    std::cout << "Unable to open BAM header." << std::endl;
+    std::cerr << "Unable to open BAM header." << std::endl;
   }
   add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
-  if(bam_hdr_write(out, header) < 0){
-    std::cout << "Unable to write BAM header to path." << std::endl;
+  if(sam_hdr_write(out, header) < 0){
+    std::cerr << "Unable to write BAM header to path." << std::endl;
     sam_close(in);
     return -1;
   }
@@ -484,7 +484,7 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out, 
         if(!amplicon_flag){
 	  if (keep_for_reanalysis) {   // -k (keep) option
 	    aln->core.flag |= BAM_FQCFAIL;
-	    if (bam_write1(out, aln) < 0) { retval = -1; goto error; }
+	    if (sam_write1(out, header, aln) < 0) { retval = -1; goto error; }
           }
           amplicon_flag_ctr++;
           continue;
@@ -565,16 +565,16 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out, 
       if(primer_trimmed){	// Write to BAM only if primer found.
 	int16_t cand_ind = cand_primer.get_indice();
 	bam_aux_append(aln, "XA", 's', sizeof(cand_ind), (uint8_t*) &cand_ind);
-	if(bam_write1(out, aln) < 0) { retval = -1; goto error; }
+	if(sam_write1(out, header, aln) < 0) { retval = -1; goto error; }
       } else {  // no primer found
         if (keep_for_reanalysis) {   // -k (keep) option
           if((primers.size() == 0 || !write_no_primer_reads) && !unmapped_flag){ // -k only option
             aln->core.flag |= BAM_FQCFAIL;
           }
-	  if (bam_write1(out, aln) < 0) { retval = -1; goto error; }
+	  if (sam_write1(out, header, aln) < 0) { retval = -1; goto error; }
 	} else {        // no -k option
           if((primers.size() == 0 || write_no_primer_reads) && !unmapped_flag){ // -e only option
-	    if (bam_write1(out, aln) < 0) { retval = -1; goto error; }
+	    if (sam_write1(out, header, aln) < 0) { retval = -1; goto error; }
           }
         }
 	no_primer_counter++;
@@ -583,27 +583,27 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out, 
       low_quality++;
       if (keep_for_reanalysis) {
         aln->core.flag |= BAM_FQCFAIL;
-	if (bam_write1(out, aln) < 0) { retval = -1; goto error; }
+	if (sam_write1(out, header, aln) < 0) { retval = -1; goto error; }
       }
     }
     ctr++;
   }
   
-  std::cout << std::endl << "-------" << std::endl;
-  std::cout << "Results: " << std::endl;
-  std::cout << "Primer Name" << "\t" << "Read Count" << std::endl;
+  std::cerr << std::endl << "-------" << std::endl;
+  std::cerr << "Results: " << std::endl;
+  std::cerr << "Primer Name" << "\t" << "Read Count" << std::endl;
   for(cit = primers.begin(); cit != primers.end(); ++cit) {
-    std::cout << cit->get_name() << "\t" << cit->get_read_count() << std::endl;
+    std::cerr << cit->get_name() << "\t" << cit->get_read_count() << std::endl;
   }
   if(unmapped_counter > 0){
-    std::cout << unmapped_counter << " unmapped reads were not written to file." << std::endl;
+    std::cerr << unmapped_counter << " unmapped reads were not written to file." << std::endl;
   }
 
  error:
-  if (retval) std::cout << "Not able to write to BAM" << std::endl;
+  if (retval) std::cerr << "Not able to write to BAM" << std::endl;
   bam_destroy1(aln);
   bam_hdr_destroy(header);
   sam_close(in);
-  bgzf_close(out);
+  sam_close(out);
   return retval;
 }
