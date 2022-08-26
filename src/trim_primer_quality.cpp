@@ -279,7 +279,6 @@ int binarySearch(std::vector<primer> primers, uint32_t item, int low, int high){
 }
 
 std::vector<primer> insertionSort(std::vector<primer> primers, uint32_t n){
-  //std::cerr << "in insertion sort length: " << n << "\n";
   uint32_t i = 0;
   int loc = 0;
   int j = 0;
@@ -314,20 +313,15 @@ void get_overlapping_primers(bam1_t* r, std::vector<primer> primers, std::vector
   //print_primers(primers);
   //sort it first
   std::vector<primer> test = insertionSort(primers, primers.size());  
-  //std::cerr << test.size() << "\n";
   //then we iterate and push what fits
   for(std::vector<primer>::iterator it = test.begin(); it != test.end(); ++it) {
     //if we've passed the end, we're going to find no more matches
     if(start_pos < it->get_start()){
-        //std::cerr << "break start_pos: " << start_pos << " start:  " << it->get_end() << " end: " << it->get_start() << "\n";
         break;
     }
     if(start_pos >= it->get_start() && start_pos <= it->get_end() && (strand == it->get_strand() || it->get_strand() == 0))
-      //std::cerr << it->get_start() << " " << start_pos << "\n";
       overlapped_primers.push_back(*it);
   }
-  //print_primers(overlapped_primers);
-  //std::cerr << "break\n";
 }
 
 // For unpaired reads
