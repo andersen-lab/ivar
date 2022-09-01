@@ -150,7 +150,7 @@ std::vector<primer> populate_from_file(std::string path, int32_t offset = 0){
     primers.push_back(p);
     indice++;
   }
-  std::cout << "Found " << primers.size() << " primers in BED file" << std::endl;
+  std::cerr << "Found " << primers.size() << " primers in BED file" << std::endl;
   return primers;
 }
 
