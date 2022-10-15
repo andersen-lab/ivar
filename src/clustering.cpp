@@ -14,6 +14,7 @@
 #include "interval_tree.h"
 #include "allele_functions.h"
 #include "call_consensus_pileup.h"
+#include "get_masked_amplicons.h"
 #include "primer_bed.h"
 #include "stdafx.h"
 #include "clustering.h"
@@ -630,8 +631,8 @@ void count_haplotype_occurences(std::vector<std::vector<int>> all_haplotypes, st
       count_haplotypes.push_back(1);
     }
   }
-    
-  std::cout << "haplotypes\n";
+  std::cout << "cluster things " << final_positions[0] << std::endl;
+  /*std::cout << "haplotypes\n";
   uint32_t x = 0;
   for(uint32_t o : final_positions){
     std::cout << o << " ";
@@ -644,7 +645,7 @@ void count_haplotype_occurences(std::vector<std::vector<int>> all_haplotypes, st
     }
     x += 1;
     std::cout << "\n";
-  }
+  }*/
   
   bool match = true;
   uint32_t match_loc = 0;
@@ -954,7 +955,8 @@ int determine_threshold(std::string bam, std::string bed, std::string pair_info,
   //populate primer, and primer pairs
   primers = populate_from_file(bed, primer_offset);
   amplicons = populate_amplicons(pair_info, primers);
-  
+  get_primers_with_mismatches(primers, bam);
+
   samFile *in = hts_open(bam.c_str(), "r");  
   hts_idx_t *idx = sam_index_load(in, bam.c_str());
   bam_hdr_t *header = sam_hdr_read(in);
