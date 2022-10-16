@@ -212,6 +212,7 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
   std::string nt;
   std::vector<uint32_t> deletions; //record deletion spots to skip when adding ref nucs
   std::vector<float> saved_qualities;
+  uint32_t del_correction_factor = 0;
 
   //int qual = 0;
   int i = 0;
@@ -220,6 +221,7 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
     char tmp = aux[i]; //this is the reference nuc 
     if(isdigit(tmp)){ //on digit character
       if(deletion){
+        //del_correction_factor += nucs.length(); //this speaks to the relative position
         deletion = false;
         for(uint32_t len = 0; len < nucs.length(); len++){
           deletions.push_back(abs_start_pos + len);
@@ -228,6 +230,8 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
           nt = '*';
           nucleotides.push_back(nt);
           saved_qualities.push_back(0);
+          //std::cout << "del " << abs_start_pos << " " << correction_factor << " " << length << " aux " << aux << " digits " << digits << " nucs " << nucs << std::endl;
+ 
           //std::cout << nt << " " << abs_start_pos << " " << digits << " " << nucs << std::endl;
         }
         //abs_start_pos += std::stoi(digits) + nucs.length();
@@ -244,12 +248,17 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
         continue;
       }
       if(digits != ""){
+        if(nucs == ""){
+          abs_start_pos += stoi(digits);
+          digits.clear();
+          continue;
+        }
         //check if the position already got soft clipped
         abs_start_pos += std::stoi(digits) + nucs.length();
         positions.push_back(abs_start_pos);
         nt = "";
-        nt = seq_nt16_str[bam_seqi(seq, abs_start_pos+correction_factor - length - 1)];
-        saved_qualities.push_back(qualities[abs_start_pos+correction_factor - length - 1]+0);
+        nt = seq_nt16_str[bam_seqi(seq, abs_start_pos+correction_factor - length - 1 - del_correction_factor)];
+        saved_qualities.push_back(qualities[abs_start_pos+correction_factor - length - 1 - del_correction_factor]+0);
 
         //std::cout << "qual " << qualities[abs_start_pos - length] +0 << std::endl;
         if(reverse){
@@ -549,7 +558,6 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
   while(i < r->core.n_cigar){   
     op = bam_cigar_op(cigar[i]); //cigar operation
     op_len = bam_cigar_oplen(cigar[i]); //cigar length
-    
     if(op == 4 && first_pass){
       if(!reverse){
         correction_factor = op_len;
@@ -724,10 +732,56 @@ void count_haplotype_occurences(std::vector<std::vector<int>> all_haplotypes, st
   }
   
 }
+std::vector<uint32_t> check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vector<position> all_positions, std::vector<double> save_read_counts, double adjusted_read_count, std::vector<std::vector<int>> final_haplotypes){
+  /*
+   * If we know this primer is masked, we do an additional check in which we make sure the mutation
+   * frequencies for all haplotypes are close to the total depth frequencies. Yes, it does get weird
+   * for haplotypes with a lot of mutations, but it crudely works.
+   */
+  std::vector<double> pos_frequencies;
+  std::vector<uint32_t> suspect_haplotypes;
+  double tmp_freq;
+  std::string nuc;
+  uint32_t tmp_pos;
+  std::vector<allele>::iterator it;
 
-std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector<position> all_positions){
+  for(uint32_t i = 0 ; i < final_haplotypes.size(); i++){
+    //for this single haplotype, calculate the freq of every position
+    for(uint32_t p = 0; p < final_haplotypes[i].size(); p++){
+      //match ref or SC
+      if(final_haplotypes[i][p] < 0){
+        continue;
+      }
+      tmp_pos = final_positions[p];
+      nuc = decoded_nucs(final_haplotypes[i][p]);
+      for(allele a: all_positions[tmp_pos].ad){
+        if(a.nuc == nuc){
+          tmp_freq = a.depth / all_positions[tmp_pos].depth;
+          pos_frequencies.push_back(tmp_freq);
+          break;
+        }
+      }
+    }
+    //look at each position frequency versus the haplotype frequency, if it's too different
+    //return a the indicies of haplotype which are suspect
+    tmp_freq = save_read_counts[i] / adjusted_read_count;
+    for(double d : pos_frequencies){
+      //greater thann 30% freq diff at any pos, we flag it
+      if(abs(d - tmp_freq) > 0.30){
+        suspect_haplotypes.push_back(i);
+        break;
+      }
+    }
+    pos_frequencies.clear();
+  }
+  return(suspect_haplotypes);
+}
+
+std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector<position> all_positions, std::vector<primer> masked_primers, std::string output_primer){
   /*
    * @param amplicons : data strucuture containing read count, haplotype nt, and positions
+   * @param all_positions : vector containing depths / alleles for all pos
+   * @param masked_primers : vector containing primers with mismatches
    * @return frequencies : a flat vector containing all haplotype frequencies
    *
    * Function calculates the frequency of unique haplotypes on a per amplicon basis. In
@@ -751,8 +805,9 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
   std::vector<uint32_t> position;
   std::vector<uint32_t> range;
   std::vector<int> haplotype;
+  std::string lower_primer_name;
 
- 
+  bool masked = false;
   //loop through all the amplicons
   while(node != NULL){
     node = amplicons.iterate_nodes(node->right);
@@ -763,6 +818,16 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     if(read_count == 0){
       continue;
     }
+    //search for this amplicon as being one with primer binding mutations
+    //could use a find function here instead...
+    for(uint32_t i = 0; i < masked_primers.size(); i++){
+      if(node->data->low == masked_primers[i].get_start()){
+        masked = true;
+        lower_primer_name = masked_primers[i].get_name();
+        break;
+      }
+    }
+
     //remove positions & indels where avg. quality is below 20
     remove_low_quality_nts(node, all_positions);
 
@@ -835,17 +900,46 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
 
     std::vector<std::vector<int>> transposed_haplotypes = transpose(final_haplotypes); 
     std::vector<std::vector<int>> save_haplotypes; //this is where we have our final things
-    std::vector<double> save_read_counts;
+    std::vector<double> save_read_counts; //save the relative count of each haplotype
     double adjusted_read_count = 0;
     //the haplotypes by index to be condensed, first one is SC second is matched
     count_haplotype_occurences(transposed_haplotypes, save_haplotypes, save_read_counts, adjusted_read_count, final_positions);
     //save this info to the amplicon
     node->final_haplotypes = save_haplotypes;
     node->final_positions = final_positions;
-    for(double d: save_read_counts){
-      //std::cout << d << " adjusted read count " << adjusted_read_count << " read count " << read_count << std::endl;
-      node->frequency.push_back(d / adjusted_read_count);
-      frequencies.push_back(d / adjusted_read_count);
+    std::vector<uint32_t> suspect_haplotypes;
+    //if we have a masked primer, let's check the position depths vs. haplotype frequency
+    if(masked){
+      suspect_haplotypes = check_primer_binding_issues(final_positions, all_positions, save_read_counts, adjusted_read_count, save_haplotypes);
+    }
+
+    std::vector<uint32_t>::iterator it_suspects;
+    //std::string suspect_positions;
+    //std::string suspect_haplotype;
+
+    //push back frequencies to master list, ignoring suspect values
+    //or write to txt file
+    ofstream file;
+    if(!output_primer.empty()){
+      file.open(output_primer, ios_base::app);
+    }
+    for(uint32_t d = 0; d < save_read_counts.size(); d++){
+      //std::cout << "d " << d << std::endl;
+      it_suspects = std::find(suspect_haplotypes.begin(), suspect_haplotypes.end(), d);
+      //in the suspects list, write to files
+      if(it_suspects != suspect_haplotypes.end()){
+        if(!output_primer.empty()){
+          //generate positions string
+          file << lower_primer_name << "\n";
+        }
+      }else{
+        node->frequency.push_back(save_read_counts[d] / adjusted_read_count);
+        frequencies.push_back(save_read_counts[d] / adjusted_read_count);
+     }
+    }
+    
+    if(!output_primer.empty()){
+      file.close();
     }
   }
   return(frequencies);
@@ -942,20 +1036,20 @@ std::vector<uint32_t> call_variant_positions(std::vector<position> all_positions
   }
   return(variant_positions);
 }
-void get_masked_primers(std::vector<uint32_t> variant_positions, std::vector<primer> primers){
+void get_masked_primers(std::vector<uint32_t> variant_positions, std::vector<primer> primers, std::vector<primer> &mismatches_primers){
   /*
    * Get primers with variant in the binding site.
    */
   std::vector<primer> tmp;
-  std::vector<primer> mismatches_primers;
+  std::cout << "Looking for primer mismatches..." << std::endl;
   for(uint32_t pos : variant_positions){
     tmp = get_primers(primers, pos); //call to get_masked functionality
     std::vector<primer>::iterator tmp_it;
     for(std::vector<primer>::iterator it = tmp.begin(); it != tmp.end(); ++it) {
       tmp_it = std::find(mismatches_primers.begin(), mismatches_primers.end(), *it);
       if(tmp_it == mismatches_primers.end()){
-      std::cout << it->get_name() << std::endl;
-      mismatches_primers.push_back(*it);
+        //std::cout << it->get_name() << std::endl;
+        mismatches_primers.push_back(*it);
       }
       // Look for primer pair
       if(it->get_pair_indice() != -1){
@@ -966,11 +1060,8 @@ void get_masked_primers(std::vector<uint32_t> variant_positions, std::vector<pri
       }
     }
   }
-  //this is doubled up, write condition to not save things twice
-  for(primer p : mismatches_primers){
-    std::cout << p.get_name() << std::endl;
-  }
 }
+
 //entry point for threshold determination
 int determine_threshold(std::string bam, std::string ref, std::string bed, std::string pair_info, int32_t primer_offset, double min_insert_threshold, uint8_t min_qual, char gap, double min_depth, bool min_coverage_flag, std::string prefix){
   /*
@@ -995,6 +1086,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     basic_alleles.push_back(new_allele);
   }
 
+  std::vector<primer> mismatches_primers;
   //make sure the alleles get recorded by position
   std::vector<position> all_positions;
   //populate with empty positions for each thing in reference
@@ -1054,10 +1146,17 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
       all_positions[i].ad[x].mean_qual = tmp_qual;
     }  
   }
+  std::vector<uint32_t> variant_positions = call_variant_positions(all_positions, reference, region_);
+  get_masked_primers(variant_positions, primers, mismatches_primers);
+  std::string output_primer = "primer_mismatches_" + prefix + ".txt";
 
+  ofstream file;
+  file.open(output_primer, ios_base::app);
+  file << "lower_primer_name" << "\n";
+  file.close(); 
   //extract those reads into a format useable in the clustering
-  std::vector<double> all_frequencies = create_frequency_matrix(amplicons, all_positions);
-  if(all_frequencies.size() == 0){
+  std::vector<double> all_frequencies = create_frequency_matrix(amplicons, all_positions, mismatches_primers, output_primer);
+  if(all_frequencies.size() < 2){
     return(0);
   }
   //remove perfect 1 haplotypes
@@ -1069,12 +1168,9 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   
   //test lines
   //print_allele_depths(all_positions[22947].ad);
-  std::vector<uint32_t> variant_positions = call_variant_positions(all_positions, reference, region_);
-  get_masked_primers(variant_positions, primers);
-  
+ 
   //test lines
   //amplicons.print_amplicon_summary();  
-  ofstream file;
   file.open(output_amplicon, ios_base::app);
   file << "lower_primer\tupper_primer\tread_count\tpositions\tfrequencies\thaplotypes\tnumber_haplotypes\n";
   file.close();
@@ -1112,6 +1208,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     //std::cout << "n " << n << " sil " << cluster_results.sil_score << std::endl;
   }
   cluster choice_cluster = all_cluster_results[best_cluster_index];
+
   //find the largest cluster center
   int largest_cluster_index = std::max_element(choice_cluster.centers.begin(), choice_cluster.centers.end()) - choice_cluster.centers.begin();
   //this marks the lower bound of the largest cluster

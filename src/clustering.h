@@ -35,7 +35,7 @@ void k_means(int n_clusters, alglib::real_2d_array xy, cluster &cluster_results)
 std::vector<double> calculate_cluster_centers(alglib::real_2d_array X, alglib::kmeansreport rep, int n_clusters);
 double cluster_point_distances(alglib::real_2d_array X, alglib::kmeansreport rep, double point, double center, int n_clusters);
 void calculate_sil_score(alglib::real_2d_array X, alglib::kmeansreport rep,int n_clusters, cluster &cluster_results);
-std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector<position> all_positions);
+std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector<position> all_positions, std::vector<primer> masked_primers, std::string output_primer);
 int determine_threshold(std::string bam, std::string ref, std::string bed, std::string pair_info, int32_t primer_offset, double min_insert_threshold, uint8_t min_qual, char gap, double min_depth, bool min_coverage_flag, std::string prefix);
 void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32_t> &positions,
     uint32_t abs_start_pos, std::vector<position> &all_positions,

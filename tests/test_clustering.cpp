@@ -132,6 +132,7 @@ int _unit_test_frequencies(){
   std::vector<std::string> nucleotides;
   std::vector<uint32_t> range = {23620, 23727};
   std::vector<double> frequency_gt = {0.1};
+  std::vector<primer> blank_masked;
   int i = 0;
 
   //Case A - Don't return mutations <= 0.03, do return mutations > 0.03 frequency 
@@ -180,7 +181,7 @@ int _unit_test_frequencies(){
   }
 
   //try to create the frequency matrix
-  frequencies = create_frequency_matrix(amplicons, all_positions);
+  frequencies = create_frequency_matrix(amplicons, all_positions, blank_masked, "");
   if(frequencies == frequency_gt){
     success += 1;
   }
@@ -215,7 +216,7 @@ int _unit_test_frequencies(){
     update_allele_depth(all_positions, nucleotides, positions, qualities);
     i++;
   }
-  frequencies = create_frequency_matrix(amplicons, all_positions);
+  frequencies = create_frequency_matrix(amplicons, all_positions, blank_masked, "");
   if(frequencies == frequency_gt){
     success += 1;
   }
@@ -248,7 +249,7 @@ int _unit_test_frequencies(){
     amplicons.find_amplicon_per_read(abs_start_pos, abs_end_pos, haplotypes, positions, reverse, range, all_positions);
     i++;
   }
-  frequencies = create_frequency_matrix(amplicons, all_positions);
+  frequencies = create_frequency_matrix(amplicons, all_positions, blank_masked, "");
   if(frequencies == frequency_gt){
     success += 1;
   }
@@ -274,7 +275,7 @@ int _unit_test_frequencies(){
     update_allele_depth(all_positions, nucleotides, positions, qualities);
     i++;
   }
-  frequencies = create_frequency_matrix(amplicons, all_positions);
+  frequencies = create_frequency_matrix(amplicons, all_positions, blank_masked, "");
   if(frequencies == frequency_gt){
     success += 1;
   }
