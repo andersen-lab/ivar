@@ -106,7 +106,11 @@ ref_antd::ref_antd(std::string ref_path, std::string gff_path){
 
 ref_antd::~ref_antd()
 {
-  if (this->fai) fai_destroy(this->fai);
+  if (this->fai){
+    //this is complaining that the pointer isn't being allocated, so allocating it as NULL before destroy
+    this->fai = NULL;
+    fai_destroy(this->fai);
+  }
 }
 
 //used to add codon info to variants output
