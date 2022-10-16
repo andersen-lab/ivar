@@ -3,7 +3,7 @@
 #include<vector>
 #include<algorithm>
 #include<iostream>
-
+#include<fstream>
 #include "allele_functions.h"
 void print_single_allele(allele a){
   std::cout << "Nuc: " << a.nuc << std::endl;;
@@ -59,10 +59,15 @@ void update_allele_depth(std::vector<position> &all_positions, std::vector<std::
    * @param nucleotides : vector containing the SNV NT values
    * @param positions : vector containing the SNV positions
    * @param qualities : vector containing variant qualities
+   * @param ref : do these positions match the ref or not
    *
    * Function takes in the variants for a read and populates the allele data structure. All reads
    * get passed through this. Qualities all get added to the tmp_mean_qual prior to averaging. 
    */
+  if(positions.size() != nucleotides.size()){
+    std::cout << "Error in allele updates." << std::endl;
+    std::cout << positions.size() << " " << nucleotides.size() << std::endl;
+  }
   uint32_t location = 0;
   int allele_location = 0;
   //iterate over the variants

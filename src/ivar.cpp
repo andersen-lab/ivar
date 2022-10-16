@@ -145,6 +145,7 @@ void print_autoconsensus_usage(){
     "           -i    (Required) Input bam file to call consensus on\n"
     "           -f    (Required) Primer pair file .tsv\n"
     "           -b    (Required) Bed file containing primer information\n"
+    "           -r    (Required) Reference file used for alignment. This is used to translate the nucleotide     sequences and identify intra host single nucleotide variants\n"    
     "           -q    Minimum quality score threshold to count base (Default: 20)\n"
     "           -c    Minimum insertion frequency threshold(0 - 1) to call consensus. (Default: 0.8)\n"
     "                 Frequently used thresholds | Description\n"
@@ -205,7 +206,7 @@ void print_version_info(){
 static const char *trim_opt_str = "i:b:f:x:p:m:q:s:ekh?";
 static const char *variants_opt_str = "p:t:q:m:r:g:h?";
 static const char *consensus_opt_str = "i:p:q:t:c:m:n:kfh?";
-static const char *autoconsensus_opt_str = "i:p:f:b:q:c:m:n:kh?";
+static const char *autoconsensus_opt_str = "i:p:f:b:r:q:c:m:n:kh?";
 static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
@@ -452,6 +453,7 @@ int main(int argc, char* argv[]){
     g_args.prefix = "";
     g_args.bed = "";
     g_args.primer_pair_file ="";
+    g_args.ref = "";
     while( opt != -1 ) {
       switch( opt ) {
       case 'b':
@@ -462,6 +464,9 @@ int main(int argc, char* argv[]){
 	break;
        case 'i':
 	g_args.seq_id = optarg;
+  break;
+	      case 'r':
+	g_args.ref = optarg;
 	break;
       case 'p':
 	g_args.prefix = optarg;
@@ -490,11 +495,11 @@ int main(int argc, char* argv[]){
       }
     opt = getopt( argc, argv, autoconsensus_opt_str);
   }
-  if(g_args.seq_id.empty() || g_args.prefix.empty() || g_args.bed.empty() || g_args.primer_pair_file.empty()){
+  if(g_args.seq_id.empty() || g_args.prefix.empty() || g_args.bed.empty() || g_args.primer_pair_file.empty() || g_args.ref.empty()){
       print_autoconsensus_usage();
       return -1;
   }
-  res = determine_threshold(g_args.seq_id, g_args.bed, g_args.primer_pair_file, primer_offset, g_args.min_insert_threshold, g_args.min_qual, g_args.gap, g_args.min_depth, g_args.keep_min_coverage, g_args.prefix);
+  res = determine_threshold(g_args.seq_id, g_args.ref, g_args.bed, g_args.primer_pair_file, primer_offset, g_args.min_insert_threshold, g_args.min_qual, g_args.gap, g_args.min_depth, g_args.keep_min_coverage, g_args.prefix);
   }
   //ivar removereads
   else if (cmd.compare("removereads") == 0){

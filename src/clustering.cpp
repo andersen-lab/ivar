@@ -18,6 +18,7 @@
 #include "primer_bed.h"
 #include "stdafx.h"
 #include "clustering.h"
+#include "ref_seq.h"
 #include "kmeans.h"
 using namespace alglib;
 
@@ -293,6 +294,7 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
   //main issue to watch out for is deletions will shift the NT pos
 
   uint32_t relative_seq_pos = length;
+  uint32_t add_correct = 0;
   for(uint32_t z = length; z < abs_end_pos; z++){
     //if this is a deletion position we pass it
     it_deletion = std::find(deletions.begin(), deletions.end(), z);
@@ -301,40 +303,32 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
     }
     it = std::find(positions.begin(), positions.end(), z);
     it_ignore = std::find(ignore_positions.begin(), ignore_positions.end(), z);
-    //position wasn't found to be a variant and wasn't found in soft clipped regions
+    //position wasn't found to be a variant and wasn't found to be deletion
     if(it == positions.end() && it_ignore == ignore_positions.end()){
       ref_pos.push_back(z);
-      seq_pos = relative_seq_pos  - length;
-      //add ref to haplotypes so it can later be removed
-      positions.push_back(z);
+      seq_pos = relative_seq_pos  - length + correction_factor + add_correct;
       haplotypes.push_back(soft_clipped);
       nt = "";
       nt = seq_nt16_str[bam_seqi(seq, seq_pos)];
       ref_qual.push_back(qualities[seq_pos] + 0);
-      if(!check_nucleotide(nt)){
-        std::cout << "\n";       
-        std::cout << "\nseq pos " << seq_pos << std::endl;
-        std::cout << "aux " << aux << std::endl;
-        std::cout << "problem loc by ref " << seq_pos + length << std::endl;
-        std::cout << "start " << length << " end " << abs_end_pos << std::endl;
-        std::cout << " z " << z << " correction factor " << correction_factor << std::endl;
-        std::cout << "bad nucelotide " << nt << std::endl;
-        /*for(int x = 0; x < 10; x++){
-          std::cout << seq_nt16_str[bam_seqi(seq, x)] << " ";
-          std::cout << "\n";
-        }*/
-      }
       ref_nt.push_back(nt);
       relative_seq_pos += 1;
+    }else{
+      add_correct++;
     }
   }
-
   if(ref_pos.size() > 0){
     update_allele_depth(all_positions, ref_nt, ref_pos, ref_qual);
   }
   if(positions.size() > 0){
     update_allele_depth(all_positions, nucleotides, positions, saved_qualities);
   }
+  for(uint32_t rp : ref_pos){
+    positions.push_back(rp);
+  }
+  ref_pos.clear();
+  ref_nt.clear();
+  ref_qual.clear();
 }
 
 
@@ -921,15 +915,53 @@ void call_consensus_from_vector(std::vector<position> all_positions, std::string
   std::cout << "Positions with depth below " <<(unsigned) min_depth << ": " << bases_min_depth << std::endl;
 }
 
+std::vector<uint32_t> call_variant_positions(std::vector<position> all_positions, ref_antd reference, std::string region_){
+  /*
+   * Generates variants position list for downstream filtered of primers.
+   */
+  char ref;
+  uint32_t mdepth = 10; 
+  double min_freq = 0.03;
+  std::vector<uint32_t> variant_positions;
+
+  for(uint32_t i = 0; i < all_positions.size(); i++){
+    if(all_positions[i].depth == 0){
+      continue;
+    }
+    ref = reference.get_base(all_positions[i+1].pos, region_);
+    //std::cout << ref << " " << i << " " << all_positions[i].pos << std::endl;
+    //print_allele_depths(all_positions[i].ad);
+    if(all_positions[i].depth < mdepth){
+      continue;
+    }
+    for(allele a : all_positions[i].ad){
+      //correct for string vs char comparions
+      if(a.nuc[0] == ref){
+        continue;
+      }
+      if((a.depth / all_positions[i].depth) < min_freq){
+        continue;
+      }
+      if(all_positions[i].pos == 23073){
+        std::cout << "23073\n";
+        print_single_allele(a);
+      }
+      variant_positions.push_back(all_positions[i].pos);
+      break;
+    }
+  }
+  return(variant_positions);
+}
+
 //entry point for threshold determination
-int determine_threshold(std::string bam, std::string bed, std::string pair_info, int32_t primer_offset, double min_insert_threshold, uint8_t min_qual, char gap, double min_depth, bool min_coverage_flag, std::string prefix){
+int determine_threshold(std::string bam, std::string ref, std::string bed, std::string pair_info, int32_t primer_offset, double min_insert_threshold, uint8_t min_qual, char gap, double min_depth, bool min_coverage_flag, std::string prefix){
   /*
    * @param bam : path to the bam file
+   * @param ref : path to the reference file
    * @param bed : path to the bed file
    * @param pair_info : path to the primer pair .tsv file
    * @param primer_offset : 
    */
-
   //generate the .fa consensus file header
   std::string suffix = ".bam";
   std::string seq_id = "Consensus_" + bam.substr(0, bam.length() - suffix.length());
@@ -955,8 +987,7 @@ int determine_threshold(std::string bam, std::string bed, std::string pair_info,
   //populate primer, and primer pairs
   primers = populate_from_file(bed, primer_offset);
   amplicons = populate_amplicons(pair_info, primers);
-  get_primers_with_mismatches(primers, bam);
-
+  
   samFile *in = hts_open(bam.c_str(), "r");  
   hts_idx_t *idx = sam_index_load(in, bam.c_str());
   bam_hdr_t *header = sam_hdr_read(in);
@@ -975,10 +1006,12 @@ int determine_threshold(std::string bam, std::string bed, std::string pair_info,
   std::string region_;
   //region refers to reference
   region_.assign(header->target_name[0]);
-  
   iter = sam_itr_querys(idx, header, region_.c_str());
+  
+  //load the reference
+  ref_antd reference(ref);
 
-  //fill md tag
+  //fill md tag TODO
   //bam_fillmd1_core(const char *ref_name, aln, char *ref, int flag, int max_nm)
 
   int read_counter = 0;
@@ -1017,6 +1050,11 @@ int determine_threshold(std::string bam, std::string bed, std::string pair_info,
   
   //test lines
   //print_allele_depths(all_positions[22947].ad);
+  std::vector<uint32_t> variant_positions = call_variant_positions(all_positions, reference, region_);
+  //variant_positions.clear();
+  for(uint32_t vp: variant_positions){
+    std::cout << vp << std::endl;
+  }
 
   std::cout << "prior to amplicon dump" << std::endl;
   //test lines
@@ -1033,6 +1071,7 @@ int determine_threshold(std::string bam, std::string bed, std::string pair_info,
   for(uint32_t i=0; i < all_frequencies.size(); i++){
     xy(i,0) = all_frequencies[i];
   }
+
   //keep track of best sil score index
   int best_cluster_index = 0;
   double best_sil_score = 0;
@@ -1055,7 +1094,7 @@ int determine_threshold(std::string bam, std::string bed, std::string pair_info,
       best_cluster_index = i;
     }
     //test lines
-    //std::cout << "n " << n << " sil " << cluster_results.sil_score << std::endl;
+    std::cout << "n " << n << " sil " << cluster_results.sil_score << std::endl;
   }
   cluster choice_cluster = all_cluster_results[best_cluster_index];
   //find the largest cluster center
@@ -1076,6 +1115,7 @@ int determine_threshold(std::string bam, std::string bed, std::string pair_info,
     tmp_thresh = x.cluster_bounds[tmp_cluster_index][0] - 0.01;
     file << x.sil_score << "\t";
     for(double c : x.centers){
+      std::cout << c << " ";
       file << c << "_";
     }
     file << "\t";
@@ -1091,7 +1131,6 @@ int determine_threshold(std::string bam, std::string bed, std::string pair_info,
 
   //call consensus
   call_consensus_from_vector(all_positions, seq_id, prefix, min_qual, threshold, min_depth, gap, min_coverage_flag, min_insert_threshold);
-
   return 0;
 }
 
