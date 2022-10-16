@@ -295,7 +295,7 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
 
   uint32_t relative_seq_pos = length;
   uint32_t add_correct = 0;
-  for(uint32_t z = length; z < abs_end_pos; z++){
+  for(uint32_t z = length+1; z < abs_end_pos; z++){
     //if this is a deletion position we pass it
     it_deletion = std::find(deletions.begin(), deletions.end(), z);
     if(it_deletion != deletions.end()){
@@ -326,9 +326,6 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
   for(uint32_t rp : ref_pos){
     positions.push_back(rp);
   }
-  ref_pos.clear();
-  ref_nt.clear();
-  ref_qual.clear();
 }
 
 
@@ -925,12 +922,8 @@ std::vector<uint32_t> call_variant_positions(std::vector<position> all_positions
   std::vector<uint32_t> variant_positions;
 
   for(uint32_t i = 0; i < all_positions.size(); i++){
-    if(all_positions[i].depth == 0){
-      continue;
-    }
-    ref = reference.get_base(all_positions[i+1].pos, region_);
-    //std::cout << ref << " " << i << " " << all_positions[i].pos << std::endl;
-    //print_allele_depths(all_positions[i].ad);
+    ref = reference.get_base(all_positions[i].pos, region_);
+    //second condition is to prevent additional 'leading' variant
     if(all_positions[i].depth < mdepth){
       continue;
     }
@@ -942,10 +935,7 @@ std::vector<uint32_t> call_variant_positions(std::vector<position> all_positions
       if((a.depth / all_positions[i].depth) < min_freq){
         continue;
       }
-      if(all_positions[i].pos == 23073){
-        std::cout << "23073\n";
-        print_single_allele(a);
-      }
+      //handles the 
       variant_positions.push_back(all_positions[i].pos);
       break;
     }
@@ -993,6 +983,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   bam_hdr_t *header = sam_hdr_read(in);
 
   uint32_t *ref_length = header->target_len;
+  //first i=0 should always be blank, reference starts at 1
   for(uint32_t i=0; i < *ref_length; i++){
     position new_position;
     new_position.pos = i;
@@ -1056,7 +1047,6 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     std::cout << vp << std::endl;
   }
 
-  std::cout << "prior to amplicon dump" << std::endl;
   //test lines
   //amplicons.print_amplicon_summary();  
   ofstream file;
@@ -1094,7 +1084,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
       best_cluster_index = i;
     }
     //test lines
-    std::cout << "n " << n << " sil " << cluster_results.sil_score << std::endl;
+    //std::cout << "n " << n << " sil " << cluster_results.sil_score << std::endl;
   }
   cluster choice_cluster = all_cluster_results[best_cluster_index];
   //find the largest cluster center
