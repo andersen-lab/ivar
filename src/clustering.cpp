@@ -630,7 +630,7 @@ void count_haplotype_occurences(std::vector<std::vector<int>> all_haplotypes, st
       count_haplotypes.push_back(1);
     }
   }
-  std::cout << "cluster things " << final_positions[0] << std::endl;
+  final_positions[0] = final_positions[0];
   /*std::cout << "haplotypes\n";
   uint32_t x = 0;
   for(uint32_t o : final_positions){
@@ -767,7 +767,7 @@ std::vector<uint32_t> check_primer_binding_issues(std::vector<uint32_t> final_po
     tmp_freq = save_read_counts[i] / adjusted_read_count;
     for(double d : pos_frequencies){
       //greater thann 30% freq diff at any pos, we flag it
-      if(abs(d - tmp_freq) > 0.30){
+      if(abs(d - tmp_freq) > 0.20){
         suspect_haplotypes.push_back(i);
         break;
       }
@@ -810,6 +810,9 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
   bool masked = false;
   //loop through all the amplicons
   while(node != NULL){
+    masked = false;
+    lower_primer_name.clear();
+
     node = amplicons.iterate_nodes(node->right);
     if(node == NULL){
       break;
@@ -923,15 +926,17 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     if(!output_primer.empty()){
       file.open(output_primer, ios_base::app);
     }
+    bool written_primer = false;
     for(uint32_t d = 0; d < save_read_counts.size(); d++){
       //std::cout << "d " << d << std::endl;
       it_suspects = std::find(suspect_haplotypes.begin(), suspect_haplotypes.end(), d);
       //in the suspects list, write to files
-      if(it_suspects != suspect_haplotypes.end()){
+      if(it_suspects != suspect_haplotypes.end() && !written_primer){
         if(!output_primer.empty()){
           //generate positions string
           file << lower_primer_name << "\n";
         }
+        written_primer = true;  
       }else{
         node->frequency.push_back(save_read_counts[d] / adjusted_read_count);
         frequencies.push_back(save_read_counts[d] / adjusted_read_count);
