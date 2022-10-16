@@ -942,7 +942,35 @@ std::vector<uint32_t> call_variant_positions(std::vector<position> all_positions
   }
   return(variant_positions);
 }
-
+void get_masked_primers(std::vector<uint32_t> variant_positions, std::vector<primer> primers){
+  /*
+   * Get primers with variant in the binding site.
+   */
+  std::vector<primer> tmp;
+  std::vector<primer> mismatches_primers;
+  for(uint32_t pos : variant_positions){
+    tmp = get_primers(primers, pos); //call to get_masked functionality
+    std::vector<primer>::iterator tmp_it;
+    for(std::vector<primer>::iterator it = tmp.begin(); it != tmp.end(); ++it) {
+      tmp_it = std::find(mismatches_primers.begin(), mismatches_primers.end(), *it);
+      if(tmp_it == mismatches_primers.end()){
+      std::cout << it->get_name() << std::endl;
+      mismatches_primers.push_back(*it);
+      }
+      // Look for primer pair
+      if(it->get_pair_indice() != -1){
+        tmp_it = std::find(mismatches_primers.begin(), mismatches_primers.end(), primers.at(it->get_pair_indice()));  
+        if(tmp_it == mismatches_primers.end()){
+          mismatches_primers.push_back(primers.at(it->get_pair_indice()));
+        }
+      }
+    }
+  }
+  //this is doubled up, write condition to not save things twice
+  for(primer p : mismatches_primers){
+    std::cout << p.get_name() << std::endl;
+  }
+}
 //entry point for threshold determination
 int determine_threshold(std::string bam, std::string ref, std::string bed, std::string pair_info, int32_t primer_offset, double min_insert_threshold, uint8_t min_qual, char gap, double min_depth, bool min_coverage_flag, std::string prefix){
   /*
@@ -1042,11 +1070,8 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   //test lines
   //print_allele_depths(all_positions[22947].ad);
   std::vector<uint32_t> variant_positions = call_variant_positions(all_positions, reference, region_);
-  //variant_positions.clear();
-  for(uint32_t vp: variant_positions){
-    std::cout << vp << std::endl;
-  }
-
+  get_masked_primers(variant_positions, primers);
+  
   //test lines
   //amplicons.print_amplicon_summary();  
   ofstream file;

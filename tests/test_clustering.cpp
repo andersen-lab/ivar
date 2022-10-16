@@ -317,8 +317,8 @@ int _unit_test_kmeans(){
 }
 
 int main(){
-  /*int success = 4; //count total number of tests
-  success -= _unit_test_frequencies(); //contains 4 tests
+  int success = 4; //count total number of tests
+  /*success -= _unit_test_frequencies(); //contains 4 tests
   success -= _unit_test_parse_md_tag(); //contains 2 tests
   success -= _integreation_create_haplotypes();
   
@@ -326,8 +326,8 @@ int main(){
   */
   //success -= _unit_test_kmeans();
   //success -= _unit_test_sil_score();
-  determine_threshold("../data/contamination_tests/test.calmd.bam", "../data/contamination_tests/sequence.fasta", "../data/contamination_tests/sars_primers_strand.bed", "../data/contamination_tests/primer_pairs.tsv", 0, 0.8, 20, 'N', 10, true, "amplicon");
+  success -= determine_threshold("../data/contamination_tests/test.calmd.bam", "../data/contamination_tests/sequence.fasta", "../data/contamination_tests/sars_primers_strand.bed", "../data/contamination_tests/primer_pairs.tsv", 0, 0.8, 20, 'N', 10, true, "amplicon");
   //determine_threshold("../data/contamination_tests/test.calmd.bam", "../data/contamination_tests/sars_primers_strand.bed", "../data/contamination_tests/primer_pairs.tsv", 0);
   //determine_threshold("../data/contamination_tests/simulated_alpha_beta_90_10.bam", "../data/contamination_tests/sars_primers_strand.bed", "../data/contamination_tests/primer_pairs.tsv", 0);
-  return(0);
+  return 0;
 }
