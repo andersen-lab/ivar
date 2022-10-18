@@ -1153,8 +1153,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   }
   std::vector<uint32_t> variant_positions = call_variant_positions(all_positions, reference, region_);
   get_masked_primers(variant_positions, primers, mismatches_primers);
-  std::string output_primer = "primer_mismatches_" + prefix + ".txt";
-
+  std::string output_primer = prefix + "_primer_mismatches.txt";
   ofstream file;
   file.open(output_primer, ios_base::app);
   file << "lower_primer_name" << "\n";
@@ -1172,8 +1171,9 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     }), all_frequencies.end());
   
   //test lines
-  //print_allele_depths(all_positions[22947].ad);
- 
+  //print_allele_depths(all_positions[21801].ad);
+  //std::cout << all_positions[21802].depth << std::endl;
+
   //test lines
   //amplicons.print_amplicon_summary();  
   file.open(output_amplicon, ios_base::app);
@@ -1200,51 +1200,58 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     max_n = all_frequencies.size();
   }
   //call kmeans clustering
-  for (uint32_t n =2, i = 0; n <= max_n; n++, i++){
+  for (uint32_t n =2; n <= max_n; n++){
     //call kmeans clustering
     cluster cluster_results; //reset the results
     k_means(n, xy, cluster_results);
     all_cluster_results.push_back(cluster_results);
-    if(cluster_results.sil_score > best_sil_score){
-      best_sil_score = cluster_results.sil_score;
-      best_cluster_index = i;
-    }
     //test lines
     //std::cout << "n " << n << " sil " << cluster_results.sil_score << std::endl;
   }
-  cluster choice_cluster = all_cluster_results[best_cluster_index];
-
-  //find the largest cluster center
-  int largest_cluster_index = std::max_element(choice_cluster.centers.begin(), choice_cluster.centers.end()) - choice_cluster.centers.begin();
-  //this marks the lower bound of the largest cluster
-  threshold = choice_cluster.cluster_bounds[largest_cluster_index][0] - 0.01;
-
   int tmp_cluster_index;
   double tmp_thresh;
+  double sum_centers = 0;
+  int i = 0;
   std::string cluster_filename = prefix + "_cluster_results.txt";
   //open the file to save clustering results
   file.open(cluster_filename, ios_base::app);
-  file << "sil_score\tcluster_centers\tn_clusters\tthreshold\n";
+  file << "sil_score\tadjusted_sil_score\tcluster_centers\tn_clusters\tthreshold\n";
   //dump additional information to a file such as (1) cluster values (2) cluster centers
   for(cluster x : all_cluster_results){
+    sum_centers = 0;
     //threshold for if we chose this cluster
     tmp_cluster_index = std::max_element(x.centers.begin(), x.centers.end()) - x.centers.begin();
     tmp_thresh = x.cluster_bounds[tmp_cluster_index][0] - 0.01;
     file << x.sil_score << "\t";
-    for(double c : x.centers){
+    for(double cent : x.centers){
+      sum_centers += cent;
+    }
+    file << x.sil_score - (abs(sum_centers -1)) << "\t";
+    if((x.sil_score - abs(sum_centers -1))  > best_sil_score){
+      best_sil_score = x.sil_score - abs(sum_centers-1);
+      best_cluster_index = i;
+   }
+   for(double c : x.centers){
       std::cout << c << " ";
       file << c << "_";
     }
     file << "\t";
     file << x.n_clusters << "\t";
     file << tmp_thresh << "\n";
-    
+    i++;
   }
   file.close();
+ cluster choice_cluster = all_cluster_results[best_cluster_index];
+
+  //find the largest cluster center
+  int largest_cluster_index = std::max_element(choice_cluster.centers.begin(), choice_cluster.centers.end()) - choice_cluster.centers.begin();
+  //this marks the lower bound of the largest cluster
+  threshold = choice_cluster.cluster_bounds[largest_cluster_index][0] - 0.01;
+
   //determine whether or not we should call consensus
-  if(choice_cluster.sil_score <= 0.80 || threshold <= 0.5){
-    return(0);
-  }
+  //if(choice_cluster.sil_score <= 0.80 || threshold <= 0.5){
+  //  return(0);
+  //}
 
   //call consensus
   call_consensus_from_vector(all_positions, seq_id, prefix, min_qual, threshold, min_depth, gap, min_coverage_flag, min_insert_threshold);
