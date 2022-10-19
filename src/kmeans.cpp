@@ -781,6 +781,7 @@ void kmeans_internal(alglib_impl::ae_matrix* xy, alglib_impl::ae_int_t npoints, 
                   sorted_points[c].push_back(xy->ptr.pp_double[j][0]);
                 }
                 sil_score(sorted_points, centers);
+                
                 //fix noise cluster
                 int min_index  = std::min_element(centers.begin(), centers.end()) - centers.begin();
                 centers[min_index] = 0.03;

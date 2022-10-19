@@ -216,7 +216,7 @@ void IntervalTree::find_amplicon_per_read(ITNode *root, uint32_t start, uint32_t
       return;
    }
   }
-  find_amplicon_per_read(root->right, start, end, haplotypes, positions, reverse, range, all_positions);
+  find_amplicon_per_read(root->right, start, end, haplotypes, positions, reverse, range, all_positions, primer_mutation);
   
 }
 

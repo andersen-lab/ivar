@@ -64,10 +64,10 @@ void update_allele_depth(std::vector<position> &all_positions, std::vector<std::
    * Function takes in the variants for a read and populates the allele data structure. All reads
    * get passed through this. Qualities all get added to the tmp_mean_qual prior to averaging. 
    */
-  if(positions.size() != nucleotides.size()){
+  /*if(positions.size() != nucleotides.size()){
     std::cout << "Error in allele updates." << std::endl;
     std::cout << positions.size() << " " << nucleotides.size() << std::endl;
-  }
+  }*/
   uint32_t location = 0;
   int allele_location = 0;
   //iterate over the variants
