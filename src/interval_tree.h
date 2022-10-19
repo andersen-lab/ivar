@@ -33,9 +33,15 @@ public:
   std::vector<std::vector<int>> haplotypes;
   std::vector<std::vector<uint32_t>> positions;
   std::vector<std::vector<uint32_t>> ranges; //the starts and ends of the reads
+
   std::vector<std::vector<int>> final_haplotypes; //these are summary for the amplicon
   std::vector<uint32_t> final_positions;
   std::vector<float> frequency;
+
+  double reverse=0; //these are added to track how many reverse/forward reads have mutations
+  double forward=0;
+  double mut_reverse=0;
+  double mut_forward=0;
   int read_count=0;
 
 };
@@ -52,7 +58,7 @@ private:
   void clear(ITNode *root); //removes all information from each node
   void dump_amplicon_summary(ITNode *root, std::string filename); //dump amplicon summaries to json file
   void find_amplicon_per_read(ITNode *root, uint32_t start, uint32_t end, std::vector<int> haplotypes, 
-      std::vector<uint32_t> positions, bool reverse, std::vector<uint32_t> ranges, std::vector<position> &all_positions);
+      std::vector<uint32_t> positions, bool reverse, std::vector<uint32_t> ranges, std::vector<position> &all_positions, bool primer_mutation);
 
 public:
   IntervalTree();  // constructor
@@ -65,7 +71,7 @@ public:
   ITNode *iterate_nodes(ITNode *root); //used to returns nodes iteratively
   ITNode *iterate_nodes(){return iterate_nodes(_root);}
   void find_amplicon_per_read(uint32_t start, uint32_t end, std::vector<int> haplotypes, 
-      std::vector<uint32_t> positions, bool reverse, std::vector<uint32_t> ranges, std::vector<position> &all_positions){find_amplicon_per_read(_root, start, end, haplotypes, positions, reverse, ranges, all_positions);}
+      std::vector<uint32_t> positions, bool reverse, std::vector<uint32_t> ranges, std::vector<position> &all_positions, bool primer_mutation){find_amplicon_per_read(_root, start, end, haplotypes, positions, reverse, ranges, all_positions, primer_mutation);}
 };
 
 IntervalTree populate_amplicons(std::string pair_info_file, std::vector<primer> &primers);
