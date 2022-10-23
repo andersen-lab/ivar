@@ -1,16 +1,27 @@
 #include "ref_seq.h"
 
+//this is slow because it fetchs the seq every time
 char ref_antd::get_base(int64_t pos, std::string region){ // 1-based position
   int len;
   char base = 0;
-  if(!region.empty() && this->fai != NULL){
-    seq = fai_fetch(this->fai, region.c_str(), &len);
+  if(!region.empty() && this->fai != NULL && this->seq == NULL){
+    this->seq = fai_fetch(this->fai, region.c_str(), &len);
   }
+  region = "";
   if (seq) base = *(seq + (pos - 1));
-  free(seq);
+  //free(seq);
   return base;
 }
+void ref_antd::remove_seq(){
+  free(this->seq);
+}
 
+void ref_antd::set_seq(std::string region){
+   int len;
+   if(!region.empty() && this->fai != NULL && this->seq == NULL){
+    this->seq = fai_fetch(this->fai, region.c_str(), &len);
+   } 
+}
 char* ref_antd::get_codon(int64_t pos, std::string region, gff3_feature feature){
   int len;
   seq = fai_fetch(this->fai, region.c_str(), &len);

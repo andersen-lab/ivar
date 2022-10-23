@@ -17,6 +17,8 @@ public:
   ref_antd(std::string ref_path, std::string gff_path);
   ~ref_antd();
   char get_base(int64_t pos, std::string region);
+  void set_seq(std::string region);
+  void remove_seq();
   int add_gff(std::string path);
   int add_seq(std::string path);
   int codon_aa_stream(std::string region, std::ostringstream &line_stream, std::ofstream &fout, int64_t pos, char alt);
