@@ -1,4 +1,6 @@
 #include <iostream>
+#include "htslib/hts.h"
+#include "htslib/sam.h"
 #include "primer_bed.h"
 #include "allele_functions.h"
 using namespace std;
@@ -58,7 +60,7 @@ private:
   void clear(ITNode *root); //removes all information from each node
   void dump_amplicon_summary(ITNode *root, std::string filename); //dump amplicon summaries to json file
   void find_amplicon_per_read(ITNode *root, uint32_t start, uint32_t end, std::vector<int> haplotypes, 
-      std::vector<uint32_t> positions, bool reverse, std::vector<uint32_t> ranges, std::vector<position> &all_positions, bool primer_mutation);
+      std::vector<uint32_t> positions, bool reverse, std::vector<uint32_t> ranges, std::vector<position> &all_positions, bool primer_mutation, bam1_t *r);
 
 public:
   IntervalTree();  // constructor
@@ -71,7 +73,7 @@ public:
   ITNode *iterate_nodes(ITNode *root); //used to returns nodes iteratively
   ITNode *iterate_nodes(){return iterate_nodes(_root);}
   void find_amplicon_per_read(uint32_t start, uint32_t end, std::vector<int> haplotypes, 
-      std::vector<uint32_t> positions, bool reverse, std::vector<uint32_t> ranges, std::vector<position> &all_positions, bool primer_mutation){find_amplicon_per_read(_root, start, end, haplotypes, positions, reverse, ranges, all_positions, primer_mutation);}
+      std::vector<uint32_t> positions, bool reverse, std::vector<uint32_t> ranges, std::vector<position> &all_positions, bool primer_mutation, bam1_t *r){find_amplicon_per_read(_root, start, end, haplotypes, positions, reverse, ranges, all_positions, primer_mutation, r);}
 };
 
 IntervalTree populate_amplicons(std::string pair_info_file, std::vector<primer> &primers);
