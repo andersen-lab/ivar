@@ -255,6 +255,7 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
           nt = '*';
           nucleotides.push_back(nt);
           saved_qualities.push_back(0);
+        }
         nucs.clear();
         digits.clear();
       }
@@ -950,6 +951,7 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
         }
         written_primer = true;
         node->frequency.push_back(save_read_counts[d] / adjusted_read_count); 
+        frequencies.push_back(save_read_counts[d] / adjusted_read_count);
       }else{
         node->frequency.push_back(save_read_counts[d] / adjusted_read_count);
         frequencies.push_back(save_read_counts[d] / adjusted_read_count);
@@ -1131,7 +1133,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   all_frequencies.erase(std::remove_if(
     all_frequencies.begin(), all_frequencies.end(),
     [](double& x) { 
-        return(x==1);
+        return(x==1 || x < 0.001);
     }), all_frequencies.end());
   
   //test lines
