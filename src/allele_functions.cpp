@@ -76,7 +76,19 @@ void update_allele_depth(std::vector<position> &all_positions, std::vector<std::
     location = positions[i];
     //this position already exists
     all_positions[location].depth += 1;
-    allele_location = check_allele_exists(nucleotides[i], all_positions[location].ad);
+    
+    //meant to cut down run time for checking allele existance
+    if(nucleotides[i] == "A"){
+      allele_location = 0;
+    }else if(nucleotides[i] == "C"){
+      allele_location = 1;
+    }else if(nucleotides[i] == "G"){
+      allele_location = 2;
+    }else if(nucleotides[i] == "T"){
+      allele_location = 3;
+    }else{
+      allele_location = check_allele_exists(nucleotides[i], all_positions[location].ad);
+    }
     //allele doesn't exist
     if(allele_location == -1){
       allele new_allele;
