@@ -6,13 +6,13 @@
 #include "../src/clustering.h"
 #include "../src/kmeans.h"
 
-void reset_positions(std::vector<position> &all_positions){
+//void reset_positions(std::vector<position> &all_positions){
   /*
    * @param all_positions : vector containing position objects for whole genome
    * Reset function to basic alleles with no depths for the position vector.
    * Meant to allow multiple tests within a single function.
    */
-  all_positions.clear();
+/*  all_positions.clear();
 
   //set up basic nucleotides
   std::vector<std::string> basic_nts = {"A", "C", "G", "T"};
@@ -32,13 +32,13 @@ void reset_positions(std::vector<position> &all_positions){
     all_positions.push_back(new_position);
   }
 }
-int _integreation_test_consensus(){
+int _integreation_test_consensus(){*/
   /*
    * Tests the consensus call using two approaches. First, we call consensus using autothresholding.
    * Second, we call consensus using the traditional mpileup and set the same threshold.
    * consensus sequences should be identical.
    */
-
+/*
   return(0);
 }
 
@@ -46,13 +46,13 @@ int _integreation_create_haplotypes(){
   return(0);
 }
 
-int _unit_test_parse_md_tag(){
+int _unit_test_parse_md_tag(){*/
   /*
    * @return success : 0 for passing else failing 
    *
    * Tests the process of parsing the MD tag.
    */
-  int success = 0;
+  //int success = 0;
 
   /*uint32_t abs_start_pos = 23620;
   uint32_t abs_end_pos = 23727;
@@ -78,17 +78,17 @@ int _unit_test_parse_md_tag(){
   std::vector<uint32_t> ignore_positions;*/
   
 
-  //parse_md_tag(aux, haplotypes, positions, abs_start_pos, all_positions, seq, length, correction_factor, abs_end_pos, ignore_positions, reverse);
+/*  //parse_md_tag(aux, haplotypes, positions, abs_start_pos, all_positions, seq, length, correction_factor, abs_end_pos, ignore_positions, reverse);
   
 
   return(success);
 }
 
-int _unit_test_frequencies(){
+int _unit_test_frequencies(){*/
   /*
    * Unit test for the function create_frequency_matrix.
    */
-  int success = 0;
+  /*int success = 0;
 
   int32_t primer_offset = 0;
   std::string pair_info = "../data/contamination_tests/primer_pairs.tsv";
@@ -103,7 +103,7 @@ int _unit_test_frequencies(){
   primers = populate_from_file(bed, primer_offset);
   amplicons = populate_amplicons(pair_info, primers);
   reset_positions(all_positions);
-
+  */
   /* Generate some fake haplotypes / positions to test.
    * Using the amplicon between 23601-23619 23728-23751.
    *
@@ -120,7 +120,7 @@ int _unit_test_frequencies(){
    * Case D. Testing the use of a deletion in creation of frequencies.
    *    One deletion at 23700 0.20 with the other 0.80 matching the reference.
    */
-
+/*
   //declare some baseline variables
   std::vector<uint32_t> positions;
   std::vector<int> haplotypes;
@@ -282,22 +282,16 @@ int _unit_test_frequencies(){
   return(success);
 }
 
-int _unit_test_sil_score(){
-  /*
-   * Makes sure the scoring metric is working to par.
-   */
-  return(0);  
-}
-
 //test the clustering function
 int _unit_test_kmeans(){
+*/
   /*
    * @return success : 0 for passing else failing
    *
    * Does two checks on the kmeans function looking for (1) accurate cluster centers 
    * and (2) an accurate sil score.
    */
-
+/*
   int success = 0;
   //test case one
   alglib::real_2d_array xy = "[[1],[1],[1],[4],[4],[4]]";
@@ -316,15 +310,14 @@ int _unit_test_kmeans(){
   //std::cout << "success " << success << std::endl;
   return(success);
 }
-
+*/
 int main(){
   int success = 4; //count total number of tests
-  /*success -= _unit_test_frequencies(); //contains 4 tests
-  success -= _unit_test_parse_md_tag(); //contains 2 tests
-  success -= _integreation_create_haplotypes();
+  //success -= _unit_test_frequencies(); //contains 4 tests
+  //success -= _unit_test_parse_md_tag(); //contains 2 tests
+  //success -= _integreation_create_haplotypes();
   
-  std::cout << "success: " << success << std::endl;
-  */
+  //std::cout << "success: " << success << std::endl;
   //success -= _unit_test_kmeans();
   //success -= _unit_test_sil_score();
   success -= determine_threshold("../data/contamination_tests/test.calmd.bam", "../data/contamination_tests/sequence.fasta", "../data/contamination_tests/sars_primers_strand.bed", "../data/contamination_tests/primer_pairs.tsv", 0, 0.8, 20, 'N', 10, true, "amplicon");
