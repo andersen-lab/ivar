@@ -175,6 +175,8 @@ std::vector<allele> update_allele_depth(char ref,std::string bases, std::string 
   }
   if(ad.size() > 0)
     std::sort(ad.begin(), ad.end());
+  //test code
+  //print_allele_depths(ad);
   return ad;
 }
 
