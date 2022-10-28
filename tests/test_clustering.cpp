@@ -1,6 +1,6 @@
 #include<iostream>
-#include "ap.h"
-#include "stdafx.h"
+#include "../src/alglib/ap.h"
+#include "../src/alglib/stdafx.h"
 #include "../src/interval_tree.h"
 #include "../src/primer_bed.h"
 #include "../src/clustering.h"
