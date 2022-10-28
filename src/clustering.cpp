@@ -603,7 +603,7 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
   bool first_pass = true;
   bool second_pass = true;
   uint32_t insertion_pos = 0;
-  insertion_pos = correction_factor; //just to shut up compiler issue
+  insertion_pos = correction_factor + 1 - 1; //just to shut up compiler issue
   char nt = 0;
   char ref = 0; //reference base at this pos
   bool primer_mutation = false; //track whether this read has a primer mut
@@ -876,7 +876,7 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
   
   //loop through all the amplicons
   while(node != NULL){
-    bool primer_issue = false;
+    bool primer_issue = true;
     primer_issue = false; //shut up compiler error
     lower_primer_name.clear();
 
