@@ -22,6 +22,64 @@
 #include "kmeans.h"
 using namespace alglib;
 
+std::vector<double> test_new_cluserting_function(std::vector<position> all_positions, IntervalTree &amplicons){
+  /*
+   * EXPERIMENTAL
+   */
+  ITNode *node = amplicons.iterate_nodes();
+  int read_count=0; //total reads in amplicon
+
+  std::vector<std::vector<int>> haplotypes;
+  std::vector<uint32_t> positions;
+  std::vector<uint32_t> suspect_positions;
+
+  std::vector<uint32_t> suspect_haplotypes;
+  std::vector<double> freq;
+  //loop through all the amplicons
+  while(node != NULL){
+    node = amplicons.iterate_nodes(node->right);
+    if(node == NULL){
+      break;
+    }
+    read_count = node->read_count;
+    if(read_count == 0){
+      continue;
+    }
+    haplotypes = node->final_haplotypes;
+    positions = node->final_positions;
+
+    suspect_haplotypes = node->suspect_haplotypes; //stores haplotypes that are suspect
+    suspect_positions = node->suspect_positions; 
+    std::vector<uint32_t>::iterator sus_iter;
+    std::vector<double>::iterator iter;
+    double tmp_freq;
+    for(uint32_t i = 0; i < haplotypes.size(); i++){
+      sus_iter = std::find(suspect_haplotypes.begin(), suspect_haplotypes.end(), i);
+      
+      //haplotype not suspect
+      if(sus_iter == suspect_haplotypes.end()){
+        //iterate it's positions
+        for(uint32_t x = 0; x < positions.size(); x++){
+          if(positions[x] < 0){
+            continue;
+          }
+          //std::cout << positions[x] << std::endl; //positions
+          //std::cout << haplotypes[i][x] << std::endl; //nucleotide
+          //std::cout << all_positions[positions[x]].depth << std::endl;                                            
+          //std::cout << all_positions[positions[x]].ad[haplotypes[i][x]].depth << std::endl;
+          //std::cout << "percent " << all_positions[positions[x]].ad[haplotypes[i][x]].depth / all_positions[positions[x]].depth << std::endl;
+          tmp_freq = all_positions[positions[x]].ad[haplotypes[i][x]].depth / all_positions[positions[x]].depth;
+          iter = std::find(freq.begin(), freq.end(), tmp_freq);
+          if(iter == freq.end()){
+            freq.push_back(tmp_freq);
+          }
+        }
+      }
+    }
+  }
+  return(freq);
+}
+
 bool check_nucleotide(std::string nt){
   /*
    * Helper function to determine if a nucelotide is a valid string.
@@ -248,6 +306,7 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
       if(deletion){
         //del_correction_factor += nucs.length(); //this speaks to the relative position
         deletion = false;
+        abs_start_pos += stoi(digits);
         for(uint32_t len = 0; len < nucs.length(); len++){
           deletions.push_back(abs_start_pos + len);
           positions.push_back(abs_start_pos + len);
@@ -926,6 +985,8 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     std::vector<uint32_t> suspect_positions;
     suspect_haplotypes = check_primer_binding_issues(flattened, all_positions, save_read_counts, adjusted_read_count, save_haplotypes, suspect_positions);
 
+    node->suspect_positions = suspect_positions;
+    node->suspect_haplotypes = suspect_haplotypes;
     std::string suspect_position_string = "";
     for(uint32_t i = 0; i < suspect_positions.size(); i++){
       if(i > 0){
@@ -951,7 +1012,6 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
         }
         written_primer = true;
         node->frequency.push_back(save_read_counts[d] / adjusted_read_count); 
-        frequencies.push_back(save_read_counts[d] / adjusted_read_count);
       }else{
         node->frequency.push_back(save_read_counts[d] / adjusted_read_count);
         frequencies.push_back(save_read_counts[d] / adjusted_read_count);
@@ -1112,6 +1172,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   }
   std::cout << "end read processing." << std::endl; 
   reference.remove_seq(); 
+
   //calculate the mean quality, might not print properly but saves properly
   for(uint32_t i = 0; i < all_positions.size(); i++){
     for(uint32_t x = 0; x < all_positions[i].ad.size(); x++){
@@ -1129,6 +1190,10 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   if(all_frequencies.size() < 2){
     return(0);
   }
+  
+  //std::vector<double> test_freq = test_new_cluserting_function(all_positions, amplicons);
+  //all_frequencies.clear();
+  //all_frequencies = test_freq;
   //remove perfect 1 haplotypes
   all_frequencies.erase(std::remove_if(
     all_frequencies.begin(), all_frequencies.end(),
@@ -1153,7 +1218,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   }
 
   //if we have fewer than 6 points, we can only have that many clusters
-  if(all_frequencies.size() < 6){
+  if(all_frequencies.size() < max_n){
     max_n = all_frequencies.size();
   }
   //call kmeans clustering
@@ -1191,7 +1256,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     i++;
   }
   file.close();
- cluster choice_cluster = all_cluster_results[best_cluster_index];
+  cluster choice_cluster = all_cluster_results[best_cluster_index];
 
   //find the largest cluster center
   int largest_cluster_index = std::max_element(choice_cluster.centers.begin(), choice_cluster.centers.end()) - choice_cluster.centers.begin();
@@ -1205,7 +1270,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
 
   //call consensus
   call_consensus_from_vector(all_positions, seq_id, prefix, min_qual, threshold, min_depth, gap, min_coverage_flag, min_insert_threshold);
-
+  
   return 0;
 }
 
