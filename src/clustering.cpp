@@ -602,6 +602,7 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
   uint32_t correction_factor = 0;
   bool first_pass = true;
   bool second_pass = true;
+  uint32_t insertion_pos = 0;
   char nt = 0;
   char ref = 0; //reference base at this pos
   bool primer_mutation = false; //track whether this read has a primer mut
@@ -644,9 +645,9 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
     if(op == 1){
 
       if(reverse){
-        uint32_t insertion_pos = abs_end_pos - start;
+        insertion_pos = abs_end_pos - start;
       } else {
-        uint32_t insertion_pos = abs_start_pos + start;
+        insertion_pos = abs_start_pos + start;
       }
       //go get each nt in the insertion region
       for(uint32_t x = 0; x < op_len; x++){
