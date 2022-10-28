@@ -40,6 +40,9 @@ public:
   std::vector<uint32_t> final_positions;
   std::vector<float> frequency;
 
+  std::vector<uint32_t> suspect_positions;
+  std::vector<uint32_t> suspect_haplotypes;
+
   double reverse=0; //these are added to track how many reverse/forward reads have mutations
   double forward=0;
   double mut_reverse=0;

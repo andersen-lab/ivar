@@ -321,7 +321,7 @@ int main(){
   //success -= _unit_test_kmeans();
   //success -= _unit_test_sil_score();
   success -= determine_threshold("../data/contamination_tests/test.calmd.bam", "../data/contamination_tests/sequence.fasta", "../data/contamination_tests/sars_primers_strand.bed", "../data/contamination_tests/primer_pairs.tsv", 0, 0.8, 20, 'N', 10, true, "amplicon");
-  //determine_threshold("../data/contamination_tests/test.calmd.bam", "../data/contamination_tests/sars_primers_strand.bed", "../data/contamination_tests/primer_pairs.tsv", 0);
-  //determine_threshold("../data/contamination_tests/simulated_alpha_beta_90_10.bam", "../data/contamination_tests/sars_primers_strand.bed", "../data/contamination_tests/primer_pairs.tsv", 0);
+   //success -= determine_threshold("/Users/caceves/Desktop/simulated_data/simulated_gamma_delta_80_20.bam", "../data/contamination_tests/sequence.fasta", "../data/contamination_tests/sars_primers_strand.bed", "../data/contamination_tests/primer_pairs.tsv", 0, 0.8, 20, 'N', 10, true, "amplicon");
+
   return 0;
 }
