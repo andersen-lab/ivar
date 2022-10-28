@@ -1,6 +1,6 @@
-#include "dataanalysis.h"
-#include "ap.h"
-#include "stdafx.h"
+#include "./alglib/dataanalysis.h"
+#include "./alglib/ap.h"
+#include "./alglib/stdafx.h"
 using namespace alglib;
 #include <numeric>
 /*

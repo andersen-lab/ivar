@@ -1,6 +1,6 @@
-#include "dataanalysis.h"
-#include "ap.h"
-#include "stdafx.h"
+#include "./alglib/dataanalysis.h"
+#include "./alglib/ap.h"
+#include "./alglib/stdafx.h"
 #define ae_bool bool
 #define ae_true true
 #define ae_false false
