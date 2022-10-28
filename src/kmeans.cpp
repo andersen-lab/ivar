@@ -3,6 +3,7 @@
 #include "./alglib/stdafx.h"
 using namespace alglib;
 #include <numeric>
+#include<algorithm>
 /*
  * Written to extend alglib kmeans clustering, imposing 
  * and additional "compositional constraint" and fixing a noise
