@@ -8,10 +8,10 @@
 #include <string.h>
 #include <sstream>
 #include <vector>
-#include "ap.h"
-#include "dataanalysis.h"
+#include "./alglib/ap.h"
+#include "./alglib/dataanalysis.h"
 #include "interval_tree.h"
-#include "stdafx.h"
+#include "./alglib/stdafx.h"
 #include "primer_bed.h"
 
 #ifndef clustering

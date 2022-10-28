@@ -603,6 +603,7 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
   bool first_pass = true;
   bool second_pass = true;
   uint32_t insertion_pos = 0;
+  insertion_pos = correction_factor; //just to shut up compiler issue
   char nt = 0;
   char ref = 0; //reference base at this pos
   bool primer_mutation = false; //track whether this read has a primer mut
@@ -672,7 +673,6 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
     reorder_haplotypes(haplotypes, positions);
     //places haplotype on amplicon node
     amplicons.find_amplicon_per_read(abs_start_pos, abs_end_pos, haplotypes, positions, reverse, range, all_positions, primer_mutation, r); 
-    insertion_pos = 0;
   }
 }
 
@@ -873,10 +873,11 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
   std::vector<uint32_t> range;
   std::vector<int> haplotype;
   std::string lower_primer_name;
-
+  
   //loop through all the amplicons
   while(node != NULL){
     bool primer_issue = false;
+    primer_issue = false; //shut up compiler error
     lower_primer_name.clear();
 
     node = amplicons.iterate_nodes(node->right);
