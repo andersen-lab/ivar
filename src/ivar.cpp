@@ -483,8 +483,6 @@ int main(int argc, char* argv[]){
       case 'f':
   g_args.primer_pair_file = optarg;
   break;
-      case 'g':
-	break;
       case 'h':
       case '?':
 	print_autoconsensus_usage();
