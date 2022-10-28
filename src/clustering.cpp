@@ -9,23 +9,20 @@
 #include <string.h>
 #include <sstream>
 #include <vector>
-#include "ap.h"
-#include "dataanalysis.h"
+#include "./alglib/ap.h"
+#include "./alglib/dataanalysis.h"
 #include "interval_tree.h"
 #include "allele_functions.h"
 #include "call_consensus_pileup.h"
 #include "get_masked_amplicons.h"
 #include "primer_bed.h"
-#include "stdafx.h"
+#include "./alglib/stdafx.h"
 #include "clustering.h"
 #include "ref_seq.h"
 #include "kmeans.h"
 using namespace alglib;
-
+/*
 std::vector<double> test_new_cluserting_function(std::vector<position> all_positions, IntervalTree &amplicons){
-  /*
-   * EXPERIMENTAL
-   */
   ITNode *node = amplicons.iterate_nodes();
   int read_count=0; //total reads in amplicon
 
@@ -79,7 +76,7 @@ std::vector<double> test_new_cluserting_function(std::vector<position> all_posit
   }
   return(freq);
 }
-
+*/
 bool check_nucleotide(std::string nt){
   /*
    * Helper function to determine if a nucelotide is a valid string.
@@ -601,7 +598,6 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
   std::vector<int> haplotypes;
   std::vector<uint32_t> positions;
   std::vector<uint32_t> ignore_positions; //all positions that are soft clipped
-  uint32_t insertion_pos = 0;
   std::string nucs = "";
   uint32_t correction_factor = 0;
   bool first_pass = true;
@@ -646,10 +642,11 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
     if(op != 4){ first_pass = false;}
     //these are the only operations we care about
     if(op == 1){
+
       if(reverse){
-        insertion_pos = abs_end_pos - start;
+        uint32_t insertion_pos = abs_end_pos - start;
       } else {
-        insertion_pos = abs_start_pos + start;
+        uint32_t insertion_pos = abs_start_pos + start;
       }
       //go get each nt in the insertion region
       for(uint32_t x = 0; x < op_len; x++){
@@ -674,6 +671,7 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
     reorder_haplotypes(haplotypes, positions);
     //places haplotype on amplicon node
     amplicons.find_amplicon_per_read(abs_start_pos, abs_end_pos, haplotypes, positions, reverse, range, all_positions, primer_mutation, r); 
+    insertion_pos = 0;
   }
 }
 
@@ -875,10 +873,9 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
   std::vector<int> haplotype;
   std::string lower_primer_name;
 
-  bool primer_issue = false;
   //loop through all the amplicons
   while(node != NULL){
-    primer_issue = false;
+    bool primer_issue = false;
     lower_primer_name.clear();
 
     node = amplicons.iterate_nodes(node->right);
@@ -1042,7 +1039,7 @@ void call_consensus_from_vector(std::vector<position> all_positions, std::string
     fout << ">" << seq_id <<std::endl;
   }
   delete [] o;
-  int ctr = 0, mdepth = 0;
+  int mdepth = 0;
   uint32_t prev_pos = 0, pos = 0;
   ret_t t;
   std::string bases;
@@ -1051,7 +1048,6 @@ void call_consensus_from_vector(std::vector<position> all_positions, std::string
   uint32_t bases_zero_depth = 0, bases_min_depth = 0, total_bases = 0;
   for(position p : all_positions){
     ad = p.ad;
-    ctr = 0;
     pos = p.pos;
     mdepth = p.depth;
     total_bases++;
