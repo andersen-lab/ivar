@@ -603,7 +603,10 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
   bool first_pass = true;
   bool second_pass = true;
   uint32_t insertion_pos = 0;
-  insertion_pos = correction_factor + 1 - 1; //just to shut up compiler issue
+  insertion_pos += 1; //just to shut up compiler issue
+  if(first_pass){
+    insertion_pos -= 1;
+  }
   char nt = 0;
   char ref = 0; //reference base at this pos
   bool primer_mutation = false; //track whether this read has a primer mut
@@ -876,8 +879,6 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
   
   //loop through all the amplicons
   while(node != NULL){
-    bool primer_issue = true;
-    primer_issue = false; //shut up compiler error
     lower_primer_name.clear();
 
     node = amplicons.iterate_nodes(node->right);
@@ -907,9 +908,12 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     }
      
     //this indicates that a number of primers contain mismatches in either the right or left primer region
+    bool primer_issue = true;
+    primer_issue = false;
     if((mut_for_ratio > 0.03) || (mut_rev_ratio > 0.03)){
       primer_issue = true;
     }
+    
     std::string primer_mismatch_percent = std::to_string(mut_for_ratio) + " " + std::to_string(mut_rev_ratio);
 
     //remove positions & indels where avg. quality is below 20
@@ -1004,7 +1008,7 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     for(uint32_t d = 0; d < save_read_counts.size(); d++){
       it_suspects = std::find(suspect_haplotypes.begin(), suspect_haplotypes.end(), d);
       //in the suspects list, write to files
-      if(it_suspects != suspect_haplotypes.end() && !written_primer){
+      if(it_suspects != suspect_haplotypes.end() && !written_primer && primer_issue){
         if(!output_primer.empty()){
           //generate positions string
           file << lower_primer_name << "\t" << suspect_position_string << "\t" << primer_mismatch_percent <<  "\n";
