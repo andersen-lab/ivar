@@ -908,9 +908,10 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     }
      
     //this indicates that a number of primers contain mismatches in either the right or left primer region
-    bool primer_issue = true;
+    bool primer_issue = false;
     primer_issue = false;
     if((mut_for_ratio > 0.03) || (mut_rev_ratio > 0.03)){
+      //std::cout << "this" << std::endl;
       primer_issue = true;
     }
     
@@ -1014,8 +1015,8 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
           file << lower_primer_name << "\t" << suspect_position_string << "\t" << primer_mismatch_percent <<  "\n";
         }
         written_primer = true;
-        node->frequency.push_back(save_read_counts[d] / adjusted_read_count); 
-      }else{
+        node->frequency.push_back(save_read_counts[d] / adjusted_read_count);
+      }else if(suspect_haplotypes.size() == 0){
         node->frequency.push_back(save_read_counts[d] / adjusted_read_count);
         frequencies.push_back(save_read_counts[d] / adjusted_read_count);
      }
@@ -1192,7 +1193,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   if(all_frequencies.size() < 2){
     return(0);
   }
-  
+   
   //std::vector<double> test_freq = test_new_cluserting_function(all_positions, amplicons);
   //all_frequencies.clear();
   //all_frequencies = test_freq;
