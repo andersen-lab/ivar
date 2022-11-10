@@ -38,6 +38,7 @@ public:
 
   std::vector<std::vector<int>> final_haplotypes; //these are summary for the amplicon
   std::vector<uint32_t> final_positions;
+  std::vector<int> haplotype_counts;
   std::vector<float> frequency;
 
   std::vector<uint32_t> suspect_positions;
