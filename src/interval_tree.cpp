@@ -208,7 +208,7 @@ void IntervalTree::find_amplicon_per_read(ITNode *root, uint32_t start, uint32_t
       root->reverse += 1;
       if(primer_mutation){
         root->mut_reverse += 1;
-      }      
+      }
       //we go through this additional step where we chop off positions not within the amplicon
       std::vector<std::pair<std::uint32_t, int>> zipped = _trim_read_positions(haplotypes, positions, 
           root->data->low, root->data->high);
@@ -220,7 +220,7 @@ void IntervalTree::find_amplicon_per_read(ITNode *root, uint32_t start, uint32_t
         root->positions.push_back(positions);
         root->ranges.push_back(range);
         root->read_count += 1;
-        return;
+       return;
     }
   }else{
     if((root->data->low_inner - 10 - 1 < start) && (root->data->low_inner + 10 - 1 >  start)){
@@ -228,7 +228,7 @@ void IntervalTree::find_amplicon_per_read(ITNode *root, uint32_t start, uint32_t
       if(primer_mutation){
         root->mut_forward += 1;
       }     
-      std::vector<std::pair<std::uint32_t, int>> zipped = _trim_read_positions(haplotypes, positions, 
+     std::vector<std::pair<std::uint32_t, int>> zipped = _trim_read_positions(haplotypes, positions, 
         root->data->low, root->data->high);
       if(zipped.size() == 0){return;}
       //unzip the newly modifed haplotypes
@@ -236,7 +236,7 @@ void IntervalTree::find_amplicon_per_read(ITNode *root, uint32_t start, uint32_t
       root->haplotypes.push_back(haplotypes);
       root->positions.push_back(positions);
       root->ranges.push_back(range);
-      //always increment the read count, even if the read macthes the ref perfectly
+      //always increment the read count, even if the read mathes the ref perfectly
       root->read_count += 1;
       return;
    }

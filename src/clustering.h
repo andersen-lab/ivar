@@ -16,7 +16,13 @@
 
 #ifndef clustering
 #define clustering
+class read_linkage {
+  public:
+    std::string read_name;
+    std::vector<uint32_t> positions;
+    std::vector<int> haplotype;
 
+};
 class cluster {
   public:
     int n_clusters;
