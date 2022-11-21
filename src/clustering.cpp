@@ -435,12 +435,10 @@ void calculate_sil_score(alglib::real_2d_array X, alglib::kmeansreport rep,
     center = rep.cidx[i];
     sorted_points[center].push_back(point);
     tmp = cluster_point_distances(X, rep, point, center, n_clusters);
-    sil_scores.push_back(tmp);
+    std::cout << "point " << X[i][0] << " center " << rep.cidx[i] << " score " << tmp << std::endl;
+   sil_scores.push_back(tmp);
   }
 
-  for(double d: sil_scores){
-    std::cout << d << std::endl;
-  }
   //store the cumulative results
   cluster_results.sil_score = average(sil_scores);
   cluster_results.sil_scores = sil_scores;
@@ -1163,6 +1161,10 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     if(read_counter % 100000 == 0){
       std::cout << read_counter << " reads processed." << std::endl;
     }
+    if(read_counter < 1400000 || read_counter > 1600000){
+      read_counter += 1;
+      continue;
+    }
     read_counter += 1;
     iterate_reads(aln, amplicons, all_positions, reference, region_);
   }
@@ -1196,6 +1198,9 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
         return(x==1 || x < 0.001);
     }), all_frequencies.end());
 
+  for(double f : all_frequencies){
+    std::cout << f << std::endl;
+  }
   //if we're going to masked the mutations, remove them here
   if(mask_primer_muts){
     for(uint32_t i=0; i < masked_positions.size(); i++){
@@ -1214,7 +1219,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   file << "lower_primer\tupper_primer\tread_count\tpositions\tfrequencies\thaplotypes\tnumber_haplotypes\n";
   file.close();
   amplicons.dump_amplicon_summary(output_amplicon);
-
+  
   //reshape it into a real 2d array for alglib
   xy.setlength(all_frequencies.size(), 1);
   for(uint32_t i=0; i < all_frequencies.size(); i++){
