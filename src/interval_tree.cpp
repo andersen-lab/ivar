@@ -137,6 +137,8 @@ std::vector<std::pair<std::uint32_t, int>>  _trim_read_positions(std::vector<int
     if((positions[i] >= lower_bound) && (positions[i] <= upper_bound)){
       new_haplotypes.push_back(haplotypes[i]);
       new_positions.push_back(positions[i]);
+    }else if (positions[i] == 14933){
+      std::cout << "not pushed back " << lower_bound << " " << upper_bound << std::endl;
     }
   }
 
@@ -210,12 +212,11 @@ void IntervalTree::find_amplicon_per_read(ITNode *root, uint32_t start, uint32_t
         root->mut_reverse += 1;
       }
       //we go through this additional step where we chop off positions not within the amplicon
-      std::vector<std::pair<std::uint32_t, int>> zipped = _trim_read_positions(haplotypes, positions, 
-          root->data->low, root->data->high);
-        if(zipped.size() == 0){return;}
+      //std::vector<std::pair<std::uint32_t, int>> zipped = _trim_read_positions(haplotypes, positions, root->data->low, root->data->high);
+        //if(zipped.size() == 0){return;}
         //unzip the newly modifed haplotypes
-        unzip(zipped, haplotypes, positions);
-        if(zipped.size() == 0){return;}
+        //unzip(zipped, haplotypes, positions);
+        //if(zipped.size() == 0){return;}
         root->haplotypes.push_back(haplotypes);
         root->positions.push_back(positions);
         root->ranges.push_back(range);
@@ -227,12 +228,11 @@ void IntervalTree::find_amplicon_per_read(ITNode *root, uint32_t start, uint32_t
       root->forward += 1;
       if(primer_mutation){
         root->mut_forward += 1;
-      }     
-     std::vector<std::pair<std::uint32_t, int>> zipped = _trim_read_positions(haplotypes, positions, 
-        root->data->low, root->data->high);
-      if(zipped.size() == 0){return;}
+      }
+      //std::vector<std::pair<std::uint32_t, int>> zipped = _trim_read_positions(haplotypes, positions, root->data->low, root->data->high);
+      //if(zipped.size() == 0){return;}
       //unzip the newly modifed haplotypes
-      unzip(zipped, haplotypes, positions);
+      //unzip(zipped, haplotypes, positions);
       root->haplotypes.push_back(haplotypes);
       root->positions.push_back(positions);
       root->ranges.push_back(range);
