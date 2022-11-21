@@ -973,7 +973,7 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
       frequency_positions.push_back(flattened);
       node->frequency.push_back(save_read_counts[i] / adjusted_read_count);
     }
-
+    node->final_positions = flattened;
     //write suspicious positions because of primer issues to text file
     ofstream file;
     if(!output_primer.empty() && primer_issue && suspect_positions.size() > 0){
