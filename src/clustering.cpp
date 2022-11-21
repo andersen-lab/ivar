@@ -438,6 +438,9 @@ void calculate_sil_score(alglib::real_2d_array X, alglib::kmeansreport rep,
     sil_scores.push_back(tmp);
   }
 
+  for(double d: sil_scores){
+    std::cout << d << std::endl;
+  }
   //store the cumulative results
   cluster_results.sil_score = average(sil_scores);
   cluster_results.sil_scores = sil_scores;
