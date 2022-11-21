@@ -407,6 +407,7 @@ double cluster_point_distances(alglib::real_2d_array X, alglib::kmeansreport rep
       b = tmp;
     }
   }
+  std::cout << "a " << a << " b " << b << std::endl;
   return((b - a) / std::max(a,b));
 }
 
@@ -429,7 +430,7 @@ void calculate_sil_score(alglib::real_2d_array X, alglib::kmeansreport rep,
   std::vector<double> sil_scores;
   std::vector<std::vector<double>> sorted_points(n_clusters);
   double tmp = 0;
-
+  std::cout << "\nclusters " << n_clusters << std::endl;
   for (int i = 0; i < rows; i++) {
     point = X[i][0];
     center = rep.cidx[i];
