@@ -406,13 +406,11 @@ double cluster_point_distances(alglib::real_2d_array X, alglib::kmeansreport rep
       continue;
     }
     tmp = external_dist[z][0] / external_dist[z][1];
-    std::cout << "z " << z << " " << external_dist[z][0] << " " << external_dist[z][1] << " " << tmp << std::endl;
     //find the minimum of the external cluster dists
     if(tmp < b){
       b = tmp;
     }
   }
-  std::cout << "a " << a << " b " << b << std::endl;
   return((b - a) / std::max(a,b));
 }
 
@@ -435,14 +433,12 @@ void calculate_sil_score(alglib::real_2d_array X, alglib::kmeansreport rep,
   std::vector<double> sil_scores;
   std::vector<std::vector<double>> sorted_points(n_clusters);
   double tmp = 0;
-  std::cout << "\nclusters " << n_clusters << std::endl;
   for (int i = 0; i < rows; i++) {
     point = X[i][0];
     center = rep.cidx[i];
     sorted_points[center].push_back(point);
     tmp = cluster_point_distances(X, rep, point, center, n_clusters);
-    std::cout << "point " << X[i][0] << " center " << rep.cidx[i] << " score " << tmp << std::endl;
-   sil_scores.push_back(tmp);
+    sil_scores.push_back(tmp);
   }
 
   //store the cumulative results
@@ -1167,10 +1163,6 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     if(read_counter % 100000 == 0){
       std::cout << read_counter << " reads processed." << std::endl;
     }
-    if(read_counter < 1400000 || read_counter > 1600000){
-      read_counter += 1;
-      continue;
-    }
     read_counter += 1;
     iterate_reads(aln, amplicons, all_positions, reference, region_);
   }
@@ -1204,9 +1196,6 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
         return(x==1 || x < 0.001);
     }), all_frequencies.end());
 
-  for(double f : all_frequencies){
-    std::cout << f << std::endl;
-  }
   //if we're going to masked the mutations, remove them here
   if(mask_primer_muts){
     for(uint32_t i=0; i < masked_positions.size(); i++){
