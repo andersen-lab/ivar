@@ -1160,10 +1160,6 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     if(read_counter % 100000 == 0){
       std::cout << read_counter << " reads processed." << std::endl;
     }
-    if(read_counter < 1500000 || read_counter > 1600000){
-      read_counter += 1;
-      continue;
-    }
     read_counter += 1;
     iterate_reads(aln, amplicons, all_positions, reference, region_);
   }
