@@ -401,8 +401,12 @@ double cluster_point_distances(alglib::real_2d_array X, alglib::kmeansreport rep
 
   //find the average distance from each external cluster
   for(int z=0; z < n_clusters; z++){
+    double zz = z;
+    if(zz == center){
+      continue;
+    }
     tmp = external_dist[z][0] / external_dist[z][1];
-    std::cout << external_dist[z][0] << " " << external_dist[z][1] << " " << tmp << std::endl;
+    std::cout << "z " << z << " " << external_dist[z][0] << " " << external_dist[z][1] << " " << tmp << std::endl;
     //find the minimum of the external cluster dists
     if(tmp < b){
       b = tmp;
