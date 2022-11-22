@@ -1135,7 +1135,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   bam_hdr_t *header = sam_hdr_read(in);
 
   uint32_t *ref_length = header->target_len;
-  for(uint32_t i=0; i < *ref_length; i++){
+  for(uint32_t i=0; i <= *ref_length; i++){
     position new_position;
     new_position.pos = i;
     new_position.depth = 0;
