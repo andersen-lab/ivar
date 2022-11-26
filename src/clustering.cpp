@@ -1,6 +1,7 @@
 #include "htslib/hts.h"
 #include "htslib/sam.h"
 #include "htslib/bgzf.h"
+#include <unordered_map>
 #include <iostream>
 #include <fstream>
 #include <unistd.h>
@@ -22,6 +23,12 @@
 #include "kmeans.h"
 using namespace alglib;
 
+void print_map(std::unordered_map<char, std::string> const &m)
+{
+    for (auto const &pair: m) {
+        std::cout << "{" << pair.first << ": " << pair.second << "}\n";
+    }
+}
 bool check_nucleotide(std::string nt){
   /*
    * Helper function to determine if a nucelotide is a valid string.
@@ -559,12 +566,18 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
   char ref = 0; //reference base at this pos
   bool primer_mutation = false; //track whether this read has a primer mut
   std::string qname = bam_get_qname(r);
-
+  std::string test = "A01535:8:HJ3YYDSX2:4:1228:22001:21496";
   i = 0;
+  if(test == qname){
+    std::cout << "\n";
+  }
   //iterate through cigar ops for this read
   while(i < r->core.n_cigar){   
     op = bam_cigar_op(cigar[i]); //cigar operation
     op_len = bam_cigar_oplen(cigar[i]); //cigar length
+    if(qname == test){
+      std::cout << op << " " << op_len << std::endl;
+    }      
     if(op == 4 && first_pass){
       if(!reverse){
         correction_factor = op_len;
@@ -595,23 +608,16 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
     if(op != 4){ first_pass = false;}
     //these are the only operations we care about
     if(op == 1){
-
-      if(reverse){
-        insertion_pos = abs_end_pos - start;
-      } else {
-        insertion_pos = abs_start_pos + start;
-      }
+      uint32_t start_insertion = start+correction_factor;
       //go get each nt in the insertion region
       for(uint32_t x = 0; x < op_len; x++){
         //the nucelotide at the insertion poi
-        nt = seq_nt16_str[bam_seqi(seq, start+x)];
+        nt = seq_nt16_str[bam_seqi(seq, start_insertion+x)];
         nucs += nt;
-        //in this process, the positions are not longer in numeric order
-        haplotypes.push_back(encoded_nucs(nucs));
-        nucs.clear();
-        positions.push_back(abs_start_pos+start+x);
-      }
-    }
+       }
+       haplotypes.push_back(encoded_nucs(nucs));
+       positions.push_back(abs_start_pos+start);
+   }
 
     if (bam_cigar_type(op) & 2){
       start += op_len; //total positions iterated relation to ref
@@ -1088,7 +1094,11 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
    * @param pair_info : path to the primer pair .tsv file
    * @param primer_offset : 
    */
- 
+  std::unordered_map<std::string, char> dict_encode;
+  std::unordered_map<char, std::string> dict_decode;
+  dict_decode['A'] = "hello world";
+  print_map(dict_decode); 
+  exit(1);
   //TODO: pass this as a param 
   bool mask_primer_muts = true;
 
@@ -1162,6 +1172,10 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     //TODO: reimagine this as a percent
     if(read_counter % 100000 == 0){
       std::cout << read_counter << " reads processed." << std::endl;
+    }
+    if(read_counter < 1600000 || read_counter > 1700000){
+      read_counter += 1;
+      continue;
     }
     read_counter += 1;
     iterate_reads(aln, amplicons, all_positions, reference, region_);
