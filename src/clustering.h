@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <sstream>
+#include <unordered_map>
 #include <vector>
 #include "./alglib/ap.h"
 #include "./alglib/dataanalysis.h"
@@ -47,6 +48,6 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
     uint32_t abs_start_pos, std::vector<position> &all_positions,
     uint8_t *seq, uint32_t length, uint32_t correction_factor, uint32_t abs_end_pos,
     std::vector<uint32_t> ignore_positions, bool reverse);
-std::string decoded_nucs(int tmp);
+std::string decoded_nucs(int tmp, std::unordered_map<int, std::string> dict_decode);
 std::vector<std::vector<int>> transpose(const std::vector<std::vector<int>> data);
 #endif

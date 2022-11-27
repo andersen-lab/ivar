@@ -1,3 +1,4 @@
+#include<unordered_map>
 #include "interval_tree.h"
 #include "clustering.h"
 // Constructor for initializing an Interval Tree
@@ -148,7 +149,7 @@ std::vector<std::pair<std::uint32_t, int>>  _trim_read_positions(std::vector<int
   return(zipped);
 }
 
-void remove_low_quality_nts(ITNode *node, std::vector<position> all_positions){
+void remove_low_quality_nts(ITNode *node, std::vector<position> all_positions, std::unordered_map<int, std::string> dict_decode){
   /*
    * Function takes in a single node and uses average quality information to eliminate positions
    * within haplotypes that are possible sequencing errors.
@@ -163,7 +164,7 @@ void remove_low_quality_nts(ITNode *node, std::vector<position> all_positions){
       if(node->haplotypes[i][x] < 0){
         continue;
       }
-      nt = decoded_nucs(node->haplotypes[i][x]);
+      nt = decoded_nucs(node->haplotypes[i][x], dict_decode);
       allele_storage = all_positions[node->positions[i][x]].ad;
       for (allele a : allele_storage){
         //find the proper nuc

@@ -23,7 +23,13 @@
 #include "kmeans.h"
 using namespace alglib;
 
-void print_map(std::unordered_map<char, std::string> const &m)
+void print_map(std::unordered_map<std::string, int> const &m){
+    for (auto const &pair: m) {
+        std::cout << "{" << pair.first << ": " << pair.second << "}\n";
+    }
+}
+
+void print_map(std::unordered_map<int, std::string> const &m)
 {
     for (auto const &pair: m) {
         std::cout << "{" << pair.first << ": " << pair.second << "}\n";
@@ -160,64 +166,47 @@ void print_cluster_info(cluster cluster_results){
   }
 }
 
-std::string decoded_nucs(int tmp){
+std::string decoded_nucs(int tmp, std::unordered_map<int, std::string> dict_decoded){
   /*
    * @param tmp : integer value encoding for a nucleotide
    * @return dencoded_nuc : nucleotide sequence as a string
    *
    * TODO could be a case-switch?
    */
-  std::string dencoded_nuc = "XXX";
-  
-  if (tmp == 0) {
-    dencoded_nuc = "A";
-  }else if(tmp == 1){
-    dencoded_nuc = "C";
-  }else if (tmp == 2){
-    dencoded_nuc = "G";
-  }else if(tmp == 3){
-    dencoded_nuc = "T";
-  }else if(tmp == 4){
-    dencoded_nuc = "D";
-  }  
-  return(dencoded_nuc);
+  std::string decoded_nuc = dict_decoded[tmp];
+  return(decoded_nuc);
 }
 
 
-int encoded_nucs(std::string &tmp){
+int encoded_nucs(std::string &tmp, std::unordered_map<std::string, int> &dict_encode, std::unordered_map<int, std::string> &dict_decode){
   /*
    * @param tmp : nucleotide to encode
    * @return encoded_nuc : nucleotide encoded as an int
-   *
-   * Encoded the char passed using the following system:
-   * Soft Clipped : -1
-   * Match Ref : -2
-   * A : 0
-   * C : 1 
-   * G : 2
-   * T : 3
-   * Del : 4
    */
-  int encoded_nuc = -1;
+  int encoded_nuc=-200;
+  std::unordered_map<std::string, int>::iterator it;
   
-  if (tmp == "A") {
-    encoded_nuc = 0;
-  }else if(tmp == "C"){
-    encoded_nuc = 1;
-  }else if (tmp == "G"){
-    encoded_nuc = 2;
-  }else if(tmp == "T"){
-    encoded_nuc = 3;
-  }else if(tmp == "D"){
-    encoded_nuc = 4;
+  if (dict_encode.find(tmp) == dict_encode.end()){
+    int max = -3;
+    for(it = dict_encode.begin(); it != dict_encode.end(); it++){
+      if(it->second > max){
+        max = it->second;
+      }
+      encoded_nuc = max + 1;
+      dict_decode[max+1] = tmp;
+      dict_encode[tmp] = max + 1;
+    }  
+  }else{
+    encoded_nuc = dict_encode[tmp];
   }
   return(encoded_nuc);
 }
 
-void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32_t> &positions,
+void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32_t> &positions, std::vector<float> &saved_qualities,
     uint32_t abs_start_pos, std::vector<position> &all_positions,
     uint8_t *seq, uint32_t length, uint32_t correction_factor, uint32_t abs_end_pos,
-    std::vector<uint32_t> ignore_positions, bool reverse, bam1_t *r, uint8_t *qualities){
+    std::vector<uint32_t> ignore_positions, bool reverse, bam1_t *r, uint8_t *qualities,
+    std::unordered_map<std::string,int> &dict_encode, std::unordered_map<int, std::string> &dict_decode){
   /*
    * @param aux : the md tag
    * @param haplotypes : vector with encoded nuc haplotypes
@@ -234,21 +223,19 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
    */
   //also record the pos that match the reference
   std::vector<uint32_t> ref_pos;
-  std::vector<std::string> ref_nt;
+  std::vector<int> ref_haplotypes;
   std::vector<float> ref_qual;
 
   bool deletion = false; //helping track the deletions
   std::string digits; //helping to track number operations 
   std::string nucs;
-  std::string del = "D";
   std::string nt;
   std::vector<uint32_t> deletions; //record deletion spots to skip when adding ref nucs
-  std::vector<float> saved_qualities;
   uint32_t del_correction_factor = 0;
 
   //int qual = 0;
   int i = 0;
-  std::vector<std::string> nucleotides; //store the substituions & deletions
+  std::vector<std::string> nucleotides; //store the substitutions & deletions
   do {
     char tmp = aux[i]; //this is the reference nuc 
     if(isdigit(tmp)){ //on digit character
@@ -259,8 +246,8 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
         for(uint32_t len = 0; len < nucs.length(); len++){
           deletions.push_back(abs_start_pos + len);
           positions.push_back(abs_start_pos + len);
-          haplotypes.push_back(encoded_nucs(del));
           nt = '*';
+          haplotypes.push_back(encoded_nucs(nt, dict_encode, dict_decode));
           nucleotides.push_back(nt);
           saved_qualities.push_back(0);
         }
@@ -292,7 +279,7 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
         bam_get_qname(r);
         }
         nucleotides.push_back(nt);
-        haplotypes.push_back(encoded_nucs(nt));
+        haplotypes.push_back(encoded_nucs(nt, dict_encode, dict_decode));
         digits.clear();
         nucs.clear();
         nucs += tmp;
@@ -328,24 +315,24 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
     if(it == positions.end() && it_ignore == ignore_positions.end()){
       ref_pos.push_back(z);
       seq_pos = relative_seq_pos  - length + correction_factor + add_correct;
-      haplotypes.push_back(soft_clipped);
-      nt = "";
       nt = seq_nt16_str[bam_seqi(seq, seq_pos)];
       ref_qual.push_back(qualities[seq_pos] + 0);
-      ref_nt.push_back(nt);
+      int tmp2 = encoded_nucs(nt, dict_encode, dict_decode);
+      ref_haplotypes.push_back(tmp2);
       relative_seq_pos += 1;
     }else{
       add_correct++;
     }
   }
   if(ref_pos.size() > 0){
-    update_allele_depth(all_positions, ref_nt, ref_pos, ref_qual);
+    update_allele_depth(all_positions, ref_haplotypes, ref_pos, ref_qual, dict_decode);
   }
   if(positions.size() > 0){
-    update_allele_depth(all_positions, nucleotides, positions, saved_qualities);
+    update_allele_depth(all_positions, haplotypes, positions, saved_qualities, dict_decode);
   }
   for(uint32_t rp : ref_pos){
     positions.push_back(rp);
+    haplotypes.push_back(soft_clipped);
   }
 }
 
@@ -508,7 +495,7 @@ void k_means(int n_clusters, alglib::real_2d_array xy, cluster &cluster_results)
   find_cluster_bounds(cluster_results);
 }
 
-void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &all_positions, ref_antd reference, std::string region_){
+void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &all_positions, ref_antd reference, std::string region_, std::unordered_map<std::string, int> &dict_encode, std::unordered_map<int, std::string> &dict_decode){
   /*
    * @param r : alignment object
    * 
@@ -552,6 +539,7 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
   //these will later be place in the amplicon object
   std::vector<int> haplotypes;
   std::vector<uint32_t> positions;
+  std::vector<float> saved_qualities;
   std::vector<uint32_t> ignore_positions; //all positions that are soft clipped
   std::string nucs = "";
   uint32_t correction_factor = 0;
@@ -566,18 +554,11 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
   char ref = 0; //reference base at this pos
   bool primer_mutation = false; //track whether this read has a primer mut
   std::string qname = bam_get_qname(r);
-  std::string test = "A01535:8:HJ3YYDSX2:4:1228:22001:21496";
   i = 0;
-  if(test == qname){
-    std::cout << "\n";
-  }
   //iterate through cigar ops for this read
   while(i < r->core.n_cigar){   
     op = bam_cigar_op(cigar[i]); //cigar operation
     op_len = bam_cigar_oplen(cigar[i]); //cigar length
-    if(qname == test){
-      std::cout << op << " " << op_len << std::endl;
-    }      
     if(op == 4 && first_pass){
       if(!reverse){
         correction_factor = op_len;
@@ -608,23 +589,30 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
     if(op != 4){ first_pass = false;}
     //these are the only operations we care about
     if(op == 1){
+      nucs.clear();
       uint32_t start_insertion = start+correction_factor;
+      float qual = 0;
       //go get each nt in the insertion region
       for(uint32_t x = 0; x < op_len; x++){
         //the nucelotide at the insertion poi
         nt = seq_nt16_str[bam_seqi(seq, start_insertion+x)];
+        if(x == 0){
+          nucs += '+';
+        }
         nucs += nt;
+        qual += qualities[start_insertion+x];
        }
-       haplotypes.push_back(encoded_nucs(nucs));
+       haplotypes.push_back(encoded_nucs(nucs, dict_encode, dict_decode));
        positions.push_back(abs_start_pos+start);
-   }
+       saved_qualities.push_back(qual/nucs.size());
+    }
 
     if (bam_cigar_type(op) & 2){
       start += op_len; //total positions iterated relation to ref
     }                   
     i++;
   }
-  parse_md_tag(aux, haplotypes, positions, abs_start_pos, all_positions, seq, abs_start_pos, correction_factor, abs_end_pos, ignore_positions, reverse, r, qualities);
+  parse_md_tag(aux, haplotypes, positions, saved_qualities, abs_start_pos, all_positions, seq, abs_start_pos, correction_factor, abs_end_pos, ignore_positions, reverse, r, qualities, dict_encode, dict_decode);
   if(positions.size() > 0){
     //reoder the positions to be consistent
     reorder_haplotypes(haplotypes, positions);
@@ -731,7 +719,7 @@ void count_haplotype_occurences(std::vector<std::vector<int>> all_haplotypes, st
   
 }
 
-void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vector<position> all_positions, std::vector<double> save_read_counts, double adjusted_read_count, std::vector<std::vector<int>> final_haplotypes, std::vector<uint32_t> &suspect_positions, std::vector<uint32_t> &masked_positions, std::vector<int> &masked_alleles){
+void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vector<position> all_positions, std::vector<double> save_read_counts, double adjusted_read_count, std::vector<std::vector<int>> final_haplotypes, std::vector<uint32_t> &suspect_positions, std::vector<uint32_t> &masked_positions, std::vector<int> &masked_alleles, std::unordered_map<int, std::string> dict_decode){
   /*
    * If we know this primer is masked, we do an additional check in which we make sure the mutation
    * frequencies for all haplotypes are close to the total depth frequencies.
@@ -779,7 +767,7 @@ void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vec
     for(uint32_t z= 0; z < mut_count.size(); z++){
       double amplicon_freq = mut_count[z] / adjusted_read_count;
       if(amplicon_freq < 0.03){continue;}
-      std::string nuc = decoded_nucs(mut[z]);
+      std::string nuc = decoded_nucs(mut[z], dict_decode);
       double global_freq=0;
       std::vector<allele> pos_alleles = all_positions[final_positions[i]].ad;
       for(allele x : pos_alleles){
@@ -796,7 +784,7 @@ void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vec
   }
 }
 
-std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector<position> all_positions, std::vector<primer> primers, std::string output_primer, std::vector<uint32_t> &masked_positions, std::vector<int> &masked_alleles){
+std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector<position> all_positions, std::vector<primer> primers, std::string output_primer, std::vector<uint32_t> &masked_positions, std::vector<int> &masked_alleles, std::unordered_map<int, std::string> dict_decode){
   /*
    * @param amplicons : data strucuture containing read count, haplotype nt, and positions
    * @param all_positions : vector containing depths / alleles for all pos
@@ -866,7 +854,7 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     std::string primer_mismatch_percent = std::to_string(mut_for_ratio) + " " + std::to_string(mut_rev_ratio);
 
     //remove positions & indels where avg. quality is below 20
-    remove_low_quality_nts(node, all_positions);
+    remove_low_quality_nts(node, all_positions, dict_decode);
 
     positions = node->positions;
     haplotypes = node->haplotypes;
@@ -936,7 +924,7 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     if(save_haplotypes.size() == 0){continue;}
 
     //returns positions that are improperly represented on the amplicon
-    check_primer_binding_issues(flattened, all_positions, save_read_counts, adjusted_read_count, save_haplotypes, suspect_positions, masked_positions, masked_alleles); 
+    check_primer_binding_issues(flattened, all_positions, save_read_counts, adjusted_read_count, save_haplotypes, suspect_positions, masked_positions, masked_alleles, dict_decode); 
     //write the suspect positions to a file    
     std::string suspect_position_string = "";
     for(uint32_t i = 0; i < suspect_positions.size(); i++){
@@ -1094,11 +1082,23 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
    * @param pair_info : path to the primer pair .tsv file
    * @param primer_offset : 
    */
-  std::unordered_map<std::string, char> dict_encode;
-  std::unordered_map<char, std::string> dict_decode;
-  dict_decode['A'] = "hello world";
-  print_map(dict_decode); 
-  exit(1);
+  std::unordered_map<std::string, int> dict_encode;
+  std::unordered_map<int, std::string> dict_decode;
+
+  dict_encode["A"] = 0;
+  dict_encode["S"] = -1;
+  dict_encode["C"] = 1;
+  dict_encode["G"] = 2;
+  dict_encode["T"] = 3;
+  dict_encode["*"] = 4;
+
+  dict_decode[0] = "A";
+  dict_decode[1] = "C";
+  dict_decode[2] = "G";
+  dict_decode[3] = "T";
+  dict_decode[-1] = "S";
+  dict_decode[4] = "*";
+
   //TODO: pass this as a param 
   bool mask_primer_muts = true;
 
@@ -1178,7 +1178,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
       continue;
     }
     read_counter += 1;
-    iterate_reads(aln, amplicons, all_positions, reference, region_);
+    iterate_reads(aln, amplicons, all_positions, reference, region_, dict_encode, dict_decode);
   }
   std::cout << "end read processing." << std::endl; 
   reference.remove_seq(); 
@@ -1195,14 +1195,21 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   file.open(output_primer, ios_base::app);
   file << "lower_primer_name" << "\t" << "suspect_positions" << "\t" << "mutation_percent_primer" << "\n";
   file.close(); 
-  
+  print_map(dict_decode); 
   std::vector<uint32_t> masked_positions;
   std::vector<int> masked_alleles;
   //extract those reads into a format useable in the clustering
-  std::vector<double> all_frequencies = create_frequency_matrix(amplicons, all_positions, primers, output_primer, masked_positions, masked_alleles);
+  std::vector<double> all_frequencies = create_frequency_matrix(amplicons, all_positions, primers, output_primer, masked_positions, masked_alleles, dict_decode);
   if(all_frequencies.size() < 2){
     return(0);
   }
+  std::cout << "28262" << std::endl;
+  print_allele_depths(all_positions[28262].ad);
+  std::cout << "28263" << std::endl;
+  print_allele_depths(all_positions[28263].ad);
+  for(double f : all_frequencies){
+    std::cout << f << std::endl;
+  } 
   //remove perfect 1 haplotypes
   all_frequencies.erase(std::remove_if(
     all_frequencies.begin(), all_frequencies.end(),
@@ -1214,7 +1221,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   if(mask_primer_muts){
     for(uint32_t i=0; i < masked_positions.size(); i++){
       position tmp_pos = all_positions[masked_positions[i]];
-      std::string tmp_nuc = decoded_nucs(masked_alleles[i]);
+      std::string tmp_nuc = decoded_nucs(masked_alleles[i], dict_decode);
       for(uint32_t x = 0; x < tmp_pos.ad.size(); x++){
         if(tmp_pos.ad[x].nuc == tmp_nuc){
           tmp_pos.depth -= tmp_pos.ad[x].depth;

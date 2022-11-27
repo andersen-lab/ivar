@@ -53,10 +53,9 @@ int find_ref_in_allele(std::vector<allele> ad, char ref){
 }
 
 //overload function for storing alleles depths as reads are iterated
-void update_allele_depth(std::vector<position> &all_positions, std::vector<std::string> nucleotides, std::vector<uint32_t> positions, std::vector<float> qualities){
+void update_allele_depth(std::vector<position> &all_positions, std::vector<int> haplotypes, std::vector<uint32_t> positions, std::vector<float> qualities, std::unordered_map<int, std::string> dict_decode){
   /*
    * @param all_positions : vector containing all position information including alleles
-   * @param nucleotides : vector containing the SNV NT values
    * @param positions : vector containing the SNV positions
    * @param qualities : vector containing variant qualities
    * @param ref : do these positions match the ref or not
@@ -71,30 +70,20 @@ void update_allele_depth(std::vector<position> &all_positions, std::vector<std::
   uint32_t location = 0;
   int allele_location = 0;
   //iterate over the variants
-  for(uint32_t i = 0; i < nucleotides.size(); i++){
-    //int location = check_pos_exists(positions[i], all_positions);
+  for(uint32_t i = 0; i < haplotypes.size(); i++){
     location = positions[i];
     //this position already exists
     all_positions[location].depth += 1;
     
     //meant to cut down run time for checking allele existance
-    if(nucleotides[i] == "A"){
-      allele_location = 0;
-    }else if(nucleotides[i] == "C"){
-      allele_location = 1;
-    }else if(nucleotides[i] == "G"){
-      allele_location = 2;
-    }else if(nucleotides[i] == "T"){
-      allele_location = 3;
-    }else{
-      allele_location = check_allele_exists(nucleotides[i], all_positions[location].ad);
-    }
+    std::string nt = dict_decode[haplotypes[i]];
+    allele_location = check_allele_exists(nt, all_positions[location].ad);
     //allele doesn't exist
     if(allele_location == -1){
       allele new_allele;
       new_allele.depth = 1;
       new_allele.tmp_mean_qual = qualities[i];
-      new_allele.nuc = nucleotides[i];
+      new_allele.nuc = nt;
       all_positions[location].ad.push_back(new_allele);
     }else{
       all_positions[location].ad[allele_location].tmp_mean_qual += qualities[i];
@@ -105,7 +94,7 @@ void update_allele_depth(std::vector<position> &all_positions, std::vector<std::
 }
 
 //ad means the number of reads that support the reported alleles
-std::vector<allele> update_allele_depth(char ref,std::string bases, std::string qualities, uint8_t min_qual){
+std::vector<allele> update_allele_depth(char ref, std::string bases, std::string qualities, uint8_t min_qual){
   //ref always starts as 'N' ?
   //bases seems to print all bases found at a position but is both lower and upper case
   //qualities is phred quality
