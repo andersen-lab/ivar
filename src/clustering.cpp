@@ -185,17 +185,17 @@ int encoded_nucs(std::string &tmp, std::unordered_map<std::string, int> &dict_en
    */
   int encoded_nuc=-200;
   std::unordered_map<std::string, int>::iterator it;
-  
-  if (dict_encode.find(tmp) == dict_encode.end()){
+  auto map_it = dict_encode.find(tmp);
+  if(map_it == dict_encode.end()){
     int max = -3;
     for(it = dict_encode.begin(); it != dict_encode.end(); it++){
       if(it->second > max){
         max = it->second;
       }
-      encoded_nuc = max + 1;
-      dict_decode[max+1] = tmp;
-      dict_encode[tmp] = max + 1;
     }  
+    encoded_nuc = max + 1;
+    dict_decode[max+1] = tmp;
+    dict_encode[tmp] = max + 1;
   }else{
     encoded_nuc = dict_encode[tmp];
   }
@@ -206,7 +206,8 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
     uint32_t abs_start_pos, std::vector<position> &all_positions,
     uint8_t *seq, uint32_t length, uint32_t correction_factor, uint32_t abs_end_pos,
     std::vector<uint32_t> ignore_positions, bool reverse, bam1_t *r, uint8_t *qualities,
-    std::unordered_map<std::string,int> &dict_encode, std::unordered_map<int, std::string> &dict_decode){
+    std::unordered_map<std::string,int> &dict_encode, std::unordered_map<int, std::string> &dict_decode,
+    std::vector<uint32_t> insertion_start, std::vector<uint32_t> insertion_length){
   /*
    * @param aux : the md tag
    * @param haplotypes : vector with encoded nuc haplotypes
@@ -232,12 +233,29 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
   std::string nt;
   std::vector<uint32_t> deletions; //record deletion spots to skip when adding ref nucs
   uint32_t del_correction_factor = 0;
-
+  std::vector<uint32_t> rinsertion_length = insertion_length;
+  std::vector<uint32_t> rinsertion_start = insertion_start;
   //int qual = 0;
   int i = 0;
   std::vector<std::string> nucleotides; //store the substitutions & deletions
   do {
     char tmp = aux[i]; //this is the reference nuc 
+    //add insertion corrections as needed
+    uint32_t insertion_p = 0;
+    uint32_t insertion_l = 0;
+    for(uint32_t x=0; x < insertion_start.size(); x++){
+      if(abs_start_pos >= insertion_start[x]){
+        insertion_l = insertion_length[x];
+        insertion_p = insertion_start[x];
+        abs_start_pos += insertion_l;
+        break;
+      }
+    }
+    if(insertion_p != 0 && insertion_l != 0){
+      insertion_start.erase(std::remove(insertion_start.begin(), insertion_start.end(), insertion_p), insertion_start.end());
+      insertion_length.erase(std::remove(insertion_length.begin(), insertion_length.end(), insertion_l), insertion_length.end());
+   }
+
     if(isdigit(tmp)){ //on digit character
       if(deletion){
         //del_correction_factor += nucs.length(); //this speaks to the relative position
@@ -293,6 +311,7 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
     }
     i++;
   } while(aux[i] != '\0');
+
   int soft_clipped = -2;
   uint32_t seq_pos = 0;
   std::vector<uint32_t>::iterator it;
@@ -304,7 +323,22 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
   uint32_t relative_seq_pos = length;
   uint32_t add_correct = 0;
   for(uint32_t z = length+1; z <= abs_end_pos; z++){
-    //if this is a deletion position we pass it
+    //add insertion corrections as needed
+    uint32_t rinsertion_p = 0;
+    uint32_t rinsertion_l = 0;
+    for(uint32_t x=0; x < rinsertion_start.size(); x++){
+      if(z >= rinsertion_start[x]){
+        rinsertion_l = rinsertion_length[x];
+        rinsertion_p = rinsertion_start[x];
+        relative_seq_pos += rinsertion_l;
+        break;
+      }
+    }
+    if(rinsertion_p != 0 && rinsertion_l != 0){
+      rinsertion_start.erase(std::remove(rinsertion_start.begin(), rinsertion_start.end(), rinsertion_p), rinsertion_start.end());
+      rinsertion_length.erase(std::remove(rinsertion_length.begin(), rinsertion_length.end(), rinsertion_l), rinsertion_length.end());
+   }
+   //if this is a deletion position we pass it
     it_deletion = std::find(deletions.begin(), deletions.end(), z);
     if(it_deletion != deletions.end()){
       continue;
@@ -314,8 +348,11 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
     //position wasn't found to be a variant and wasn't found to be deletion
     if(it == positions.end() && it_ignore == ignore_positions.end()){
       ref_pos.push_back(z);
-      seq_pos = relative_seq_pos  - length + correction_factor + add_correct;
+      seq_pos = relative_seq_pos - length + correction_factor + add_correct;
       nt = seq_nt16_str[bam_seqi(seq, seq_pos)];
+      if(check_nucleotide(nt) == false){
+        std::cout << abs_start_pos << " " << abs_end_pos << " " << aux <<" " << nt << relative_seq_pos - length + correction_factor + add_correct << std::endl;
+      }
       ref_qual.push_back(qualities[seq_pos] + 0);
       int tmp2 = encoded_nucs(nt, dict_encode, dict_decode);
       ref_haplotypes.push_back(tmp2);
@@ -545,11 +582,11 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
   uint32_t correction_factor = 0;
   bool first_pass = true;
   bool second_pass = true;
-  uint32_t insertion_pos = 0;
-  insertion_pos += 1; //just to shut up compiler issue
-  if(first_pass){
-    insertion_pos -= 1;
-  }
+  
+  //track the length and start of all insertions in the sequence
+  std::vector<uint32_t> insertion_start;
+  std::vector<uint32_t> insertion_length;
+
   char nt = 0;
   char ref = 0; //reference base at this pos
   bool primer_mutation = false; //track whether this read has a primer mut
@@ -602,6 +639,8 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
         nucs += nt;
         qual += qualities[start_insertion+x];
        }
+       insertion_start.push_back(abs_start_pos+start);
+       insertion_length.push_back(nucs.size()-1);
        haplotypes.push_back(encoded_nucs(nucs, dict_encode, dict_decode));
        positions.push_back(abs_start_pos+start);
        saved_qualities.push_back(qual/nucs.size());
@@ -612,7 +651,7 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
     }                   
     i++;
   }
-  parse_md_tag(aux, haplotypes, positions, saved_qualities, abs_start_pos, all_positions, seq, abs_start_pos, correction_factor, abs_end_pos, ignore_positions, reverse, r, qualities, dict_encode, dict_decode);
+  parse_md_tag(aux, haplotypes, positions, saved_qualities, abs_start_pos, all_positions, seq, abs_start_pos, correction_factor, abs_end_pos, ignore_positions, reverse, r, qualities, dict_encode, dict_decode, insertion_start, insertion_length);
   if(positions.size() > 0){
     //reoder the positions to be consistent
     reorder_haplotypes(haplotypes, positions);
@@ -1173,10 +1212,10 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     if(read_counter % 100000 == 0){
       std::cout << read_counter << " reads processed." << std::endl;
     }
-    if(read_counter < 1600000 || read_counter > 1700000){
+    /*if(read_counter < 1600000 || read_counter > 1700000){
       read_counter += 1;
       continue;
-    }
+    }*/
     read_counter += 1;
     iterate_reads(aln, amplicons, all_positions, reference, region_, dict_encode, dict_decode);
   }
@@ -1195,21 +1234,15 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   file.open(output_primer, ios_base::app);
   file << "lower_primer_name" << "\t" << "suspect_positions" << "\t" << "mutation_percent_primer" << "\n";
   file.close(); 
-  print_map(dict_decode); 
   std::vector<uint32_t> masked_positions;
   std::vector<int> masked_alleles;
+  
   //extract those reads into a format useable in the clustering
   std::vector<double> all_frequencies = create_frequency_matrix(amplicons, all_positions, primers, output_primer, masked_positions, masked_alleles, dict_decode);
   if(all_frequencies.size() < 2){
     return(0);
   }
-  std::cout << "28262" << std::endl;
-  print_allele_depths(all_positions[28262].ad);
-  std::cout << "28263" << std::endl;
-  print_allele_depths(all_positions[28263].ad);
-  for(double f : all_frequencies){
-    std::cout << f << std::endl;
-  } 
+  std::cout << "past create frequency matrix" << std::endl;
   //remove perfect 1 haplotypes
   all_frequencies.erase(std::remove_if(
     all_frequencies.begin(), all_frequencies.end(),
@@ -1230,30 +1263,29 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
       }
     }
   }
-
   file.open(output_amplicon, ios_base::app);
   file << "lower_primer\tupper_primer\tread_count\tpositions\tfrequencies\thaplotypes\tnumber_haplotypes\n";
   file.close();
   amplicons.dump_amplicon_summary(output_amplicon);
-  
   //reshape it into a real 2d array for alglib
   xy.setlength(all_frequencies.size(), 1);
   for(uint32_t i=0; i < all_frequencies.size(); i++){
     xy(i,0) = all_frequencies[i];
   }
 
+  std::sort(all_frequencies.begin(), all_frequencies.end());
+  auto uniq = std::unique(all_frequencies.begin(), all_frequencies.end()) - all_frequencies.begin();
   //if we have fewer than 6 points, we can only have that many clusters
-  if(all_frequencies.size() < max_n){
-    max_n = all_frequencies.size();
+  if(uniq < max_n){
+    max_n = uniq;
   }
   //call kmeans clustering
-  for (uint32_t n =2; n <= max_n; n++){
+  for (uint32_t n = 2; n < max_n; n++){
     //call kmeans clustering
     cluster cluster_results; //reset the results
     k_means(n, xy, cluster_results);
     all_cluster_results.push_back(cluster_results);
   }
-
   //open the file to save clustering results
   file.open(cluster_filename, ios_base::app);
   file << "sil_score\tadjusted_sil_score\tcluster_centers\tn_clusters\tthreshold\n";
