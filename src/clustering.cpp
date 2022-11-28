@@ -238,6 +238,7 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
   //int qual = 0;
   int i = 0;
   std::vector<std::string> nucleotides; //store the substitutions & deletions
+
   do {
     char tmp = aux[i]; //this is the reference nuc 
     //add insertion corrections as needed
@@ -269,6 +270,7 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
           nucleotides.push_back(nt);
           saved_qualities.push_back(0);
         }
+        abs_start_pos += nucs.length();
         nucs.clear();
         digits.clear();
       }
@@ -292,7 +294,6 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
         nt = "";
         nt = seq_nt16_str[bam_seqi(seq, abs_start_pos+correction_factor - length - 1 - del_correction_factor)];
         saved_qualities.push_back(qualities[abs_start_pos+correction_factor - length - 1 - del_correction_factor]+0);
-
         if(reverse){
         bam_get_qname(r);
         }
@@ -351,7 +352,7 @@ void parse_md_tag(uint8_t *aux, std::vector<int> &haplotypes, std::vector<uint32
       seq_pos = relative_seq_pos - length + correction_factor + add_correct;
       nt = seq_nt16_str[bam_seqi(seq, seq_pos)];
       if(check_nucleotide(nt) == false){
-        std::cout << abs_start_pos << " " << abs_end_pos << " " << aux <<" " << nt << relative_seq_pos - length + correction_factor + add_correct << std::endl;
+        std::cout << bam_get_qname(r) << " " << abs_start_pos << " " << abs_end_pos << " " << aux <<" " << nt <<  " " << relative_seq_pos - length + correction_factor + add_correct << std::endl;
       }
       ref_qual.push_back(qualities[seq_pos] + 0);
       int tmp2 = encoded_nucs(nt, dict_encode, dict_decode);
@@ -1212,7 +1213,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     if(read_counter % 100000 == 0){
       std::cout << read_counter << " reads processed." << std::endl;
     }
-    /*if(read_counter < 1600000 || read_counter > 1700000){
+    /*if(read_counter < 500000 || read_counter > 600000){
       read_counter += 1;
       continue;
     }*/
