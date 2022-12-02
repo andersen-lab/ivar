@@ -72,6 +72,9 @@ void update_allele_depth(std::vector<position> &all_positions, std::vector<int> 
   //iterate over the variants
   for(uint32_t i = 0; i < haplotypes.size(); i++){
     location = positions[i];
+    /*if(location == 22132){
+      std::cout << all_positions[location].depth << std::endl;
+    }*/
     //this position already exists
     all_positions[location].depth += 1;
     
