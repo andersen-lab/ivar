@@ -552,6 +552,7 @@ void find_cluster_bounds(cluster &cluster_results){
       if(tmp[i] >= outlier_lower && tmp[i] <= outlier_upper){
         clean_cluster.push_back(tmp[i]);
       }else{
+        //clean_cluster.push_back(tmp[i]);
         std::cout << "outlier: " << tmp[i] << std::endl;
       }
     }
@@ -870,9 +871,6 @@ void count_haplotype_occurences(std::vector<std::vector<int>> all_haplotypes, st
   std::vector<int>::iterator it;
   std::vector<std::vector<uint32_t>> pairs;
   std::unordered_map<uint32_t, std::vector<uint32_t>> matches;
-  for(uint32_t o : final_positions){
-    std::cout << o << std::endl;
-  }
   //here we look to combine haplotypes with soft-clipped or not covered regions (-1) with existing haplotypes
   for(uint32_t i = 0; i < unique_haplotypes.size(); i++){
     if(count_haplotypes[i] < 10){continue;}
@@ -890,7 +888,6 @@ void count_haplotype_occurences(std::vector<std::vector<int>> all_haplotypes, st
       for(uint32_t z = 0; z < unique_haplotypes[i].size(); z++){
         position_1 = unique_haplotypes[i][z];
         position_2 = unique_haplotypes[c][z];        
-        //std::cout << "i " << i << " c " << c << " z " << z << " pos1 " << position_1 << " pos2 " << position_2 << std::endl;
         //we differ at a non soft-clipped or not covered location
         if(position_1 != -1 && position_2 != -1 && position_1 != position_2){
           match = false;
@@ -905,21 +902,8 @@ void count_haplotype_occurences(std::vector<std::vector<int>> all_haplotypes, st
     }
   }
   
-  for(uint32_t i =0; i < unique_haplotypes.size(); i++){
-    std::cout << "haplo" << i << " readcounter" << count_haplotypes[i]<< " ";
-    for(uint32_t x = 0; x < unique_haplotypes[i].size(); x++){
-      std::cout << unique_haplotypes[i][x] << " ";
-    }
-    std::cout << "\n";
-  }
-
-  print_map(matches);
   std::vector<uint32_t> tmp;
   for(auto i: sort_indexes(count_haplotypes)) {
-    //std::vector<uint32_t>::iterator it = std::find(flat_pairs.begin(), flat_pairs.end(), i);
-    //if(it != flat_pairs.end()){
-    //  continue;
-    //}
     tmp.clear();
     tmp.push_back(i);
     flat_pairs.push_back(i);
@@ -933,50 +917,21 @@ void count_haplotype_occurences(std::vector<std::vector<int>> all_haplotypes, st
     pairs.push_back(tmp);  
   }
 
-  for(uint32_t i = 0; i < pairs.size(); i++){
-    for(uint32_t x = 0; x < pairs[i].size(); x++){
-      std::cout << pairs[i][x] << " ";
-    }
-    std::cout << "\n";
-  }
-
   //the first value is the softclipped haplotype, the second is the match 
-  std::cout << "before combining" << std::endl;
   for(std::vector<uint32_t> p : pairs){
     save_haplotypes.push_back(unique_haplotypes[p[0]]);
     save_read_counts.push_back(count_haplotypes[p[0]]);
     adjusted_read_count += count_haplotypes[p[0]];
-    for(uint32_t x : p){
-      std::cout << x << " ";
-    }
-    std::cout << "\n";
     for(uint32_t y=0; y < p.size(); y++){
       if(y == 0){continue;}
-      std::cout << save_read_counts[save_read_counts.size()-1] << " " << count_haplotypes[p[y]] << std::endl;
       save_read_counts[save_read_counts.size()-1] += count_haplotypes[p[y]];
       adjusted_read_count += count_haplotypes[p[y]];
     }
    }
 
-   /*std::cout << "adjusted read count " << adjusted_read_count << std::endl;
-   for(uint32_t p:final_positions){
-    if(p == 22132){
-      for(uint32_t t : final_positions){
-        std::cout << t << " ";
-      }
-      std::cout << "\n";
-      for(uint32_t x = 0; x < save_haplotypes.size(); x++){
-        std::cout << save_read_counts[x] << std::endl;
-        for(uint32_t y =0; y < save_haplotypes[x].size(); y++){
-          std::cout << save_haplotypes[x][y] << " ";
-        }
-        std::cout << "\n";
-      }
-    }
-   }*/
 }
 
-void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vector<position> &all_positions, std::vector<double> save_read_counts, double adjusted_read_count, std::vector<std::vector<int>> final_haplotypes, std::vector<uint32_t> &suspect_positions, std::vector<uint32_t> &masked_positions, std::vector<int> &masked_alleles, std::unordered_map<int, std::string> dict_decode, bool primer_issue, bool &flagged, std::vector<double> subtract_read_counts){
+void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vector<position> &all_positions, std::vector<double> save_read_counts, double adjusted_read_count, std::vector<std::vector<int>> final_haplotypes, std::vector<uint32_t> &suspect_positions, std::vector<uint32_t> &masked_positions, std::vector<int> &masked_alleles, std::unordered_map<int, std::string> dict_decode, bool primer_issue, bool &flagged, std::vector<double> subtract_read_counts, ref_antd reference, std::string region_, std::vector<double> &frequencies){
   /*
    * If we know this primer is masked, we do an additional check in which we make sure the mutation
    * frequencies for all haplotypes are close to the total depth frequencies.
@@ -999,19 +954,42 @@ void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vec
     arc = 0;
     //look for this position to not match ref in haplotypes
     std::vector<int> all_versions = transposed_haplotypes[i];
-
+    
     //this iterates through the different values found at this position for all haplotypes
+    char ref = reference.get_base(final_positions[i], region_);
+    std::vector<int> tmp_all_versions;
+    for(int i : all_versions){
+      if(i != -2){
+        tmp_all_versions.push_back(i);
+      }else{
+        if(ref == 'A'){
+          tmp_all_versions.push_back(0);
+        }else if(ref == 'C'){
+          tmp_all_versions.push_back(1);
+        }else if(ref == 'G'){
+          tmp_all_versions.push_back(2);
+        }else if(ref == 'T'){
+          tmp_all_versions.push_back(3);
+        }
+      }
+     }
+    if(final_positions[i] == 23604){
+      for(int l : tmp_all_versions){
+        std::cout << l << " ";
+      }
+      std::cout << "\n";
+    }
     for(uint32_t x = 0; x < all_versions.size(); x++){
       if(all_versions[x] == -2 || all_versions[x] >= 0){
         arc += save_read_counts[x];
       }
       //don't apply to deletions
-      if(all_versions[x] >= 0 && all_versions[x] <= 3){
+      if((tmp_all_versions[x] >= 0 && tmp_all_versions[x] <= 3)){
         //check if we've seen this mutation before
-        it = std::find(mut.begin(), mut.end(), all_versions[x]);
+        it = std::find(mut.begin(), mut.end(), tmp_all_versions[x]);
         //if we haven't seen it, add it to our repitore
         if(it == mut.end()){
-          mut.push_back(all_versions[x]);
+          mut.push_back(tmp_all_versions[x]);
           mut_count.push_back(save_read_counts[x]);
           sub_mut_count.push_back(subtract_read_counts[x]);
           index.push_back({x});
@@ -1031,8 +1009,7 @@ void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vec
         continue;
       }
       double amplicon_freq = mut_count[z] / arc;
-      //amplicon_freq = mut_count[z] / adjusted_read_count;
-      std::cout << "adjusted_read_count " << adjusted_read_count << " arc " << arc << " mut count " << mut_count[z] << std::endl;
+      std::cout << "adjusted_read_count " << adjusted_read_count << " arc " << arc << " mut count " << mut_count[z] <<  " subtract read count " << sub_mut_count[z] << std::endl;
 
       std::string nuc = decoded_nucs(mut[z], dict_decode);
       double global_freq=0;
@@ -1042,12 +1019,14 @@ void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vec
           global_freq = x.depth / all_positions[final_positions[i]].depth;
         }
       }
-      std::cout << "check primer binding " << final_positions[i] << " " << global_freq << " " << amplicon_freq << " " << mut[z] << std::endl;
+      std::cout << "check primer binding " << final_positions[i] << " global_freq " << global_freq << " amplicon_freq " << amplicon_freq << " mut type " << mut[z] << std::endl;
       if(abs(global_freq-amplicon_freq) >= 0.20){
-        flagged = true;
+        //adjusted_read_count -= mut_count[z];
         suspect_positions.push_back(final_positions[i]);
+        //primer_issue = true;
         if(primer_issue){
           double new_total_depth = 0;
+          double new_global_depth = 0;
           for(uint32_t y=0; y < pos_alleles.size(); y++){ 
             if(pos_alleles[y].nuc == nuc){
               //std::cout << pos_alleles[y].depth << " ";
@@ -1055,26 +1034,32 @@ void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vec
               if(pos_alleles[y].depth < 0){
                 pos_alleles[y].depth = 0;
               }
-              //std::cout << pos_alleles[y].depth << std::endl;
+              new_global_depth = pos_alleles[y].depth;
             }
             new_total_depth += pos_alleles[y].depth;
           }
-          //print_allele_depths(pos_alleles);
-          all_positions[final_positions[i]].depth = new_total_depth;
-          all_positions[final_positions[i]].ad = pos_alleles;
-          if(final_positions[i] == 23525){
-            print_allele_depths(all_positions[final_positions[i]].ad);
-            std::cout << "HERERERER "<< all_positions[final_positions[i]].depth << std::endl;
-          }
-          masked_positions.push_back(final_positions[i]);
-          masked_alleles.push_back(mut[z]);
+         double new_global_freq = new_global_depth / new_total_depth;
+         if(abs(new_global_freq-amplicon_freq) >= 0.20){
+            std::cout << "still sucks global_freq " << new_global_freq << " amplicon freq " << amplicon_freq << std::endl;
+            //flagged=true;
+         }else{
+           std::cout << new_global_freq << std::endl;;
+           frequencies.push_back(new_global_freq);
+         }
+         //print_allele_depths(pos_alleles);
+         all_positions[final_positions[i]].depth = new_total_depth;
+         all_positions[final_positions[i]].ad = pos_alleles;
+         masked_positions.push_back(final_positions[i]);
+         masked_alleles.push_back(mut[z]);
         }
+      } else{
+        frequencies.push_back(amplicon_freq);
       }
     }
   }
 }
 
-std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector<position> &all_positions, std::vector<primer> primers, std::string output_primer, std::vector<uint32_t> &masked_positions, std::vector<int> &masked_alleles, std::unordered_map<int, std::string> dict_decode){
+std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector<position> &all_positions, std::vector<primer> primers, std::string output_primer, std::vector<uint32_t> &masked_positions, std::vector<int> &masked_alleles, std::unordered_map<int, std::string> dict_decode, ref_antd reference, std::string region_){
   /*
    * @param amplicons : data strucuture containing read count, haplotype nt, and positions
    * @param all_positions : vector containing depths / alleles for all pos
@@ -1138,7 +1123,7 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     //this indicates that a number of primers contain mismatches in either the right or left primer region
     bool primer_issue = false;
     primer_issue = false;
-    if((mut_for_ratio > 0.08) || (mut_rev_ratio > 0.08)){
+    if((mut_for_ratio > 0.05) || (mut_rev_ratio > 0.05)){
       primer_issue = true;
     }
     std::string primer_mismatch_percent = std::to_string(mut_for_ratio) + " " + std::to_string(mut_rev_ratio);
@@ -1215,7 +1200,7 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     if(save_haplotypes.size() == 0){continue;}
     bool flagged = false;
     //returns positions that are improperly represented on the amplicon
-    check_primer_binding_issues(flattened, all_positions, save_read_counts, adjusted_read_count, save_haplotypes, suspect_positions, masked_positions, masked_alleles, dict_decode, primer_issue, flagged, subtract_read_counts);
+    check_primer_binding_issues(flattened, all_positions, save_read_counts, adjusted_read_count, save_haplotypes, suspect_positions, masked_positions, masked_alleles, dict_decode, primer_issue, flagged, subtract_read_counts, reference, region_, frequencies);
 
     //write the suspect positions to a file    
     std::string suspect_position_string = "";
@@ -1225,16 +1210,19 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
       }
       suspect_position_string += std::to_string(suspect_positions[i]);
     }
+    
     std::vector<uint32_t> good_haplotypes;
     std::vector<uint32_t> bad_haplotypes;
     
     //we iterate the haplotypes and whichever contain 'bad' positions they get skipped
     for(uint32_t i = 0; i < save_haplotypes.size(); i++){
       for(uint32_t x = 0; x < save_haplotypes[i].size(); x++){
-        pos_search = std::find(suspect_positions.begin(), suspect_positions.end(), flattened[x]); 
+        pos_search = std::find(masked_positions.begin(), masked_positions.end(), flattened[x]); 
         //check if this haplotype contains a bad pos
-        if(save_haplotypes[i][x] >=0 && pos_search != suspect_positions.end()){
-          bad_haplotypes.push_back(i);        
+        if(pos_search != masked_positions.end()){
+          if(save_haplotypes[i][x] == masked_alleles[pos_search - masked_positions.begin()]){
+            bad_haplotypes.push_back(i);        
+          }
         }else{
          good_haplotypes.push_back(i);
         }
@@ -1255,17 +1243,12 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     adjusted_read_count = 0;
     for(uint32_t x : good_haplotypes){
       adjusted_read_count += save_read_counts[x];
-      std::cout << save_read_counts[x] << std::endl;
-      for(int x : save_haplotypes[x]){
-        std::cout << x << " ";
-      }
-      std::cout << "\n";
     }
-        
+      
     if(!primer_issue && !flagged){
     for(uint32_t i : good_haplotypes){
       node->final_haplotypes.push_back(save_haplotypes[i]);
-      frequencies.push_back(save_read_counts[i] / adjusted_read_count); //record freuqnecies     
+      //frequencies.push_back(save_read_counts[i] / adjusted_read_count); //record freuqnecies     
       std::cout << save_read_counts[i] / adjusted_read_count << std::endl;                                                               
       //record the haplotype
       frequency_haplotypes.push_back(save_haplotypes[i]);
@@ -1485,7 +1468,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     if(read_counter % 100000 == 0){
       std::cout << read_counter << " reads processed." << std::endl;
     }
-    /*if(read_counter < 600000 || read_counter > 700000){
+    /*if(read_counter < 1300000 || read_counter > 1400000){
       read_counter += 1;
       continue;
     }*/
@@ -1493,7 +1476,6 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     iterate_reads(aln, amplicons, all_positions, reference, region_, dict_encode, dict_decode);
   }
   std::cout << "end read processing." << std::endl; 
-  reference.remove_seq(); 
  
   //calculate the mean quality, might not print properly but saves properly
   for(uint32_t i = 0; i < all_positions.size(); i++){
@@ -1509,11 +1491,12 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   file.close(); 
   std::vector<uint32_t> masked_positions;
   std::vector<int> masked_alleles;
-  print_allele_depths(all_positions[11750].ad);
+  print_allele_depths(all_positions[23604].ad);
   //extract those reads into a format useable in the clustering
-  std::vector<double> all_frequencies = create_frequency_matrix(amplicons, all_positions, primers, output_primer, masked_positions, masked_alleles, dict_decode);
+  std::vector<double> all_frequencies = create_frequency_matrix(amplicons, all_positions, primers, output_primer, masked_positions, masked_alleles, dict_decode, reference, region_);
+  reference.remove_seq(); 
   std::cout << "FINAL" << std::endl;
-  print_allele_depths(all_positions[11750].ad);
+  print_allele_depths(all_positions[23604].ad);
   if(all_frequencies.size() < 2){
     return(0);
   }
@@ -1600,10 +1583,22 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   /*if(choice_cluster.sil_score <= 0.80 || threshold <= 0.5){
     return(0);
   }*/
-
+   
   //call consensus
   call_consensus_from_vector(all_positions, seq_id, prefix, min_qual, threshold, min_depth, gap, min_coverage_flag, min_insert_threshold);
-  
+
+  file.open("frequencies_corrected.txt", ios_base::app);
+  file << "position\tfrequency\tnuc\ttotal_depth\n";
+ //dump out frequency information for my own personal use
+  for(position p : all_positions){
+    for(allele a : p.ad){
+      if(a.depth > 0){
+        file << p.pos << "\t" << a.depth/p.depth << "\t" << a.nuc << "\t"<< p.depth <<"\n"; 
+      }
+    }
+  }
+  file.close();
+
   return 0;
 }
 
