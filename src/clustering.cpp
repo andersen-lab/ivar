@@ -525,7 +525,6 @@ void find_cluster_bounds(cluster &cluster_results){
   double outlier_lower = 0;
   double outlier_upper = 0;
   double avg = 0;
-  std::cout << "\nnew run\n";
   for(uint32_t i = 0; i < cluster_results.sorted_points.size(); i++){
     variance = 0;
     std_deviation = 0;
@@ -545,19 +544,19 @@ void find_cluster_bounds(cluster &cluster_results){
     std_deviation = std::sqrt(variance);
     outlier_lower = avg - (std_deviation * 2);
     outlier_upper = avg + (std_deviation * 2);
-    std::cout << "average: " << avg << " std dev: " << std_deviation << std::endl;
-    std::cout << "lower: " << outlier_lower << " upper: " << outlier_upper << std::endl;
+    //std::cout << "average: " << avg << " std dev: " << std_deviation << std::endl;
+    //std::cout << "lower: " << outlier_lower << " upper: " << outlier_upper << std::endl;
 
     for(uint32_t i = 0; i < tmp.size(); i++){
       if(tmp[i] >= outlier_lower && tmp[i] <= outlier_upper){
         clean_cluster.push_back(tmp[i]);
       }else{
         //clean_cluster.push_back(tmp[i]);
-        std::cout << "outlier: " << tmp[i] << std::endl;
+        //std::cout << "outlier: " << tmp[i] << std::endl;
       }
     }
-    /*std::cout << "cleaned cluster" << std::endl;
-    for(uint32_t i = 0; i < clean_cluster.size(); i++){
+    //std::cout << "cleaned cluster size " << clean_cluster.size() << std::endl;
+    /*for(uint32_t i = 0; i < clean_cluster.size(); i++){
       std::cout << clean_cluster[i] << std::endl;
     }*/
     //these find the min/max index within the vector
@@ -591,13 +590,14 @@ void k_means(int n_clusters, alglib::real_2d_array xy, cluster &cluster_results)
   //then distance matrix
   clusterizersetpoints(s, xy, num_points, 1, 2);
   clusterizersetkmeanslimits(s, 5, 0);
+  
   //this is the cluster size!!!
   custom_kmeans(s, n_clusters, rep);
+  
   if (int(rep.terminationtype) != 1){
     std::cout << "Error in clustering haplotypes" << std::endl;
     exit(1);
   }
-  
   calculate_sil_score(xy, rep, n_clusters, cluster_results);
   calculate_cluster_centers(xy, rep, n_clusters, cluster_results);
   find_cluster_bounds(cluster_results);
@@ -679,13 +679,10 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
   /*
    * @param r : alignment object
    * 
-   * In this function we encode the changes to the reference as follows:
-   * A:0, C:1, G:2, T:4, Del:5
    */
 
   //get the cigar operation 
   uint32_t *cigar = bam_get_cigar(r);
-  //get the qualities
   uint8_t *qualities = bam_get_qual(r);
   uint32_t i = 0;  
 
@@ -813,9 +810,6 @@ void iterate_reads(bam1_t *r, IntervalTree &amplicons, std::vector<position> &al
       std::cout << op << " " << op_len << std::endl;                                          
       i++;                                          
     }
-    std::cout << "filename: " << bam_get_qname(r) << " " << aux << std::endl;
-    std::cout << "aux nt count: " << aux_nt_count << " cigar nt count: " << total_nucleotides << std::endl;
-    std::cout << abs_start_pos << " " << abs_end_pos << std::endl; 
     return;
   }
   //}
@@ -973,12 +967,6 @@ void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vec
         }
       }
      }
-    if(final_positions[i] == 23604){
-      for(int l : tmp_all_versions){
-        std::cout << l << " ";
-      }
-      std::cout << "\n";
-    }
     for(uint32_t x = 0; x < all_versions.size(); x++){
       if(all_versions[x] == -2 || all_versions[x] >= 0){
         arc += save_read_counts[x];
@@ -1009,7 +997,7 @@ void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vec
         continue;
       }
       double amplicon_freq = mut_count[z] / arc;
-      std::cout << "adjusted_read_count " << adjusted_read_count << " arc " << arc << " mut count " << mut_count[z] <<  " subtract read count " << sub_mut_count[z] << std::endl;
+      //std::cout << "adjusted_read_count " << adjusted_read_count << " arc " << arc << " mut count " << mut_count[z] <<  " subtract read count " << sub_mut_count[z] << std::endl;
 
       std::string nuc = decoded_nucs(mut[z], dict_decode);
       double global_freq=0;
@@ -1019,18 +1007,18 @@ void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vec
           global_freq = x.depth / all_positions[final_positions[i]].depth;
         }
       }
-      std::cout << "check primer binding " << final_positions[i] << " global_freq " << global_freq << " amplicon_freq " << amplicon_freq << " mut type " << mut[z] << std::endl;
       if(abs(global_freq-amplicon_freq) >= 0.20){
         //adjusted_read_count -= mut_count[z];
         suspect_positions.push_back(final_positions[i]);
         //primer_issue = true;
         if(primer_issue){
+
           double new_total_depth = 0;
           double new_global_depth = 0;
           for(uint32_t y=0; y < pos_alleles.size(); y++){ 
-            if(pos_alleles[y].nuc == nuc){
-              //std::cout << pos_alleles[y].depth << " ";
-              pos_alleles[y].depth -= sub_mut_count[z];
+            if(pos_alleles[y].nuc == nuc && pos_alleles[y].ref == false){
+              std::cout << "check primer binding " << final_positions[i] << " global_freq " << global_freq << " amplicon_freq " << amplicon_freq << " mut type " << mut[z] << std::endl;
+             pos_alleles[y].depth -= sub_mut_count[z];
               if(pos_alleles[y].depth < 0){
                 pos_alleles[y].depth = 0;
               }
@@ -1039,11 +1027,7 @@ void check_primer_binding_issues(std::vector<uint32_t> final_positions, std::vec
             new_total_depth += pos_alleles[y].depth;
           }
          double new_global_freq = new_global_depth / new_total_depth;
-         if(abs(new_global_freq-amplicon_freq) >= 0.20){
-            std::cout << "still sucks global_freq " << new_global_freq << " amplicon freq " << amplicon_freq << std::endl;
-            //flagged=true;
-         }else{
-           std::cout << new_global_freq << std::endl;;
+         if(abs(new_global_freq-amplicon_freq) < 0.20){
            frequencies.push_back(new_global_freq);
          }
          //print_allele_depths(pos_alleles);
@@ -1120,12 +1104,6 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     if(node->mut_forward != 0){
       mut_for_ratio = node->mut_forward / node->forward;
     }
-    //this indicates that a number of primers contain mismatches in either the right or left primer region
-    bool primer_issue = false;
-    primer_issue = false;
-    if((mut_for_ratio > 0.05) || (mut_rev_ratio > 0.05)){
-      primer_issue = true;
-    }
     std::string primer_mismatch_percent = std::to_string(mut_for_ratio) + " " + std::to_string(mut_rev_ratio);
 
     //remove positions & indels where avg. quality is below 20
@@ -1199,6 +1177,7 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
 
     if(save_haplotypes.size() == 0){continue;}
     bool flagged = false;
+    bool primer_issue = true;
     //returns positions that are improperly represented on the amplicon
     check_primer_binding_issues(flattened, all_positions, save_read_counts, adjusted_read_count, save_haplotypes, suspect_positions, masked_positions, masked_alleles, dict_decode, primer_issue, flagged, subtract_read_counts, reference, region_, frequencies);
 
@@ -1211,6 +1190,7 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
       suspect_position_string += std::to_string(suspect_positions[i]);
     }
     
+    std::cout << "sus pos " << suspect_position_string << std::endl;
     std::vector<uint32_t> good_haplotypes;
     std::vector<uint32_t> bad_haplotypes;
     
@@ -1245,7 +1225,7 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
       adjusted_read_count += save_read_counts[x];
     }
       
-    if(!primer_issue && !flagged){
+    if(!flagged){
     for(uint32_t i : good_haplotypes){
       node->final_haplotypes.push_back(save_haplotypes[i]);
       //frequencies.push_back(save_read_counts[i] / adjusted_read_count); //record freuqnecies     
@@ -1259,7 +1239,7 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     node->final_positions = flattened;
     //write suspicious positions because of primer issues to text file
     ofstream file;
-    if(!output_primer.empty() && primer_issue && suspect_positions.size() > 0){
+    if(!output_primer.empty() && suspect_positions.size() > 0){
       file.open(output_primer, ios_base::app);
         file << lower_primer_name << "\t" << suspect_position_string << "\t" << primer_mismatch_percent <<  "\n";
     }
@@ -1269,42 +1249,6 @@ std::vector<double> create_frequency_matrix(IntervalTree &amplicons, std::vector
     }
   }
   return(frequencies);
-  /*
-   * So the issue we run into is that we can mark a haplotype as "bad" due to an allele at a specific position, however we have no way of saying which frequency is correct, the global one or the local amplicon one. To this effect, we remove any frequency linked to this allele from this position in the running.
-   */
-  /*std::vector<double> return_frequencies;
-  //loop through all frequencies and search for masked positions/alleles
-  for(uint32_t i = 0; i < frequencies.size(); i++){
-    std::vector<int> tmp_haplo = frequency_haplotypes[i];
-    std::vector<uint32_t> tmp_pos = frequency_positions[i];
-
-    bool save = true;
-    for(uint32_t x=0; x < tmp_haplo.size(); x++){
-      if(tmp_haplo[x] < 0){
-        continue;
-      }
-      //look for this position in the masked positions
-      std::vector<uint32_t>::iterator it_masked_pos = std::find(masked_positions.begin(), masked_positions.end(), tmp_pos[x]);
-      //if it is in masked positions
-      if(it_masked_pos != masked_positions.end()){
-        int index = it_masked_pos - masked_positions.begin();
-        //if this allele matches at this position
-        if(masked_alleles[index] == tmp_haplo[x]){
-          std::cout << "removal " << frequencies[i] << " " << tmp_haplo[x] << " " << tmp_pos[x] << std::endl;
-          //CHANGED
-          save = false;
-        }
-      }
-    }
-    if(save){
-     std::cout << "save " << frequencies[i] << std::endl;
-     for(uint32_t x = 0; x < tmp_haplo.size(); x++){
-        std::cout << tmp_haplo[x] << " " << tmp_pos[x] << std::endl;
-     }
-     return_frequencies.push_back(frequencies[i]);
-    }
-  }
-  return(return_frequencies);*/
 }
 
 //acutal consensus call
@@ -1440,14 +1384,6 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   bam_hdr_t *header = sam_hdr_read(in);
 
   uint32_t *ref_length = header->target_len;
-  for(uint32_t i=0; i <= *ref_length; i++){
-    position new_position;
-    new_position.pos = i;
-    new_position.depth = 0;
-    new_position.ad = basic_alleles;
-    all_positions.push_back(new_position);
-  }
-
   bam1_t *aln = bam_init1();
   hts_itr_t *iter = NULL;
   std::string region_;
@@ -1459,8 +1395,24 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   ref_antd reference(ref);
   reference.set_seq(region_);
 
+  std::string ref_nuc;
   //fill md tag TODO
   //bam_fillmd1_core(const char *ref_name, aln, char *ref, int flag, int max_nm)
+  for(uint32_t i=0; i <= *ref_length; i++){
+    position new_position;
+    new_position.pos = i;
+    new_position.depth = 0;
+    new_position.ad = basic_alleles;    
+    ref_nuc += reference.get_base(i, region_);
+    for(uint32_t i = 0; i < new_position.ad.size(); i++){
+      if(new_position.ad[i].nuc == ref_nuc){
+        new_position.ad[i].ref = true;
+        break;
+      }
+    }
+    ref_nuc.clear();
+    all_positions.push_back(new_position);
+  }
 
   //this iterates over the reads and assigns them to an amplicon
   while(sam_itr_next(in, iter, aln) >= 0) {
@@ -1468,10 +1420,10 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
     if(read_counter % 100000 == 0){
       std::cout << read_counter << " reads processed." << std::endl;
     }
-    /*if(read_counter < 1300000 || read_counter > 1400000){
+    if(read_counter < 1400000 || read_counter > 1500000){
       read_counter += 1;
       continue;
-    }*/
+    }
     read_counter += 1;
     iterate_reads(aln, amplicons, all_positions, reference, region_, dict_encode, dict_decode);
   }
@@ -1491,11 +1443,11 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   file.close(); 
   std::vector<uint32_t> masked_positions;
   std::vector<int> masked_alleles;
+  
   print_allele_depths(all_positions[23604].ad);
   //extract those reads into a format useable in the clustering
   std::vector<double> all_frequencies = create_frequency_matrix(amplicons, all_positions, primers, output_primer, masked_positions, masked_alleles, dict_decode, reference, region_);
   reference.remove_seq(); 
-  std::cout << "FINAL" << std::endl;
   print_allele_depths(all_positions[23604].ad);
   if(all_frequencies.size() < 2){
     return(0);
@@ -1573,7 +1525,6 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
   }
   file.close();
   cluster choice_cluster = all_cluster_results[best_cluster_index];
-
   //find the largest cluster center
   int largest_cluster_index = std::max_element(choice_cluster.centers.begin(), choice_cluster.centers.end()) - choice_cluster.centers.begin();
   //this marks the lower bound of the largest cluster
@@ -1586,7 +1537,7 @@ int determine_threshold(std::string bam, std::string ref, std::string bed, std::
    
   //call consensus
   call_consensus_from_vector(all_positions, seq_id, prefix, min_qual, threshold, min_depth, gap, min_coverage_flag, min_insert_threshold);
-
+  
   file.open("frequencies_corrected.txt", ios_base::app);
   file << "position\tfrequency\tnuc\ttotal_depth\n";
  //dump out frequency information for my own personal use

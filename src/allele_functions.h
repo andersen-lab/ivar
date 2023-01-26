@@ -13,7 +13,7 @@ struct allele{
   uint32_t beg;
   uint32_t end;
   float tmp_mean_qual;
-  
+  bool ref = false; //is this the reference  
   bool operator < (const allele& a) const{
     return (nuc.compare(a.nuc) > 0) ? true : false;
   }
