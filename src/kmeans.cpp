@@ -120,11 +120,10 @@ std::vector<double> remove_outlier_points(std::vector<double> points, double dis
    * Given a cluster, remove the point contributing the most to the variance in the direction
    * opposite the distance and return.
    */ 
-  //std::cout << "top of remove outlier, points size : " << points.size() << std::endl;
   std::vector<double> zscores;
   double mean = std::accumulate(points.begin(), points.end(), 0.0) / points.size();
   double stddev = sqrt(calculate_variance(points));
-
+  std::vector<double> new_points;
   for(double p: points){
     zscores.push_back((p - mean) / stddev);
   }
@@ -135,9 +134,13 @@ std::vector<double> remove_outlier_points(std::vector<double> points, double dis
   }else{
     remove_index = std::max_element(zscores.begin(),zscores.end()) - zscores.begin(); 
   }
-  points.erase(points.begin() + remove_index);
-  //std::cout << "bottom of remove outlier, points size : " << points.size() << std::endl;
-  return(points);
+  
+  for(double i = 0; i < points.size(); i++){
+    if(i != remove_index){
+      new_points.push_back(points[i]);
+    }
+  }
+  return(new_points);
 
 }
 
