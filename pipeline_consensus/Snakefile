@@ -31,7 +31,7 @@ rule call_consensus:
         "{out_dir}/consensus_sequences/{sample}.fa"
     shell:
         """
-        samtools mpileup -A -Q 0 -d 0 {input} | ivar consensus -p {output} -m 10 -n N
+        samtools mpileup -A -a -Q 0 -d 0 {input} | ivar consensus -p {output} -m 10 -n N
         """
 
 rule trim_reads:
