@@ -1,0 +1,49 @@
+name: Build pages using Doxygen
+on:
+    workflow_dispatch:
+        inputs:
+            commitmsg:
+                description: 'Commit Message'
+                required: true
+                default: 'Update documentation'
+    # pull_request:
+    #     branches:
+    #         - master
+    #     types:
+    #         - closed
+    #     paths:
+    #         - 'docs/'
+
+jobs:
+    build_pages:
+        # if: github.event.pull_request.merged == true
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v2
+
+            - name: Install Doxygen
+              run: |
+                  cd ..
+                  wget https://github.com/doxygen/doxygen/archive/refs/tags/Release_1_8_14.tar.gz
+                  tar -xzf Release_1_8_14.tar.gz
+                  cd doxygen-Release_1_8_14
+                  mkdir build
+                  cd build
+                  cmake -G "Unix Makefiles" ..
+                  make
+                  sudo make install
+                  cd ../../ivar
+              shell: bash
+
+            - name: Build pages
+              run: doxygen Doxyfile
+              shell: bash
+
+            - name: Commit to changes to branch
+              run: |
+                  git config --global user.name '${{ github.actor }}'
+                  git config --global user.email '${{ github.actor }}@users.noreply.github.com'
+                  git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+                  git commit -am "${{ github.event.inputs.commitmsg }}"
+                  git push

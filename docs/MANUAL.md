@@ -173,7 +173,7 @@ Usage: ivar filtervariants -p <prefix> replicate-one.tsv replicate-two.tsv ... O
 Input: Variant tsv files for each replicate/sample
 
 Input Options    Description
-           -t    Minimum fration of files required to contain the same variant. Specify value within [0,1]. (Default: 1)
+           -t    Minimum fraction of files required to contain the same variant. Specify value within [0,1]. (Default: 1)
            -f    A text file with one variant file per line.
 
 Output Options   Description
