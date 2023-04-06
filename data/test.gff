@@ -5,3 +5,4 @@ test	Genbank	CDS	2	292	.	+	.	ID=id-test3;Note=eluvite;gene=geneKatyPerry;
 test	Genbank	CDS	1	55	.	+	.	ID=id-test4;Note=ategnato;gene=geneKatyPerry;
 test	Genbank	CDS	2	292	.	+	.	ID=id-testedit1;Note=PinkFloyd;EditPosition=100;EditSequence=A;
 test	Genbank	CDS	2	292	.	+	.	ID=id-testedit2;Note=AnotherBrickInTheWall;EditPosition=102;EditSequence=AA;gene=geneTaylorSwift;
+
