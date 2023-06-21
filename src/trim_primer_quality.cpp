@@ -542,6 +542,22 @@ int iterate_aln(std::vector<bam1_t *>::iterator &aln_itr,
   return iterate_reads;
 }
 
+void find_primer_per_position(std::vector<primer> primers){
+  //end pos of last primer
+  uint32_t last_pos = primers.back().get_end();
+  //std::map<uint32_t, uint32_t> primer_map_forward;
+  //std::map<uint32_t, uint32_t> primer_map_reverse;
+  for(uint32_t j = 0; j < last_pos; j++){
+    for (uint32_t i = 0; i < primers.size(); i++){ 
+      uint32_t start = primers[i].get_start();
+      uint32_t end = primers[i].get_end();
+      if(start < j && j <= end){
+        std::cout << primers[i].get_start() << " " << j << " " << primers[i].get_end() << std::endl;
+      }
+    }
+  }
+}
+
 int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
                          uint8_t min_qual, uint8_t sliding_window,
                          std::string cmd, bool write_no_primer_reads,
@@ -566,6 +582,9 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
     std::cerr << "Amplicons detected: " << std::endl;
     amplicons.inOrder();
   }
+
+  // calculate the primers that should cover each position
+  find_primer_per_position(primers);
 
   // Read in input file
   samFile *in;
