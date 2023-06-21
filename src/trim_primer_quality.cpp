@@ -1,5 +1,5 @@
 #include "trim_primer_quality.h"
-
+#include <map>
 #define round_int(x, total) \
   ((int)(0.5 + ((float)x / float(total)) * 10000)) / (float)100
 
@@ -545,14 +545,20 @@ int iterate_aln(std::vector<bam1_t *>::iterator &aln_itr,
 void find_primer_per_position(std::vector<primer> primers){
   //end pos of last primer
   uint32_t last_pos = primers.back().get_end();
-  //std::map<uint32_t, uint32_t> primer_map_forward;
-  //std::map<uint32_t, uint32_t> primer_map_reverse;
-  for(uint32_t j = 0; j < last_pos; j++){
+  std::map<uint32_t, std::vector<uint32_t>> primer_map_forward;
+  std::map<uint32_t, std::vector<uint32_t>> primer_map_reverse;
+  for(uint32_t j = 0; j < last_pos; j++){    
+    primer_map_forward.insert(std::pair<uint32_t, std::vector<uint32_t>>(j, std::vector<uint32_t>()));
     for (uint32_t i = 0; i < primers.size(); i++){ 
       uint32_t start = primers[i].get_start();
       uint32_t end = primers[i].get_end();
+      char strand = primers[i].get_strand();
       if(start < j && j <= end){
-        std::cout << primers[i].get_start() << " " << j << " " << primers[i].get_end() << std::endl;
+        if(strand == '+'){
+          primer_map_forward[j].push_back(primers[i].get_end());
+        }else{
+          primer_map_reverse[j].push_back(primers[i].get_end());
+        }
       }
     }
   }
