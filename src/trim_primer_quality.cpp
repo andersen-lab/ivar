@@ -542,26 +542,29 @@ int iterate_aln(std::vector<bam1_t *>::iterator &aln_itr,
   return iterate_reads;
 }
 
-void find_primer_per_position(std::vector<primer> primers){
+std::vector<std::map<uint32_t, std::vector<primer>>> find_primer_per_position(std::vector<primer> primers){
   //end pos of last primer
   uint32_t last_pos = primers.back().get_end();
-  std::map<uint32_t, std::vector<uint32_t>> primer_map_forward;
-  std::map<uint32_t, std::vector<uint32_t>> primer_map_reverse;
+  std::map<uint32_t, std::vector<primer>> primer_map_forward;
+  std::map<uint32_t, std::vector<primer>> primer_map_reverse;
   for(uint32_t j = 0; j < last_pos; j++){    
-    primer_map_forward.insert(std::pair<uint32_t, std::vector<uint32_t>>(j, std::vector<uint32_t>()));
     for (uint32_t i = 0; i < primers.size(); i++){ 
       uint32_t start = primers[i].get_start();
       uint32_t end = primers[i].get_end();
       char strand = primers[i].get_strand();
       if(start < j && j <= end){
         if(strand == '+'){
-          primer_map_forward[j].push_back(primers[i].get_end());
+          primer_map_forward[j].push_back(primers[i]);
         }else{
-          primer_map_reverse[j].push_back(primers[i].get_end());
+          primer_map_reverse[j].push_back(primers[i]);
         }
       }
     }
   }
+  std::vector<std::map<uint32_t, std::vector<primer>>> hash;
+  hash.push_back(primer_map_forward);
+  hash.push_back(primer_map_reverse);
+  return hash;
 }
 
 int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
@@ -590,7 +593,9 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
   }
 
   // calculate the primers that should cover each position
-  find_primer_per_position(primers);
+  std::vector<std::map<uint32_t, std::vector<primer>>> hash = find_primer_per_position(primers);
+  std::map<uint32_t, std::vector<primer>> primer_map_forward = hash[0];
+  std::map<uint32_t, std::vector<primer>> primer_map_reverse = hash[1];
 
   // Read in input file
   samFile *in;
@@ -667,12 +672,21 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
   std::vector<primer> sorted_primers = insertionSort(primers, primers.size());
 
   std::vector<bam1_t *>::iterator aln_itr = alns.begin();
+  uint32_t start_pos = -1;
+  char strand = '+';
 
   // Iterate through reads
   while (iterate_aln(aln_itr, alns, header, in, aln) >= 0) {
     unmapped_flag = false;
     primer_trimmed = false;
     get_overlapping_primers(aln, sorted_primers, overlapping_primers);
+    strand = '+';
+    if (bam_is_rev(aln)) {
+      start_pos = bam_endpos(aln) - 1;
+      strand = '-';
+    } else {
+      start_pos = aln->core.pos;
+    }
     if ((aln->core.flag & BAM_FUNMAP) == 0) {  // If mapped
       // if primer pair info provided, check if read correctly overlaps with
       // atleast one amplicon
@@ -697,7 +711,12 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
           (abs(aln->core.isize) - max_primer_len) > abs(aln->core.l_qseq);
       // if reverse strand
       if ((aln->core.flag & BAM_FPAIRED) != 0 && isize_flag) {  // If paired
-        get_overlapping_primers(aln, sorted_primers, overlapping_primers);
+        //get_overlapping_primers(aln, sorted_primers, overlapping_primers);
+        if(strand == '+'){
+          std::vector<primer> overlapping_primers = primer_map_forward[start_pos];
+        }else{
+          std::vector<primer> overlapping_primers = primer_map_reverse[start_pos];
+        }
         if (overlapping_primers.size() >
             0) {  // If read starts before overlapping regions (?)
           primer_trimmed = true;
