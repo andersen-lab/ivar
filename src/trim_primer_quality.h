@@ -56,11 +56,6 @@ cigar_ primer_trim(bam1_t *r, bool &isize_flag, int32_t new_pos,
                    bool unpaired_rev);
 void replace_cigar(bam1_t *b, uint32_t n, uint32_t *cigar);
 void condense_cigar(cigar_ *t);
-void get_overlapping_primers(bam1_t *r, std::vector<primer> &primers,
-                             std::vector<primer> &overlapping_primers);
-void get_overlapping_primers(bam1_t *r, std::vector<primer> primers,
-                             std::vector<primer> &overlapping_primers,
-                             bool unpaired_rev);
 int get_bigger_primer(std::vector<primer> primers);
 bool amplicon_filter(IntervalTree amplicons, bam1_t *r);
 std::vector<primer> insertionSort(std::vector<primer> primers, uint32_t n);

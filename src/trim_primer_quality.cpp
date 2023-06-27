@@ -388,90 +388,6 @@ std::vector<primer> insertionSort(std::vector<primer> primers, uint32_t n) {
   return primers;
 }
 
-// For paired reads
-void get_overlapping_primers(bam1_t *r, std::vector<primer> &primers,
-                             std::vector<primer> &overlapped_primers) {
-  overlapped_primers.clear();
-  uint32_t start_pos = -1;
-  char strand = '+';
-  if (bam_is_rev(r)) {
-    start_pos = bam_endpos(r) - 1;
-    strand = '-';
-  } else {
-    start_pos = r->core.pos;
-  }
- 
-  int low = 0;
-  int high = primers.size();
-  // then we iterate and push what fits
-  int loc_exact = binary_search(primers, start_pos, low,
-                 high);
-  primer possible_match;
-  if(loc_exact >= low && loc_exact < high){ 
-      possible_match = primers[loc_exact]; 
-      if(start_pos >= possible_match.get_start() && start_pos <= possible_match.get_end() &&
-          (strand == possible_match.get_strand() || possible_match.get_strand() == 0)){
-        overlapped_primers.push_back(possible_match);
-      }
-  }
-  int loc = 0;
-  bool done_right = false;
-  bool done_left = false;
-  int i = 1;
-  while(!done_left && !done_right){
-    loc = loc_exact + i;
-    if(loc >= low && loc < high){
-      possible_match = primers[loc]; 
-
-      if(start_pos >= possible_match.get_start() && start_pos <= possible_match.get_end() &&
-          (strand == possible_match.get_strand() || possible_match.get_strand() == 0)){
-        overlapped_primers.push_back(possible_match);
-      }
-      if(start_pos < possible_match.get_start()){
-        done_right = true;
-      }
-    } else{
-      done_right = true;
-    }
-  
-    loc = loc_exact - i;
-    if(loc >= low && loc < high){
-      possible_match = primers[loc]; 
-      if(start_pos >= possible_match.get_start() && start_pos <= possible_match.get_end() &&
-          (strand == possible_match.get_strand() || possible_match.get_strand() == 0)){
-        overlapped_primers.push_back(possible_match);
-      }
-      if(start_pos > possible_match.get_end()){
-        done_left = true;
-      }
-    } else{
-      done_left = true;
-    }
-    i++;
-  }
-}
-
-// For unpaired reads
-void get_overlapping_primers(bam1_t *r, std::vector<primer> primers,
-                             std::vector<primer> &overlapped_primers,
-                             bool unpaired_rev) {
-  overlapped_primers.clear();
-  uint32_t start_pos = -1;
-  char strand = '+';
-  if (unpaired_rev) {
-    start_pos = bam_endpos(r) - 1;
-    strand = '-';
-  } else {
-    start_pos = r->core.pos;
-  }
-  for (std::vector<primer>::iterator it = primers.begin(); it != primers.end();
-       ++it) {
-    if (start_pos >= it->get_start() && start_pos <= it->get_end() &&
-        (strand == it->get_strand() || it->get_strand() == 0))
-      overlapped_primers.push_back(*it);
-  }
-}
-
 void condense_cigar(cigar_ *t) {
   uint32_t i = 0, len = 0, cig, next_cig;
   while (i < t->nlength - 1) {
@@ -552,7 +468,7 @@ std::vector<std::map<uint32_t, std::vector<primer>>> find_primer_per_position(st
       uint32_t start = primers[i].get_start();
       uint32_t end = primers[i].get_end();
       char strand = primers[i].get_strand();
-      if(start < j && j <= end){
+      if(start <= j && j <= end){
         if(strand == '+'){
           primer_map_forward[j].push_back(primers[i]);
         }else{
@@ -679,7 +595,6 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
   while (iterate_aln(aln_itr, alns, header, in, aln) >= 0) {
     unmapped_flag = false;
     primer_trimmed = false;
-    get_overlapping_primers(aln, sorted_primers, overlapping_primers);
     strand = '+';
     if (bam_is_rev(aln)) {
       start_pos = bam_endpos(aln) - 1;
@@ -687,6 +602,13 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
     } else {
       start_pos = aln->core.pos;
     }
+    overlapping_primers.clear();
+    if(strand == '+'){
+      overlapping_primers = primer_map_forward[start_pos];
+    }else{
+      overlapping_primers = primer_map_reverse[start_pos];
+    }
+
     if ((aln->core.flag & BAM_FUNMAP) == 0) {  // If mapped
       // if primer pair info provided, check if read correctly overlaps with
       // atleast one amplicon
@@ -711,11 +633,11 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
           (abs(aln->core.isize) - max_primer_len) > abs(aln->core.l_qseq);
       // if reverse strand
       if ((aln->core.flag & BAM_FPAIRED) != 0 && isize_flag) {  // If paired
-        //get_overlapping_primers(aln, sorted_primers, overlapping_primers);
+        overlapping_primers.clear();                                                                
         if(strand == '+'){
-          std::vector<primer> overlapping_primers = primer_map_forward[start_pos];
+          overlapping_primers = primer_map_forward[start_pos];
         }else{
-          std::vector<primer> overlapping_primers = primer_map_reverse[start_pos];
+          overlapping_primers = primer_map_reverse[start_pos];
         }
         if (overlapping_primers.size() >
             0) {  // If read starts before overlapping regions (?)
@@ -751,7 +673,9 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
 
         // handle the unpaired reads
         // forward primer unpaired read
-        get_overlapping_primers(aln, primers, overlapping_primers, false);
+        start_pos = aln->core.pos;
+        overlapping_primers.clear();
+        overlapping_primers = primer_map_forward[start_pos]; 
         if (overlapping_primers.size() > 0) {
           primer_trimmed = true;
           cand_primer = get_max_end(overlapping_primers);
@@ -765,7 +689,9 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
         }
 
         // reverse primer unpaired read
-        get_overlapping_primers(aln, primers, overlapping_primers, true);
+        overlapping_primers.clear();
+        start_pos = bam_endpos(aln) - 1;
+        overlapping_primers = primer_map_reverse[start_pos]; 
 
         if (overlapping_primers.size() > 0) {
           primer_trimmed = true;
