@@ -604,9 +604,13 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
     }
     overlapping_primers.clear();
     if(strand == '+'){
-      overlapping_primers = primer_map_forward[start_pos];
+      if (primer_map_forward.find(start_pos) != primer_map_forward.end()) {
+        overlapping_primers = primer_map_forward[start_pos]; 
+      }
     }else{
-      overlapping_primers = primer_map_reverse[start_pos];
+      if (primer_map_reverse.find(start_pos) != primer_map_reverse.end()){
+        overlapping_primers = primer_map_reverse[start_pos];
+      }
     }
 
     if ((aln->core.flag & BAM_FUNMAP) == 0) {  // If mapped
@@ -635,9 +639,13 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
       if ((aln->core.flag & BAM_FPAIRED) != 0 && isize_flag) {  // If paired
         overlapping_primers.clear();                                                                
         if(strand == '+'){
-          overlapping_primers = primer_map_forward[start_pos];
-        }else{
-          overlapping_primers = primer_map_reverse[start_pos];
+          if (primer_map_forward.find(start_pos) != primer_map_forward.end()) {
+            overlapping_primers = primer_map_forward[start_pos];
+          }
+        }else{ //FIX THIS DUMMY
+          if (primer_map_reverse.find(start_pos) != primer_map_reverse.end()) {
+            overlapping_primers = primer_map_reverse[start_pos];
+          }
         }
         if (overlapping_primers.size() >
             0) {  // If read starts before overlapping regions (?)
@@ -675,7 +683,9 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
         // forward primer unpaired read
         start_pos = aln->core.pos;
         overlapping_primers.clear();
-        overlapping_primers = primer_map_forward[start_pos]; 
+        if (primer_map_forward.find(start_pos) != primer_map_forward.end()) {
+          overlapping_primers = primer_map_forward[start_pos]; 
+        }
         if (overlapping_primers.size() > 0) {
           primer_trimmed = true;
           cand_primer = get_max_end(overlapping_primers);
@@ -691,8 +701,10 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
         // reverse primer unpaired read
         overlapping_primers.clear();
         start_pos = bam_endpos(aln) - 1;
-        overlapping_primers = primer_map_reverse[start_pos]; 
-
+        if (primer_map_reverse.find(start_pos) != primer_map_reverse.end()) {
+          overlapping_primers = primer_map_reverse[start_pos];
+        } 
+        
         if (overlapping_primers.size() > 0) {
           primer_trimmed = true;
           cand_primer = get_min_start(overlapping_primers);
