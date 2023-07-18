@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <string.h>
-
+#include <map>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -50,6 +50,7 @@ int32_t get_pos_on_reference(uint32_t *cigar, uint32_t ncigar, uint32_t pos,
 void reverse_qual(uint8_t *q, int l);
 void reverse_cigar(uint32_t *cigar, int l);
 double mean_quality(uint8_t *a, int s, int e);
+std::vector<std::map<uint32_t, std::vector<primer>>> find_primer_per_position(std::vector<primer> primers);
 cigar_ quality_trim(bam1_t *r, uint8_t qual_threshold, uint8_t sliding_window);
 void print_cigar(uint32_t *cigar, int nlength);
 cigar_ primer_trim(bam1_t *r, bool &isize_flag, int32_t new_pos,
