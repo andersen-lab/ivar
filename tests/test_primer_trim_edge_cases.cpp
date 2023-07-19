@@ -25,6 +25,10 @@ int main() {
       }
     }
   }
+  // calculate the primers that should cover each position
+  std::vector<std::map<uint32_t, std::vector<primer>>> hash = find_primer_per_position(primers);
+  std::map<uint32_t, std::vector<primer>> primer_map_forward = hash[0];
+  std::map<uint32_t, std::vector<primer>> primer_map_reverse = hash[1];
   bam_hdr_t *header = sam_hdr_read(in);
   region_.assign(header->target_name[0]);
   std::string temp(header->text);
@@ -39,16 +43,23 @@ int main() {
   std::vector<primer> overlapping_primers;
   primer cand_primer;
   bool isize_flag = false;
+  uint32_t start_pos = -1;
   while (sam_itr_next(in, iter, aln) >= 0) {
     if ((aln->core.flag & BAM_FUNMAP) != 0) {
       continue;
     }
+    
+    start_pos = aln->core.pos;
     isize_flag =
         (abs(aln->core.isize) - max_primer_len) > abs(aln->core.l_qseq);
     len = bam_cigar2qlen(aln->core.n_cigar, bam_get_cigar(aln));
     std::cout << bam_get_qname(aln) << std::endl;
     print_cigar(bam_get_cigar(aln), aln->core.n_cigar);
-    get_overlapping_primers(aln, primers, overlapping_primers, false);
+    overlapping_primers.clear();
+    if (primer_map_forward.find(start_pos) != primer_map_forward.end()) {
+      overlapping_primers = primer_map_forward[start_pos];
+    }
+    //get_overlapping_primers(aln, primers, overlapping_primers, false);
     if (overlapping_primers.size() > 0) {
       // Forward trim
       cand_primer = get_max_end(overlapping_primers);
@@ -61,7 +72,13 @@ int main() {
     cigar = bam_get_cigar(aln);
     print_cigar(cigar, aln->core.n_cigar);
     // Reverse trim
-    get_overlapping_primers(aln, primers, overlapping_primers, true);
+    start_pos = bam_endpos(aln) - 1;
+    overlapping_primers.clear();
+    if (primer_map_reverse.find(start_pos) != primer_map_reverse.end()){
+      overlapping_primers = primer_map_reverse[start_pos];
+    }
+;
+    //get_overlapping_primers(aln, primers, overlapping_primers, true);
     if (overlapping_primers.size() > 0) {
       cand_primer = get_min_start(overlapping_primers);
       t = primer_trim(aln, isize_flag, cand_primer.get_start() - 1, true);
@@ -82,7 +99,7 @@ int main() {
       success = -1;
       std::cout << "Cigar length and read length don't match after trimming"
                 << std::endl;
-      std::cout << "Expected" << len << ". Got "
+      std::cout << "Expected " << len << ". Got "
                 << bam_cigar2qlen(aln->core.n_cigar, bam_get_cigar(aln))
                 << std::endl;
     }
