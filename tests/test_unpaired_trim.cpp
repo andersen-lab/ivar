@@ -77,6 +77,12 @@ int main() {
   std::vector<primer> overlapping_primers;
   primer cand_primer;
   bool isize_flag = false;
+  uint32_t start_pos = -1;
+  // calculate the primers that should cover each position
+  std::vector<std::map<uint32_t, std::vector<primer>>> hash = find_primer_per_position(primers);
+  std::map<uint32_t, std::vector<primer>> primer_map_forward = hash[0];
+  std::map<uint32_t, std::vector<primer>> primer_map_reverse = hash[1];
+  
   while (sam_itr_next(in, iter, aln) >= 0) {
     if ((aln->core.flag & BAM_FUNMAP) != 0) {
       continue;
@@ -85,10 +91,17 @@ int main() {
         (abs(aln->core.isize) - max_primer_len) > abs(aln->core.l_qseq);
     std::cout << bam_get_qname(aln) << std::endl;
     std::cout << std::endl << "Forward" << std::endl;
-    get_overlapping_primers(aln, primers, overlapping_primers, false);
+    overlapping_primers.clear();
+    start_pos = aln->core.pos;
+    if (primer_map_forward.find(start_pos) != primer_map_forward.end()) {
+      overlapping_primers.clear();
+      overlapping_primers = primer_map_forward[start_pos];
+    }
+    start_pos = bam_endpos(aln) - 1;
     // Forward primer
     if (overlapping_primers.size() > 0) {
       cand_primer = get_max_end(overlapping_primers);
+      std::cout << cand_primer.get_start() << " " << cand_primer.get_end() << std::endl;
       t = primer_trim(aln, isize_flag, cand_primer.get_end() + 1, false);
       aln->core.pos += t.start_pos;
       replace_cigar(aln, t.nlength, t.cigar);
@@ -108,7 +121,12 @@ int main() {
     }
     // Reverse primer
     std::cout << std::endl << "Reverse" << std::endl;
-    get_overlapping_primers(aln, primers, overlapping_primers, true);
+    overlapping_primers.clear();
+    if (primer_map_reverse.find(start_pos) != primer_map_reverse.end()){
+      overlapping_primers = primer_map_reverse[start_pos];
+    }
+
+    //get_overlapping_primers(aln, primers, overlapping_primers, true);
     if (overlapping_primers.size() > 0) {
       cand_primer = get_min_start(overlapping_primers);
       free_cigar(t);
