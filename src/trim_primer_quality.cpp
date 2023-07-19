@@ -460,7 +460,12 @@ int iterate_aln(std::vector<bam1_t *>::iterator &aln_itr,
 
 std::vector<std::map<uint32_t, std::vector<primer>>> find_primer_per_position(std::vector<primer> primers){
   //end pos of last primer
-  uint32_t last_pos = primers.back().get_end();
+  uint32_t last_pos = 0;
+  for (uint32_t i = 0; i < primers.size(); i++){ 
+    if (primers[i].get_end() > last_pos){
+      last_pos = primers[i].get_end();
+    }
+  }
   std::map<uint32_t, std::vector<primer>> primer_map_forward;
   std::map<uint32_t, std::vector<primer>> primer_map_reverse;
   for(uint32_t j = 0; j < last_pos; j++){    
