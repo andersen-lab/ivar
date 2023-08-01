@@ -42,4 +42,4 @@ RUN cd root/ &&\
     rm v0.7.17.tar.gz
 ENV PATH /root/bwa-0.7.17:$PATH
 # Snakemake
-RUN pip3 install pandas snakemake
+RUN pip3 install pandas snakemake matplotlib
