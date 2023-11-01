@@ -143,9 +143,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     std::cerr << start_pos << std::endl;
     
   }
-  //collapse variants by amplicon
-  
-
-  //detect fluctuating variants
+  //PRIMER METHOD calculate mutations from unique cigars per primer (ie. count mutations per primer efficiently)
+  //AMPLICON METHOD translate this into amplicon haplotype obj of mutations per primer (ie. variant freq per amplicon)
+  //detect fluctuating variants - iterate every position and look for fluctuation between every amplicon objects, flag these
+  //combine amplicon counts to get total variants
+  //end, data has been appropriately preprocessed and problematic positions have been flagged
+  //room for extension to calcualte physical linkage in the future
   return(retval);
 }

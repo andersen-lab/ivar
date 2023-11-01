@@ -57,6 +57,12 @@ class IntervalTree {
   void print_amplicons() {print_amplicons(_root);}
 };
 
+//uses amplicons as a base class, build new haplotype functionality
+class haplotype : public IntervalTree {
+  public:
+    std::vector<uint32_t> haplotypes; //stores mutation/indel count and depth per pos covering amplicon
+};
+
 IntervalTree populate_amplicons(std::string pair_info_file,
                                 std::vector<primer> &primers);
 #endif

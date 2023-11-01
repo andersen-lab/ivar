@@ -285,7 +285,7 @@ int populate_pair_indices(std::vector<primer>& primers, std::string path) {
   return 0;
 }
 
-void haplotype::add_cigarotype(uint32_t *cigar){
+void cigarotype::add_cigarotype(uint32_t *cigar){
   cigarotypes.push_back(cigar);    
 }
 

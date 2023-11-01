@@ -7,16 +7,19 @@
 #ifndef primer_bed
 #define primer_bed
 
-class haplotype{
+class cigarotype{
   private:
-    std::vector<uint32_t *> cigarotypes;
-    std::vector<uint32_t> ncigarotypes;
+    std::vector<uint32_t *> cigarotypes; //unique cigar value
+    std::vector<uint32_t> ncigarotypes; //starting pos of these cigars
+    std::vector<uint32_t> count_cigarotypes; //count of amount found
   public:
     void add_cigarotype(uint32_t *cigar);
+    //void transform_mutations(); //this is will process unique cigar strings into mutations/indels
     int test = 12;
+
 };
 
-class primer : public haplotype{
+class primer : public cigarotype{
  private:
   std::string region;
   uint32_t start;  // 0 based
