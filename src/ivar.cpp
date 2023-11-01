@@ -16,6 +16,7 @@
 #include "remove_reads_from_amplicon.h"
 #include "suffix_tree.h"
 #include "trim_primer_quality.h"
+#include "saga.h"
 
 const std::string VERSION = "1.4.2";
 
@@ -54,6 +55,7 @@ void print_usage() {
          "\n"
          "        Command       Description\n"
          "           trim       Trim reads in aligned BAM file\n"
+         "         contam       TODO\n"
          "       variants       Call variants from aligned BAM file\n"
          " filtervariants       Filter variants across replicates or samples\n"
          "      consensus       Call consensus from aligned BAM file\n"
@@ -288,6 +290,60 @@ int main(int argc, char *argv[]) {
   argv[1] = argv[0];
   argv++;
   argc--;
+
+  //ivar contam
+  if (cmd.compare("contam") == 0) {
+    g_args.min_qual = 20;
+    g_args.bed = "";
+    g_args.primer_pair_file = "";
+    g_args.primer_offset = 0;
+    opt = getopt(argc, argv, trim_opt_str);
+    while (opt != -1) {
+      switch (opt) {
+        case 'i':
+          g_args.bam = optarg;
+          break;
+        case 'b':
+          g_args.bed = optarg;
+          break;
+        case 'f':
+          g_args.primer_pair_file = optarg;
+          break;
+        case 'x':
+          g_args.primer_offset = std::stoi(optarg);
+          break;
+        case 'p':
+          g_args.prefix = optarg;
+          break;
+        case 'm':
+          g_args.min_length = std::stoi(optarg);
+          break;
+        case 'q':
+          g_args.min_qual = std::stoi(optarg);
+          break;
+        case 'h':
+        case '?':
+          print_trim_usage();
+          return -1;
+          break;
+      }
+      opt = getopt(argc, argv, trim_opt_str);
+    }
+    if (g_args.bam.empty() && isatty(STDIN_FILENO)) {
+      std::cout << "Please supply a BAM file using -i or supply the input file "
+                   "through standard input"
+                << std::endl
+                << std::endl;
+      print_trim_usage();
+      return -1;
+    }
+    g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
+    res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
+                               g_args.min_qual,
+                               cl_cmd.str(),
+                               g_args.primer_pair_file, g_args.primer_offset);
+  }
+
   // ivar trim
   if (cmd.compare("trim") == 0) {
     g_args.min_qual = 20;

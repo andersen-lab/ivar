@@ -285,6 +285,10 @@ int populate_pair_indices(std::vector<primer>& primers, std::string path) {
   return 0;
 }
 
+void haplotype::add_cigarotype(uint32_t *cigar){
+  cigarotypes.push_back(cigar);    
+}
+
 primer get_min_start(std::vector<primer> primers) {
   std::vector<primer>::iterator it;
   auto minmax_start = std::minmax_element(

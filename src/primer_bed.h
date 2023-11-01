@@ -7,7 +7,16 @@
 #ifndef primer_bed
 #define primer_bed
 
-class primer {
+class haplotype{
+  private:
+    std::vector<uint32_t *> cigarotypes;
+    std::vector<uint32_t> ncigarotypes;
+  public:
+    void add_cigarotype(uint32_t *cigar);
+    int test = 12;
+};
+
+class primer : public haplotype{
  private:
   std::string region;
   uint32_t start;  // 0 based
@@ -54,5 +63,5 @@ void print_primer_info(primer primers);
 void print_all_primer_info(std::vector<primer> primers);
 primer get_min_start(std::vector<primer> primers);
 primer get_max_end(std::vector<primer> primers);
-
+void add_cigarotype(uint32_t *cigar);
 #endif

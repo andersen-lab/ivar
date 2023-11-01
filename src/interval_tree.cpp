@@ -95,6 +95,12 @@ IntervalTree populate_amplicons(std::string pair_info_file,
   return tree;
 }
 
+void IntervalTree::print_amplicons(ITNode *root){
+  if (root==NULL) return;
+  std::cout << "\nLow:" << root->data->low << " High: " << root->data->high << std::endl;
+  print_amplicons(root->right);
+}
+
 /*
 // Simple access functions to retrieve node's interval data
 Interval ITNode::getData()const{

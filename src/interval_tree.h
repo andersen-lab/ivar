@@ -36,6 +36,7 @@ class ITNode {
   Interval *data;           // pointer to node's interval data object
   ITNode *left, *right;     // pointer to node's left & right child node objects
   int max;
+
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -46,15 +47,16 @@ class IntervalTree {
   void insert(ITNode *root, Interval data);
   bool envelopSearch(ITNode *root, Interval data);
   void inOrder(ITNode *root);
+  void print_amplicons(ITNode *root);
 
  public:
   IntervalTree();  // constructor
   void insert(Interval data) { insert(_root, data); }
   bool envelopSearch(Interval data) { return envelopSearch(_root, data); }
   void inOrder() { inOrder(_root); }
+  void print_amplicons() {print_amplicons(_root);}
 };
 
 IntervalTree populate_amplicons(std::string pair_info_file,
                                 std::vector<primer> &primers);
-
 #endif
