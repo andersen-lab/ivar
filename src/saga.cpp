@@ -114,6 +114,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       start_pos = aln->core.pos;
     }
     overlapping_primers.clear();
+    //for this case, we've already trimmed so the starting pos will be shifted
+    //TODO look instead for primers matching a small range!
     if(strand == '+'){
       if (primer_map_forward.find(start_pos) != primer_map_forward.end()) {
         overlapping_primers = primer_map_forward[start_pos];
@@ -127,22 +129,46 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     bam1_t *r = aln;
     uint32_t *cigar = bam_get_cigar(r); 
     uint32_t nlength = r->core.n_cigar; 
-
+    
     //assign to a primer not an amplicon, because here direction matters
     if (overlapping_primers.size() == 0){
+      //std::cerr << start_pos << " " << strand << std::endl;
+      //std::cerr << "this" << std::endl;
       continue;
     }
 
     for(uint32_t i=0; i < overlapping_primers.size(); i++){
-      primer tmp = overlapping_primers[i];
-      tmp.add_cigarotype(cigar);
-    }
-    //we extend the primer class to include "cigarotypes"
-    print_cigar(cigar, nlength);
-    print_primers(overlapping_primers);
-    std::cerr << start_pos << std::endl;
-    
+      uint32_t start = overlapping_primers[i].get_start();
+      uint32_t end = overlapping_primers[i].get_end();
+
+      for(uint32_t j=0; j < primers.size(); j++){
+        uint32_t pstart = primers[j].get_start();
+        uint32_t pend = primers[j].get_end();
+
+        if (start == pstart && end == pend){
+          primers[j].add_cigarotype(cigar, start_pos, nlength);
+        }
+      }
+    }   
   }
+
+  for(uint32_t i=0; i < primers.size(); i++){
+    std::cout << "primer " << i << std::endl;
+    primer tmp = primers[i];
+    std::vector<std::vector<uint32_t>> otmp = tmp.get_cigarotypes();
+    std::vector<uint32_t> nlengths = tmp.get_nlengths();
+    for(uint32_t j=0; j < otmp.size(); j++){
+      std::cerr << "cigarotype " << j << std::endl;
+      std::cerr << nlengths[j] << std::endl;
+
+      for(uint32_t k = 0; k < nlengths[j]; k++){
+        std::cerr << "k " << k << std::endl;
+        std:: cerr << bam_cigar_op(otmp[j][k]) << " " << bam_cigar_oplen(otmp[j][k]) << std::endl;
+      }
+    }
+    if( i > 10) break;
+  }
+  
   //PRIMER METHOD calculate mutations from unique cigars per primer (ie. count mutations per primer efficiently)
   //AMPLICON METHOD translate this into amplicon haplotype obj of mutations per primer (ie. variant freq per amplicon)
   //detect fluctuating variants - iterate every position and look for fluctuation between every amplicon objects, flag these

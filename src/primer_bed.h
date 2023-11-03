@@ -8,12 +8,15 @@
 #define primer_bed
 
 class cigarotype{
-  private:
-    std::vector<uint32_t *> cigarotypes; //unique cigar value
+  protected:
+    std::vector<std::vector<uint32_t>> cigarotypes; //unique cigar value x = cigar, y = operation z, = length
+    std::vector<uint32_t> nlengths; //this is just for printing, record length og cig ops
     std::vector<uint32_t> ncigarotypes; //starting pos of these cigars
     std::vector<uint32_t> count_cigarotypes; //count of amount found
   public:
-    void add_cigarotype(uint32_t *cigar);
+    std::vector<std::vector<uint32_t>> get_cigarotypes();
+    std::vector<uint32_t> get_nlengths();
+    void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength);
     //void transform_mutations(); //this is will process unique cigar strings into mutations/indels
     int test = 12;
 
@@ -66,5 +69,7 @@ void print_primer_info(primer primers);
 void print_all_primer_info(std::vector<primer> primers);
 primer get_min_start(std::vector<primer> primers);
 primer get_max_end(std::vector<primer> primers);
-void add_cigarotype(uint32_t *cigar);
+void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength);
+std::vector<std::vector<uint32_t>> get_cigarotypes();
+std::vector<uint32_t> get_nlengths();
 #endif

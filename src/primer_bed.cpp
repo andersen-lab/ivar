@@ -1,8 +1,11 @@
 #include "primer_bed.h"
-
 std::string primer::get_name() { return name; }
 
 std::string primer::get_region() { return region; }
+
+std::vector<std::vector<uint32_t>> cigarotype::get_cigarotypes() { return cigarotypes; }
+
+std::vector<uint32_t> cigarotype::get_nlengths() { return nlengths; }
 
 int primer::get_score() { return score; }
 
@@ -284,9 +287,34 @@ int populate_pair_indices(std::vector<primer>& primers, std::string path) {
   }
   return 0;
 }
+//this must be passed by pointer due to array decay
+void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t nlength){
+  bool found = false; //have we seen this before
+  std::vector<uint32_t> cig;
+  uint32_t sp;
+  std::vector<uint32_t> cigar_reformat;
+  //first handle the array decay aspect
+  for(uint32_t i=0; i < nlength; i++){
+    cigar_reformat.push_back(cigar[i]); 
+  }
 
-void cigarotype::add_cigarotype(uint32_t *cigar){
-  cigarotypes.push_back(cigar);    
+  for(uint32_t i=0; i < cigarotypes.size(); i++){
+    cig = cigarotypes[i];
+    sp = ncigarotypes[i]; 
+    if(cigar_reformat == cig && start_pos == sp){
+      found = true;
+      count_cigarotypes[i] += 1;
+      break;
+    }
+  }
+  //haven't seen this cigar/start pos combo before
+  if(!found){
+    cigarotypes.push_back(cigar_reformat);    
+    ncigarotypes.push_back(start_pos);
+    uint32_t digit = 1;
+    count_cigarotypes.push_back(digit);
+    nlengths.push_back(nlength);
+  }
 }
 
 primer get_min_start(std::vector<primer> primers) {
