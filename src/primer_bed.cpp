@@ -5,6 +5,8 @@ std::string primer::get_region() { return region; }
 
 std::vector<std::vector<uint32_t>> cigarotype::get_cigarotypes() { return cigarotypes; }
 
+std::vector<uint32_t> cigarotype::get_count_cigarotypes() { return count_cigarotypes; }
+
 std::vector<uint32_t> cigarotype::get_nlengths() { return nlengths; }
 
 int primer::get_score() { return score; }
@@ -287,7 +289,17 @@ int populate_pair_indices(std::vector<primer>& primers, std::string path) {
   }
   return 0;
 }
-//this must be passed by pointer due to array decay
+
+void primer::transform_mutations() {
+  /*
+   * Take all recorded cigarotypes and transform them into positions relative to primer
+   */
+  std::vector<std::vector<uint32_t>> cigarotypes = this->get_cigarotypes(); 
+  std::cerr << cigarotypes.size() << std::endl;
+  std::cerr << "hello world" << std::endl;;
+}
+
+//cigar must be passed by pointer due to array decay
 void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t nlength){
   bool found = false; //have we seen this before
   std::vector<uint32_t> cig;

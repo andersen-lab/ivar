@@ -152,24 +152,26 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     }   
   }
 
-  for(uint32_t i=0; i < primers.size(); i++){
+  //sanity check not intended for final version
+  /*for(uint32_t i=0; i < primers.size(); i++){
     std::cout << "primer " << i << std::endl;
     primer tmp = primers[i];
     std::vector<std::vector<uint32_t>> otmp = tmp.get_cigarotypes();
     std::vector<uint32_t> nlengths = tmp.get_nlengths();
+    std::vector<uint32_t> counts = tmp.get_count_cigarotypes();
     for(uint32_t j=0; j < otmp.size(); j++){
-      std::cerr << "cigarotype " << j << std::endl;
+      std::cerr << "cigarotype " << j << " counts " << counts[j] << std::endl;
       std::cerr << nlengths[j] << std::endl;
 
-      for(uint32_t k = 0; k < nlengths[j]; k++){
-        std::cerr << "k " << k << std::endl;
-        std:: cerr << bam_cigar_op(otmp[j][k]) << " " << bam_cigar_oplen(otmp[j][k]) << std::endl;
-      }
     }
     if( i > 10) break;
-  }
+  }*/
   
-  //PRIMER METHOD calculate mutations from unique cigars per primer (ie. count mutations per primer efficiently)
+  //PRIMER METHOD calculate mutations from unique cigars per primer, outputing variant frequencies
+  for(uint32_t i=0; i < primers.size(); i++){
+    primers[i].transform_mutations();
+    if(i > 10) break;
+  }
   //AMPLICON METHOD translate this into amplicon haplotype obj of mutations per primer (ie. variant freq per amplicon)
   //detect fluctuating variants - iterate every position and look for fluctuation between every amplicon objects, flag these
   //combine amplicon counts to get total variants

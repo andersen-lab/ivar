@@ -9,15 +9,16 @@
 
 class cigarotype{
   protected:
-    std::vector<std::vector<uint32_t>> cigarotypes; //unique cigar value x = cigar, y = operation z, = length
+    std::vector<std::vector<uint32_t>> cigarotypes; //unique cigar value 
     std::vector<uint32_t> nlengths; //this is just for printing, record length og cig ops
     std::vector<uint32_t> ncigarotypes; //starting pos of these cigars
     std::vector<uint32_t> count_cigarotypes; //count of amount found
+
   public:
     std::vector<std::vector<uint32_t>> get_cigarotypes();
+    std::vector<uint32_t> get_count_cigarotypes();
     std::vector<uint32_t> get_nlengths();
     void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength);
-    //void transform_mutations(); //this is will process unique cigar strings into mutations/indels
     int test = 12;
 
 };
@@ -55,6 +56,7 @@ class primer : public cigarotype{
   void set_indice(int16_t i);
   void set_read_count(uint32_t rc);
   void add_read_count(uint32_t rc);
+  void transform_mutations();
   bool operator==(const primer& p) const {
     return (indice == p.get_indice()) ? true : false;
   }
@@ -71,5 +73,7 @@ primer get_min_start(std::vector<primer> primers);
 primer get_max_end(std::vector<primer> primers);
 void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength);
 std::vector<std::vector<uint32_t>> get_cigarotypes();
+std::vector<uint32_t> get_count_cigarotypes();
 std::vector<uint32_t> get_nlengths();
+void transform_mutations();
 #endif
