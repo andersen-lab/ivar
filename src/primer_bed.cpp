@@ -21,6 +21,8 @@ std::vector<uint32_t> cigarotype::get_nlengths() { return nlengths; }
 
 int primer::get_score() { return score; }
 
+std::vector<position> primer::get_positions() { return positions; }
+
 uint32_t primer::get_start() const { return start; }
 
 uint32_t primer::get_end() const { return end; }
@@ -309,47 +311,59 @@ void primer::transform_mutations() {
   std::vector<std::vector<uint8_t>> sequences = this->get_sequences();
   std::vector<std::vector<uint8_t>> aux_tags = this->get_aux_tags();
   std::vector<std::string> qnames = this->get_qnames();
+  
   //this tracks all mutations at all positions
-  std::vector<position> positions;
+  std::vector<position> positions = this->get_positions();
 
-  //here let's turng the cigar string into a vector of alleles specific to this primer, this is not something previously done in ivar
+  //here let's turng the cigar string into a vector of alleles specific to this primer
   //iterate all unique sequences
   for(uint32_t i=0; i < cigarotypes.size(); i++){
     //get the cigar string and start pos
     std::vector<uint32_t> cigarotype = cigarotypes[i]; //carries the insertions
-    std::vector<uint8_t> aux_tag = aux_tags[i]; //carries deletions and substitutions
+    std::vector<uint8_t> aux_tag = aux_tags[i]; //carries deletions
     std::vector<uint8_t> sequence = sequences[i]; //carries NT values
     uint32_t start_pos = start_positions[i]; // pos after soft-clipped region
     std::string qname = qnames[i];                                             
-    uint32_t current_pos = start_pos;
-    //we've looked at this for forward read but not reverse
+    uint32_t current_pos = start_pos; 
+    //position relative to query
+    uint32_t total_ops = 0;
+    std::vector<uint32_t> ignore_sequence; //positions in query that are either deletions or insertions
+    //we'll use the cigar string to handle insertions
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
       uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
       //insertions
       if(op == 1){
-        std::cerr << "start pos " << start_pos << std::endl;
-        std::cerr << qname << std::endl;
-        std::cerr << " found insertion " << std::endl;
+        std::ostringstream convert;
         for(uint32_t k=0; k < oplen; k++) {
-          uint32_t p = current_pos + k;
-          //check if this position exists
-          uint32_t exists = check_position_exists(p, positions);
-          if (exists) {
-            std::string test = "hello world";
-            positions[exists].update_alleles(test);  
-          } else {
-            std::string test = "hello world";
-            //add position to vector
-            position add_pos;
-            add_pos.pos = p;
-            positions.push_back(add_pos);
-            positions[-1].update_alleles(test);            
-          }
+          //convert data type to get the characters
+          ignore_sequence.push_back(k+total_ops);
+          convert << sequence[k+total_ops];
+        }
+        std::string nuc = "+" + convert.str();
+        //position relative to reference
+        //check if this position exists
+        uint32_t exists = check_position_exists(current_pos, positions);
+        if (exists) {
+          positions[exists].update_alleles(nuc);  
+        } else {
+          //add position to vector
+          position add_pos;
+          add_pos.pos = current_pos; //don't add a position
+          add_pos.update_alleles(nuc);            
+          positions.push_back(add_pos);
         }          
+      } else {
+        current_pos += oplen;
       }
-      current_pos += oplen;
-    }   
+      total_ops += oplen;
+    }
+    std::cerr << qname << " " << start_pos << std::endl;
+    
+    //we will use the aux tag to handle deletions
+    for(uint32_t j=1; j < aux_tag.size(); j++){
+        std::cerr << aux_tag[j] << std::endl;
+    }
   }
   //set positions
   //this->set_positions(positions);

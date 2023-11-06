@@ -46,6 +46,7 @@ class primer : public cigarotype{
  public:
   std::string get_name();
   std::string get_region();
+  std::vector<position> get_positions();
   int get_score();
   uint32_t get_start() const;
   uint32_t get_end() const;
@@ -88,4 +89,5 @@ std::vector<uint32_t> get_nlengths();
 std::vector<uint32_t> get_start_positions();
 std::vector<std::string> get_qnames();
 void transform_mutations();
+std::vector<position> get_positions();
 #endif

@@ -23,7 +23,7 @@ struct allele {
 };
 
 //need this for tracking more than a single pileup pos
-class position : public allele {
+class position {
   public:
     uint32_t pos;
     uint32_t depth;
@@ -41,5 +41,4 @@ void print_allele_depths(std::vector<allele> ad);
 int find_ref_in_allele(std::vector<allele> ad, char ref);
 char gt2iupac(char a, char b);
 char codon2aa(char n1, char n2, char n3);
-
 #endif
