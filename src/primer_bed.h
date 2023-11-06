@@ -3,22 +3,29 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
-
+#include "htslib/sam.h"
+#include "allele_functions.h"
 #ifndef primer_bed
 #define primer_bed
 
 class cigarotype{
   protected:
     std::vector<std::vector<uint32_t>> cigarotypes; //unique cigar value 
-    std::vector<uint32_t> nlengths; //this is just for printing, record length og cig ops
+    std::vector<uint32_t> nlengths; //this is just for printing, record length og cig ops TODO can remove
     std::vector<uint32_t> ncigarotypes; //starting pos of these cigars
     std::vector<uint32_t> count_cigarotypes; //count of amount found
-
+    std::vector<std::vector<uint8_t>> aux_tags; //auxillary tags
+    std::vector<std::vector<uint8_t>> sequences; //sequences                        
+    std::vector<std::string> qnames; //TODO remove this at the end, qname
   public:
     std::vector<std::vector<uint32_t>> get_cigarotypes();
+    std::vector<std::vector<uint8_t>> get_aux_tags();
+    std::vector<std::vector<uint8_t>> get_sequences();   
     std::vector<uint32_t> get_count_cigarotypes();
+    std::vector<uint32_t> get_start_positions();
     std::vector<uint32_t> get_nlengths();
-    void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength);
+    std::vector<std::string> get_qnames(); 
+    void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname);
     int test = 12;
 
 };
@@ -34,6 +41,7 @@ class primer : public cigarotype{
   int16_t pair_indice;
   int16_t indice;
   uint32_t read_count = 0;
+  std::vector<position> positions; //allele counts for this primer
 
  public:
   std::string get_name();
@@ -71,9 +79,13 @@ void print_primer_info(primer primers);
 void print_all_primer_info(std::vector<primer> primers);
 primer get_min_start(std::vector<primer> primers);
 primer get_max_end(std::vector<primer> primers);
-void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength);
+void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname);
 std::vector<std::vector<uint32_t>> get_cigarotypes();
+std::vector<std::vector<uint8_t>> get_aux_tags();
+std::vector<std::vector<uint8_t>> get_sequences();   
 std::vector<uint32_t> get_count_cigarotypes();
 std::vector<uint32_t> get_nlengths();
+std::vector<uint32_t> get_start_positions();
+std::vector<std::string> get_qnames();
 void transform_mutations();
 #endif

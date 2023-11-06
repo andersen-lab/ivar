@@ -125,8 +125,12 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         overlapping_primers = primer_map_reverse[start_pos];
       }
     }
-    //get cigar for the read
     bam1_t *r = aln;
+    //get the md tag
+    uint8_t *aux = bam_aux_get(aln, "MD");
+    //get the sequence
+    uint8_t *seq = bam_get_seq(aln);
+    //get cigar for the read
     uint32_t *cigar = bam_get_cigar(r); 
     uint32_t nlength = r->core.n_cigar; 
     
@@ -144,9 +148,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       for(uint32_t j=0; j < primers.size(); j++){
         uint32_t pstart = primers[j].get_start();
         uint32_t pend = primers[j].get_end();
-
+        
         if (start == pstart && end == pend){
-          primers[j].add_cigarotype(cigar, start_pos, nlength);
+          primers[j].add_cigarotype(cigar, start_pos, nlength, seq, aux, bam_get_qname(aln));
         }
       }
     }   

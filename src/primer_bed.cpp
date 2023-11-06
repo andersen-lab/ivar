@@ -1,11 +1,21 @@
 #include "primer_bed.h"
+#include "allele_functions.h"
+
 std::string primer::get_name() { return name; }
 
 std::string primer::get_region() { return region; }
 
 std::vector<std::vector<uint32_t>> cigarotype::get_cigarotypes() { return cigarotypes; }
 
+std::vector<std::vector<uint8_t>> cigarotype::get_aux_tags() { return aux_tags; }
+
+std::vector<std::vector<uint8_t>> cigarotype::get_sequences() { return sequences; }
+
+std::vector<std::string> cigarotype::get_qnames() { return qnames; }
+
 std::vector<uint32_t> cigarotype::get_count_cigarotypes() { return count_cigarotypes; }
+
+std::vector<uint32_t> cigarotype::get_start_positions() { return ncigarotypes; }
 
 std::vector<uint32_t> cigarotype::get_nlengths() { return nlengths; }
 
@@ -295,25 +305,82 @@ void primer::transform_mutations() {
    * Take all recorded cigarotypes and transform them into positions relative to primer
    */
   std::vector<std::vector<uint32_t>> cigarotypes = this->get_cigarotypes(); 
-  std::cerr << cigarotypes.size() << std::endl;
-  std::cerr << "hello world" << std::endl;;
+  std::vector<uint32_t> start_positions = this->get_start_positions();
+  std::vector<std::vector<uint8_t>> sequences = this->get_sequences();
+  std::vector<std::vector<uint8_t>> aux_tags = this->get_aux_tags();
+  std::vector<std::string> qnames = this->get_qnames();
+  //this tracks all mutations at all positions
+  std::vector<position> positions;
+
+  //here let's turng the cigar string into a vector of alleles specific to this primer, this is not something previously done in ivar
+  //iterate all unique sequences
+  for(uint32_t i=0; i < cigarotypes.size(); i++){
+    //get the cigar string and start pos
+    std::vector<uint32_t> cigarotype = cigarotypes[i]; //carries the insertions
+    std::vector<uint8_t> aux_tag = aux_tags[i]; //carries deletions and substitutions
+    std::vector<uint8_t> sequence = sequences[i]; //carries NT values
+    uint32_t start_pos = start_positions[i]; // pos after soft-clipped region
+    std::string qname = qnames[i];                                             
+    uint32_t current_pos = start_pos;
+    //we've looked at this for forward read but not reverse
+    for(uint32_t j=0; j < cigarotype.size(); j++){
+      uint32_t op = bam_cigar_op(cigarotype[j]);
+      uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
+      //insertions
+      if(op == 1){
+        std::cerr << "start pos " << start_pos << std::endl;
+        std::cerr << qname << std::endl;
+        std::cerr << " found insertion " << std::endl;
+        for(uint32_t k=0; k < oplen; k++) {
+          uint32_t p = current_pos + k;
+          //check if this position exists
+          uint32_t exists = check_position_exists(p, positions);
+          if (exists) {
+            std::string test = "hello world";
+            positions[exists].update_alleles(test);  
+          } else {
+            std::string test = "hello world";
+            //add position to vector
+            position add_pos;
+            add_pos.pos = p;
+            positions.push_back(add_pos);
+            positions[-1].update_alleles(test);            
+          }
+        }          
+      }
+      current_pos += oplen;
+    }   
+  }
+  //set positions
+  //this->set_positions(positions);
 }
 
 //cigar must be passed by pointer due to array decay
-void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t nlength){
+void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname){
   bool found = false; //have we seen this before
-  std::vector<uint32_t> cig;
-  uint32_t sp;
+  std::vector<uint8_t> saved_aux; //placeholder for saved sequence
+  std::vector<uint32_t> saved_cigarotype; //placeholder for saved cigarotypes
+  uint32_t sp; //placeholder for saved starting position
+
   std::vector<uint32_t> cigar_reformat;
+  std::vector<uint8_t> seq_reformat;
+  std::vector<uint8_t> aux_reformat;
   //first handle the array decay aspect
   for(uint32_t i=0; i < nlength; i++){
     cigar_reformat.push_back(cigar[i]); 
   }
+  int i = 0;
+  do{
+    aux_reformat.push_back(aux[i]);
+    i++;
+  } while(aux[i] != '\0');
+  
 
   for(uint32_t i=0; i < cigarotypes.size(); i++){
-    cig = cigarotypes[i];
     sp = ncigarotypes[i]; 
-    if(cigar_reformat == cig && start_pos == sp){
+    saved_aux = aux_tags[i];
+    saved_cigarotype = cigarotypes[i];
+    if(cigar_reformat == saved_cigarotype && start_pos == sp && aux_reformat == saved_aux){
       found = true;
       count_cigarotypes[i] += 1;
       break;
@@ -321,8 +388,19 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
   }
   //haven't seen this cigar/start pos combo before
   if(!found){
+    i = 0;
+    uint8_t nt = 0;
+    do{
+      nt = seq_nt16_str[bam_seqi(seq, i)];
+      seq_reformat.push_back(nt);
+      i++;
+    }while(nt != '=');
+
     cigarotypes.push_back(cigar_reformat);    
     ncigarotypes.push_back(start_pos);
+    sequences.push_back(seq_reformat);
+    aux_tags.push_back(aux_reformat);
+    qnames.push_back(qname);
     uint32_t digit = 1;
     count_cigarotypes.push_back(digit);
     nlengths.push_back(nlength);
