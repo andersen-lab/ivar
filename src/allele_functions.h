@@ -22,6 +22,17 @@ struct allele {
   }
 };
 
+//need this for tracking more than a single pileup pos
+class position : public allele {
+  public:
+    uint32_t pos;
+    uint32_t depth;
+    std::vector<allele> alleles;
+    void update_alleles(std::string nt);
+};
+
+int check_position_exists(uint32_t p, std::vector<position> positions);
+void update_alleles(std::string nt);
 int check_allele_exists(std::string n, std::vector<allele> ad);
 std::vector<allele> update_allele_depth(char ref, std::string bases,
                                         std::string qualities,

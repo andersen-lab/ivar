@@ -30,6 +30,22 @@ int check_allele_exists(std::string n, std::vector<allele> ad) {
   return -1;
 }
 
+void position::update_alleles(std::string nt) {
+  std::cerr << nt << std::endl;
+  //update overall positions depth
+  this->depth += 1;
+  //check if in allele vector
+}
+
+int check_position_exists(uint32_t p, std::vector<position> positions) {
+  for (uint32_t i=0; i < positions.size(); i++) {
+    if (p == positions[i].pos) {
+      return(i);
+    }
+  }
+  return(0);
+}
+
 int find_ref_in_allele(std::vector<allele> ad, char ref) {
   std::string ref_s(1, ref);
   std::vector<allele>::iterator it = ad.begin();
