@@ -327,7 +327,7 @@ void primer::transform_mutations() {
     uint32_t current_pos = start_pos; 
     //position relative to query
     uint32_t total_ops = 0;
-    std::vector<uint32_t> ignore_sequence; //positions in query that are either deletions or insertions
+    std::vector<uint32_t> ignore_sequence; //positions in query that are insertions
     //we'll use the cigar string to handle insertions
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
@@ -349,6 +349,7 @@ void primer::transform_mutations() {
         } else {
           //add position to vector
           position add_pos;
+          add_pos.depth = 1;
           add_pos.pos = current_pos; //don't add a position
           add_pos.update_alleles(nuc);            
           positions.push_back(add_pos);
@@ -356,17 +357,79 @@ void primer::transform_mutations() {
       } else {
         current_pos += oplen;
       }
-      total_ops += oplen;
+      if (op != 2){ //TODO this could be better, should referencing consumtion not specific actions
+        total_ops += oplen;
+      }
     }
-    std::cerr << qname << " " << start_pos << std::endl;
-    
+    //std::cerr << qname << " " << start_pos << std::endl;
+    //TODO need to account for the edge case of a deletion occuring before an insertion!
+
     //we will use the aux tag to handle deletions
+    bool deletion = false;
+    current_pos = start_pos;
+    std::vector<uint32_t> deletion_positions; //the aux tag does NOT recognize insertions
+    std::string gather_digits;     
+    std::string deleted_char;    
     for(uint32_t j=1; j < aux_tag.size(); j++){
-        std::cerr << aux_tag[j] << std::endl;
+      //std::cerr << aux_tag[j] << " gather digits " << gather_digits << " delete char " << deleted_char << " " << current_pos << std::endl;
+      char character = (char) aux_tag[j];
+      if (character == '^'){
+        current_pos += std::stoi(gather_digits);
+        gather_digits = "";
+        deletion = true;
+      } else if (isdigit(character) && deletion) {
+        uint32_t exists = check_position_exists(current_pos, positions);
+        if (exists) {
+          positions[exists].update_alleles("-");  
+        } else {
+          //add position to vector
+          position add_pos;
+          add_pos.depth = 1;
+          add_pos.pos = current_pos; //don't add a position
+          add_pos.update_alleles("-");            
+          positions.push_back(add_pos);
+        }        
+        //std::cerr << current_pos  << " " << deleted_char << std::endl; 
+        deleted_char = "";
+        deletion = false;
+      } else if (isalpha(character) && deletion) {
+        deletion_positions.push_back(current_pos);
+        current_pos += 1;
+        deleted_char += character;
+        deletion = true;    
+      } else if (isdigit(character) && !deletion) {
+        gather_digits += character;
+      } 
+    }
+    //now that we know where the insertions and deletions are, let's just iterate the query sequence and add it in, skipping problem positions
+    current_pos = start_pos;
+    for(uint32_t j=0; j < sequence.size(); j++){
+      std::vector<uint32_t>::iterator it = find(deletion_positions.begin(), deletion_positions.end(), current_pos);  
+      if (it != deletion_positions.end()) {
+        //std::cerr << "Element found in del vector " << current_pos << '\n';     
+        current_pos -= 1;
+      }
+      it = find(ignore_sequence.begin(), ignore_sequence.end(), current_pos);
+      if (it != ignore_sequence.end()) {
+        j += 1;
+      }
+      current_pos += 1;
+      uint32_t exists = check_position_exists(current_pos, positions);
+      std::ostringstream convert;
+      convert << sequence[j];
+      std::string nuc = convert.str(); 
+      if (exists) {
+        positions[exists].update_alleles(nuc);  
+      } else {
+        //add position to vector
+        position add_pos;
+        add_pos.depth = 1;
+        add_pos.pos = current_pos; //don't add a position
+        add_pos.update_alleles(nuc);            
+        positions.push_back(add_pos);
+      }         
     }
   }
-  //set positions
-  //this->set_positions(positions);
 }
 
 //cigar must be passed by pointer due to array decay

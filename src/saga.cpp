@@ -117,12 +117,21 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     //for this case, we've already trimmed so the starting pos will be shifted
     //TODO look instead for primers matching a small range!
     if(strand == '+'){
-      if (primer_map_forward.find(start_pos) != primer_map_forward.end()) {
-        overlapping_primers = primer_map_forward[start_pos];
+      for(uint32_t i=start_pos-10; i < start_pos+10; i++){
+        if (i < 0 || i > primer_map_forward.size()) continue; 
+        if (primer_map_forward.find(i) != primer_map_forward.end()) {
+          overlapping_primers = primer_map_forward[i];
+        }
+        if (overlapping_primers.size() > 0) break;
       }
     }else{
-      if (primer_map_reverse.find(start_pos) != primer_map_reverse.end()){
-        overlapping_primers = primer_map_reverse[start_pos];
+      for (uint32_t i=start_pos-10; i < start_pos+10; i++)
+      {
+        if (i < 0 || i > primer_map_reverse.size()) continue;
+        if (primer_map_reverse.find(i) != primer_map_reverse.end()){
+          overlapping_primers = primer_map_reverse[i];
+        }
+        if (overlapping_primers.size() > 0) break;
       }
     }
     bam1_t *r = aln;
