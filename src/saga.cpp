@@ -11,7 +11,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
    * Here we're iterating every single read, and adding to the haplotype object in the amplicons schema.
    */
 
-  std::cerr << min_qual << std::endl;
+  std::cerr << min_qual << std::endl; //TODO handle the quality of bases
   int retval = 0;
   std::vector<primer> primers;
   int max_primer_len = 0;
@@ -144,6 +144,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     uint32_t nlength = r->core.n_cigar; 
     
     //assign to a primer not an amplicon, because here direction matters
+    //TODO handle the case of unpaired reads
     if (overlapping_primers.size() == 0){
       //std::cerr << start_pos << " " << strand << std::endl;
       //std::cerr << "this" << std::endl;
@@ -159,33 +160,26 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         uint32_t pend = primers[j].get_end();
         
         if (start == pstart && end == pend){
-          primers[j].add_cigarotype(cigar, start_pos, nlength, seq, aux, bam_get_qname(aln));
+          primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln));
         }
       }
     }   
   }
 
-  //sanity check not intended for final version
-  /*for(uint32_t i=0; i < primers.size(); i++){
-    std::cout << "primer " << i << std::endl;
-    primer tmp = primers[i];
-    std::vector<std::vector<uint32_t>> otmp = tmp.get_cigarotypes();
-    std::vector<uint32_t> nlengths = tmp.get_nlengths();
-    std::vector<uint32_t> counts = tmp.get_count_cigarotypes();
-    for(uint32_t j=0; j < otmp.size(); j++){
-      std::cerr << "cigarotype " << j << " counts " << counts[j] << std::endl;
-      std::cerr << nlengths[j] << std::endl;
-
-    }
-    if( i > 10) break;
-  }*/
-  
+ 
   //PRIMER METHOD calculate mutations from unique cigars per primer, outputing variant frequencies
   for(uint32_t i=0; i < primers.size(); i++){
+    if (i % 100000 == 0){
+      std::cerr << i << std::endl;
+    }
     primers[i].transform_mutations();
     if(i > 10) break;
   }
   //AMPLICON METHOD translate this into amplicon haplotype obj of mutations per primer (ie. variant freq per amplicon)
+  amplicons.get_size(); //calculate number of amplicons present
+  for (uint32_t i=0; i < primers.size(); i++){
+    amplicons.set_haplotypes(primers[i]);      
+  }
   //detect fluctuating variants - iterate every position and look for fluctuation between every amplicon objects, flag these
   //combine amplicon counts to get total variants
   //end, data has been appropriately preprocessed and problematic positions have been flagged
