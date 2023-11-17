@@ -42,6 +42,7 @@ void position::update_alleles(std::string nt) {
     allele tmp;
     tmp.depth = 1;
     tmp.nuc = nt;
+    alleles.push_back(tmp);
   } else {
     alleles[exists].depth += 1;
   }
