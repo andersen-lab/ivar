@@ -23,6 +23,8 @@ int primer::get_score() { return score; }
 
 std::vector<position> primer::get_positions() { return positions; }
 
+void primer::set_positions(position pos) { positions.push_back(pos); }
+
 uint32_t primer::get_start() const { return start; }
 
 uint32_t primer::get_end() const { return end; }
@@ -313,7 +315,6 @@ void primer::transform_mutations() {
   std::vector<std::string> qnames = this->get_qnames();
   
   //this tracks all mutations at all positions
-  std::vector<position> positions = this->get_positions();
   std::string test = "A01535:8:HJ3YYDSX2:4:1248:15203:17394";
 
   //here let's turng the cigar string into a vector of alleles specific to this primer
