@@ -455,9 +455,22 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
   std::vector<uint32_t> cigar_reformat;
   std::vector<uint8_t> seq_reformat;
   std::vector<uint8_t> aux_reformat;
+
+  uint32_t length=0;
+  uint32_t ll=0;
+  std::vector<uint32_t> useful;
   //first handle the array decay aspect
   for(uint32_t i=0; i < nlength; i++){
     cigar_reformat.push_back(cigar[i]); 
+    uint32_t op = bam_cigar_op(cigar[i]);
+    //consumes query
+    if (bam_cigar_type(op) & 1){
+      length = bam_cigar_oplen(cigar[i]);
+      for(uint32_t k=0; k < length; k++){
+        useful.push_back(ll+k);
+      }
+      ll += length;
+    } 
   }
   int i = 0;
   do{
@@ -465,7 +478,6 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
     i++;
   } while(aux[i] != '\0');
   
-
   for(uint32_t i=0; i < cigarotypes.size(); i++){
     sp = ncigarotypes[i]; 
     saved_aux = aux_tags[i];
@@ -478,14 +490,11 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
   }
   //haven't seen this cigar/start pos combo before
   if(!found){
-    i = 0;
     uint8_t nt = 0;
-    do{
-      nt = seq_nt16_str[bam_seqi(seq, i)];
+    for(uint32_t k=0; k < useful.size(); k++){
+      nt = seq_nt16_str[bam_seqi(seq, useful[k])];
       seq_reformat.push_back(nt);
-      i++;
-    }while(nt != '=');
-
+    }
     cigarotypes.push_back(cigar_reformat);    
     ncigarotypes.push_back(start_pos);
     sequences.push_back(seq_reformat);

@@ -4,13 +4,22 @@
 IntervalTree::IntervalTree() { _root = NULL; }
 
 void add_allele_vectors(std::vector<allele> new_alleles, std::vector<allele> return_alleles){
+  /*
+   * @param return_alleles : the alleles we're saving to the amplicon
+   * @param new_alleles : the alleles from the primer
+   */
   for(uint32_t i=0; i < new_alleles.size(); i++){
     bool found = false;
     for(uint32_t j=0; j < return_alleles.size(); j++){
       if (return_alleles[j].nuc == new_alleles[i].nuc){
+        return_alleles[j].depth += new_alleles[i].depth;
         found = true;
         break;
       }
+    }
+    //we don't have this allele in our amplicon haplotype
+    if (!found) {
+      return_alleles.push_back(new_alleles[i]);
     }
   }
 }
@@ -19,35 +28,33 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
   if (root==NULL) return;
   char strand = prim.get_strand();
   //these are the bounds on the amplicon
-  if(strand == '+'){
-    if ((int)prim.get_start() == root->data->low) {
-      // we found the matching amplion, now we add this cigarotype to the amplicon     
-      std::vector<position> tmp_pos = prim.get_positions();
-      for (uint32_t i=0; i < tmp_pos.size(); i++){
-        position add_pos = tmp_pos[i];
-        bool found = false;
-        // check if we already have a pos for this pos
-        for(uint32_t j=0; j < root->amp_positions.size(); j++){
-          position here_pos = root->amp_positions[j];
-          if(here_pos.pos == add_pos.pos){
-            found = true;
-            here_pos.depth += add_pos.depth;
-            add_allele_vectors(add_pos.alleles, here_pos.alleles);
-            break;
-          }
-        }
-        //if we've never seen this pos for this haplotype, push a new one
-        if (!found){
-          root->amp_positions.push_back(add_pos);
-        }
-      } 
-    }
+  if(strand == '+' && ((int)prim.get_start() != root->data->low)){
+    set_haplotypes(root->right, prim);
+  } else if (strand == '-' && ((int)prim.get_end()+1 == root->data->high)){
+    set_haplotypes(root->right, prim);
   } else {
-    if ((int)prim.get_end() == root->data->high) {
-      std::cerr << prim.get_start() << " " << prim.get_end() << std::endl;
+    // we found the matching amplion, now we add this cigarotype to the amplicon     
+    std::vector<position> tmp_pos = prim.get_positions();
+    for (uint32_t i=0; i < tmp_pos.size(); i++){
+      position add_pos = tmp_pos[i];
+      bool found = false;
+      // check if we already have a pos for this pos
+      for(uint32_t j=0; j < root->amp_positions.size(); j++){
+        position here_pos = root->amp_positions[j];
+        if(here_pos.pos == add_pos.pos){
+          found = true;
+          here_pos.depth += add_pos.depth;
+          add_allele_vectors(add_pos.alleles, here_pos.alleles);
+          break;
+        }
+      }
+      //if we've never seen this pos for this haplotype, push a new one
+      if (!found){
+        root->amp_positions.push_back(add_pos);
+      }
     }
+   return; 
   }
-  set_haplotypes(root->right, prim);
 }
 
 // A utility function to insert a new Interval Search Tree Node
