@@ -80,7 +80,30 @@ int main() {
     isize_flag =
         (abs(aln->core.isize) - max_primer_len) > abs(aln->core.l_qseq);
     std::cout << bam_get_qname(aln) << std::endl;
-    get_overlapping_primers(aln, sorted_primers, overlapping_primers);
+    std::vector<std::map<uint32_t, std::vector<primer>>> hash = find_primer_per_position(primers);
+    std::map<uint32_t, std::vector<primer>> primer_map_forward = hash[0];
+    std::map<uint32_t, std::vector<primer>> primer_map_reverse = hash[1];
+    
+    uint32_t start_pos = -1;
+    char strand = '+';
+    if (bam_is_rev(aln)) {
+      start_pos = bam_endpos(aln) - 1;
+      strand = '-';
+    } else {
+      start_pos = aln->core.pos;
+    }
+    overlapping_primers.clear();
+    if(strand == '+'){
+      if (primer_map_forward.find(start_pos) != primer_map_forward.end()) {
+        overlapping_primers = primer_map_forward[start_pos];
+      }
+    }else{
+      if (primer_map_reverse.find(start_pos) != primer_map_reverse.end()){
+        overlapping_primers = primer_map_reverse[start_pos];
+      }
+    }
+    //get_overlapping_primers(aln, sorted_primers, overlapping_primers);
+
     if (overlapping_primers.size() != overlapping_primer_sizes[ctr]) {
       success = -1;
       std::cout << "Overlapping primer sizes for " << bam_get_qname(aln)
