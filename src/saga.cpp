@@ -1,7 +1,20 @@
 #include "saga.h"
 #include "trim_primer_quality.h"
+#include <cmath>
 
+float calculate_standard_deviation(std::vector<float> frequencies) {
+  float sum = 0.0, mean = 0.0, sd = 0.0;
+  uint32_t i = 0;
+  for(i = 0; i < frequencies.size(); ++i) {
+    sum += frequencies[i];
+  }
+  mean = sum / frequencies.size();
 
+  for(i = 0; i < frequencies.size(); ++i) {
+    sd += pow(frequencies[i] - mean, 2);
+  }
+  return sqrt(sd / frequencies.size());
+}
 
 int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
                              uint8_t min_qual,
@@ -169,18 +182,68 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
  
   //PRIMER METHOD calculate mutations from unique cigars per primer, outputing variant frequencies
   for(uint32_t i=0; i < primers.size(); i++){
-    if (i % 100000 == 0){
+    if (i % 100000 == 0 && i != 0){
       std::cerr << i << std::endl;
     }
     primers[i].transform_mutations();
     if(i > 10) break;
   }
+  exit(1);
+
   //AMPLICON METHOD translate this into amplicon haplotype obj of mutations per primer (ie. variant freq per amplicon)
-  amplicons.get_size(); //calculate number of amplicons present
+  amplicons.get_max_pos(); //calculate number of amplicons present, wrote this but don't need it
   for (uint32_t i=0; i < primers.size(); i++){
     amplicons.set_haplotypes(primers[i]);      
   }
+  std::vector<uint32_t> flagged_positions;
   //detect fluctuating variants - iterate every position and look for fluctuation between every amplicon objects, flag these
+  for(uint32_t i=236; i < amplicons.max_pos; i++){
+    amplicons.test_flux.clear();
+    //this bit pushes all amp position vectors back to test_flux object
+    amplicons.detect_abberations(i);
+    if (amplicons.test_flux.size() < 2) continue;
+    std::map<std::string, std::vector<float>> allele_maps;
+    for(uint32_t j=0; j < amplicons.test_flux.size(); j++){
+      uint32_t total_depth = amplicons.test_flux[j].depth;
+      if(total_depth < 10){
+        break;
+      }
+      std::vector<allele> ad  = amplicons.test_flux[j].alleles;
+      print_allele_depths(ad);
+      for(uint32_t k=0; k < ad.size(); k++){
+        std::string nuc = ad[k].nuc;
+        uint32_t ad_depth = ad[k].depth;
+        float t = (float)ad_depth / (float)total_depth; 
+        if (allele_maps.find(nuc) != allele_maps.end()){
+          allele_maps[nuc].push_back(t);  
+        } else {
+          std::vector<float> tmp;
+          tmp.push_back(t);
+          allele_maps[nuc] = tmp;
+        }
+      }
+    }
+    std::map<std::string, std::vector<float>>::iterator it;
+    for (it = allele_maps.begin(); it != allele_maps.end(); it++){
+      std::cerr << it->first << std::endl;
+      for(uint32_t x=0; x < it->second.size(); x++){
+        std::cerr << it->second[x] << std::endl;
+      }
+      float sd = calculate_standard_deviation(it->second);
+      std::cerr << sd << std::endl;
+      //TODO this is hard coded, consider it
+      if (sd >= 0.05){
+        flagged_positions.push_back(i);
+        break;
+      }
+    }
+   exit(1); 
+  }
+  std::cerr << "Here!" << std::endl;
+  for(uint32_t i = 0; i < flagged_positions.size();i++){
+    std::cerr << flagged_positions[i] << std::endl;
+  }
+
   //combine amplicon counts to get total variants
   //end, data has been appropriately preprocessed and problematic positions have been flagged
   //room for extension to calcualte physical linkage in the future

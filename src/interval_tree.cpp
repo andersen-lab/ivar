@@ -24,6 +24,22 @@ void add_allele_vectors(std::vector<allele> new_alleles, std::vector<allele> ret
   }
 }
 
+
+void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
+  if (root==NULL) return;
+  if (find_position < (uint32_t)root->data->low) return;
+  if(((uint32_t)root->data->low < find_position) && (find_position < (uint32_t)root->data->high)){
+    for(uint32_t i=0; i < root->amp_positions.size(); i++){
+      if(find_position == root->amp_positions[i].pos){
+        test_flux.push_back(root->amp_positions[i]);
+        break;
+      }
+    }
+  }
+  detect_abberations(root->right, find_position);
+
+}
+
 void IntervalTree::set_haplotypes(ITNode *root, primer prim){
   if (root==NULL) return;
   char strand = prim.get_strand();
@@ -120,10 +136,12 @@ bool IntervalTree::envelopSearch(ITNode *root, Interval i) {
   return envelopSearch(root->right, i);
 }
 
-void IntervalTree::get_size(ITNode *root){
+void IntervalTree::get_max_pos(ITNode *root){
   if (root == NULL) return;
-  count += 1;
-  get_size(root->right);
+  if (root->data->high > (int)max_pos) {
+    max_pos = (uint32_t) root->data->high;
+  }
+  get_max_pos(root->right);
 }
 
 // A helper function for inorder traversal of the tree
