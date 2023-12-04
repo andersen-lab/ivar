@@ -31,20 +31,20 @@ int check_allele_exists(std::string n, std::vector<allele> ad) {
 }
 
 
-void position::update_alleles(std::string nt) {
+void position::update_alleles(std::string nt, uint32_t count) {
   //update overall positions depth
-  depth += 1;
+  depth += count;
   //check if in allele vector
   int exists = check_allele_exists(nt, alleles);
   //TODO we haven't accounted for quality yet
   //allele does not exist
   if (exists == -1){
     allele tmp;
-    tmp.depth = 1;
+    tmp.depth = count;
     tmp.nuc = nt;
     alleles.push_back(tmp);
   } else {
-    alleles[exists].depth += 1;
+    alleles[exists].depth += count;
   }
 }
 

@@ -3,7 +3,7 @@
 // Constructor for initializing an Interval Tree
 IntervalTree::IntervalTree() { _root = NULL; }
 
-void add_allele_vectors(std::vector<allele> new_alleles, std::vector<allele> return_alleles){
+void add_allele_vectors(std::vector<allele> new_alleles, std::vector<allele> return_alleles, bool use){
   /*
    * @param return_alleles : the alleles we're saving to the amplicon
    * @param new_alleles : the alleles from the primer
@@ -12,6 +12,9 @@ void add_allele_vectors(std::vector<allele> new_alleles, std::vector<allele> ret
     bool found = false;
     for(uint32_t j=0; j < return_alleles.size(); j++){
       if (return_alleles[j].nuc == new_alleles[i].nuc){
+        if(use){
+          std::cerr << return_alleles[j].depth << " " << return_alleles[j].nuc << std::endl;
+        }
         return_alleles[j].depth += new_alleles[i].depth;
         found = true;
         break;
@@ -46,7 +49,7 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
   //these are the bounds on the amplicon
   if(strand == '+' && ((int)prim.get_start() != root->data->low)){
     set_haplotypes(root->right, prim);
-  } else if (strand == '-' && ((int)prim.get_end()+1 == root->data->high)){
+  } else if (strand == '-' && ((int)prim.get_end()+1 != root->data->high)){
     set_haplotypes(root->right, prim);
   } else {
     // we found the matching amplion, now we add this cigarotype to the amplicon     
@@ -57,16 +60,32 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
       // check if we already have a pos for this pos
       for(uint32_t j=0; j < root->amp_positions.size(); j++){
         position here_pos = root->amp_positions[j];
+        bool use = false;
+        if(add_pos.pos == 350 && here_pos.pos == add_pos.pos){
+          std::cerr << " " << std::endl;
+          print_allele_depths(root->amp_positions[j].alleles);
+          std::cerr << root->data->low << " " << root->data->high << std::endl;
+          std::cerr << "amp " << here_pos.depth << " prim "<< add_pos.depth << std::endl;
+          print_allele_depths(add_pos.alleles);
+          use = true;
+        }
         if(here_pos.pos == add_pos.pos){
           found = true;
-          here_pos.depth += add_pos.depth;
-          add_allele_vectors(add_pos.alleles, here_pos.alleles);
+          root->amp_positions[j].depth += add_pos.depth;
+          add_allele_vectors(add_pos.alleles, root->amp_positions[j].alleles, use);
+          if(add_pos.pos == 350){
+            print_allele_depths(root->amp_positions[j].alleles);
+          }
           break;
         }
       }
       //if we've never seen this pos for this haplotype, push a new one
       if (!found){
-        root->amp_positions.push_back(add_pos);
+        position tmp;
+        tmp.depth = add_pos.depth;
+        tmp.alleles = add_pos.alleles;
+        tmp.pos = add_pos.pos;
+        root->amp_positions.push_back(tmp);
       }
     }
    return; 

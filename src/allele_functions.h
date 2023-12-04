@@ -28,12 +28,12 @@ class position {
     uint32_t pos;
     uint32_t depth;
     std::vector<allele> alleles;
-    void update_alleles(std::string nt);
+    void update_alleles(std::string nt, uint32_t count);
     bool flux;
 };
 
 int check_position_exists(uint32_t p, std::vector<position> positions);
-void update_alleles(std::string nt);
+void update_alleles(std::string nt, uint32_t count);
 int check_allele_exists(std::string n, std::vector<allele> ad);
 std::vector<allele> update_allele_depth(char ref, std::string bases,
                                         std::string qualities,

@@ -312,18 +312,21 @@ void primer::transform_mutations() {
   std::vector<uint32_t> start_positions = this->get_start_positions();
   std::vector<std::vector<uint8_t>> sequences = this->get_sequences();
   std::vector<std::vector<uint8_t>> aux_tags = this->get_aux_tags();
+  std::vector<uint32_t> counts = this->get_count_cigarotypes();
   std::vector<std::string> qnames = this->get_qnames();
-  
+   
   //this tracks all mutations at all positions
-  std::string test = "A01535:8:HJ3YYDSX2:4:1248:15203:17394";
+  std::string test = "";
 
-  //here let's turng the cigar string into a vector of alleles specific to this primer
+  //here let's turn the cigar string into a vector of alleles specific to this primer
   //iterate all unique sequences
   for(uint32_t i=0; i < cigarotypes.size(); i++){
     //get the cigar string and start pos
     std::vector<uint32_t> cigarotype = cigarotypes[i]; //carries the insertions
     std::vector<uint8_t> aux_tag = aux_tags[i]; //carries deletions
     std::vector<uint8_t> sequence = sequences[i]; //carries NT values
+    std::vector<uint32_t> sc_positions; //sc positions             
+    uint32_t ccount = counts[i];                                                     
     uint32_t start_pos = start_positions[i]; // pos after soft-clipped region
     std::string qname = qnames[i];                                             
     uint32_t consumed_query = 0;
@@ -336,6 +339,7 @@ void primer::transform_mutations() {
       if (qname == test){
         std::cerr << "start pos " << start_pos  << " op " << op << " oplen " << oplen << std::endl;
       }
+      //honestly this whole bit could be better - more general
       //insertions
       if(op == 1){
         std::ostringstream convert;
@@ -348,15 +352,29 @@ void primer::transform_mutations() {
         //check if this position exists
         uint32_t exists = check_position_exists(start_pos+consumed_ref, positions);
         if (exists) {
-          positions[exists].update_alleles(nuc);  
+          positions[exists].update_alleles(nuc, ccount);  
         } else {
           //add position to vector
           position add_pos;
-          add_pos.depth = 1;
+          add_pos.depth = ccount;
           add_pos.pos = start_pos+consumed_ref; //don't add a position
-          add_pos.update_alleles(nuc);            
+          add_pos.update_alleles(nuc, ccount);            
           positions.push_back(add_pos);
-        }          
+        }
+        consumed_query += oplen;
+        continue;        
+      }
+      //if we don't consume both query and reference
+      if (!(bam_cigar_type(op) & 1) || !(bam_cigar_type(op) & 2)){
+        if (op != 2){
+          for(uint32_t k=0; k < oplen; k++) {
+             if(qname == test){
+                std::cerr << "k " << k+consumed_query << " " << op << " " << oplen << std::endl;
+             }
+            //convert data type to get the characters
+            sc_positions.push_back(k+consumed_query);
+          }
+        }
       }
       //consumes query
       if (bam_cigar_type(op) & 1){
@@ -373,72 +391,90 @@ void primer::transform_mutations() {
     std::vector<uint32_t> deletion_positions; //the aux tag does NOT recognize insertions
     std::string gather_digits;     
     std::string deleted_char;    
+    uint32_t last_char = 0;
     for(uint32_t j=1; j < aux_tag.size(); j++){
-      //std::cerr << aux_tag[j] << " gather digits " << gather_digits << " delete char " << deleted_char << " " << current_pos << std::endl;
+      if (qname == test){
+        std::cerr << aux_tag[j] << " gather digits " << gather_digits << " delete char " << deleted_char << " " << current_pos << std::endl;
+      }
       char character = (char) aux_tag[j];
       if (character == '^'){
-        //std::cerr << qname << std::endl;
         current_pos += std::stoi(gather_digits);
         gather_digits = "";
         deletion = true;
       } else if (isdigit(character) && deletion) {
-        uint32_t exists = check_position_exists(current_pos, positions);
-        if (exists) {
-          positions[exists].update_alleles("-");  
-        } else {
-          //add position to vector
-          position add_pos;
-          add_pos.depth = 1;
-          add_pos.pos = current_pos; //don't add a position
-          add_pos.update_alleles("-");            
-          positions.push_back(add_pos);
-        }        
         deleted_char = "";
         deletion = false;
       } else if (isalpha(character) && deletion) {
+        uint32_t exists = check_position_exists(current_pos, positions);
+        if (exists) {
+          positions[exists].update_alleles("-", ccount);  
+        } else {
+          //add position to vector
+          position add_pos;
+          add_pos.depth = ccount;
+          add_pos.pos = current_pos; //don't add a position
+          add_pos.update_alleles("-", ccount);            
+          positions.push_back(add_pos);
+        } 
         deletion_positions.push_back(current_pos);
         current_pos += 1;
         deleted_char += character;
         deletion = true;    
       } else if (isdigit(character) && !deletion) {
+        if(last_char > 0){
+          current_pos += last_char;
+          last_char = 0;
+        } 
         gather_digits += character;
+      } else if (isalpha(character) && !deletion) {
+        last_char += 1;
+        if(gather_digits.size() > 0){
+          current_pos += std::stoi(gather_digits);
+        }
+        gather_digits = "";
       } 
     }
-    //if(deletion_positions.size() > 0 && ignore_sequence.size() > 0){
-    //  std::cerr << qname << std::endl;
-    //}
-    /*if (qname == test) {
-      for(uint32_t z=0; z < ignore_sequence.size(); z++){
-        std::cerr << "insertion " << ignore_sequence[z] << std::endl;
-      }
-      for(uint32_t z=0; z < deletion_positions.size(); z++){
-        std::cerr << "deletion " << deletion_positions[z] << std::endl;
-      }
-    }*/
     //now that we know where the insertions and deletions are, let's just iterate the query sequence and add it in, skipping problem positions
     current_pos = start_pos;
+    //j is relative to the sequence and current pos to the reference
     for(uint32_t j=0; j < sequence.size(); j++){
       std::vector<uint32_t>::iterator it = find(deletion_positions.begin(), deletion_positions.end(), current_pos);  
       if (it != deletion_positions.end()) {
-        current_pos -= 1;
+        if (qname == test){
+          std::cerr << "deletion " << current_pos << " j " << j << std::endl;
+        }
+        current_pos += 1;
+        j -= 1;
+        continue;
       }
       it = find(ignore_sequence.begin(), ignore_sequence.end(), current_pos);
       if (it != ignore_sequence.end()) {
         j += 1;
+      }
+      it = find(sc_positions.begin(), sc_positions.end(), j);
+      if (it != sc_positions.end()){
+        continue;
       }
       current_pos += 1;
       uint32_t exists = check_position_exists(current_pos, positions);
       std::ostringstream convert;
       convert << sequence[j];
       std::string nuc = convert.str(); 
+      if (current_pos == 350 && nuc != "C"){
+        std::cerr << current_pos << " " << nuc << "  " << ccount << std::endl;
+      }
       if (exists) {
-        positions[exists].update_alleles(nuc);  
+        if (qname == test){
+          //std::cerr << qname << " " << nuc << std::endl;
+          std::cerr << current_pos  << " j " << j << " nuc " << nuc << " del pos " << deletion_positions.size() << " insert pos " << ignore_sequence.size() << std::endl;
+        }
+        positions[exists].update_alleles(nuc, ccount);  
       } else {
         //add position to vector
         position add_pos;
-        add_pos.depth = 1;
+        add_pos.depth = ccount;
         add_pos.pos = current_pos; //don't add a position
-        add_pos.update_alleles(nuc);            
+        add_pos.update_alleles(nuc, ccount);            
         positions.push_back(add_pos);
       }         
     }

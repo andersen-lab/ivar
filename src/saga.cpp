@@ -159,7 +159,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     //assign to a primer not an amplicon, because here direction matters
     //TODO handle the case of unpaired reads
     if (overlapping_primers.size() == 0){
-      //std::cerr << start_pos << " " << strand << std::endl;
+     //std::cerr << start_pos << " " << strand << std::endl;
       //std::cerr << "this" << std::endl;
       continue;
     }
@@ -171,9 +171,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       for(uint32_t j=0; j < primers.size(); j++){
         uint32_t pstart = primers[j].get_start();
         uint32_t pend = primers[j].get_end();
-        
+ 
         if (start == pstart && end == pend){
-          primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln));
+           primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln));
         }
       }
     }   
@@ -186,18 +186,18 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       std::cerr << i << std::endl;
     }
     primers[i].transform_mutations();
-    if(i > 10) break;
   }
-  exit(1);
-
+  std::cerr << "amp method" << std::endl;
   //AMPLICON METHOD translate this into amplicon haplotype obj of mutations per primer (ie. variant freq per amplicon)
   amplicons.get_max_pos(); //calculate number of amplicons present, wrote this but don't need it
   for (uint32_t i=0; i < primers.size(); i++){
     amplicons.set_haplotypes(primers[i]);      
   }
+  exit(1);
   std::vector<uint32_t> flagged_positions;
+  std::cerr << amplicons.max_pos << std::endl;
   //detect fluctuating variants - iterate every position and look for fluctuation between every amplicon objects, flag these
-  for(uint32_t i=236; i < amplicons.max_pos; i++){
+  for(uint32_t i=350; i < amplicons.max_pos; i++){
     amplicons.test_flux.clear();
     //this bit pushes all amp position vectors back to test_flux object
     amplicons.detect_abberations(i);
@@ -205,10 +205,12 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     std::map<std::string, std::vector<float>> allele_maps;
     for(uint32_t j=0; j < amplicons.test_flux.size(); j++){
       uint32_t total_depth = amplicons.test_flux[j].depth;
-      if(total_depth < 10){
+      std::cerr << "total depth " << total_depth << std::endl;
+      if(total_depth < 20){
         break;
       }
       std::vector<allele> ad  = amplicons.test_flux[j].alleles;
+      std::cerr << "" << std::endl;
       print_allele_depths(ad);
       for(uint32_t k=0; k < ad.size(); k++){
         std::string nuc = ad[k].nuc;
@@ -224,20 +226,22 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       }
     }
     std::map<std::string, std::vector<float>>::iterator it;
+    std::cerr << "position is " << i << std::endl;
     for (it = allele_maps.begin(); it != allele_maps.end(); it++){
       std::cerr << it->first << std::endl;
       for(uint32_t x=0; x < it->second.size(); x++){
         std::cerr << it->second[x] << std::endl;
       }
       float sd = calculate_standard_deviation(it->second);
-      std::cerr << sd << std::endl;
+      std::cerr << "sdv dev " << sd << std::endl;
       //TODO this is hard coded, consider it
       if (sd >= 0.05){
         flagged_positions.push_back(i);
         break;
       }
     }
-   exit(1); 
+    std::cerr << "here!" << std::endl;
+    exit(1);
   }
   std::cerr << "Here!" << std::endl;
   for(uint32_t i = 0; i < flagged_positions.size();i++){
