@@ -460,13 +460,13 @@ void primer::transform_mutations() {
       std::ostringstream convert;
       convert << sequence[j];
       std::string nuc = convert.str(); 
-      if (current_pos == 350 && nuc != "C"){
-        std::cerr << current_pos << " " << nuc << "  " << ccount << std::endl;
-      }
       if (exists) {
         if (qname == test){
           //std::cerr << qname << " " << nuc << std::endl;
           std::cerr << current_pos  << " j " << j << " nuc " << nuc << " del pos " << deletion_positions.size() << " insert pos " << ignore_sequence.size() << std::endl;
+        }
+        if(current_pos ==350){
+          std::cerr << "primer " << ccount << " " << nuc << std::endl;
         }
         positions[exists].update_alleles(nuc, ccount);  
       } else {
@@ -476,6 +476,9 @@ void primer::transform_mutations() {
         add_pos.pos = current_pos; //don't add a position
         add_pos.update_alleles(nuc, ccount);            
         positions.push_back(add_pos);
+        if(current_pos ==350){
+          std::cerr << "primer " << ccount << " " << nuc << std::endl;
+        }
       }         
     }
   }

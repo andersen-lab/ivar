@@ -26,7 +26,7 @@ struct allele {
 class position {
   public:
     uint32_t pos;
-    uint32_t depth;
+    uint32_t depth=0;
     std::vector<allele> alleles;
     void update_alleles(std::string nt, uint32_t count);
     bool flux;
