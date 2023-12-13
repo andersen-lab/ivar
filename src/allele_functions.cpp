@@ -61,10 +61,10 @@ void position::update_alleles(std::string nt, uint32_t count){
 int check_position_exists(uint32_t p, std::vector<position> positions) {
   for (uint32_t i=0; i < positions.size(); i++) {
     if (p == positions[i].pos) {
-      return(i);
+      return((int)i);
     }
   }
-  return(0);
+  return(-1);
 }
 
 int find_ref_in_allele(std::vector<allele> ad, char ref) {
