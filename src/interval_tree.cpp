@@ -3,7 +3,7 @@
 // Constructor for initializing an Interval Tree
 IntervalTree::IntervalTree() { _root = NULL; }
 
-void add_allele_vectors(std::vector<allele> new_alleles, std::vector<allele> return_alleles, bool use){
+std::vector<allele> add_allele_vectors(std::vector<allele> new_alleles, std::vector<allele> return_alleles){
   /*
    * @param return_alleles : the alleles we're saving to the amplicon
    * @param new_alleles : the alleles from the primer
@@ -12,10 +12,6 @@ void add_allele_vectors(std::vector<allele> new_alleles, std::vector<allele> ret
     bool found = false;
     for(uint32_t j=0; j < return_alleles.size(); j++){
       if (return_alleles[j].nuc == new_alleles[i].nuc){
-        if(use){
-          std::cerr<<"";
-        //  std::cerr << "\nin found " << return_alleles[j].depth << " " << return_alleles[j].nuc << std::endl;
-        }
         return_alleles[j].depth += new_alleles[i].depth;
         found = true;
         break;
@@ -26,6 +22,7 @@ void add_allele_vectors(std::vector<allele> new_alleles, std::vector<allele> ret
       return_alleles.push_back(new_alleles[i]);
     }
   }
+  return(return_alleles);
 }
 
 
@@ -56,34 +53,16 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
     // we found the matching amplion, now we add this cigarotype to the amplicon     
     std::vector<position> tmp_pos = prim.get_positions();
     for (uint32_t i=0; i < tmp_pos.size(); i++){
-      if(tmp_pos[i].pos == 350){
-        std::cerr << "posssssss" << std::endl;
-      }
       position add_pos = tmp_pos[i];
       bool found = false;
       // check if we already have a pos for this pos
       for(uint32_t j=0; j < root->amp_positions.size(); j++){
         position here_pos = root->amp_positions[j];
-        bool use = false;
-        if(add_pos.pos == 350 && here_pos.pos == add_pos.pos){
-          /*
-          std::cerr << "\nthe original thing" << std::endl;
-          print_allele_depths(root->amp_positions[j].alleles);
-          std::cerr << root->data->low << " " << root->data->high << std::endl;
-          std::cerr << "position depth " << root->amp_positions[j].depth << " prim depth "<< tmp_pos[i].depth << std::endl;
-          std::cerr << "thing being added" << std::endl;
-          print_allele_depths(add_pos.alleles);
-          */
-          use = true;
-        }
-        if(here_pos.pos == add_pos.pos){
+        if(here_pos.pos == tmp_pos[i].pos){
           found = true;
-          root->amp_positions[j].depth += add_pos.depth;
-          add_allele_vectors(add_pos.alleles, root->amp_positions[j].alleles, use);
-          //if(add_pos.pos == 350){
-          //  std::cerr << "after being added " << std::endl;
-          //  print_allele_depths(root->amp_positions[j].alleles);
-          //}
+          root->amp_positions[j].depth += tmp_pos[i].depth;
+          std::vector<allele> new_alleles = add_allele_vectors(tmp_pos[i].alleles, root->amp_positions[j].alleles);
+          root->amp_positions[j].alleles = new_alleles;
           break;
         }
       }
@@ -93,11 +72,6 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
         tmp.depth = add_pos.depth;
         tmp.alleles = add_pos.alleles;
         tmp.pos = add_pos.pos;
-        if(add_pos.pos == 350){
-          std::cerr << "initiate " << tmp.depth << " " << add_pos.depth << std::endl;
-          std::cerr << root->data->low << " " << root->data->high << std::endl;
-          print_allele_depths(tmp.alleles);
-        }
         root->amp_positions.push_back(tmp);
       }
     }

@@ -317,7 +317,7 @@ void primer::transform_mutations() {
    
   //this tracks all mutations at all positions
   std::string test = "";
-
+  uint32_t test_count = 0;
   //here let's turn the cigar string into a vector of alleles specific to this primer
   //iterate all unique sequences
   for(uint32_t i=0; i < cigarotypes.size(); i++){
@@ -336,9 +336,6 @@ void primer::transform_mutations() {
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
       uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
-      if (qname == test){
-        std::cerr << "start pos " << start_pos  << " op " << op << " oplen " << oplen << std::endl;
-      }
       //honestly this whole bit could be better - more general
       //insertions
       if(op == 1){
@@ -356,7 +353,6 @@ void primer::transform_mutations() {
         } else {
           //add position to vector
           position add_pos;
-          add_pos.depth = ccount;
           add_pos.pos = start_pos+consumed_ref; //don't add a position
           add_pos.update_alleles(nuc, ccount);            
           positions.push_back(add_pos);
@@ -393,9 +389,6 @@ void primer::transform_mutations() {
     std::string deleted_char;    
     uint32_t last_char = 0;
     for(uint32_t j=1; j < aux_tag.size(); j++){
-      if (qname == test){
-        std::cerr << aux_tag[j] << " gather digits " << gather_digits << " delete char " << deleted_char << " " << current_pos << std::endl;
-      }
       char character = (char) aux_tag[j];
       if (character == '^'){
         current_pos += std::stoi(gather_digits);
@@ -406,12 +399,14 @@ void primer::transform_mutations() {
         deletion = false;
       } else if (isalpha(character) && deletion) {
         uint32_t exists = check_position_exists(current_pos, positions);
+        if(current_pos == 350){
+          test_count += ccount;
+        }
         if (exists) {
           positions[exists].update_alleles("-", ccount);  
         } else {
           //add position to vector
           position add_pos;
-          add_pos.depth = ccount;
           add_pos.pos = current_pos; //don't add a position
           add_pos.update_alleles("-", ccount);            
           positions.push_back(add_pos);
@@ -440,9 +435,6 @@ void primer::transform_mutations() {
     for(uint32_t j=0; j < sequence.size(); j++){
       std::vector<uint32_t>::iterator it = find(deletion_positions.begin(), deletion_positions.end(), current_pos);  
       if (it != deletion_positions.end()) {
-        if (qname == test){
-          std::cerr << "deletion " << current_pos << " j " << j << std::endl;
-        }
         current_pos += 1;
         j -= 1;
         continue;
@@ -461,24 +453,25 @@ void primer::transform_mutations() {
       convert << sequence[j];
       std::string nuc = convert.str(); 
       if (exists) {
-        if (qname == test){
-          //std::cerr << qname << " " << nuc << std::endl;
-          std::cerr << current_pos  << " j " << j << " nuc " << nuc << " del pos " << deletion_positions.size() << " insert pos " << ignore_sequence.size() << std::endl;
-        }
-        if(current_pos ==350){
-          std::cerr << "primer " << ccount << " " << nuc << std::endl;
+        if(current_pos == 350){
+          test_count += ccount;
+          uint32_t counter = 0;
+          counter = sum_allele_depths(positions[exists].alleles);
+          if(positions[exists].depth != counter){
+            std::cerr << positions[exists].depth << " " << counter << std::endl;
+            std::cerr << qname << std::endl;
+          }
         }
         positions[exists].update_alleles(nuc, ccount);  
       } else {
         //add position to vector
+        if(current_pos == 350){
+          test_count += ccount;
+        }
         position add_pos;
-        add_pos.depth = ccount;
         add_pos.pos = current_pos; //don't add a position
         add_pos.update_alleles(nuc, ccount);            
         positions.push_back(add_pos);
-        if(current_pos ==350){
-          std::cerr << "primer " << ccount << " " << nuc << std::endl;
-        }
       }         
     }
   }

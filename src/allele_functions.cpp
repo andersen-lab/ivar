@@ -30,8 +30,18 @@ int check_allele_exists(std::string n, std::vector<allele> ad) {
   return -1;
 }
 
+uint32_t sum_allele_depths(std::vector<allele> test){
+  /*
+   * Helped function for troubleshooting depth issues.
+   */
+  uint32_t counter = 0;
+  for(uint32_t i=0; i < test.size(); i++){
+    counter += test[i].depth;
+  }
+  return(counter);
+}
 
-void position::update_alleles(std::string nt, uint32_t count) {
+void position::update_alleles(std::string nt, uint32_t count){
   //update overall positions depth
   depth += count;
   //check if in allele vector
