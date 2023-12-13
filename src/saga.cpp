@@ -178,7 +178,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       }
     }   
   }
-
  
   //PRIMER METHOD calculate mutations from unique cigars per primer, outputing variant frequencies
   for(uint32_t i=0; i < primers.size(); i++){
@@ -188,12 +187,14 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     primers[i].transform_mutations();
   }
   //AMPLICON METHOD translate this into amplicon haplotype obj of mutations per primer (ie. variant freq per amplicon)
+  //std::cerr << "setting haplotypes" << std::endl;
   amplicons.get_max_pos(); //calculate number of amplicons present, wrote this but don't need it
   for (uint32_t i=0; i < primers.size(); i++){
     amplicons.set_haplotypes(primers[i]);      
   }
   std::vector<uint32_t> flagged_positions;
-  std::cerr << amplicons.max_pos << std::endl;
+  std::cerr << "max pos " << amplicons.max_pos << std::endl;
+  
   //detect fluctuating variants - iterate every position and look for fluctuation between every amplicon objects, flag these
   for(uint32_t i=0; i < amplicons.max_pos; i++){
     amplicons.test_flux.clear();
@@ -241,11 +242,16 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     //std::cerr << "here!" << std::endl;
     //exit(1);
   }
-  for(uint32_t i = 0; i < flagged_positions.size();i++){
+  /*for(uint32_t i = 0; i < flagged_positions.size();i++){
     std::cerr << flagged_positions[i] << std::endl;
-  }
+  }*/
+  
+  //combine amplicon counts to get total variants 
+  amplicons.combine_haplotypes();
+  //std::vector<position> variants = amplicons.variants;
+  //sort the positions into a proper order
+  //for(uint32_t i=0; i<
 
-  //combine amplicon counts to get total variants
   //end, data has been appropriately preprocessed and problematic positions have been flagged
   //room for extension to calcualte physical linkage in the future
   return(retval);

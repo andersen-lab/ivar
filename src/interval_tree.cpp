@@ -26,6 +26,22 @@ std::vector<allele> add_allele_vectors(std::vector<allele> new_alleles, std::vec
 }
 
 
+void IntervalTree::combine_haplotypes(ITNode *root){
+  if (root==NULL) return;
+  for(uint32_t i=0; i < root->amp_positions.size(); i++){
+    uint32_t exists = check_position_exists(root->amp_positions[i].pos, variants);
+    //does exist
+    if (exists){
+      variants[exists].depth += root->amp_positions[i].depth;
+      std::vector<allele> new_alleles = add_allele_vectors(root->amp_positions[i].alleles, variants[exists].alleles);
+      variants[exists].alleles = new_alleles;
+   } else {
+      variants.push_back(root->amp_positions[i]);
+    }
+  }
+  combine_haplotypes(root->right);
+}
+
 void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
   if (root==NULL) return;
   if (find_position < (uint32_t)root->data->low) return;

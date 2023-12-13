@@ -317,7 +317,6 @@ void primer::transform_mutations() {
    
   //this tracks all mutations at all positions
   std::string test = "";
-  uint32_t test_count = 0;
   //here let's turn the cigar string into a vector of alleles specific to this primer
   //iterate all unique sequences
   for(uint32_t i=0; i < cigarotypes.size(); i++){
@@ -399,9 +398,6 @@ void primer::transform_mutations() {
         deletion = false;
       } else if (isalpha(character) && deletion) {
         uint32_t exists = check_position_exists(current_pos, positions);
-        if(current_pos == 350){
-          test_count += ccount;
-        }
         if (exists) {
           positions[exists].update_alleles("-", ccount);  
         } else {
@@ -452,22 +448,10 @@ void primer::transform_mutations() {
       std::ostringstream convert;
       convert << sequence[j];
       std::string nuc = convert.str(); 
+      //TODO THIS NEEDS TO CHANGE IN THE OTHER PRIMER FILE TO -1
       if (exists) {
-        if(current_pos == 350){
-          test_count += ccount;
-          uint32_t counter = 0;
-          counter = sum_allele_depths(positions[exists].alleles);
-          if(positions[exists].depth != counter){
-            std::cerr << positions[exists].depth << " " << counter << std::endl;
-            std::cerr << qname << std::endl;
-          }
-        }
         positions[exists].update_alleles(nuc, ccount);  
       } else {
-        //add position to vector
-        if(current_pos == 350){
-          test_count += ccount;
-        }
         position add_pos;
         add_pos.pos = current_pos; //don't add a position
         add_pos.update_alleles(nuc, ccount);            

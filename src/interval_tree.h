@@ -52,10 +52,12 @@ class IntervalTree {
   void print_amplicons(ITNode *root);
   void get_max_pos(ITNode *root);
   void set_haplotypes(ITNode *root, primer prim);
+  void combine_haplotypes(ITNode *root);
   void detect_abberations(ITNode *root, uint32_t pos);
   public:
-  uint32_t max_pos;
+  uint32_t max_pos=0;
   std::vector<position> test_flux; //storage for looking at pos across all amps
+  std::vector<position> variants; //all variants across every position                                 
   std::vector<uint32_t> flagged_positions; //positions where freq flux occurs MIGHT NOT NEED
   IntervalTree();  // constructor
   void insert(Interval data) { insert(_root, data); }
@@ -65,8 +67,10 @@ class IntervalTree {
   void get_max_pos() {get_max_pos(_root);}
   void set_haplotypes(primer prim) {set_haplotypes(_root, prim);}
   void detect_abberations(uint32_t pos) {detect_abberations(_root, pos);}
+  void combine_haplotypes() {combine_haplotypes(_root);}
 };
 
+void combine_haplotypes();
 void detect_abberations(ITNode *root, uint32_t find_position);
 void get_max_pos();
 void set_haplotypes(ITNode *root, primer prim);
