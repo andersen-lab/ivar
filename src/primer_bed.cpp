@@ -342,12 +342,12 @@ void primer::transform_mutations() {
         for(uint32_t k=0; k < oplen; k++) {
           //convert data type to get the characters
           ignore_sequence.push_back(k+consumed_ref+start_pos);
-          convert << sequence[k+consumed_query+start_pos];
+          convert << sequence[k+consumed_query];
         }
         std::string nuc = "+" + convert.str();
         //check if this position exists
-        uint32_t exists = check_position_exists(start_pos+consumed_ref, positions);
-        if (exists) {
+        int  exists = check_position_exists(start_pos+consumed_ref, positions);
+        if (exists != -1) {
           positions[exists].update_alleles(nuc, ccount);  
         } else {
           //add position to vector
@@ -363,9 +363,6 @@ void primer::transform_mutations() {
       if (!(bam_cigar_type(op) & 1) || !(bam_cigar_type(op) & 2)){
         if (op != 2){
           for(uint32_t k=0; k < oplen; k++) {
-             if(qname == test){
-                std::cerr << "k " << k+consumed_query << " " << op << " " << oplen << std::endl;
-             }
             //convert data type to get the characters
             sc_positions.push_back(k+consumed_query);
           }
@@ -397,8 +394,8 @@ void primer::transform_mutations() {
         deleted_char = "";
         deletion = false;
       } else if (isalpha(character) && deletion) {
-        uint32_t exists = check_position_exists(current_pos, positions);
-        if (exists) {
+        int exists = check_position_exists(current_pos, positions);
+        if (exists != -1) {
           positions[exists].update_alleles("-", ccount);  
         } else {
           //add position to vector
@@ -444,12 +441,11 @@ void primer::transform_mutations() {
         continue;
       }
       current_pos += 1;
-      uint32_t exists = check_position_exists(current_pos, positions);
+      int exists = check_position_exists(current_pos, positions);
       std::ostringstream convert;
       convert << sequence[j];
       std::string nuc = convert.str(); 
-      //TODO THIS NEEDS TO CHANGE IN THE OTHER PRIMER FILE TO -1
-      if (exists) {
+      if (exists != -1) {
         positions[exists].update_alleles(nuc, ccount);  
       } else {
         position add_pos;
