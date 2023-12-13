@@ -1,5 +1,6 @@
 #include "saga.h"
 #include "trim_primer_quality.h"
+#include <fstream>
 #include <cmath>
 
 float calculate_standard_deviation(std::vector<float> frequencies) {
@@ -69,15 +70,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     return -1;
   }
 
-  // Setup output file
-  samFile *out;
-  if(bam_out.empty()) {
-    out = sam_open("-", "w");
-  } else {
-    bam_out += ".bam";
-    out = sam_open(bam_out.c_str(), "wb");
-  }
-
   // Get the header
   sam_hdr_t *header = sam_hdr_read(in);
   if (header == NULL) {
@@ -85,12 +77,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     return -1;
   }
   add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
-  if (sam_hdr_write(out, header) < 0) {
-    std::cerr << "Unable to write BAM header to path." << std::endl;
-    sam_close(in);
-    return -1;
-  }
-
+  amplicons.get_max_pos();
+  std::cerr << "max pos " << amplicons.max_pos << std::endl;
   // Initiate the alignment record
   bam1_t *aln = bam_init1();
   //int ctr = 0;
@@ -116,7 +104,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   header = sam_hdr_read(in);
   add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
   aln = bam_init1();
- 
   // Iterate through reads
   while (sam_read1(in, header, aln) >= 0) {
     strand = '+';
@@ -126,12 +113,17 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     } else {
       start_pos = aln->core.pos;
     }
+    //TESTLINES
+    if(start_pos > 3000){
+      continue;
+    }
     overlapping_primers.clear();
     //for this case, we've already trimmed so the starting pos will be shifted
     //TODO look instead for primers matching a small range!
     if(strand == '+'){
       for(uint32_t i=start_pos-10; i < start_pos+10; i++){
-        if (i < 0 || i > primer_map_forward.size()) continue; 
+        //std::cerr << "i " << i << " " << start_pos << std::endl;
+        if (i < 0 || i > amplicons.max_pos) continue; 
         if (primer_map_forward.find(i) != primer_map_forward.end()) {
           overlapping_primers = primer_map_forward[i];
         }
@@ -140,7 +132,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     }else{
       for (uint32_t i=start_pos-10; i < start_pos+10; i++)
       {
-        if (i < 0 || i > primer_map_reverse.size()) continue;
+        if (i < 0 || i > amplicons.max_pos) continue;
         if (primer_map_reverse.find(i) != primer_map_reverse.end()){
           overlapping_primers = primer_map_reverse[i];
         }
@@ -159,8 +151,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     //assign to a primer not an amplicon, because here direction matters
     //TODO handle the case of unpaired reads
     if (overlapping_primers.size() == 0){
-     //std::cerr << start_pos << " " << strand << std::endl;
-      //std::cerr << "this" << std::endl;
       continue;
     }
 
@@ -171,31 +161,27 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       for(uint32_t j=0; j < primers.size(); j++){
         uint32_t pstart = primers[j].get_start();
         uint32_t pend = primers[j].get_end();
- 
+        
         if (start == pstart && end == pend){
-           primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln));
+          primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln));
         }
       }
     }   
   }
- 
+  std::cerr << "transforming mutations" << std::endl;
   //PRIMER METHOD calculate mutations from unique cigars per primer, outputing variant frequencies
   for(uint32_t i=0; i < primers.size(); i++){
-    if (i % 100000 == 0 && i != 0){
-      std::cerr << i << std::endl;
-    }
     primers[i].transform_mutations();
   }
+  std::cerr << "setting amplicon level haplotypes" << std::endl;
   //AMPLICON METHOD translate this into amplicon haplotype obj of mutations per primer (ie. variant freq per amplicon)
-  //std::cerr << "setting haplotypes" << std::endl;
-  amplicons.get_max_pos(); //calculate number of amplicons present, wrote this but don't need it
   for (uint32_t i=0; i < primers.size(); i++){
     amplicons.set_haplotypes(primers[i]);      
   }
   std::vector<uint32_t> flagged_positions;
-  std::cerr << "max pos " << amplicons.max_pos << std::endl;
   
-  //detect fluctuating variants - iterate every position and look for fluctuation between every amplicon objects, flag these
+  std::cerr << "detecting variant abberations" << std::endl;
+  //detect fluctuating variants
   for(uint32_t i=0; i < amplicons.max_pos; i++){
     amplicons.test_flux.clear();
     //this bit pushes all amp position vectors back to test_flux object
@@ -245,13 +231,42 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   /*for(uint32_t i = 0; i < flagged_positions.size();i++){
     std::cerr << flagged_positions[i] << std::endl;
   }*/
-  
   //combine amplicon counts to get total variants 
   amplicons.combine_haplotypes();
-  //std::vector<position> variants = amplicons.variants;
-  //sort the positions into a proper order
-  //for(uint32_t i=0; i<
+  std::vector<position> variants = amplicons.variants;
+  std::cerr << "variants size " << variants.size() << std::endl;
 
+  //write variants to a file
+  ofstream file;
+  file.open(bam_out + ".txt", ios::trunc);
+  file << "POS\tALLELE\tDEPTH\tFREQ\tAVG_QUAL\tFLAGGED_POS\n";
+  for(uint32_t i=0; i < variants.size(); i++){
+    for(uint32_t j=0; j < variants[i].alleles.size(); j++){
+      float freq = (float)variants[i].alleles[j].depth / (float)variants[i].depth;
+      if(freq == 0){
+        continue;
+      }
+      file << std::to_string(variants[i].pos) << "\t";
+      if(variants[i].pos == 208){
+        std::cerr << variants[i].alleles[j].nuc << std::endl;
+      }
+      file << variants[i].alleles[j].nuc << "\t";
+      file << std::to_string(variants[i].alleles[j].depth) << "\t";   
+      file << std::to_string(freq) << "\t";    
+      //TODO QUALITY
+      file << std::to_string(20) << "\t";
+      std::vector<uint32_t>::iterator it; 
+      it = find(flagged_positions.begin(), flagged_positions.end(), variants[i].pos);
+      if (it != flagged_positions.end()){
+        file << "TRUE" << "\t";
+      } else {
+        file << "FALSE" << "\t";
+      }
+      file << "\n";
+    }
+    
+  }  
+  file.close();
   //end, data has been appropriately preprocessed and problematic positions have been flagged
   //room for extension to calcualte physical linkage in the future
   return(retval);
