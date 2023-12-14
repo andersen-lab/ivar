@@ -21,10 +21,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
                              uint8_t min_qual,
                              std::string cmd,
                              std::string pair_info, int32_t primer_offset){
-  /*
-   * Here we're iterating every single read, and adding to the haplotype object in the amplicons schema.
-   */
-
+ 
   std::cerr << min_qual << std::endl; //TODO handle the quality of bases
   int retval = 0;
   std::vector<primer> primers;
@@ -47,14 +44,14 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   IntervalTree amplicons;
   if (!pair_info.empty()) {
     amplicons = populate_amplicons(pair_info, primers);
-    /*if (amplicons.size() == 0){
-      std::cerr << "Exiting." << std::endl;
-      return -1;
-    }*/
     std::cerr << "Amplicons detected: " << std::endl;
     amplicons.inOrder();
+    amplicons.get_max_pos();
+    std::cerr << "Maximum position " << amplicons.max_pos << std::endl;
+  } else{
+    std::cerr << "Exiting." << std::endl;
+    return -1;
   }
-
   // Read in input file
   samFile *in;
   
@@ -77,8 +74,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     return -1;
   }
   add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
-  amplicons.get_max_pos();
-  std::cerr << "max pos " << amplicons.max_pos << std::endl;
   // Initiate the alignment record
   bam1_t *aln = bam_init1();
   //int ctr = 0;
@@ -95,10 +90,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   std::vector<primer> overlapping_primers;
   std::vector<bam1_t *> alns;
 
-  //int cig;
   char strand = '+';
   uint32_t start_pos = -1;
-
+  uint32_t outside_amp = 0;
   // Iterate through reads
   in = sam_open(bam.c_str(), "r");
   header = sam_hdr_read(in);
@@ -114,14 +108,14 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       start_pos = aln->core.pos;
     }
     //TESTLINES
-    if(start_pos > 3000){
-      continue;
-    }
+    //if(start_pos > 3000){
+    //  continue;
+    //}
     overlapping_primers.clear();
     //TODO handle unpaired
+    //esp important for possible next era sequencing
     if(strand == '+'){
       for(uint32_t i=start_pos-10; i < start_pos+10; i++){
-        //std::cerr << "i " << i << " " << start_pos << std::endl;
         if (i < 0 || i > amplicons.max_pos) continue; 
         if (primer_map_forward.find(i) != primer_map_forward.end()) {
           overlapping_primers = primer_map_forward[i];
@@ -150,9 +144,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     //assign to a primer not an amplicon, because here direction matters
     //TODO handle the case of unpaired reads
     if (overlapping_primers.size() == 0){
+      amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities);
+      exit(1);
+      outside_amp += 1;
       continue;
     }
-
     for(uint32_t i=0; i < overlapping_primers.size(); i++){
       uint32_t start = overlapping_primers[i].get_start();
       uint32_t end = overlapping_primers[i].get_end();
@@ -167,14 +163,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       }
     }   
   }
-  std::cerr << "transforming mutations" << std::endl;
-  //PRIMER METHOD calculate mutations from unique cigars per primer, outputing variant frequencies
+  std::cerr << "Number of reads outside an amplicon: " << outside_amp << std::endl;
   for(uint32_t i=0; i < primers.size(); i++){
     primers[i].transform_mutations();
   }
-  //exit(1);
   std::cerr << "setting amplicon level haplotypes" << std::endl;
-  //AMPLICON METHOD translate this into amplicon haplotype obj of mutations per primer (ie. variant freq per amplicon)
   for (uint32_t i=0; i < primers.size(); i++){
     amplicons.set_haplotypes(primers[i]);      
   }
@@ -190,13 +183,10 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     std::map<std::string, std::vector<float>> allele_maps;
     for(uint32_t j=0; j < amplicons.test_flux.size(); j++){
       uint32_t total_depth = amplicons.test_flux[j].depth;
-      //std::cerr << "total depth " << total_depth << std::endl;
       if(total_depth < 20){
         break;
       }
       std::vector<allele> ad  = amplicons.test_flux[j].alleles;
-      //std::cerr << "" << std::endl;
-      //print_allele_depths(ad);
       for(uint32_t k=0; k < ad.size(); k++){
         std::string nuc = ad[k].nuc;
         uint32_t ad_depth = ad[k].depth;
@@ -211,26 +201,15 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       }
     }
     std::map<std::string, std::vector<float>>::iterator it;
-    //std::cerr << "position is " << i << std::endl;
     for (it = allele_maps.begin(); it != allele_maps.end(); it++){
-      /*std::cerr << it->first << std::endl;
-      for(uint32_t x=0; x < it->second.size(); x++){
-        std::cerr << it->second[x] << std::endl;
-      }*/
       float sd = calculate_standard_deviation(it->second);
-      //std::cerr << "sdv dev " << sd << std::endl;
       //TODO this is hard coded, consider it
       if (sd >= 0.05){
         flagged_positions.push_back(i);
         break;
       }
     }
-    //std::cerr << "here!" << std::endl;
-    //exit(1);
   }
-  /*for(uint32_t i = 0; i < flagged_positions.size();i++){
-    std::cerr << flagged_positions[i] << std::endl;
-  }*/
   //combine amplicon counts to get total variants 
   amplicons.combine_haplotypes();
   std::vector<position> variants = amplicons.variants;
@@ -247,9 +226,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         continue;
       }
       file << std::to_string(variants[i].pos) << "\t";
-      if(variants[i].pos == 208){
-        std::cerr << variants[i].alleles[j].nuc << std::endl;
-      }
       file << variants[i].alleles[j].nuc << "\t";
       file << std::to_string(variants[i].alleles[j].depth) << "\t";   
       file << std::to_string(freq) << "\t";    

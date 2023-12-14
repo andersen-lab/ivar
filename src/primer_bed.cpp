@@ -461,7 +461,7 @@ void primer::transform_mutations() {
 }
 
 //cigar must be passed by pointer due to array decay
-void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality){
+void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality) {
   bool found = false; //have we seen this before
   std::vector<uint8_t> saved_aux; //placeholder for saved sequence
   std::vector<uint32_t> saved_cigarotype; //placeholder for saved cigarotypes
