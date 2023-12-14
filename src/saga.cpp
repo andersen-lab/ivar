@@ -118,8 +118,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       continue;
     }
     overlapping_primers.clear();
-    //for this case, we've already trimmed so the starting pos will be shifted
-    //TODO look instead for primers matching a small range!
+    //TODO handle unpaired
     if(strand == '+'){
       for(uint32_t i=start_pos-10; i < start_pos+10; i++){
         //std::cerr << "i " << i << " " << start_pos << std::endl;
@@ -147,7 +146,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     //get cigar for the read
     uint32_t *cigar = bam_get_cigar(r); 
     uint32_t nlength = r->core.n_cigar; 
-    
+    uint8_t *qualities = bam_get_qual(r);
     //assign to a primer not an amplicon, because here direction matters
     //TODO handle the case of unpaired reads
     if (overlapping_primers.size() == 0){
@@ -163,7 +162,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         uint32_t pend = primers[j].get_end();
         
         if (start == pstart && end == pend){
-          primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln));
+          primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln), qualities);
         }
       }
     }   
@@ -173,6 +172,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   for(uint32_t i=0; i < primers.size(); i++){
     primers[i].transform_mutations();
   }
+  //exit(1);
   std::cerr << "setting amplicon level haplotypes" << std::endl;
   //AMPLICON METHOD translate this into amplicon haplotype obj of mutations per primer (ie. variant freq per amplicon)
   for (uint32_t i=0; i < primers.size(); i++){
@@ -253,8 +253,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       file << variants[i].alleles[j].nuc << "\t";
       file << std::to_string(variants[i].alleles[j].depth) << "\t";   
       file << std::to_string(freq) << "\t";    
-      //TODO QUALITY
-      file << std::to_string(20) << "\t";
+      file << std::to_string((float)variants[i].alleles[j].mean_qual / (float)variants[i].alleles[j].depth) << "\t";
       std::vector<uint32_t>::iterator it; 
       it = find(flagged_positions.begin(), flagged_positions.end(), variants[i].pos);
       if (it != flagged_positions.end()){
@@ -267,6 +266,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     
   }  
   file.close();
+  bam_destroy1(aln);
+  bam_hdr_destroy(header);
+  sam_close(in);
   //end, data has been appropriately preprocessed and problematic positions have been flagged
   //room for extension to calcualte physical linkage in the future
   return(retval);

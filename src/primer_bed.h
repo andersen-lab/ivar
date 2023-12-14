@@ -16,16 +16,18 @@ class cigarotype{
     std::vector<uint32_t> count_cigarotypes; //count of amount found
     std::vector<std::vector<uint8_t>> aux_tags; //auxillary tags
     std::vector<std::vector<uint8_t>> sequences; //sequences                        
+    std::vector<std::vector<uint32_t>> qualities; //qualities                                             
     std::vector<std::string> qnames; //TODO remove this at the end, qname
   public:
     std::vector<std::vector<uint32_t>> get_cigarotypes();
     std::vector<std::vector<uint8_t>> get_aux_tags();
     std::vector<std::vector<uint8_t>> get_sequences();   
+    std::vector<std::vector<uint32_t>> get_qualities();
     std::vector<uint32_t> get_count_cigarotypes();
     std::vector<uint32_t> get_start_positions();
     std::vector<uint32_t> get_nlengths();
     std::vector<std::string> get_qnames(); 
-    void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname);
+    void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality);
     int test = 12;
 
 };
@@ -81,9 +83,10 @@ void print_primer_info(primer primers);
 void print_all_primer_info(std::vector<primer> primers);
 primer get_min_start(std::vector<primer> primers);
 primer get_max_end(std::vector<primer> primers);
-void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname);
+void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality);
 std::vector<std::vector<uint32_t>> get_cigarotypes();
 std::vector<std::vector<uint8_t>> get_aux_tags();
+std::vector<std::vector<uint32_t>> get_qualities();   
 std::vector<std::vector<uint8_t>> get_sequences();   
 std::vector<uint32_t> get_count_cigarotypes();
 std::vector<uint32_t> get_nlengths();

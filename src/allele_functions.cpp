@@ -41,7 +41,7 @@ uint32_t sum_allele_depths(std::vector<allele> test){
   return(counter);
 }
 
-void position::update_alleles(std::string nt, uint32_t count){
+void position::update_alleles(std::string nt, uint32_t count, uint32_t qual){
   //update overall positions depth
   depth += count;
   //check if in allele vector
@@ -50,10 +50,12 @@ void position::update_alleles(std::string nt, uint32_t count){
   //allele does not exist
   if (exists == -1){
     allele tmp;
+    tmp.mean_qual = qual;
     tmp.depth = count;
     tmp.nuc = nt;
     alleles.push_back(tmp);
   } else {
+    alleles[exists].mean_qual += qual;
     alleles[exists].depth += count;
   }
 }

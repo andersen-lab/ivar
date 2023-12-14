@@ -13,6 +13,7 @@ std::vector<allele> add_allele_vectors(std::vector<allele> new_alleles, std::vec
     for(uint32_t j=0; j < return_alleles.size(); j++){
       if (return_alleles[j].nuc == new_alleles[i].nuc){
         return_alleles[j].depth += new_alleles[i].depth;
+        return_alleles[j].mean_qual += new_alleles[i].mean_qual;
         found = true;
         break;
       }
