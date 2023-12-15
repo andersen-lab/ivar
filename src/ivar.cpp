@@ -50,12 +50,12 @@ struct args_t {
 void print_usage() {
   std::cout
       << "Usage:	ivar [command "
-         "<trim|variants|filtervariants|consensus|getmasked|removereads|"
+         "<trim|variants|filtervariants|consensus|getmasked|removereads|contam"
          "version|help>]\n"
          "\n"
          "        Command       Description\n"
          "           trim       Trim reads in aligned BAM file\n"
-         "         contam       TODO\n"
+         "         contam       Detect contamination and call consensus\n"
          "       variants       Call variants from aligned BAM file\n"
          " filtervariants       Filter variants across replicates or samples\n"
          "      consensus       Call consensus from aligned BAM file\n"
@@ -293,7 +293,6 @@ int main(int argc, char *argv[]) {
 
   //ivar contam
   if (cmd.compare("contam") == 0) {
-    g_args.min_qual = 20;
     g_args.bed = "";
     g_args.primer_pair_file = "";
     g_args.primer_offset = 0;
@@ -318,9 +317,6 @@ int main(int argc, char *argv[]) {
         case 'm':
           g_args.min_length = std::stoi(optarg);
           break;
-        case 'q':
-          g_args.min_qual = std::stoi(optarg);
-          break;
         case 'h':
         case '?':
           print_trim_usage();
@@ -339,13 +335,12 @@ int main(int argc, char *argv[]) {
     }
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
     res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
-                               g_args.min_qual,
                                cl_cmd.str(),
                                g_args.primer_pair_file, g_args.primer_offset);
   }
 
   // ivar trim
-  if (cmd.compare("trim") == 0) {
+  else if (cmd.compare("trim") == 0) {
     g_args.min_qual = 20;
     g_args.sliding_window = 4;
     g_args.min_length = -1;
