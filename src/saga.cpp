@@ -107,9 +107,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       start_pos = aln->core.pos;
     }
     //TESTLINES
-    //if(start_pos > 3000){
-    //  continue;
-    //}
+    /*if(start_pos > 3000){
+      continue;
+    }*/
     overlapping_primers.clear();
     if(strand == '+'){
       for(uint32_t i=start_pos-10; i < start_pos+10; i++){
