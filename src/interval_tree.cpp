@@ -1,5 +1,6 @@
 #include "interval_tree.h"
-
+#include <chrono> 
+using namespace std::chrono;
 // Constructor for initializing an Interval Tree
 IntervalTree::IntervalTree() { _root = NULL; }
 
@@ -32,13 +33,9 @@ void IntervalTree::combine_haplotypes(ITNode *root){
   for(uint32_t i=0; i < root->amp_positions.size(); i++){
     int exists = check_position_exists(root->amp_positions[i].pos, variants);
     //does exist
-    if (exists != -1){
-      variants[exists].depth += root->amp_positions[i].depth;
-      std::vector<allele> new_alleles = add_allele_vectors(root->amp_positions[i].alleles, variants[exists].alleles);
-      variants[exists].alleles = new_alleles;
-   } else {
-      variants.push_back(root->amp_positions[i]);
-    }
+    variants[root->amp_positions[i].pos].depth += root->amp_positions[i].depth;
+    std::vector<allele> new_alleles = add_allele_vectors(root->amp_positions[i].alleles, variants[exists].alleles);
+    variants[root->amp_positions[i].pos].alleles = new_alleles;
   }
   combine_haplotypes(root->right);
 }
@@ -58,7 +55,7 @@ void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
 
 }
 
-void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, uint8_t* quality) {
+void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, uint8_t* qual) {
   uint32_t consumed_query = 0;
   uint32_t consumed_ref = 0;
   std::vector<uint32_t> sc_positions; //sc positions            
@@ -66,15 +63,38 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
   //first we handle insertion from the cigar
   std::vector<uint32_t> useful;
   std::vector<uint8_t> sequence;
+  std::vector<uint8_t> quality;
+
+  uint8_t nt = 0;
+  uint32_t length = 0;
+  uint32_t ll = 0;
+  uint32_t op;
+  for(uint32_t i=0; i < nlength; i++){
+    op = bam_cigar_op(cigar[i]);
+    if (bam_cigar_type(op) & 1){
+      length = bam_cigar_oplen(cigar[i]);
+      for(uint32_t k=0; k < length; k++){
+        useful.push_back(ll+k);
+      }
+      ll += length;
+    }
+  }
+  for(uint32_t k=0; k < useful.size(); k++){
+    nt = seq_nt16_str[bam_seqi(seq, useful[k])];
+    sequence.push_back(nt);
+    quality.push_back(qual[useful[k]]);;
+  }
+  useful.clear();
+
   for(uint32_t j=0; j < nlength; j++){
-    uint32_t op = bam_cigar_op(cigar[j]);
+    op = bam_cigar_op(cigar[j]);
     uint32_t oplen = bam_cigar_oplen(cigar[j]);
     if(op == 1){
       for(uint32_t k=0; k < oplen; k++){
         std::ostringstream convert;
         //convert data type to get the characters
         ignore_sequence.push_back(k+consumed_ref+start_pos);
-        convert << sequence[k+consumed_query];
+        convert << sequence[k+consumed_query]; //this is throwing error
         std::string nuc = "+" + convert.str();
         //check if this position exists
         int  exists = check_position_exists(start_pos+consumed_ref, variants);
@@ -102,9 +122,6 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
     }
     //consumes query
     if (bam_cigar_type(op) & 1){
-      for(uint32_t k=0; k < oplen; k++){
-        useful.push_back(consumed_query+k);
-      }
       consumed_query += oplen;
     } 
     //consumes ref
@@ -112,12 +129,6 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
       consumed_ref += oplen;
     } 
   }
-  uint8_t nt = 0;
-  for(uint32_t k=0; k < useful.size(); k++){
-    nt = seq_nt16_str[bam_seqi(seq, useful[k])];
-    sequence.push_back(nt);
-  }
-
   //we will use the aux tag to handle deletions
   bool deletion = false;
   uint32_t current_pos = start_pos;
@@ -127,7 +138,7 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
   uint32_t last_char = 0;
   uint32_t j = 0;
   do {
-    char character = (char) aux[j];
+    char character = (char)aux[j];
     if (character == '^'){
       current_pos += std::stoi(gather_digits);
       gather_digits = "";
@@ -168,6 +179,7 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
   //now that we know where the insertions and deletions are, let's just iterate the query sequence and add it in, skipping problem positions
   current_pos = start_pos;
   //j is relative to the sequence and current pos to the reference
+  //auto stop_again = high_resolution_clock::now();
   for(uint32_t j=0; j < sequence.size(); j++){
     std::vector<uint32_t>::iterator it = find(deletion_positions.begin(), deletion_positions.end(), current_pos);  
     if (it != deletion_positions.end()) {
@@ -184,21 +196,23 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
       continue;
     }
     current_pos += 1;
-    int exists = check_position_exists(current_pos, variants);
     std::ostringstream convert;
     convert << sequence[j];
     std::string nuc = convert.str(); 
-    if (exists != -1) {
-      variants[exists].update_alleles(nuc, 1, quality[j]);  
-    } else {
-      position add_pos;
-      add_pos.pos = current_pos; //don't add a position
-      add_pos.update_alleles(nuc, 1, quality[j]);            
-      variants.push_back(add_pos);
-    }         
+    variants[current_pos].update_alleles(nuc, 1, quality[j]);  
   }
+  //auto stop_again_again = high_resolution_clock::now();
+  //auto duration_again_again = duration_cast<microseconds>(stop_again_again - stop_again);
+  //std::cerr << duration_again_again.count() << std::endl;
 }
 
+void IntervalTree::populate_variants(){
+  for(uint32_t i=0; i <= max_pos; i++){
+    position tmp;
+    tmp.pos = i;
+    variants.push_back(tmp);
+  }
+}
 void IntervalTree::set_haplotypes(ITNode *root, primer prim){
   if (root==NULL) return;
   char strand = prim.get_strand();

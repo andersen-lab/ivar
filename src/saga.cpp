@@ -47,6 +47,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     std::cerr << "Amplicons detected: " << std::endl;
     amplicons.inOrder();
     amplicons.get_max_pos();
+    amplicons.populate_variants();
     std::cerr << "Maximum position " << amplicons.max_pos << std::endl;
   } else{
     std::cerr << "Exiting." << std::endl;
@@ -112,8 +113,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     //  continue;
     //}
     overlapping_primers.clear();
-    //TODO handle unpaired
-    //esp important for possible next era sequencing
     if(strand == '+'){
       for(uint32_t i=start_pos-10; i < start_pos+10; i++){
         if (i < 0 || i > amplicons.max_pos) continue; 
@@ -145,7 +144,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     //TODO handle the case of unpaired reads
     if (overlapping_primers.size() == 0){
       amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities);
-      exit(1);
       outside_amp += 1;
       continue;
     }
@@ -155,8 +153,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
 
       for(uint32_t j=0; j < primers.size(); j++){
         uint32_t pstart = primers[j].get_start();
-        uint32_t pend = primers[j].get_end();
-        
+        uint32_t pend = primers[j].get_end(); 
         if (start == pstart && end == pend){
           primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln), qualities);
         }
@@ -245,7 +242,5 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   bam_destroy1(aln);
   bam_hdr_destroy(header);
   sam_close(in);
-  //end, data has been appropriately preprocessed and problematic positions have been flagged
-  //room for extension to calcualte physical linkage in the future
   return(retval);
 }
