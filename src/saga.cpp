@@ -17,6 +17,7 @@ float calculate_standard_deviation(std::vector<float> frequencies) {
   return sqrt(sd / frequencies.size());
 }
 
+//first main function call
 int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
                              std::string cmd,
                              std::string pair_info, int32_t primer_offset){
@@ -64,7 +65,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   if (in == NULL) {
     std::cerr << ("Unable to open input file.") << std::endl;
     return -1;
-  }
+  }  
 
   // Get the header
   sam_hdr_t *header = sam_hdr_read(in);
@@ -88,6 +89,15 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   std::vector<primer>::iterator cit;
   std::vector<primer> overlapping_primers;
   std::vector<bam1_t *> alns;
+ 
+  
+  std::vector<primer> unpaired_primers;
+  for(uint32_t i=0; i < primers.size(); i++){
+    bool paired = amplicons.unpaired_primers(primers[i]);
+    if(!paired){
+      unpaired_primers.push_back(primers[i]);
+    }
+  }
 
   char strand = '+';
   uint32_t start_pos = -1;
@@ -107,9 +117,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       start_pos = aln->core.pos;
     }
     //TESTLINES
-    /*if(start_pos > 3000){
+    if(start_pos > 3000){
       continue;
-    }*/
+    }
     overlapping_primers.clear();
     if(strand == '+'){
       for(uint32_t i=start_pos-10; i < start_pos+10; i++){
@@ -138,17 +148,28 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     uint32_t *cigar = bam_get_cigar(r); 
     uint32_t nlength = r->core.n_cigar; 
     uint8_t *qualities = bam_get_qual(r);
-    //assign to a primer not an amplicon, because here direction matters
-    //TODO handle the case of unpaired reads
+
+    //this handles the case of reads outside of an amplicon
     if (overlapping_primers.size() == 0){
-      amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities);
+      amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln));
       outside_amp += 1;
       continue;
     }
     for(uint32_t i=0; i < overlapping_primers.size(); i++){
       uint32_t start = overlapping_primers[i].get_start();
       uint32_t end = overlapping_primers[i].get_end();
-
+      bool cont = true;
+      for(uint32_t k =0; k < unpaired_primers.size(); k++){
+        if (unpaired_primers[k].get_start() == start && unpaired_primers[k].get_end() == end){
+          amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln));
+          outside_amp += 1;
+          cont = false;
+          continue;
+        }
+      }
+      if(!cont){
+        continue;
+      }
       for(uint32_t j=0; j < primers.size(); j++){
         uint32_t pstart = primers[j].get_start();
         uint32_t pend = primers[j].get_end(); 
@@ -221,6 +242,10 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         continue;
       }
       file << std::to_string(variants[i].pos) << "\t";
+      std::string test_string = variants[i].alleles[j].nuc;
+      /*if (test_string != "A" && test_string != "C" && test_string != "G" && test_string != "T" && test_string != "-" && test_string != "N"){
+        std::cerr << variants[i].pos << " " << variants[i].alleles[j].nuc << std::endl;
+      }*/
       file << variants[i].alleles[j].nuc << "\t";
       file << std::to_string(variants[i].alleles[j].depth) << "\t";   
       file << std::to_string(freq) << "\t";    
@@ -228,13 +253,12 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       std::vector<uint32_t>::iterator it; 
       it = find(flagged_positions.begin(), flagged_positions.end(), variants[i].pos);
       if (it != flagged_positions.end()){
-        file << "TRUE" << "\t";
+        file << "TRUE";
       } else {
-        file << "FALSE" << "\t";
+        file << "FALSE";
       }
       file << "\n";
-    }
-    
+    } 
   }  
   file.close();
   bam_destroy1(aln);

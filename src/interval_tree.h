@@ -52,6 +52,7 @@ class IntervalTree {
   void print_amplicons(ITNode *root);
   void get_max_pos(ITNode *root);
   void set_haplotypes(ITNode *root, primer prim);
+  int unpaired_primers(ITNode *root, primer prim);
   void combine_haplotypes(ITNode *root);
   void detect_abberations(ITNode *root, uint32_t pos);
   public:
@@ -66,18 +67,21 @@ class IntervalTree {
   void print_amplicons() {print_amplicons(_root);}
   void get_max_pos() {get_max_pos(_root);}
   void set_haplotypes(primer prim) {set_haplotypes(_root, prim);}
+  int unpaired_primers(primer prim) { return unpaired_primers(_root, prim);}
   void detect_abberations(uint32_t pos) {detect_abberations(_root, pos);}
   void combine_haplotypes() {combine_haplotypes(_root);}
-  void add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *sequence, uint8_t *aux, uint8_t *quality);
+  void add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *sequence, uint8_t *aux, uint8_t *quality, std::string qname);
   void populate_variants();
+  
 };
 
 void combine_haplotypes();
 void detect_abberations(ITNode *root, uint32_t find_position);
 void get_max_pos();
 void set_haplotypes(ITNode *root, primer prim);
-void add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *sequence, uint8_t *aux, uint8_t *quality);
+void add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *sequence, uint8_t *aux, uint8_t *quality, std::string qname);
 void populate_variants();
+int unpaired_primers(ITNode *root, primer prim);
 IntervalTree populate_amplicons(std::string pair_info_file,
                                 std::vector<primer> &primers);
 #endif

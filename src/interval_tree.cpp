@@ -55,7 +55,8 @@ void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
 
 }
 
-void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, uint8_t* qual) {
+void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, uint8_t* qual, std::string qname) {
+  std::string test = "";
   uint32_t consumed_query = 0;
   uint32_t consumed_ref = 0;
   std::vector<uint32_t> sc_positions; //sc positions            
@@ -85,6 +86,7 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
     quality.push_back(qual[useful[k]]);;
   }
   useful.clear();
+  if(qname == test){std::cerr << "";}
 
   for(uint32_t j=0; j < nlength; j++){
     op = bam_cigar_op(cigar[j]);
@@ -110,6 +112,9 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
       }
       consumed_query += oplen;
       continue;        
+    }
+    if (!(bam_cigar_type(op) & 1) && !(bam_cigar_type(op) & 2)){
+      continue;
     }
     //if we don't consume both query and reference
     if (!(bam_cigar_type(op) & 1) || !(bam_cigar_type(op) & 2)){
@@ -195,6 +200,7 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
     if (it != sc_positions.end()){
       continue;
     }
+   
     current_pos += 1;
     std::ostringstream convert;
     convert << sequence[j];
@@ -213,6 +219,19 @@ void IntervalTree::populate_variants(){
     variants.push_back(tmp);
   }
 }
+
+int IntervalTree::unpaired_primers(ITNode *root, primer prim){
+  if (root==NULL) return 0;
+  char strand = prim.get_strand();
+  if (strand == '+' && ((int)prim.get_start() == root->data->low)){
+    return 1;
+  } else if (strand == '-' && ((int)prim.get_end()+1 == root->data->high)){
+    return 1;
+  }
+  int ret = unpaired_primers(root->right, prim);
+  return ret;
+}
+
 void IntervalTree::set_haplotypes(ITNode *root, primer prim){
   if (root==NULL) return;
   char strand = prim.get_strand();
@@ -222,6 +241,9 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
   } else if (strand == '-' && ((int)prim.get_end()+1 != root->data->high)){
     set_haplotypes(root->right, prim);
   } else {
+    if(prim.get_start() == 33){
+      std::cerr << "THIS" << std::endl;
+    }
     // we found the matching amplion, now we add this cigarotype to the amplicon     
     std::vector<position> tmp_pos = prim.get_positions();
     for (uint32_t i=0; i < tmp_pos.size(); i++){
@@ -233,6 +255,9 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
         if(here_pos.pos == tmp_pos[i].pos){
           found = true;
           root->amp_positions[j].depth += tmp_pos[i].depth;
+          if(here_pos.pos == 105){
+            print_allele_depths(tmp_pos[i].alleles);
+          }
           std::vector<allele> new_alleles = add_allele_vectors(tmp_pos[i].alleles, root->amp_positions[j].alleles);
           root->amp_positions[j].alleles = new_alleles;
           break;
@@ -240,6 +265,9 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
       }
       //if we've never seen this pos for this haplotype, push a new one
       if (!found){
+        if(add_pos.pos == 105){
+          print_allele_depths(add_pos.alleles);
+        }
         position tmp;
         tmp.depth = add_pos.depth;
         tmp.alleles = add_pos.alleles;

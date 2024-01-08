@@ -333,34 +333,49 @@ void primer::transform_mutations() {
     std::string qname = qnames[i];                                             
     uint32_t consumed_query = 0;
     uint32_t consumed_ref = 0;
+    std::string nuc;
     std::vector<uint32_t> ignore_sequence; //positions in query that are insertions
     //we'll use the cigar string to handle insertions
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
       uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
+      if(qname == test){
+        std::cerr << op << " " << oplen << std::endl;
+      }
       //honestly this whole bit could be better - more general
       //insertions
       if(op == 1){
+        std::ostringstream convert;
+        uint32_t q = 0;
         for(uint32_t k=0; k < oplen; k++) {
-          std::ostringstream convert;
           //convert data type to get the characters
           ignore_sequence.push_back(k+consumed_ref+start_pos);
           convert << sequence[k+consumed_query];
-          std::string nuc = "+" + convert.str();
-          //check if this position exists
-          int  exists = check_position_exists(start_pos+consumed_ref, positions);
-          if (exists != -1) {
-            positions[exists].update_alleles(nuc, ccount, quality[k+consumed_query]);  
-          } else {
-            //add position to vector
-            position add_pos;
-            add_pos.pos = start_pos+consumed_ref; //don't add a position
-            add_pos.update_alleles(nuc, ccount, quality[k+consumed_query]);            
-            positions.push_back(add_pos);
-          }
+          q += quality[k+consumed_query];
+        }
+        nuc.clear();
+        nuc = convert.str();
+        int avg_q = (int)q/nuc.size();
+        if(qname == test){
+          std::cerr << nuc << " " << q << " avg qual " << avg_q << " " << start_pos+consumed_ref << std::endl;
+        }
+        std::string nuc = "+" + convert.str();
+        //check if this position exists
+        int  exists = check_position_exists(start_pos+consumed_ref, positions);
+        if (exists != -1) {
+          positions[exists].update_alleles(nuc, ccount, avg_q);  
+        } else {
+          //add position to vector
+          position add_pos;
+          add_pos.pos = start_pos+consumed_ref; //don't add a position
+          add_pos.update_alleles(nuc, ccount, avg_q);            
+          positions.push_back(add_pos);
         }
         consumed_query += oplen;
         continue;        
+      }
+      if (!(bam_cigar_type(op) & 1) && !(bam_cigar_type(op) & 2)){
+        continue;
       }
       //if we don't consume both query and reference
       if (!(bam_cigar_type(op) & 1) || !(bam_cigar_type(op) & 2)){
@@ -384,11 +399,14 @@ void primer::transform_mutations() {
     bool deletion = false;
     uint32_t current_pos = start_pos;
     std::vector<uint32_t> deletion_positions; //the aux tag does NOT recognize insertions
-    std::string gather_digits;     
+    std::string gather_digits = "";
     std::string deleted_char;    
     uint32_t last_char = 0;
     for(uint32_t j=1; j < aux_tag.size(); j++){
       char character = (char) aux_tag[j];
+      if(test == qname){
+        std::cerr << "aux " << aux_tag[j] << " digits " << gather_digits << " " << current_pos << " deletion " << deletion << " is digit " << isdigit(character) <<  std::endl;
+      }
       if (character == '^'){
         current_pos += std::stoi(gather_digits);
         gather_digits = "";
@@ -396,6 +414,7 @@ void primer::transform_mutations() {
       } else if (isdigit(character) && deletion) {
         deleted_char = "";
         deletion = false;
+        gather_digits += character;
       } else if (isalpha(character) && deletion) {
         int exists = check_position_exists(current_pos, positions);
         if (exists != -1) {
@@ -425,22 +444,61 @@ void primer::transform_mutations() {
         gather_digits = "";
       } 
     }
+    if(qname == test) {
+      std::cerr << "deletion pos" << std::endl;
+      for(uint32_t i=0; i<deletion_positions.size(); i++){
+        std::cerr << deletion_positions[i] << std::endl;
+      }
+      std::cerr << "insertion pos" << std::endl;
+      for(uint32_t i=0; i < ignore_sequence[i]; i++){
+        std::cerr << ignore_sequence[i] << std::endl;
+      }
+    }
     //now that we know where the insertions and deletions are, let's just iterate the query sequence and add it in, skipping problem positions
     current_pos = start_pos;
+    bool prev_insertion = false;
+    std::ostringstream convert;
+    nuc.clear();
+    std::vector<uint32_t> seen_insertions;
+    std::vector<uint32_t>::iterator i_it;
     //j is relative to the sequence and current pos to the reference
     for(uint32_t j=0; j < sequence.size(); j++){
-      std::vector<uint32_t>::iterator it = find(deletion_positions.begin(), deletion_positions.end(), current_pos);  
+      if(qname == test){
+        std::cerr << "j " << j << " cur pos " << current_pos << " " << sequence[j] << std::endl;
+      }
+      std::vector<uint32_t>::iterator it = find(deletion_positions.begin(), deletion_positions.end(), current_pos); 
       if (it != deletion_positions.end()) {
         current_pos += 1;
         j -= 1;
         continue;
       }
       it = find(ignore_sequence.begin(), ignore_sequence.end(), current_pos);
-      if (it != ignore_sequence.end()) {
-        j += 1;
+      i_it = find(seen_insertions.begin(), seen_insertions.end(), current_pos);
+      //handle insertions
+      if (it != ignore_sequence.end() && i_it == seen_insertions.end()) {
+        if(qname == test){
+          std::cerr << j << " " << current_pos << " insertion" << std::endl;
+        }
+        std::ostringstream convert;
+        convert << sequence[j];
+        nuc += convert.str();
+        seen_insertions.push_back(current_pos);
+        current_pos += 1;
+        prev_insertion = true;
+        continue;
+      } else if (it == ignore_sequence.end()){
+        //insertion is over 
+        if(prev_insertion) {
+          current_pos -= nuc.size();
+        }
+        prev_insertion = false;
+        nuc = "";
       }
       it = find(sc_positions.begin(), sc_positions.end(), j);
       if (it != sc_positions.end()){
+        if(qname == test){
+          std::cerr << "soft clipped" << std::endl;
+        }
         continue;
       }
       current_pos += 1;
@@ -448,6 +506,9 @@ void primer::transform_mutations() {
       std::ostringstream convert;
       convert << sequence[j];
       std::string nuc = convert.str(); 
+      if (nuc != "A" && nuc != "T" && nuc != "C" && nuc != "G" && nuc != "N") {
+        std::cerr << qname << " " << nuc << std::endl;
+      }
       if (exists != -1) {
         positions[exists].update_alleles(nuc, ccount, quality[j]);  
       } else {
@@ -465,12 +526,13 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
   bool found = false; //have we seen this before
   std::vector<uint8_t> saved_aux; //placeholder for saved sequence
   std::vector<uint32_t> saved_cigarotype; //placeholder for saved cigarotypes
+  std::vector<uint8_t> saved_seq;
   uint32_t sp; //placeholder for saved starting position
   std::vector<uint32_t> qual_reformat;
   std::vector<uint32_t> cigar_reformat;
   std::vector<uint8_t> seq_reformat;
   std::vector<uint8_t> aux_reformat;
-
+  std::string test = "A01535:8:HJ3YYDSX2:4:2571:28447:16344";
   uint32_t length=0;
   uint32_t ll=0;
   std::vector<uint32_t> useful;
@@ -488,20 +550,68 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
     } 
   }
   int i = 0;
+  bool substitution = false;;
   do{
     aux_reformat.push_back(aux[i]);
+    if(isalpha(aux[i]) && aux[i] != 'Z'){
+      substitution = false;
+    }
     i++;
   } while(aux[i] != '\0');
- 
 
   for(uint32_t k=0; k < useful.size(); k++){
     qual_reformat.push_back(quality[useful[k]]);
+    /*if(substitution){
+      uint8_t nt = 0;
+      for(uint32_t k=0; k < useful.size(); k++){
+        nt = seq_nt16_str[bam_seqi(seq, useful[k])];
+        seq_reformat.push_back(nt);
+      }
+    }*/
+  }
+  if(qname == test){
+    bool deletion = false;
+    std::string deleted_char;
+    std::string gather_digits;
+    uint32_t current_pos = 0;
+    uint32_t last_char = 0;
+    for(uint32_t j=1; j < aux_reformat.size(); j++){
+      char character = (char) aux_reformat[j];
+      if (character == '^'){
+        current_pos += std::stoi(gather_digits);
+        gather_digits = "";
+        deletion = true;
+      } else if (isdigit(character) && deletion) {
+        deleted_char = "";
+        deletion = false;
+      } else if (isalpha(character) && deletion) {
+        current_pos += 1;
+        deleted_char += character;
+        deletion = true;    
+      } else if (isdigit(character) && !deletion) {
+        if(last_char > 0){
+          current_pos += last_char;
+          last_char = 0;
+        } 
+        gather_digits += character;
+      } else if (isalpha(character) && !deletion) {
+        last_char += 1;
+        if(gather_digits.size() > 0){
+          current_pos += std::stoi(gather_digits);
+        }
+        gather_digits = "";
+      } 
+    }
   }
   for(uint32_t i=0; i < cigarotypes.size(); i++){
     sp = ncigarotypes[i]; 
     saved_aux = aux_tags[i];
     saved_cigarotype = cigarotypes[i];
+    saved_seq = sequences[i];
     if(cigar_reformat == saved_cigarotype && start_pos == sp && aux_reformat == saved_aux){
+      if(substitution && seq_reformat != saved_seq){
+        continue;
+      }
       found = true;
       count_cigarotypes[i] += 1;
       for(uint32_t k = 0; k < qual_reformat.size(); k++){
@@ -512,12 +622,13 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
   }
   //haven't seen this cigar/start pos combo before
   if(!found){
-    uint8_t nt = 0;
-    for(uint32_t k=0; k < useful.size(); k++){
-      nt = seq_nt16_str[bam_seqi(seq, useful[k])];
-      seq_reformat.push_back(nt);
+    if(seq_reformat.size() == 0){ 
+      uint8_t nt = 0;
+      for(uint32_t k=0; k < useful.size(); k++){
+        nt = seq_nt16_str[bam_seqi(seq, useful[k])];
+        seq_reformat.push_back(nt);
+      }
     }
-    
     qualities.push_back(qual_reformat);
     cigarotypes.push_back(cigar_reformat);    
     ncigarotypes.push_back(start_pos);
