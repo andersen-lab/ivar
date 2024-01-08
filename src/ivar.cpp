@@ -16,6 +16,7 @@
 #include "remove_reads_from_amplicon.h"
 #include "suffix_tree.h"
 #include "trim_primer_quality.h"
+#include "gmm.h"
 #include "saga.h"
 
 const std::string VERSION = "1.4.2";
@@ -337,6 +338,7 @@ int main(int argc, char *argv[]) {
     res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
                                cl_cmd.str(),
                                g_args.primer_pair_file, g_args.primer_offset);
+    res = gmm_model(g_args.prefix);
   }
 
   // ivar trim
