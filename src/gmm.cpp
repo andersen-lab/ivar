@@ -1,6 +1,18 @@
 #include "./include/armadillo"
+#include "gmm.h"
 #include <fstream>
 #include <cmath>
+
+uint32_t count_useful_variants(std::vector<variant> variants){
+  uint32_t count = 0;
+  //determine the number of variants useful for modeling
+  for(uint32_t i=0; i< variants.size(); i++){
+    if(!variants[i].amplicon_flux && !variants[i].depth_flag && !variants[i].outside_freq_range){
+      count += 1;
+    }
+  }
+  return(count);
+}
 
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations){
     std::vector<uint32_t> d(n);
@@ -147,8 +159,8 @@ void solve_solution_sets(std::vector<double> means, uint32_t n){
 
 }
 
-void determine_outlier_variants(std::vector<std::vector<double>> clusters, std::vector<uint32_t> &outlier_idxs, std::vector<double> means){
-
+void determine_outlier_variants(std::vector<std::vector<double>> clusters, std::vector<uint32_t> &outlier_idxs, std::vector<double> means){ 
+  std::cerr << clusters[0][0] << " " << outlier_idxs[0] << " " << means[0] << std::endl;
   //look at spread of variants assigned to each cluster to determine outliers
   /*for(uint32_t i=0; i < clusters.size(); i++){
     for(uint32_t j=0; j < clusters[i].size(); j++){
@@ -186,7 +198,7 @@ void split(const std::string &s, char delim, std::vector<std::string> &elems){
     }
 }
 
-void parse_internal_variants(std::string filename, std::vector<float> &frequencies, std::vector<uint32_t> &positions, std::vector<uint32_t> &depths, std::vector<std::string> &flagged, std::vector<std::string> &nucs){
+void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound){
   /*
    * Parses the variants file produced internally by reading bam file line-by-line.
    */
@@ -205,15 +217,34 @@ void parse_internal_variants(std::string filename, std::vector<float> &frequenci
     float freq = 0;
     std::string flag = "";
     split(line, '\t', row_values);
+
+
     pos = std::stoi(row_values[0]);
-    nucs.push_back(row_values[1]);
     depth = std::stoi(row_values[2]);
     freq = std::stof(row_values[3]);
     flag = row_values[5];
-    frequencies.push_back(freq);
-    positions.push_back(pos);
-    depths.push_back(depth);
-    flagged.push_back(flag);
+   
+    variant tmp;
+    tmp.position = pos;
+    tmp.nuc = row_values[1];
+    tmp.depth = depth;
+    tmp.freq = freq;
+    if (flag == "TRUE"){
+      tmp.amplicon_flux = true;
+    } else {
+      tmp.amplicon_flux = false;
+    }
+    if (depth < depth_cutoff){
+      tmp.depth_flag = true;
+    } else {
+      tmp.depth_flag = false;
+    } 
+    if (freq < lower_bound || freq > upper_bound){
+      tmp.outside_freq_range = true;
+    } else {
+      tmp.outside_freq_range = false;
+    }
+    variants.push_back(tmp); 
     count += 1;
   } 
 }
@@ -223,33 +254,28 @@ int gmm_model(std::string prefix){
   int retval = 0;
   float lower_bound = 0.03;
   float upper_bound = 0.97;
+  uint32_t depth_cutoff = 10;
 
   std::string filename = prefix + ".txt";
 
-  std::vector<float> frequencies;
-  std::vector<uint32_t> positions;
-  std::vector<uint32_t> depths;
-  std::vector<std::string> nucs;
-  std::vector<std::string> flagged;
-  parse_internal_variants(filename, frequencies, positions, depths, flagged, nucs);
+  std::vector<variant> variants;
 
+  parse_internal_variants(filename, variants, depth_cutoff, lower_bound, upper_bound);
+
+  //estimate_populations();
   //the n min and n max represent the range of n values
-  uint32_t n = 3;
+  //uint32_t n = 3;
 
-  //filter out the data we won't use in our initial model
-  std::vector<float> filtered_frequencies;
-  std::vector<uint32_t> filtered_positions;
-  for(uint32_t i=0; i < frequencies.size(); i++){
-    if(depths[i] > 10 && flagged[i] == "FALSE" && frequencies[i] > lower_bound && frequencies[i] < upper_bound){
-      filtered_frequencies.push_back(frequencies[i]);  
-      filtered_positions.push_back(positions[i]);
-    }
-  }
+  //the number of variants we will acutally use when modeling
+  uint32_t useful_var = count_useful_variants(variants); 
+  std::cerr << useful_var << std::endl;
+  exit(1);
 
   //initialize armadillo dataset and populate with frequency data
   //(rows, cols) where each columns is a sample
-  arma::mat data(1, filtered_frequencies.size(), arma::fill::zeros); 
-  for(uint32_t i = 0; i < filtered_frequencies.size(); i++){
+  /*
+  arma::mat data(1, useful_var, arma::fill::zeros); 
+  for(uint32_t i = 0; i < variants.size(); i++){
     double tmp = static_cast<double>(filtered_frequencies[i]);
     data.col(i) = tmp;
   }
@@ -298,5 +324,6 @@ int gmm_model(std::string prefix){
   //places where we'll call an N value
   //std::vector<uint32_t> unassigned_points;
   //model.save("my_model.gmm");
+  */
   return(retval);
 }
