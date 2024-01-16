@@ -318,7 +318,7 @@ void primer::transform_mutations() {
   std::vector<std::string> qnames = this->get_qnames();
   std::vector<std::vector<uint32_t>> qualities = this->get_qualities(); 
   //this tracks all mutations at all positions
-  std::string test = "A01535:8:HJ3YYDSX2:4:1523:8413:3599";
+  std::string test = "";
   //here let's turn the cigar string into a vector of alleles specific to this primer
   //iterate all unique sequences
   for(uint32_t i=0; i < cigarotypes.size(); i++){
@@ -437,7 +437,6 @@ void primer::transform_mutations() {
         if(substitution){
           for(uint32_t z=0; z < sub_char.size(); z++){
             substitutions.push_back(current_pos + z);
-            std::cerr << current_pos <<  " z " << z << " " << sub_char << std::endl;
           }
           substitution = false;
           sub_char.clear();

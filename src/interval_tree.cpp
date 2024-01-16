@@ -86,29 +86,37 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
     quality.push_back(qual[useful[k]]);;
   }
   useful.clear();
-  if(qname == test){std::cerr << "";}
+  std::string nuc;
 
   for(uint32_t j=0; j < nlength; j++){
     op = bam_cigar_op(cigar[j]);
     uint32_t oplen = bam_cigar_oplen(cigar[j]);
     if(op == 1){
-      for(uint32_t k=0; k < oplen; k++){
-        std::ostringstream convert;
+      std::ostringstream convert;
+      uint32_t q = 0;
+      for(uint32_t k=0; k < oplen; k++) {
         //convert data type to get the characters
         ignore_sequence.push_back(k+consumed_ref+start_pos);
-        convert << sequence[k+consumed_query]; //this is throwing error
-        std::string nuc = "+" + convert.str();
-        //check if this position exists
-        int  exists = check_position_exists(start_pos+consumed_ref, variants);
-        if (exists != -1) {
-          variants[exists].update_alleles(nuc,1, quality[k+consumed_query]);  
-        } else {
-          //add position to vector
-          position add_pos;
-          add_pos.pos = start_pos+consumed_ref; //don't add a position
-          add_pos.update_alleles(nuc, 1, quality[k+consumed_query]);            
-          variants.push_back(add_pos);
-        }
+        convert << sequence[k+consumed_query];
+        q += quality[k+consumed_query];
+      }
+      nuc.clear();
+      nuc = convert.str();
+      int avg_q = (int)q/nuc.size();
+      if(qname == test){
+        std::cerr << nuc << " " << q << " avg qual " << avg_q << " " << start_pos+consumed_ref << std::endl;
+      }
+      std::string nuc = "+" + convert.str();
+      //check if this position exists
+      int  exists = check_position_exists(start_pos+consumed_ref, variants);
+      if (exists != -1) {
+        variants[exists].update_alleles(nuc, 1, avg_q, false);  
+      } else {
+        //add position to vector
+        position add_pos;
+        add_pos.pos = start_pos+consumed_ref; //don't add a position
+        add_pos.update_alleles(nuc, 1, avg_q, false);            
+        variants.push_back(add_pos);
       }
       consumed_query += oplen;
       continue;        
@@ -128,7 +136,7 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
     //consumes query
     if (bam_cigar_type(op) & 1){
       consumed_query += oplen;
-    } 
+    }
     //consumes ref
     if (bam_cigar_type(op) & 2){
       consumed_ref += oplen;
@@ -136,14 +144,20 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
   }
   //we will use the aux tag to handle deletions
   bool deletion = false;
+  bool substitution = false;
   uint32_t current_pos = start_pos;
   std::vector<uint32_t> deletion_positions; //the aux tag does NOT recognize insertions
-  std::string gather_digits;     
-  std::string deleted_char;    
+  std::vector<uint32_t> substitutions; //handle substitutions
+  std::string gather_digits = "";
+  std::string deleted_char;
+  std::string sub_char;
   uint32_t last_char = 0;
   uint32_t j = 0;
   do {
     char character = (char)aux[j];
+    if(test == qname){
+      std::cerr << "aux " << aux[j] << " digits " << gather_digits << " current pos " << current_pos << " deletion " << deletion << " is digit " << isdigit(character) <<  std::endl;
+    }
     if (character == '^'){
       current_pos += std::stoi(gather_digits);
       gather_digits = "";
@@ -151,65 +165,125 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
     } else if (isdigit(character) && deletion) {
       deleted_char = "";
       deletion = false;
+      gather_digits += character;
     } else if (isalpha(character) && deletion) {
       int exists = check_position_exists(current_pos, variants);
       if (exists != -1) {
-        variants[exists].update_alleles("-", 1, 0);  
+        variants[exists].update_alleles("-", 1, 0, false);
       } else {
         //add position to vector
         position add_pos;
         add_pos.pos = current_pos; //don't add a position
-        add_pos.update_alleles("-", 1, 0);            
+        add_pos.update_alleles("-", 1, 0, false);
         variants.push_back(add_pos);
-      } 
+      }
       deletion_positions.push_back(current_pos);
       current_pos += 1;
       deleted_char += character;
-      deletion = true;    
+      deletion = true;
     } else if (isdigit(character) && !deletion) {
+      if(substitution){
+        for(uint32_t z=0; z < sub_char.size(); z++){
+          substitutions.push_back(current_pos + z);
+        }
+        substitution = false;
+        sub_char.clear();
+      }
       if(last_char > 0){
         current_pos += last_char;
         last_char = 0;
-      } 
+      }
       gather_digits += character;
     } else if (isalpha(character) && !deletion) {
       last_char += 1;
+      substitution = true;
+      sub_char += character;
       if(gather_digits.size() > 0){
         current_pos += std::stoi(gather_digits);
       }
       gather_digits = "";
     }
-    j++; 
+    j++;
   } while(aux[j] != '\0');
+
+  if(qname == test) {
+    std::cerr << "deletion pos" << std::endl;
+    for(uint32_t i=0; i<deletion_positions.size(); i++){
+      std::cerr << deletion_positions[i] << std::endl;
+    }
+    std::cerr << "insertion pos" << std::endl;
+    for(uint32_t i=0; i < ignore_sequence.size(); i++){
+      std::cerr << ignore_sequence[i] << std::endl;
+    }
+  }   
   //now that we know where the insertions and deletions are, let's just iterate the query sequence and add it in, skipping problem positions
   current_pos = start_pos;
+  bool prev_insertion = false;
+  std::ostringstream convert;
+  nuc.clear();
+  std::vector<uint32_t> seen_insertions;
+  std::vector<uint32_t>::iterator i_it;
   //j is relative to the sequence and current pos to the reference
-  //auto stop_again = high_resolution_clock::now();
   for(uint32_t j=0; j < sequence.size(); j++){
-    std::vector<uint32_t>::iterator it = find(deletion_positions.begin(), deletion_positions.end(), current_pos);  
+    if(qname == test){
+      std::cerr << "j " << j << " cur pos " << current_pos << " " << sequence[j] << std::endl;
+    }
+    std::vector<uint32_t>::iterator it = find(deletion_positions.begin(), deletion_positions.end(), current_pos); 
     if (it != deletion_positions.end()) {
       current_pos += 1;
       j -= 1;
       continue;
     }
     it = find(ignore_sequence.begin(), ignore_sequence.end(), current_pos);
-    if (it != ignore_sequence.end()) {
-      j += 1;
+    i_it = find(seen_insertions.begin(), seen_insertions.end(), current_pos);
+    //handle insertions
+    if (it != ignore_sequence.end() && i_it == seen_insertions.end()) {
+      if(qname == test){
+        std::cerr << j << " " << current_pos << " insertion" << std::endl;
+      }
+      std::ostringstream convert;
+      convert << sequence[j];
+      nuc += convert.str();
+      seen_insertions.push_back(current_pos);
+      current_pos += 1;
+      prev_insertion = true;
+      continue;
+    } else if (it == ignore_sequence.end()){
+      //insertion is over 
+      if(prev_insertion) {
+        current_pos -= nuc.size();
+      }
+      prev_insertion = false;
+      nuc = "";
     }
     it = find(sc_positions.begin(), sc_positions.end(), j);
     if (it != sc_positions.end()){
+      if(qname == test){
+        std::cerr << "soft clipped" << std::endl;
+      }
       continue;
     }
-   
     current_pos += 1;
+    int exists = check_position_exists(current_pos, variants);
     std::ostringstream convert;
+    bool ref = false;
     convert << sequence[j];
     std::string nuc = convert.str(); 
-    variants[current_pos].update_alleles(nuc, 1, quality[j]);  
-  }
-  //auto stop_again_again = high_resolution_clock::now();
-  //auto duration_again_again = duration_cast<microseconds>(stop_again_again - stop_again);
-  //std::cerr << duration_again_again.count() << std::endl;
+    if (std::find(substitutions.begin(), substitutions.end(), current_pos) == substitutions.end()){
+      ref = true;
+    }
+    if (nuc != "A" && nuc != "T" && nuc != "C" && nuc != "G" && nuc != "N") {
+      std::cerr << qname << " " << nuc << std::endl;
+    }
+    if (exists != -1) {
+      variants[exists].update_alleles(nuc, 1, quality[j], ref);  
+    } else {
+      position add_pos;
+      add_pos.pos = current_pos; //don't add a position
+      add_pos.update_alleles(nuc, 1, quality[j], ref);            
+      variants.push_back(add_pos);
+    }         
+  }    
 }
 
 void IntervalTree::populate_variants(){
