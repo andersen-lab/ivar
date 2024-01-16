@@ -318,7 +318,7 @@ void primer::transform_mutations() {
   std::vector<std::string> qnames = this->get_qnames();
   std::vector<std::vector<uint32_t>> qualities = this->get_qualities(); 
   //this tracks all mutations at all positions
-  std::string test = "";
+  std::string test = "A01535:8:HJ3YYDSX2:4:1523:8413:3599";
   //here let's turn the cigar string into a vector of alleles specific to this primer
   //iterate all unique sequences
   for(uint32_t i=0; i < cigarotypes.size(); i++){
@@ -363,12 +363,12 @@ void primer::transform_mutations() {
         //check if this position exists
         int  exists = check_position_exists(start_pos+consumed_ref, positions);
         if (exists != -1) {
-          positions[exists].update_alleles(nuc, ccount, avg_q);  
+          positions[exists].update_alleles(nuc, ccount, avg_q, false);  
         } else {
           //add position to vector
           position add_pos;
           add_pos.pos = start_pos+consumed_ref; //don't add a position
-          add_pos.update_alleles(nuc, ccount, avg_q);            
+          add_pos.update_alleles(nuc, ccount, avg_q, false);            
           positions.push_back(add_pos);
         }
         consumed_query += oplen;
@@ -395,17 +395,20 @@ void primer::transform_mutations() {
         consumed_ref += oplen;
       } 
     }
-    //we will use the aux tag to handle deletions
+    //we will use the aux tag to handle deletions and substituitons
     bool deletion = false;
+    bool substitution = false;
     uint32_t current_pos = start_pos;
     std::vector<uint32_t> deletion_positions; //the aux tag does NOT recognize insertions
+    std::vector<uint32_t> substitutions; //handle substitutions                                              
     std::string gather_digits = "";
-    std::string deleted_char;    
+    std::string deleted_char;   
+    std::string sub_char;
     uint32_t last_char = 0;
     for(uint32_t j=1; j < aux_tag.size(); j++){
       char character = (char) aux_tag[j];
       if(test == qname){
-        std::cerr << "aux " << aux_tag[j] << " digits " << gather_digits << " " << current_pos << " deletion " << deletion << " is digit " << isdigit(character) <<  std::endl;
+        std::cerr << "aux " << aux_tag[j] << " digits " << gather_digits << " current pos " << current_pos << " deletion " << deletion << " is digit " << isdigit(character) <<  std::endl;
       }
       if (character == '^'){
         current_pos += std::stoi(gather_digits);
@@ -418,12 +421,12 @@ void primer::transform_mutations() {
       } else if (isalpha(character) && deletion) {
         int exists = check_position_exists(current_pos, positions);
         if (exists != -1) {
-          positions[exists].update_alleles("-", ccount, 0);  
+          positions[exists].update_alleles("-", ccount, 0, false);  
         } else {
           //add position to vector
           position add_pos;
           add_pos.pos = current_pos; //don't add a position
-          add_pos.update_alleles("-", ccount, 0);            
+          add_pos.update_alleles("-", ccount, 0, false);            
           positions.push_back(add_pos);
         } 
         deletion_positions.push_back(current_pos);
@@ -431,13 +434,23 @@ void primer::transform_mutations() {
         deleted_char += character;
         deletion = true;    
       } else if (isdigit(character) && !deletion) {
+        if(substitution){
+          for(uint32_t z=0; z < sub_char.size(); z++){
+            substitutions.push_back(current_pos + z);
+            std::cerr << current_pos <<  " z " << z << " " << sub_char << std::endl;
+          }
+          substitution = false;
+          sub_char.clear();
+        }
         if(last_char > 0){
           current_pos += last_char;
           last_char = 0;
-        } 
+        }  
         gather_digits += character;
       } else if (isalpha(character) && !deletion) {
         last_char += 1;
+        substitution = true;
+        sub_char += character;
         if(gather_digits.size() > 0){
           current_pos += std::stoi(gather_digits);
         }
@@ -450,7 +463,7 @@ void primer::transform_mutations() {
         std::cerr << deletion_positions[i] << std::endl;
       }
       std::cerr << "insertion pos" << std::endl;
-      for(uint32_t i=0; i < ignore_sequence[i]; i++){
+      for(uint32_t i=0; i < ignore_sequence.size(); i++){
         std::cerr << ignore_sequence[i] << std::endl;
       }
     }
@@ -504,17 +517,21 @@ void primer::transform_mutations() {
       current_pos += 1;
       int exists = check_position_exists(current_pos, positions);
       std::ostringstream convert;
+      bool ref = false;
       convert << sequence[j];
       std::string nuc = convert.str(); 
+      if (std::find(substitutions.begin(), substitutions.end(), current_pos) == substitutions.end()){
+        ref = true;
+      }
       if (nuc != "A" && nuc != "T" && nuc != "C" && nuc != "G" && nuc != "N") {
         std::cerr << qname << " " << nuc << std::endl;
       }
       if (exists != -1) {
-        positions[exists].update_alleles(nuc, ccount, quality[j]);  
+        positions[exists].update_alleles(nuc, ccount, quality[j], ref);  
       } else {
         position add_pos;
         add_pos.pos = current_pos; //don't add a position
-        add_pos.update_alleles(nuc, ccount, quality[j]);            
+        add_pos.update_alleles(nuc, ccount, quality[j], ref);            
         positions.push_back(add_pos);
       }         
     }
