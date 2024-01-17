@@ -117,9 +117,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       start_pos = aln->core.pos;
     }
     //TESTLINES
-    if(start_pos > 3000){
-      continue;
-    }
+    //if(start_pos > 3000){
+    //  continue;
+    //}
     overlapping_primers.clear();
     if(strand == '+'){
       for(uint32_t i=start_pos-10; i < start_pos+10; i++){
@@ -234,7 +234,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   //write variants to a file
   ofstream file;
   file.open(bam_out + ".txt", ios::trunc);
-  file << "POS\tALLELE\tDEPTH\tFREQ\tAVG_QUAL\tFLAGGED_POS\n";
+  file << "POS\tALLELE\tDEPTH\tFREQ\tAVG_QUAL\tFLAGGED_POS\tREF\n";
   for(uint32_t i=0; i < variants.size(); i++){
     for(uint32_t j=0; j < variants[i].alleles.size(); j++){
       float freq = (float)variants[i].alleles[j].depth / (float)variants[i].depth;
@@ -253,6 +253,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       std::vector<uint32_t>::iterator it; 
       it = find(flagged_positions.begin(), flagged_positions.end(), variants[i].pos);
       if (it != flagged_positions.end()){
+        file << "TRUE\t";
+      } else {
+        file << "FALSE\t";
+      }
+      if (variants[i].alleles[j].is_ref){
         file << "TRUE";
       } else {
         file << "FALSE";

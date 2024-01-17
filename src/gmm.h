@@ -7,11 +7,15 @@ struct variant {
   uint32_t depth;
   float qual;
   float freq;
+  bool is_ref=false; 
+  int cluster_assigned = -1;
+
   //for these true means flagged as problematic
-  bool vague_assignment; //cannot be distinguished between two groups
-  bool amplicon_flux; //fluctuatin frequency across amplicons
-  bool depth_flag; //depth is below the threshold                  
-  bool outside_freq_range; //outside of useful frequency range for model                 
+  bool vague_assignment=false; //cannot be distinguished between two groups
+  bool amplicon_flux=false; //fluctuation frequency across amplicons
+  bool depth_flag=false; //depth is below the threshold                  
+  bool outside_freq_range=false; //outside of useful frequency range for model                 
+  bool cluster_outlier=false; //is an outlier for the cluster assigned
   std::vector<double> probabilities;
 
 };
