@@ -7,7 +7,6 @@ double calculate_cluster_bounds(std::vector<variant> variants, uint32_t n){
   /*
    * Find the smallest point in the largest cluster and determine the threshold to be just below.
    */
-  double threshold = 0;
   std::vector<std::vector<double>> clusters;
   for(uint32_t i=0; i < n; i++){
     std::vector<double> tmp;
@@ -16,12 +15,27 @@ double calculate_cluster_bounds(std::vector<variant> variants, uint32_t n){
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].cluster_assigned > -1){
       clusters[variants[i].cluster_assigned].push_back(variants[i].freq);
-    } else {
-      std::cerr << variants[i].nuc << " " << variants[i].position << std::endl;
     }
   }
-  exit(1);
-  return(threshold);  
+  uint32_t max_idx = 0;
+  double max_mean;
+  for(uint32_t i=0; i < clusters.size(); i++){
+    double sum = std::accumulate(clusters[i].begin(), clusters[i].end(), 0.0);
+    double mean = sum / clusters[i].size();
+    if(mean > max_mean){
+      max_idx = i;
+      max_mean = mean;
+    }
+  }
+  double min_freq=1.0;
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].cluster_assigned == (int)max_idx && variants[i].freq < min_freq){
+      if(!variants[i].cluster_outlier){
+        min_freq = variants[i].freq;
+      }
+    }
+  }
+  return(min_freq);  
 }
 
 std::vector<uint32_t> estimate_populations(std::vector<variant> variants){
