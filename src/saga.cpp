@@ -2,7 +2,8 @@
 #include "trim_primer_quality.h"
 #include <fstream>
 #include <cmath>
-
+#include <chrono>
+using namespace std::chrono;
 float calculate_standard_deviation(std::vector<float> frequencies) {
   float sum = 0.0, mean = 0.0, sd = 0.0;
   uint32_t i = 0;
@@ -24,7 +25,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
  
   int retval = 0;
   std::vector<primer> primers;
-  int max_primer_len = 0;
   if (!bed.empty()) {
     primers = populate_from_file(bed, primer_offset);
     if (primers.size() == 0) {
@@ -38,7 +38,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   std::map<uint32_t, std::vector<primer>> primer_map_forward = hash[0];
   std::map<uint32_t, std::vector<primer>> primer_map_reverse = hash[1];
 
-  max_primer_len = get_bigger_primer(primers);
+  //int max_primer_len = get_bigger_primer(primers);
   // get coordinates of each amplicon
   IntervalTree amplicons;
   if (!pair_info.empty()) {
@@ -52,6 +52,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     std::cerr << "Exiting." << std::endl;
     return -1;
   }
+  /*if(amplicons.size() == 0){
+    std::cerr << "Exiting." << std::endl;
+    return(-1);
+  }*/
+
   // Read in input file
   samFile *in;
   
@@ -102,6 +107,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   char strand = '+';
   uint32_t start_pos = -1;
   uint32_t outside_amp = 0;
+  uint32_t lower_search;
+  uint32_t counter = 0;
   // Iterate through reads
   in = sam_open(bam.c_str(), "r");
   header = sam_hdr_read(in);
@@ -117,22 +124,28 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       start_pos = aln->core.pos;
     }
     //TESTLINES
-    //if(start_pos > 3000){
-    //  continue;
-    //}
+    if(start_pos > 3000){
+      continue;
+    }
+    counter += 1;
     overlapping_primers.clear();
     if(strand == '+'){
-      for(uint32_t i=start_pos-10; i < start_pos+10; i++){
-        if (i < 0 || i > amplicons.max_pos) continue; 
+      if(start_pos >= 10){
+        lower_search = start_pos-10;
+      } else{
+        lower_search = 0;
+      }
+      for(uint32_t i=lower_search; i < start_pos+10; i++){
+        if (i > amplicons.max_pos) continue; 
         if (primer_map_forward.find(i) != primer_map_forward.end()) {
           overlapping_primers = primer_map_forward[i];
         }
         if (overlapping_primers.size() > 0) break;
       }
     }else{
-      for (uint32_t i=start_pos-10; i < start_pos+10; i++)
+      for (uint32_t i=lower_search; i < start_pos+10; i++)
       {
-        if (i < 0 || i > amplicons.max_pos) continue;
+        if (i > amplicons.max_pos) continue;
         if (primer_map_reverse.find(i) != primer_map_reverse.end()){
           overlapping_primers = primer_map_reverse[i];
         }
@@ -177,18 +190,22 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
           primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln), qualities);
         }
       }
-    }   
+    }
   }
-  std::cerr << "Number of reads outside an amplicon: " << outside_amp << std::endl;
+  std::cerr << "counter " << counter << std::endl;
+  std::cerr << "number of reads outside an amplicon: " << outside_amp << std::endl;
+  //this is super time costly
   for(uint32_t i=0; i < primers.size(); i++){
+    primers[i].populate_positions();
+    std::cerr << primers[i].get_start() << " " << primers[i].get_end() << std::endl;
+    //exit(1);
     primers[i].transform_mutations();
   }
   std::cerr << "setting amplicon level haplotypes" << std::endl;
   for (uint32_t i=0; i < primers.size(); i++){
     amplicons.set_haplotypes(primers[i]);      
   }
-  std::vector<uint32_t> flagged_positions;
-  
+  std::vector<uint32_t> flagged_positions; 
   std::cerr << "detecting variant abberations" << std::endl;
   //detect fluctuating variants
   for(uint32_t i=0; i < amplicons.max_pos; i++){
@@ -238,14 +255,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   for(uint32_t i=0; i < variants.size(); i++){
     for(uint32_t j=0; j < variants[i].alleles.size(); j++){
       float freq = (float)variants[i].alleles[j].depth / (float)variants[i].depth;
-      if(freq == 0){
+      if((float)variants[i].alleles[j].depth == 0){
         continue;
       }
       file << std::to_string(variants[i].pos) << "\t";
       std::string test_string = variants[i].alleles[j].nuc;
-      /*if (test_string != "A" && test_string != "C" && test_string != "G" && test_string != "T" && test_string != "-" && test_string != "N"){
-        std::cerr << variants[i].pos << " " << variants[i].alleles[j].nuc << std::endl;
-      }*/
       file << variants[i].alleles[j].nuc << "\t";
       file << std::to_string(variants[i].alleles[j].depth) << "\t";   
       file << std::to_string(freq) << "\t";    

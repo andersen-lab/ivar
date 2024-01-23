@@ -15,6 +15,7 @@ std::vector<allele> add_allele_vectors(std::vector<allele> new_alleles, std::vec
       if (return_alleles[j].nuc == new_alleles[i].nuc){
         return_alleles[j].depth += new_alleles[i].depth;
         return_alleles[j].mean_qual += new_alleles[i].mean_qual;
+        return_alleles[j].is_ref = new_alleles[i].is_ref;
         found = true;
         break;
       }
@@ -27,14 +28,11 @@ std::vector<allele> add_allele_vectors(std::vector<allele> new_alleles, std::vec
   return(return_alleles);
 }
 
-
 void IntervalTree::combine_haplotypes(ITNode *root){
   if (root==NULL) return;
   for(uint32_t i=0; i < root->amp_positions.size(); i++){
-    int exists = check_position_exists(root->amp_positions[i].pos, variants);
-    //does exist
     variants[root->amp_positions[i].pos].depth += root->amp_positions[i].depth;
-    std::vector<allele> new_alleles = add_allele_vectors(root->amp_positions[i].alleles, variants[exists].alleles);
+    std::vector<allele> new_alleles = add_allele_vectors(root->amp_positions[i].alleles, variants[root->amp_positions[i].pos].alleles);
     variants[root->amp_positions[i].pos].alleles = new_alleles;
   }
   combine_haplotypes(root->right);
@@ -70,6 +68,7 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
   uint32_t length = 0;
   uint32_t ll = 0;
   uint32_t op;
+  //auto start = high_resolution_clock::now();
   for(uint32_t i=0; i < nlength; i++){
     op = bam_cigar_op(cigar[i]);
     if (bam_cigar_type(op) & 1){
@@ -155,9 +154,6 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
   uint32_t j = 0;
   do {
     char character = (char)aux[j];
-    if(test == qname){
-      std::cerr << "aux " << aux[j] << " digits " << gather_digits << " current pos " << current_pos << " deletion " << deletion << " is digit " << isdigit(character) <<  std::endl;
-    }
     if (character == '^'){
       current_pos += std::stoi(gather_digits);
       gather_digits = "";
@@ -167,23 +163,14 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
       deletion = false;
       gather_digits += character;
     } else if (isalpha(character) && deletion) {
-      int exists = check_position_exists(current_pos, variants);
-      if (exists != -1) {
-        variants[exists].update_alleles("-", 1, 0, false);
-      } else {
-        //add position to vector
-        position add_pos;
-        add_pos.pos = current_pos; //don't add a position
-        add_pos.update_alleles("-", 1, 0, false);
-        variants.push_back(add_pos);
-      }
+      variants[current_pos].update_alleles("-", 1, 0, false);
       deletion_positions.push_back(current_pos);
       current_pos += 1;
       deleted_char += character;
       deletion = true;
     } else if (isdigit(character) && !deletion) {
       if(substitution){
-        for(uint32_t z=0; z < sub_char.size(); z++){
+        for(uint32_t z=1; z < sub_char.size(); z++){
           substitutions.push_back(current_pos + z);
         }
         substitution = false;
@@ -206,16 +193,6 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
     j++;
   } while(aux[j] != '\0');
 
-  if(qname == test) {
-    std::cerr << "deletion pos" << std::endl;
-    for(uint32_t i=0; i<deletion_positions.size(); i++){
-      std::cerr << deletion_positions[i] << std::endl;
-    }
-    std::cerr << "insertion pos" << std::endl;
-    for(uint32_t i=0; i < ignore_sequence.size(); i++){
-      std::cerr << ignore_sequence[i] << std::endl;
-    }
-  }   
   //now that we know where the insertions and deletions are, let's just iterate the query sequence and add it in, skipping problem positions
   current_pos = start_pos;
   bool prev_insertion = false;
@@ -238,9 +215,6 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
     i_it = find(seen_insertions.begin(), seen_insertions.end(), current_pos);
     //handle insertions
     if (it != ignore_sequence.end() && i_it == seen_insertions.end()) {
-      if(qname == test){
-        std::cerr << j << " " << current_pos << " insertion" << std::endl;
-      }
       std::ostringstream convert;
       convert << sequence[j];
       nuc += convert.str();
@@ -258,13 +232,9 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
     }
     it = find(sc_positions.begin(), sc_positions.end(), j);
     if (it != sc_positions.end()){
-      if(qname == test){
-        std::cerr << "soft clipped" << std::endl;
-      }
       continue;
     }
     current_pos += 1;
-    int exists = check_position_exists(current_pos, variants);
     std::ostringstream convert;
     bool ref = false;
     convert << sequence[j];
@@ -272,23 +242,14 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
     if (std::find(substitutions.begin(), substitutions.end(), current_pos) == substitutions.end()){
       ref = true;
     }
-    if (nuc != "A" && nuc != "T" && nuc != "C" && nuc != "G" && nuc != "N") {
-      std::cerr << qname << " " << nuc << std::endl;
-    }
-    if (exists != -1) {
-      variants[exists].update_alleles(nuc, 1, quality[j], ref);  
-    } else {
-      position add_pos;
-      add_pos.pos = current_pos; //don't add a position
-      add_pos.update_alleles(nuc, 1, quality[j], ref);            
-      variants.push_back(add_pos);
-    }         
+    variants[current_pos].update_alleles(nuc, 1, quality[j], ref);  
   }    
 }
 
 void IntervalTree::populate_variants(){
   for(uint32_t i=0; i <= max_pos; i++){
     position tmp;
+    tmp.alleles = populate_basic_alleles();
     tmp.pos = i;
     variants.push_back(tmp);
   }
@@ -315,9 +276,6 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
   } else if (strand == '-' && ((int)prim.get_end()+1 != root->data->high)){
     set_haplotypes(root->right, prim);
   } else {
-    if(prim.get_start() == 33){
-      std::cerr << "THIS" << std::endl;
-    }
     // we found the matching amplion, now we add this cigarotype to the amplicon     
     std::vector<position> tmp_pos = prim.get_positions();
     for (uint32_t i=0; i < tmp_pos.size(); i++){
@@ -329,9 +287,6 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
         if(here_pos.pos == tmp_pos[i].pos){
           found = true;
           root->amp_positions[j].depth += tmp_pos[i].depth;
-          if(here_pos.pos == 105){
-            print_allele_depths(tmp_pos[i].alleles);
-          }
           std::vector<allele> new_alleles = add_allele_vectors(tmp_pos[i].alleles, root->amp_positions[j].alleles);
           root->amp_positions[j].alleles = new_alleles;
           break;

@@ -46,6 +46,7 @@ class primer : public cigarotype{
   std::vector<position> positions; //allele counts for this primer
 
  public:
+  uint32_t hardcoded_length=300;
   std::string get_name();
   std::string get_region();
   std::vector<position> get_positions();
@@ -58,6 +59,7 @@ class primer : public cigarotype{
   int16_t get_pair_indice();
   int16_t get_indice() const;
   uint32_t get_read_count() const;
+  void populate_positions();
   void set_start(uint32_t s);
   void set_end(uint32_t e);
   void set_strand(char s);
@@ -95,4 +97,5 @@ std::vector<std::string> get_qnames();
 void transform_mutations();
 void set_positions(position pos);
 std::vector<position> get_positions();
+void populate_positions();
 #endif
