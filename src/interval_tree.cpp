@@ -12,7 +12,7 @@ std::vector<allele> add_allele_vectors(std::vector<allele> new_alleles, std::vec
   for(uint32_t i=0; i < new_alleles.size(); i++){
     bool found = false;
     for(uint32_t j=0; j < return_alleles.size(); j++){
-      if (return_alleles[j].nuc == new_alleles[i].nuc){
+      if ((return_alleles[j].nuc == new_alleles[i].nuc) && new_alleles[i].depth > 0){
         return_alleles[j].depth += new_alleles[i].depth;
         return_alleles[j].mean_qual += new_alleles[i].mean_qual;
         return_alleles[j].is_ref = new_alleles[i].is_ref;
@@ -289,14 +289,18 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
           root->amp_positions[j].depth += tmp_pos[i].depth;
           std::vector<allele> new_alleles = add_allele_vectors(tmp_pos[i].alleles, root->amp_positions[j].alleles);
           root->amp_positions[j].alleles = new_alleles;
+          if(here_pos.pos == 28912){
+            for(uint32_t z =0; z < new_alleles.size(); z++){
+                if(new_alleles[z].nuc == "T"){
+                    std::cerr << new_alleles[z].is_ref << std::endl;
+                }
+            }
+          }
           break;
         }
       }
       //if we've never seen this pos for this haplotype, push a new one
       if (!found){
-        if(add_pos.pos == 105){
-          print_allele_depths(add_pos.alleles);
-        }
         position tmp;
         tmp.depth = add_pos.depth;
         tmp.alleles = add_pos.alleles;

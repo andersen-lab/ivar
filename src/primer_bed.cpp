@@ -527,6 +527,9 @@ void primer::transform_mutations() {
       if (std::find(substitutions.begin(), substitutions.end(), current_pos) == substitutions.end()){
         ref = true;
       }
+      /*if(current_pos == 28912 && nuc == "T"){
+        std::cerr << qname << " " << ref << std::endl;
+      }*/
       int exists = check_position_exists(current_pos, positions);
       if (exists != -1) {
         positions[exists].update_alleles(nuc, ccount, quality[j], ref);  

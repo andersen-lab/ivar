@@ -124,9 +124,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       start_pos = aln->core.pos;
     }
     //TESTLINES
-    if(start_pos > 3000){
-      continue;
-    }
+    //if(start_pos > 3000){
+    //  continue;
+    //}
     counter += 1;
     overlapping_primers.clear();
     if(strand == '+'){
@@ -197,8 +197,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   //this is super time costly
   for(uint32_t i=0; i < primers.size(); i++){
     primers[i].populate_positions();
-    std::cerr << primers[i].get_start() << " " << primers[i].get_end() << std::endl;
-    //exit(1);
     primers[i].transform_mutations();
   }
   std::cerr << "setting amplicon level haplotypes" << std::endl;

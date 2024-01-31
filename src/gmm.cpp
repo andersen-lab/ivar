@@ -1,5 +1,6 @@
 #include "./include/armadillo"
 #include "gmm.h"
+#include "population_estimate.h"
 #include <fstream>
 #include <cmath>
 
@@ -36,35 +37,6 @@ double calculate_cluster_bounds(std::vector<variant> variants, uint32_t n){
     }
   }
   return(min_freq);  
-}
-
-std::vector<uint32_t> estimate_populations(std::vector<variant> variants){
-  //TODO generalize
-  uint32_t num_var = 0;
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(!variants[i].amplicon_flux && !variants[i].depth_flag && variants[i].freq > 0.01 && !variants[i].is_ref){
-      num_var += 1;
-    }
-  }
-  //this isn't exactly what we do for ww so needs to be tested thoroughly
-  float evolutionary_rate = 0.001;
-  float time_elapsed = 0.83; //in years
-  float ref = 29003;
-  float beta = 1;
-  float percent_possible_mutations = (num_var * beta) / (ref * 3);
-  float expected_nt_sub_per_site = evolutionary_rate * time_elapsed;
-  float num_populations = percent_possible_mutations / expected_nt_sub_per_site;
-
-  std::vector<uint32_t> population_bounds;
-  //can't have 0 or fewer populations present
-  uint32_t n = round(num_populations);
-  if (n-1 <= 0) {
-    population_bounds.push_back(1);
-  } else {
-    population_bounds.push_back(n-1);
-  }
-  population_bounds.push_back(n+1);
-  return(population_bounds);
 }
 
 uint32_t count_useful_variants(std::vector<variant> variants){
@@ -343,22 +315,26 @@ int gmm_model(std::string prefix){
   float lower_bound = 0.03;
   float upper_bound = 0.97;
   uint32_t depth_cutoff = 10;
-
+  //float evoltionary_rate = 0.001;
+  //float time_elapsed = 0.83;
+  //float ref_length = 29903;  
 
   std::string filename = prefix + ".txt";
   std::vector<variant> variants;
 
+
   parse_internal_variants(filename, variants, depth_cutoff, lower_bound, upper_bound);
   uint32_t useful_var = count_useful_variants(variants); 
-  std::vector<uint32_t> population_bounds = estimate_populations(variants);
+  //std::vector<uint32_t> population_bounds = estimate_populations(variants, evolutionary_rate, time_elapsed, ref_length);
 
   //the n min and n max represent the range of n values
-  uint32_t n_min = population_bounds[0];
-  uint32_t n_max = population_bounds[1];
+  //uint32_t n_min = population_bounds[0];
+  //uint32_t n_max = population_bounds[1];
   uint32_t n = 2; 
   //the number of variants we will acutally use when modeling
-  std::cerr << "n min " << n_min << " n max " << n_max << std::endl;
- 
+  //std::cerr << "n min " << n_min << " n max " << n_max << std::endl;
+  //uint32_t n_min = 2;
+  uint32_t n_max = 3;
   //sample is too complex and we flag as a contaminant
   //TODO make this bit better
   if(n_max > 3){

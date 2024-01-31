@@ -18,6 +18,7 @@
 #include "trim_primer_quality.h"
 #include "gmm.h"
 #include "saga.h"
+#include "population_estimate.h"
 
 const std::string VERSION = "1.4.2";
 
@@ -46,17 +47,23 @@ struct args_t {
   bool write_no_primers_flag;    // -e
   std::string gff;               // -g
   bool keep_for_reanalysis;      // -k
+  //contam params
+  std::string variants;         // -t
+  float evol_rate;      // -z
+  std::string sample_date;      // -d
+  std::string ref_date;         // -r 
 } g_args;
 
 void print_usage() {
   std::cout
       << "Usage:	ivar [command "
-         "<trim|variants|filtervariants|consensus|getmasked|removereads|contam"
+         "<trim|variants|filtervariants|consensus|getmasked|removereads|contam|saga|"
          "version|help>]\n"
          "\n"
          "        Command       Description\n"
          "           trim       Trim reads in aligned BAM file\n"
-         "         contam       Detect contamination and call consensus\n"
+         "         contam       Estimate the number of populations in a sample\n"
+         "           saga       Call consensus with an automated threshold\n"
          "       variants       Call variants from aligned BAM file\n"
          " filtervariants       Filter variants across replicates or samples\n"
          "      consensus       Call consensus from aligned BAM file\n"
@@ -250,6 +257,7 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
+static const char *contam_opt_str = "i:b:f:x:p:m:q:s:t:d:z:r:ekh?";
 
 std::string get_filename_without_extension(std::string f, std::string ext) {
   if (ext.length() > f.length())  // If extension longer than filename
@@ -297,6 +305,65 @@ int main(int argc, char *argv[]) {
     g_args.bed = "";
     g_args.primer_pair_file = "";
     g_args.primer_offset = 0;
+    opt = getopt(argc, argv, contam_opt_str);
+    while (opt != -1) {
+      switch (opt) {
+        case 'i':
+          g_args.bam = optarg;
+          break;
+        case 'b':
+          g_args.bed = optarg;
+          break;
+        case 'f':
+          g_args.primer_pair_file = optarg;
+          break;
+        case 'x':
+          g_args.primer_offset = std::stoi(optarg);
+          break;
+        case 'p':
+          g_args.prefix = optarg;
+          break;
+        case 't':
+          g_args.variants = optarg;
+          break;
+        case 'z':
+          g_args.evol_rate = std::stof(optarg);
+          break;
+        case 'd':
+          g_args.sample_date = optarg;
+          break;
+        case 'r':
+          g_args.ref_date = optarg;
+          break;
+        case 'h':
+        case '?':
+          print_trim_usage();
+          return -1;
+          break;
+      }
+      opt = getopt(argc, argv, contam_opt_str);
+    }
+    /*if (g_args.bam.empty() && isatty(STDIN_FILENO)) {
+      std::cout << "Please supply a BAM file using -i or supply the input file "
+                   "through standard input"
+                << std::endl
+                << std::endl;
+      print_trim_usage();
+      return -1;
+    }*/
+    g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
+    //res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
+    //                           cl_cmd.str(),
+    //                           g_args.primer_pair_file, g_args.primer_offset);
+    //res = gmm_model(g_args.prefix);
+    res = estimate_populations(g_args.variants, g_args.evol_rate, g_args.sample_date, g_args.ref_date);
+  }
+
+  //ivar saga
+  else if (cmd.compare("saga") == 0) {
+    g_args.bed = "";
+    g_args.primer_pair_file = "";
+    g_args.primer_offset = 0;
     opt = getopt(argc, argv, trim_opt_str);
     while (opt != -1) {
       switch (opt) {
@@ -335,9 +402,9 @@ int main(int argc, char *argv[]) {
       return -1;
     }
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
-    res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
-                               cl_cmd.str(),
-                               g_args.primer_pair_file, g_args.primer_offset);
+    //res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
+    //                           cl_cmd.str(),
+    //                           g_args.primer_pair_file, g_args.primer_offset);
     res = gmm_model(g_args.prefix);
   }
 
