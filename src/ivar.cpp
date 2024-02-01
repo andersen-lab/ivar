@@ -337,7 +337,7 @@ int main(int argc, char *argv[]) {
     g_args.bed = "";
     g_args.primer_pair_file = "";
     g_args.primer_offset = 0;
-    g_args.evol_rate = -1;
+    g_args.evol_rate = 0.0;
     opt = getopt(argc, argv, contam_opt_str);
     while (opt != -1) {
       switch (opt) {
@@ -376,18 +376,23 @@ int main(int argc, char *argv[]) {
       }
       opt = getopt(argc, argv, contam_opt_str);
     }
-    if (g_args.evol_rate == -1 || g_args.variants.empty()) {
-      print_contam_usage();
-      return -1;
+    if (!(g_args.evol_rate == 0.0) && !g_args.variants.empty() && !g_args.sample_date.empty() && !g_args.ref_date.empty()) {
+      res = estimate_populations(g_args.variants, g_args.evol_rate, g_args.sample_date, g_args.ref_date);
+      //print_contam_usage();
+      //return -1;
+    } else if (!g_args.variants.empty()) {
+      std::vector<uint32_t> populations_iterate;
+      for(uint32_t i= 2; i < 6; i++){
+        populations_iterate.push_back(i);
+      }
+      res = gmm_model(g_args.variants, populations_iterate);
     }
+    res = 0; 
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
     //res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
     //                           cl_cmd.str(),
     //                           g_args.primer_pair_file, g_args.primer_offset);
     //res = gmm_model(g_args.prefix);
-    std::cerr << g_args.variants << std::endl;
-    std::cerr << g_args.evol_rate << std::endl;
-    res = estimate_populations(g_args.variants, g_args.evol_rate, g_args.sample_date, g_args.ref_date);
   }
 
   //ivar saga
@@ -436,7 +441,11 @@ int main(int argc, char *argv[]) {
     //res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
     //                           cl_cmd.str(),
     //                           g_args.primer_pair_file, g_args.primer_offset);
-    res = gmm_model(g_args.prefix);
+    std::vector<uint32_t> populations_iterate;
+    for(uint32_t i= 2; i < 6; i++){
+      populations_iterate.push_back(i);
+    }
+    res = gmm_model(g_args.prefix, populations_iterate);
   }
 
   // ivar trim

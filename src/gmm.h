@@ -21,6 +21,6 @@ struct variant {
 
 };
 
-int gmm_model(std::string prefix);
+int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate);
 void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound);
 #endif

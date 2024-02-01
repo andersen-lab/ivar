@@ -3,6 +3,26 @@
 #include "population_estimate.h"
 #include <fstream>
 #include <cmath>
+#include <algorithm>
+
+std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector) {
+  std::vector<std::vector<double>> transposed_vector;
+  // Check if the input vector is not empty
+  if (!input_vector.empty() && !input_vector[0].empty()) {
+    size_t rows = input_vector.size();
+    size_t cols = input_vector[0].size();
+    // Resize the transposed vector
+    transposed_vector.resize(cols, std::vector<double>(rows));
+
+    // Transpose the matrix
+    for (size_t i = 0; i < rows; ++i) {
+      for (size_t j = 0; j < cols; ++j) {
+        transposed_vector[j][i] = input_vector[i][j];
+      }
+    }
+  }
+  return transposed_vector;
+}
 
 double calculate_cluster_bounds(std::vector<variant> variants, uint32_t n){
   /*
@@ -155,7 +175,7 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
       for(uint32_t z =0; z < variants.size(); z++){
         if(variants[z].amplicon_flux || variants[z].depth_flag || variants[z].outside_freq_range) continue;
         //this pos was flagged as poorly assigned
-        if(tmp != assignment_flagged.end()){
+        if(tmp != assignment_flagged.end() && k == pos_idxs[j]){
           //technically this could use work as it's repetitive
           //std::cerr << variants[z].position << " " << variants[z].freq << std::endl;
           variants[z].vague_assignment = true;
@@ -174,7 +194,7 @@ void go(uint32_t offset, uint32_t k, std::vector<double> means, std::vector<doub
   //generates all the combinations
   if (k == 0) {
     double sum_of_elems = std::accumulate(combination.begin(), combination.end(), 0.0);
-    std::cerr << sum_of_elems << std::endl;
+    //std::cerr << sum_of_elems << std::endl;
     if(sum_of_elems < 1+error && sum_of_elems > 1-error){
       combos.push_back(combination);
     }
@@ -197,9 +217,9 @@ void solve_solution_sets(std::vector<double> means, uint32_t n){
   go(0, n, means, combination, combos, error);
   for(uint32_t i=0; i < combos.size(); i++){
     for(uint32_t j=0; j < combos[i].size(); j++){
-      std::cerr << combos[i][j] << " ";
+      //std::cerr << combos[i][j] << " ";
     }
-    std::cerr << std::endl;
+    //std::cerr << std::endl;
   }
 
 }
@@ -311,45 +331,28 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
   } 
 }
 
-int gmm_model(std::string prefix){
+int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate){
   arma::gmm_diag model;
   int retval = 0;
   float lower_bound = 0.03;
   float upper_bound = 0.97;
   uint32_t depth_cutoff = 10;
-  //float evoltionary_rate = 0.001;
-  //float time_elapsed = 0.83;
-  //float ref_length = 29903;  
-
-  std::string filename = prefix + ".txt";
   std::vector<variant> variants;
+  parse_internal_variants(prefix, variants, depth_cutoff, lower_bound, upper_bound);
+  std::string filename = prefix + ".txt";
 
-
-  parse_internal_variants(filename, variants, depth_cutoff, lower_bound, upper_bound);
-  uint32_t useful_var = count_useful_variants(variants); 
-  //std::vector<uint32_t> population_bounds = estimate_populations(variants, evolutionary_rate, time_elapsed, ref_length);
-
-  //the n min and n max represent the range of n values
-  //uint32_t n_min = population_bounds[0];
-  //uint32_t n_max = population_bounds[1];
-  uint32_t n = 2; 
-  //the number of variants we will acutally use when modeling
-  //std::cerr << "n min " << n_min << " n max " << n_max << std::endl;
-  //uint32_t n_min = 2;
-  uint32_t n_max = 3;
-  //sample is too complex and we flag as a contaminant
-  //TODO make this bit better
-  if(n_max > 3){
-    retval = 1;
-    return(retval);
+  //this whole things needs to be reconfigured
+  uint32_t useful_var=0;
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(!variants[i].amplicon_flux && !variants[i].depth_flag && !variants[i].outside_freq_range){
+      useful_var += 1;
+    }
   }
-
   //initialize armadillo dataset and populate with frequency data
-  //(rows, cols) where each columns is a sample
-  
+  //(rows, cols) where each columns is a sample  
   arma::mat data(1, useful_var, arma::fill::zeros);
   std::cerr << "useful var " << useful_var << std::endl; 
-  uint32_t count = 0;
+  uint32_t count=0;
   for(uint32_t i = 0; i < variants.size(); i++){
     //check if variant should be filtered for first pass model
     if(!variants[i].amplicon_flux && !variants[i].depth_flag && !variants[i].outside_freq_range){
@@ -358,48 +361,76 @@ int gmm_model(std::string prefix){
       count += 1;
     }
   }
-  
-  //model learning
-  bool status = model.learn(data, n, arma::eucl_dist, arma::random_subset, 10, 5, 1e-10, true);
-  if(status == false){
-    std::cerr << "gmm model failed" << std::endl;
-  }
-  //get the means of the gaussians
-  std::vector<double> means;
-  model.means.print("means:");
-  uint32_t j=0;
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(!variants[i].amplicon_flux && !variants[i].depth_flag && !variants[i].outside_freq_range){
-      //std::cerr << variants[i].freq << " " << model.log_p(data.col(j), 0) << " " << model.log_p(data.col(j), 1) << " " << model.log_p(data.col(j), 2) << std::endl;
-      std::cerr << variants[i].freq << " " << model.log_p(data.col(j), 0) << " " << model.log_p(data.col(j), 1) << std::endl;
-      j++;
+  for(auto n : populations_iterate){
+    //model learning
+    bool status = model.learn(data, n, arma::eucl_dist, arma::random_subset, 15, 10, 1e-10, true);
+    if(status == false){
+      std::cerr << "gmm model failed" << std::endl;
+      continue;
     }
-  }  
-  
-  //get the probability of each frequency being assigned to each gaussian
-  std::vector<std::vector<double>> prob_matrix;
-  for(uint32_t i=0; i < n; i++){
-    //means.push_back((double)model.means[i]);
-    arma::rowvec set_likelihood = model.log_p(data.cols(0,useful_var-1), i);
-    std::vector<double> tmp;
-    for(uint32_t j=0; j < useful_var; j++){
-      tmp.push_back((double)set_likelihood[j]);
+    //get the means of the gaussians
+    std::vector<double> means;
+    model.means.print("means:");
+    uint32_t j=0;
+    for(uint32_t i=0; i < variants.size(); i++){
+      if(!variants[i].amplicon_flux && !variants[i].depth_flag && !variants[i].outside_freq_range){
+        //std::cerr << variants[i].freq << " " << model.log_p(data.col(j), 0) << " " << model.log_p(data.col(j), 1) << " " << model.log_p(data.col(j), 2) << std::endl;
+        //std::cerr << variants[i].freq << " " << model.log_p(data.col(j), 0) << " " << model.log_p(data.col(j), 1) << std::endl;
+        j++;
+      }
+    }  
+    //get the probability of each frequency being assigned to each gaussian
+    std::vector<std::vector<double>> prob_matrix;
+    for(uint32_t i=0; i < n; i++){
+      //means.push_back((double)model.means[i]);
+      arma::rowvec set_likelihood = model.log_p(data.cols(0,useful_var-1), i);
+      std::vector<double> tmp;
+      for(uint32_t j=0; j < useful_var; j++){
+        tmp.push_back((double)set_likelihood[j]);
+      }
+      prob_matrix.push_back(tmp);
     }
-    prob_matrix.push_back(tmp);
+    
+    std::vector<std::vector<double>> tv = transpose_vector(prob_matrix);
+    j = 0;
+    for(uint32_t i=0; i < variants.size(); i++){
+      if(!variants[i].amplicon_flux && !variants[i].depth_flag && !variants[i].outside_freq_range){
+        variants[i].probabilities = tv[j];
+        j++;
+      }
+    }
+    //assign variants out based on probability, not taking into account condition of all variants for a pos ~= 1 
+    assign_variants_simple(variants, prob_matrix);
+   
+    //calculate cluster outliers
+    determine_outlier_variants(variants, n);
+
+    uint32_t unassigned_var = 0;
+    double prob_sum = 0;    
+    for(uint32_t i=0; i < variants.size(); i++){
+      if(!variants[i].amplicon_flux && !variants[i].depth_flag && !variants[i].outside_freq_range){
+        if(variants[i].cluster_assigned == -1){
+          unassigned_var += 1;
+        } else {
+          double prob = exp(variants[i].probabilities[variants[i].cluster_assigned]);
+          /*for(auto z : variants[i].probabilities){
+            std::cerr << z << " ";
+          }*/
+          //std::cerr << std::endl;
+          //std::cerr << "prob " << prob << " freq " << variants[i].freq << std::endl;
+          prob_sum += prob;
+        }
+      }
+    }
+    std::cerr << useful_var << " probability " << prob_sum << std::endl;
+    double aic = (2 * (double)n) - (2 * log(prob_sum));
+    std::cerr << "aic " << aic << std::endl;
+    std::cerr << "unassigned variants " << unassigned_var << std::endl;
+    //draw the actual threshold
+    double threshold = calculate_cluster_bounds(variants, n);
+    std::cerr << "n " << n << " threshold " << threshold << std::endl;
+    //call the consensus sequence
+    //model.save("my_model.gmm");
   }
-   
-  //assign variants out based on probability, not taking into account condition of all variants for a pos ~= 1 
-  assign_variants_simple(variants, prob_matrix);
-   
-  //calculate cluster outliers
-  determine_outlier_variants(variants, n);
-
-  //draw the actual threshold
-  double threshold = calculate_cluster_bounds(variants, n);
-  std::cerr << "threshold " << threshold << std::endl;
-  //call the consensus sequence
-
-  //model.save("my_model.gmm");
-
   return(retval);
 }
