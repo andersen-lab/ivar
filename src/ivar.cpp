@@ -48,8 +48,8 @@ struct args_t {
   std::string gff;               // -g
   bool keep_for_reanalysis;      // -k
   //contam params
-  std::string variants;         // -t
-  float evol_rate;      // -z
+  std::string variants;         // -s
+  float evol_rate;              // -e
   std::string sample_date;      // -d
   std::string ref_date;         // -r 
 } g_args;
@@ -73,6 +73,38 @@ void print_usage() {
          "        version       Show version information\n"
          "\n"
          "To view detailed usage for each command type `ivar <command>` \n";
+}
+
+void print_contam_usage() {
+  std::cout
+      << "Usage: ivar contam -e [<evol_rate>] -d <sample_date> [-s <variants>] [-r "
+         "<ref_date>]\n\n"
+         "Input Options    Description\n"
+         "           -i    BAM file, with aligned reads, to "
+         "trim primers and quality. If not specified will use standard in\n"
+         "           -b    BED file with primer sequences and positions. If no "
+         "BED file is specified, only quality trimming will be done.\n"
+         "           -f    [EXPERIMENTAL] Primer pair information file "
+         "containing left and right primer names for the same amplicon "
+         "separated by a tab\n"
+         "                 If provided, reads that do not fall within atleat "
+         "one amplicon will be ignored prior to primer trimming.\n"
+         "           -x    Primer position offset (Default: 0). Reads that "
+         "occur at the specified offset positions relative to primer positions "
+         "will also be trimmed.\n"
+         "           -m    Minimum length of read to retain after trimming "
+         "(Default: 50% average length of the first 1000 reads)\n"
+         "           -q    Minimum quality threshold for sliding window to "
+         "pass (Default: 20)\n"
+         "           -s    Width of sliding window (Default: 4)\n"
+         "           -e    Include reads with no primers. By default, reads "
+         "with no primers are excluded\n"
+         "           -k    Keep reads to allow for reanalysis: keep reads "
+         "which would be dropped by\n"
+         "                 alignment length filter or primer requirements, but "
+         "mark them QCFAIL\n\n"
+         "Output Options   Description\n"
+         "           -p    Prefix for the output BAM file. If none is specified output will go to std out\n";
 }
 
 void print_trim_usage() {
@@ -257,7 +289,7 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
-static const char *contam_opt_str = "i:b:f:x:p:m:q:s:t:d:z:r:ekh?";
+static const char *contam_opt_str = "i:b:f:x:p:m:q:s:d:e:r:kh?";
 
 std::string get_filename_without_extension(std::string f, std::string ext) {
   if (ext.length() > f.length())  // If extension longer than filename
@@ -305,6 +337,7 @@ int main(int argc, char *argv[]) {
     g_args.bed = "";
     g_args.primer_pair_file = "";
     g_args.primer_offset = 0;
+    g_args.evol_rate = -1;
     opt = getopt(argc, argv, contam_opt_str);
     while (opt != -1) {
       switch (opt) {
@@ -323,10 +356,10 @@ int main(int argc, char *argv[]) {
         case 'p':
           g_args.prefix = optarg;
           break;
-        case 't':
+        case 's':
           g_args.variants = optarg;
           break;
-        case 'z':
+        case 'e':
           g_args.evol_rate = std::stof(optarg);
           break;
         case 'd':
@@ -343,19 +376,17 @@ int main(int argc, char *argv[]) {
       }
       opt = getopt(argc, argv, contam_opt_str);
     }
-    /*if (g_args.bam.empty() && isatty(STDIN_FILENO)) {
-      std::cout << "Please supply a BAM file using -i or supply the input file "
-                   "through standard input"
-                << std::endl
-                << std::endl;
-      print_trim_usage();
+    if (g_args.evol_rate == -1 || g_args.variants.empty()) {
+      print_contam_usage();
       return -1;
-    }*/
+    }
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
     //res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
     //                           cl_cmd.str(),
     //                           g_args.primer_pair_file, g_args.primer_offset);
     //res = gmm_model(g_args.prefix);
+    std::cerr << g_args.variants << std::endl;
+    std::cerr << g_args.evol_rate << std::endl;
     res = estimate_populations(g_args.variants, g_args.evol_rate, g_args.sample_date, g_args.ref_date);
   }
 
