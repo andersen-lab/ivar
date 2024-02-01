@@ -268,14 +268,15 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     uint32_t pos = 0;
     uint32_t depth = 0;
     float freq = 0;
+    float qual = 0;
     std::string flag = "";
     std::string is_ref = "";
     split(line, '\t', row_values);
 
-
     pos = std::stoi(row_values[0]);
     depth = std::stoi(row_values[2]);
     freq = std::stof(row_values[3]);
+    qual = std::stof(row_values[4]);
     flag = row_values[5];
     is_ref = row_values[6];
    
@@ -284,6 +285,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     tmp.nuc = row_values[1];
     tmp.depth = depth;
     tmp.freq = freq;
+    tmp.qual = qual;
     if (flag == "TRUE"){
       tmp.amplicon_flux = true;
     } else {

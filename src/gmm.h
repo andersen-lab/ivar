@@ -1,3 +1,4 @@
+#include <vector>
 #ifndef gmm
 #define gmm
 
@@ -21,4 +22,5 @@ struct variant {
 };
 
 int gmm_model(std::string prefix);
+void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound);
 #endif
