@@ -3,6 +3,7 @@
 #include <fstream>
 #include <cmath>
 #include <chrono>
+
 using namespace std::chrono;
 float calculate_standard_deviation(std::vector<float> frequencies) {
   float sum = 0.0, mean = 0.0, sd = 0.0;
@@ -86,7 +87,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   init_cigar(&t);
   //bool unmapped_flag = false;
   //bool amplicon_flag = false;
-  //primer cand_primer;
   //bool isize_flag = true;
   //uint32_t failed_frag_size = 0;
   //uint32_t unmapped_counter = 0;
@@ -107,7 +107,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   char strand = '+';
   uint32_t start_pos = -1;
   uint32_t outside_amp = 0;
-  uint32_t lower_search;
+  uint32_t lower_search=0;
   uint32_t counter = 0;
   // Iterate through reads
   in = sam_open(bam.c_str(), "r");
@@ -123,10 +123,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     } else {
       start_pos = aln->core.pos;
     }
-    //TESTLINES
-    //if(start_pos > 3000){
-    //  continue;
-    //}
     counter += 1;
     overlapping_primers.clear();
     if(strand == '+'){
@@ -155,6 +151,13 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     bam1_t *r = aln;
     //get the md tag
     uint8_t *aux = bam_aux_get(aln, "MD");
+    uint32_t k=0;
+    do{
+      k++;
+    } while(aux[k] != '\0');
+    if(k <= 1){
+      return(0);
+    }
     //get the sequence
     uint8_t *seq = bam_get_seq(aln);
     //get cigar for the read

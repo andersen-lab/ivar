@@ -351,7 +351,26 @@ void primer::transform_mutations() {
     uint32_t consumed_ref = 0;
     std::string nuc;
     std::vector<uint32_t> ignore_sequence; //positions in query that are insertions
+    uint32_t total_soft_clipped = 0;
+    uint32_t total_read_length = 0;
     //we'll use the cigar string to handle insertions
+    if(qname == test){
+      std::cerr << "current pos " << start_pos << std::endl;
+    }
+    //if a ton of this read has been soft clipped, toss it out for quality reasons
+    for(uint32_t j=0; j < cigarotype.size(); j++){
+      uint32_t op = bam_cigar_op(cigarotype[j]);
+      uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
+      if(op == 4){
+        total_soft_clipped += oplen;
+      }
+      if (bam_cigar_type(op) & 1){
+        total_read_length += oplen;
+      }
+    }
+    if((float)total_soft_clipped / (float)total_read_length > 0.50){
+      continue;
+    }
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
       uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
@@ -477,8 +496,17 @@ void primer::transform_mutations() {
     std::vector<uint32_t> seen_insertions;
     std::vector<uint32_t>::iterator i_it;
 
+    if(qname == test){
+      for(uint32_t z=0; z < deletion_positions.size(); z++){
+        std::cerr << "del " << deletion_positions[z] << std::endl;
+      }
+    }
+
     //j is relative to the sequence and current pos to the reference
     for(uint32_t j=0; j < sequence.size(); j++){
+      if(test == qname){
+        std::cerr << "j " << j << " " << sequence[j] << " " << current_pos << std::endl;
+      }
       //auto start = std::chrono::high_resolution_clock::now();
       std::vector<uint32_t>::iterator it = find(deletion_positions.begin(), deletion_positions.end(), current_pos); 
       if (it != deletion_positions.end()) {
@@ -527,7 +555,7 @@ void primer::transform_mutations() {
       if (std::find(substitutions.begin(), substitutions.end(), current_pos) == substitutions.end()){
         ref = true;
       }
-      /*if(current_pos == 28912 && nuc == "T"){
+      /*if(current_pos == 21661 && nuc == "T"){
         std::cerr << qname << " " << ref << std::endl;
       }*/
       int exists = check_position_exists(current_pos, positions);

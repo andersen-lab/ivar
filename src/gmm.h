@@ -1,4 +1,5 @@
 #include <vector>
+#include <fstream>
 #ifndef gmm
 #define gmm
 
@@ -15,12 +16,17 @@ struct variant {
   bool vague_assignment=false; //cannot be distinguished between two groups
   bool amplicon_flux=false; //fluctuation frequency across amplicons
   bool depth_flag=false; //depth is below the threshold                  
+  bool low_prob_flag=false;
+  bool del_flag=false;
+  bool qual_flag=false;
   bool outside_freq_range=false; //outside of useful frequency range for model                 
   bool cluster_outlier=false; //is an outlier for the cluster assigned
   std::vector<double> probabilities;
 
 };
 
-int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate);
-void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound);
-#endif
+int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std::string output_prefix);
+void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions, std::vector<uint32_t> low_quality_positions, uint32_t round_val);
+std::vector<uint32_t> find_deletion_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, uint32_t round_val);
+std::vector<uint32_t> find_low_quality_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, float quality_threshold, uint32_t round_val);
+ #endif

@@ -46,6 +46,8 @@ int estimate_populations(std::string variants, float evol_rate, std::string samp
   float lower_bound = 0.03;
   float upper_bound = 0.97;
   uint32_t depth_cutoff = 10;
+  float quality_threshold = 20;
+  uint32_t round_val = 3;
   std::vector<variant> variant_vec;
   float sample_decimal = convert_decimal_date(sample_date); 
   float reference_decimal = convert_decimal_date(ref_date);
@@ -55,7 +57,9 @@ int estimate_populations(std::string variants, float evol_rate, std::string samp
   }
   float time_elapsed = sample_decimal - reference_decimal;
   std::cerr << time_elapsed << std::endl;
-  parse_internal_variants(variants, variant_vec, depth_cutoff, lower_bound, upper_bound); 
+  std::vector<uint32_t> low_quality_positions = find_low_quality_positions(variants, depth_cutoff, lower_bound, upper_bound, quality_threshold, round_val);
+  std::vector<uint32_t> deletion_positions = find_deletion_positions(variants, depth_cutoff, lower_bound, upper_bound, round_val);
+  parse_internal_variants(variants, variant_vec, depth_cutoff, lower_bound, upper_bound, deletion_positions, low_quality_positions, round_val); 
 
   std::vector<variant> kept_variants;
   float var_count = 0;
@@ -70,8 +74,6 @@ int estimate_populations(std::string variants, float evol_rate, std::string samp
       var_count += 1;
     }
   }
-  var_count = 59;
-  ref_length = 29903;
   std::vector<float> x;
   std::vector<float> y; 
   //regress
