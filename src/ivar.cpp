@@ -380,12 +380,12 @@ int main(int argc, char *argv[]) {
       res = estimate_populations(g_args.variants, g_args.evol_rate, g_args.sample_date, g_args.ref_date);
       //print_contam_usage();
       //return -1;
-    } else if (!g_args.variants.empty()) {
+    } else if (!g_args.variants.empty() && !g_args.prefix.empty()) {
       std::vector<uint32_t> populations_iterate;
-      for(uint32_t i= 2; i < 6; i++){
+      for(uint32_t i= 2; i < 8; i++){
         populations_iterate.push_back(i);
       }
-      res = gmm_model(g_args.variants, populations_iterate);
+      res = gmm_model(g_args.variants, populations_iterate, g_args.prefix);
     }
     res = 0; 
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
@@ -438,14 +438,15 @@ int main(int argc, char *argv[]) {
       return -1;
     }
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
-    //res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
-    //                           cl_cmd.str(),
-    //                           g_args.primer_pair_file, g_args.primer_offset);
-    std::vector<uint32_t> populations_iterate;
-    for(uint32_t i= 2; i < 6; i++){
-      populations_iterate.push_back(i);
-    }
-    res = gmm_model(g_args.prefix, populations_iterate);
+    res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
+                               cl_cmd.str(),
+                               g_args.primer_pair_file, g_args.primer_offset);
+    //std::vector<uint32_t> populations_iterate;
+    //for(uint32_t i= 2; i < 6; i++){
+    //  populations_iterate.push_back(i);
+    //}
+    //res = gmm_model(g_args.prefix, populations_iterate, g_args.prefix);
+    //res = cluster_consensus(
   }
 
   // ivar trim
