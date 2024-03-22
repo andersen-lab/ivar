@@ -55,8 +55,11 @@ class IntervalTree {
   int unpaired_primers(ITNode *root, primer prim);
   void combine_haplotypes(ITNode *root);
   void detect_abberations(ITNode *root, uint32_t pos);
+  void detect_amplicon_overlaps(ITNode *root, uint32_t pos);
+  void detect_primer_issues(ITNode *root, uint32_t pos);
   public:
   uint32_t max_pos=0;
+  std::vector<std::vector<uint32_t>> overlaps;
   std::vector<position> test_flux; //storage for looking at pos across all amps
   std::vector<position> variants; //all variants across every position                                 
   std::vector<uint32_t> flagged_positions; //positions where freq flux occurs MIGHT NOT NEED
@@ -69,6 +72,8 @@ class IntervalTree {
   void set_haplotypes(primer prim) {set_haplotypes(_root, prim);}
   int unpaired_primers(primer prim) { return unpaired_primers(_root, prim);}
   void detect_abberations(uint32_t pos) {detect_abberations(_root, pos);}
+  void detect_amplicon_overlaps(uint32_t pos) {detect_amplicon_overlaps(_root, pos);}
+  void detect_primer_issues(uint32_t pos) {detect_primer_issues(_root, pos);}
   void combine_haplotypes() {combine_haplotypes(_root);}
   void add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *sequence, uint8_t *aux, uint8_t *quality, std::string qname);
   void populate_variants();
@@ -82,6 +87,8 @@ void set_haplotypes(ITNode *root, primer prim);
 void add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *sequence, uint8_t *aux, uint8_t *quality, std::string qname);
 void populate_variants();
 int unpaired_primers(ITNode *root, primer prim);
+void detect_primer_issues(ITNode *root, uint32_t find_position);
+void detect_amplicon_overlaps(ITNode *root, uint32_t find_position);
 IntervalTree populate_amplicons(std::string pair_info_file,
                                 std::vector<primer> &primers);
 #endif

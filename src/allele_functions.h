@@ -31,6 +31,7 @@ class position {
     std::vector<allele> alleles;
     void update_alleles(std::string nt, uint32_t count, uint32_t qual, bool is_ref);
     bool flux;
+    bool in_primer=false;
 };
 
 int check_position_exists(uint32_t p, std::vector<position> positions);

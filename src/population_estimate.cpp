@@ -43,8 +43,8 @@ void linear_regression(const std::vector<float>& x_values, const std::vector<flo
 
 int estimate_populations(std::string variants, float evol_rate, std::string sample_date, std::string ref_date){
   int retval = 0;
-  float lower_bound = 0.03;
-  float upper_bound = 0.97;
+  float lower_bound = 0.10;
+  float upper_bound = 0.90;
   uint32_t depth_cutoff = 10;
   float quality_threshold = 20;
   uint32_t round_val = 3;
@@ -56,43 +56,52 @@ int estimate_populations(std::string variants, float evol_rate, std::string samp
     return(-1);
   }
   float time_elapsed = sample_decimal - reference_decimal;
-  std::cerr << time_elapsed << std::endl;
+  std::cerr << "time elapsed " << time_elapsed << std::endl;
   std::vector<uint32_t> low_quality_positions = find_low_quality_positions(variants, depth_cutoff, lower_bound, upper_bound, quality_threshold, round_val);
   std::vector<uint32_t> deletion_positions = find_deletion_positions(variants, depth_cutoff, lower_bound, upper_bound, round_val);
   parse_internal_variants(variants, variant_vec, depth_cutoff, lower_bound, upper_bound, deletion_positions, low_quality_positions, round_val); 
-
   std::vector<variant> kept_variants;
   float var_count = 0;
+  float evolution_disparate = 0;
   float ref_length = 0;
   for(uint32_t i=0; i < variant_vec.size(); i++){
     if((float)variant_vec[i].position > ref_length){
       ref_length = (float)variant_vec[i].position;
     }
     if(!variant_vec[i].amplicon_flux && !variant_vec[i].depth_flag && !variant_vec[i].is_ref && variant_vec[i].freq > lower_bound && variant_vec[i].qual > 20){
-      std::cerr << variant_vec[i].nuc << " " << variant_vec[i].freq << " " << variant_vec[i].position << " " << variant_vec[i].qual << std::endl;
-      kept_variants.push_back(variant_vec[i]);
+     kept_variants.push_back(variant_vec[i]);
       var_count += 1;
+      if(variant_vec[i].freq < upper_bound){
+        std::cerr << variant_vec[i].nuc << " " << variant_vec[i].freq << " " << variant_vec[i].position << " " << variant_vec[i].qual << " " << variant_vec[i].depth << std::endl;
+        evolution_disparate += 1;
+      }
     }
   }
+  std::cerr << "evolutionary " << evolution_disparate << std::endl;
+  std::cerr << "keep variants " << kept_variants.size() << std::endl;
   std::vector<float> x;
   std::vector<float> y; 
+  var_count = 47;
+  evolution_disparate = 1;
+  float percent_te = evolution_disparate / var_count;
+  std::cerr << percent_te * time_elapsed * evol_rate * ref_length << std::endl;
   //regress
-  for(uint32_t i = 2; i < 6; i++){
-    float section = time_elapsed / float(i);
+  std::cerr << "testing number of variants " << var_count << std::endl;
+  for(uint32_t i = 1; i < 6; i++){
+    float section = (percent_te * time_elapsed) / float(i);
     float cumulative_mutations = 0;
     for(uint32_t j=1; j < i+1; j++){
       float time_point = section * (float)j;
       float mut_expected = (time_point * evol_rate * ref_length);
       cumulative_mutations += mut_expected;
     }
-    x.push_back((float)i);
+    x.push_back((float)i+1);
     y.push_back(cumulative_mutations);
   }
   float slope, intercept;
-
   // Calculate linear regression
   linear_regression(x, y, slope, intercept);
-  float pop = (var_count-intercept) / slope;
+  float pop = (evolution_disparate-intercept) / slope;
   std::cerr << pop << std::endl;
   return(retval);
 }

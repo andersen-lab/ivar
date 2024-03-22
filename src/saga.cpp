@@ -5,6 +5,17 @@
 #include <chrono>
 
 using namespace std::chrono;
+
+void generate_range(uint32_t start, uint32_t end, std::vector<uint32_t> &result) {
+  if (start > end) {
+    std::swap(start, end);
+  }
+  for (uint32_t i = start; i <= end; ++i) {
+    result.push_back(i);
+  }
+}
+
+
 float calculate_standard_deviation(std::vector<float> frequencies) {
   float sum = 0.0, mean = 0.0, sd = 0.0;
   uint32_t i = 0;
@@ -94,8 +105,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   std::vector<primer>::iterator cit;
   std::vector<primer> overlapping_primers;
   std::vector<bam1_t *> alns;
- 
-  
+   
   std::vector<primer> unpaired_primers;
   for(uint32_t i=0; i < primers.size(); i++){
     bool paired = amplicons.unpaired_primers(primers[i]);
@@ -114,6 +124,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   header = sam_hdr_read(in);
   add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
   aln = bam_init1();
+
   // Iterate through reads
   while (sam_read1(in, header, aln) >= 0) {
     strand = '+';
@@ -124,6 +135,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       start_pos = aln->core.pos;
     }
     counter += 1;
+    //TESTLINES
+    //if(counter <  1400000 || counter > 1450000) continue;
     overlapping_primers.clear();
     if(strand == '+'){
       if(start_pos >= 10){
@@ -247,12 +260,49 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   //combine amplicon counts to get total variants 
   amplicons.combine_haplotypes();
   std::vector<position> variants = amplicons.variants;
+  //add in primer info
+  for(uint32_t i=0; i < variants.size(); i++){
+    bool mutation = false;
+    //establish a mutation at this position
+    for(auto al : variants[i].alleles){
+      if(!al.is_ref && (((float)al.depth/(float)variants[i].depth) > 0.05)){
+        mutation = true;
+      }
+    }
+    if(!mutation) continue;
+    //establish the mutation is within a primer region
+    for(uint32_t j=0; j < primers.size(); j++){
+      if(variants[i].pos >= primers[j].get_start() && variants[i].pos <= primers[j].get_end()+1){
+        if(primers[j].get_strand() == '+'){
+          //find the amplicon associated with this primer
+          amplicons.detect_primer_issues(primers[j].get_start());
+        } else {
+          amplicons.detect_primer_issues(primers[j].get_end());
+        }
+      }
+    }
+  }
+
+  std::vector<uint32_t> primer_binding_error;
+  for(uint32_t i=0; i < amplicons.overlaps.size(); i++){
+    generate_range(amplicons.overlaps[i][0], amplicons.overlaps[i][1], primer_binding_error);    
+  } 
+
   std::cerr << "variants size " << variants.size() << std::endl;
+  amplicons.overlaps.clear();
+  //find amplicons that are problematic
+  for(uint32_t i=0; i < flagged_positions.size(); i++){
+    amplicons.detect_amplicon_overlaps(flagged_positions[i]);
+  }
+  std::vector<uint32_t> amplicon_level_error;
+  for(uint32_t i=0; i < amplicons.overlaps.size(); i++){
+    generate_range(amplicons.overlaps[i][0], amplicons.overlaps[i][1], amplicon_level_error);    
+  } 
 
   //write variants to a file
   ofstream file;
   file.open(bam_out + ".txt", ios::trunc);
-  file << "POS\tALLELE\tDEPTH\tFREQ\tAVG_QUAL\tFLAGGED_POS\tREF\n";
+  file << "POS\tALLELE\tDEPTH\tFREQ\tAVG_QUAL\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\tREF\n";
   for(uint32_t i=0; i < variants.size(); i++){
     for(uint32_t j=0; j < variants[i].alleles.size(); j++){
       float freq = (float)variants[i].alleles[j].depth / (float)variants[i].depth;
@@ -268,6 +318,18 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       std::vector<uint32_t>::iterator it; 
       it = find(flagged_positions.begin(), flagged_positions.end(), variants[i].pos);
       if (it != flagged_positions.end()){
+        file << "TRUE\t";
+      } else {
+        file << "FALSE\t";
+      }
+      it = find(amplicon_level_error.begin(), amplicon_level_error.end(), variants[i].pos);
+      if(it != amplicon_level_error.end()){
+        file << "TRUE\t";
+      } else {
+        file << "FALSE\t";
+      }
+      it = find(primer_binding_error.begin(), primer_binding_error.end(), variants[i].pos);
+      if(it != primer_binding_error.end()){
         file << "TRUE\t";
       } else {
         file << "FALSE\t";

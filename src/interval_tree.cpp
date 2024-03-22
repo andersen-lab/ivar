@@ -38,6 +38,32 @@ void IntervalTree::combine_haplotypes(ITNode *root){
   combine_haplotypes(root->right);
 }
 
+void IntervalTree::detect_amplicon_overlaps(ITNode *root, uint32_t find_position){
+  if (root==NULL) return;
+  if (find_position < (uint32_t)root->data->low) return;
+  if(((uint32_t)root->data->low < find_position) && (find_position < (uint32_t)root->data->high)){
+    std::vector<uint32_t> tmp;
+    tmp.push_back((uint32_t)root->data->low);
+    tmp.push_back((uint32_t)root->data->high);
+    overlaps.push_back(tmp);
+  }
+  detect_amplicon_overlaps(root->right, find_position);
+}
+
+void IntervalTree::detect_primer_issues(ITNode *root, uint32_t find_position){
+  if (root==NULL) return;
+  if (find_position < (uint32_t)root->data->low) return;
+  if(((uint32_t)root->data->low == find_position) || (find_position == (uint32_t)root->data->high+1)){
+    std::vector<uint32_t> tmp;
+    tmp.push_back((uint32_t)root->data->low);
+    tmp.push_back((uint32_t)root->data->high);
+    overlaps.push_back(tmp);
+    return;
+  }
+  detect_primer_issues(root->right, find_position);
+}
+
+
 void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
   if (root==NULL) return;
   if (find_position < (uint32_t)root->data->low) return;
