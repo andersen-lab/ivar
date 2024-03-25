@@ -4,10 +4,10 @@
 
 int main() {
   int success = 0;
-  std::string bam = "../data/primer_only/primer_edge_cases.bam";
+  std::string bam = "../../data/primer_only/primer_edge_cases.bam";
   int32_t primer_offset = 0;
   std::vector<primer> primers =
-      populate_from_file("../data/test.bed", primer_offset);
+      populate_from_file("../../data/test.bed", primer_offset);
   int max_primer_len = 0;
   max_primer_len = get_bigger_primer(primers);
   std::string region_;

@@ -7,8 +7,8 @@
 
 int main() {
   int success = 0;
-  std::string bam = "../data/test.sim.merged.sorted.bam";
-  std::vector<primer> primers = populate_from_file("../data/test_merged.bed");
+  std::string bam = "../../data/test.sim.merged.sorted.bam";
+  std::vector<primer> primers = populate_from_file("../../data/test_merged.bed");
   int max_primer_len = 0;
   max_primer_len = get_bigger_primer(primers);
   std::string region_;

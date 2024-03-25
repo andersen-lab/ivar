@@ -20,8 +20,8 @@ int test_trim(uint8_t min_qual, uint8_t sliding_window, bool no_write_flag,
 
   bam1_t *aln = bam_init1();
 
-  std::string bam = "../data/test.unmapped.sorted.bam";
-  std::string bed = "../data/test.bed";
+  std::string bam = "../../data/test.unmapped.sorted.bam";
+  std::string bed = "../../data/test.bed";
   std::string pair_info = "";
   int32_t primer_offset = 0;
   std::string prefix = "/tmp/trim";

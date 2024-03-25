@@ -5,7 +5,7 @@
 
 int main() {
   int success = 0;
-  std::string bam = "../data/test.sorted.bam";
+  std::string bam = "../../data/test.sorted.bam";
   std::string region_;
   samFile *in = hts_open(bam.c_str(), "r");
   hts_idx_t *idx = sam_index_load(in, bam.c_str());

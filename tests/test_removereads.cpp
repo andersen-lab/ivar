@@ -8,18 +8,18 @@
 int main() {
   int num_success = 0, num_tests = 1;
   std::vector<std::string> amp;
-  std::ifstream fin("../data/test.masked_primer_indices.txt");
+  std::ifstream fin("../../data/test.masked_primer_indices.txt");
   std::string s, region = "Consensus_ZI-27_threshold_0_quality_20";
   while (getline(fin, s, '\t')) {
     amp.push_back(s);
   }
   rmv_reads_from_amplicon(
-      "../data/test.trimmed.sorted.bam", "", "../data/test.trimmed.masked", amp,
-      "../data/test.bed",
+      "../../data/test.trimmed.sorted.bam", "", "../../data/test.trimmed.masked", amp,
+      "../../data/test.bed",
       "@PG\tID:ivar-removereads\tPN:ivar\tVN:1.0.0\tCL:ivar removereads -i "
       "../data/test.trimmed.sorted.bam -p ../data/test.trimmed.masked -t "
       "../data/test.masked_primer_indices.txt -b ../data/test.bed\n\0");
-  std::string out_file = "../data/test.trimmed.masked.bam";
+  std::string out_file = "../../data/test.trimmed.masked.bam";
   samFile *in = hts_open(out_file.c_str(), "r");
   bam_hdr_t *header = sam_hdr_read(in);
   hts_itr_t *iter = NULL;

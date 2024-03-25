@@ -8,10 +8,10 @@
 int call_var_check_outfile(std::string prefix, uint8_t min_qual,
                            uint8_t min_depth, double min_threshold,
                            std::string out[], int len) {
-  std::string path = "../data/test.indel.mpileup";
+  std::string path = "../../data/test.indel.mpileup";
   std::ifstream mplp(path);
   call_variants_from_plup(mplp, prefix, min_qual, min_threshold, min_depth,
-                          "../data/db/test_ref.fa", "../data/test.gff");
+                          "../../data/db/test_ref.fa", "../../data/test.gff");
   std::ifstream outFile(prefix + ".tsv");
   std::string l;
   getline(outFile, l);  // Ignore first line
@@ -62,15 +62,15 @@ int main() {
   // Minimum depth threshold. Should be empty
   std::string t_25_03_20[] = {};
   num_success =
-      call_var_check_outfile("../data/test.indel", 20, 0, 0.02, t_20_02_1, 4);
+      call_var_check_outfile("../../data/test.indel", 20, 0, 0.02, t_20_02_1, 4);
   std::cout << num_success << std::endl;
   num_success +=
-      call_var_check_outfile("../data/test.indel2", 20, 0, 0.03, t_20_03, 3);
+      call_var_check_outfile("../../data/test.indel2", 20, 0, 0.03, t_20_03, 3);
   std::cout << num_success << std::endl;
   num_success +=
-      call_var_check_outfile("../data/test.indel3", 25, 0, 0.03, t_25_03, 3);
+      call_var_check_outfile("../../data/test.indel3", 25, 0, 0.03, t_25_03, 3);
   std::cout << num_success << std::endl;
-  num_success += call_var_check_outfile("../data/test.indel4", 25, 20, 0.03,
+  num_success += call_var_check_outfile("../../data/test.indel4", 25, 20, 0.03,
                                         t_25_03_20, 0);
   std::cout << num_success << std::endl;
   if (num_success == 0) return 0;
