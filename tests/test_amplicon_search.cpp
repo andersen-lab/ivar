@@ -35,10 +35,10 @@ int test_amplicon_search(std::string bam_file, std::string bed_file,
 
 int main() {
   int success;
-  std::string bam = "../data/test_amplicon.sorted.bam";
-  std::string pair_indice = "../data/pair_info_2.tsv";
+  std::string bam = "../../data/test_amplicon.sorted.bam";
+  std::string pair_indice = "../../data/pair_info_2.tsv";
   int32_t primer_offset = 0;
-  std::string bed = "../data/test_isize.bed";
+  std::string bed = "../../data/test_isize.bed";
   std::string prefix = "/tmp/data/trim_amplicon";
   std::string bam_out = "/tmp/trim_amplicon.bam";
 

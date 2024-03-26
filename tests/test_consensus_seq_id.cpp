@@ -7,7 +7,7 @@
 
 int call_cns_check_outfile(std::string seq_id, std::string prefix, char gap,
                            bool call_min_depth, int min_depth) {
-  std::string path = "../data/test.gap.sorted.mpileup";
+  std::string path = "../../data/test.gap.sorted.mpileup";
   std::string expctd_hdr = "";
   std::ifstream mplp(path);
   call_consensus_from_plup(mplp, seq_id, prefix, 20, 0, min_depth, gap,
@@ -38,12 +38,12 @@ int main() {
       "GMAGCGGAGGTCACKAGACGTGGGAGTGCATACTATATGTACTTGGACWGAAACGATGCKGGGGAGGCCATA"
       "TCTTTTCCAACCACATTGGGGTTGAATAAGTG";
   num_success =
-      call_cns_check_outfile("TESTID", "../data/test.gap", '-', true, 0);
+      call_cns_check_outfile("TESTID", "../../data/test.gap", '-', true, 0);
   std::cout << num_success << std::endl;
-  num_success += call_cns_check_outfile("", "../data/test.gap", 'N', true, 0);
+  num_success += call_cns_check_outfile("", "../../data/test.gap", 'N', true, 0);
   std::cout << num_success << std::endl;
   num_success +=
-      call_cns_check_outfile("TESTID2", "../data/test.gap", 'N', false, 0);
+      call_cns_check_outfile("TESTID2", "../../data/test.gap", 'N', false, 0);
   std::cout << num_success << std::endl;
   if (num_success == 0) return 0;
   return -1;

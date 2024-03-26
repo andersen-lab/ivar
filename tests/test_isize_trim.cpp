@@ -20,12 +20,12 @@ int test_isize_trim(uint8_t min_qual, uint8_t sliding_window,
 
   bam1_t *aln = bam_init1();
 
-  std::string bam = "../data/test_isize.sorted.bam";
-  std::string bed = "../data/test_isize.bed";
+  std::string bam = "../../data/test_isize.sorted.bam";
+  std::string bed = "../../data/test_isize.bed";
   std::string pair_info = "";
   int32_t primer_offset = 0;
-  std::string prefix = "../data/trim_isize";
-  std::string bam_out = "../data/trim_isize.bam";
+  std::string prefix = "../../data/trim_isize";
+  std::string bam_out = "../../data/trim_isize.bam";
 
   std::string region_ = "";
   std::string cmd = "@PG\tID:ivar-trim\tPN:ivar\tVN:1.0.0\tCL:ivar trim\n";
