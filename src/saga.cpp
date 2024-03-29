@@ -135,8 +135,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       start_pos = aln->core.pos;
     }
     counter += 1;
-    //TESTLINES
-    //if(counter <  1400000 || counter > 1450000) continue;
     overlapping_primers.clear();
     if(strand == '+'){
       if(start_pos >= 10){

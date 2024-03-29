@@ -18,7 +18,6 @@
 #include "trim_primer_quality.h"
 #include "gmm.h"
 #include "saga.h"
-#include "population_estimate.h"
 
 const std::string VERSION = "1.4.2";
 
@@ -49,9 +48,6 @@ struct args_t {
   bool keep_for_reanalysis;      // -k
   //contam params
   std::string variants;         // -s
-  float evol_rate;              // -e
-  std::string sample_date;      // -d
-  std::string ref_date;         // -r 
 } g_args;
 
 void print_usage() {
@@ -77,8 +73,7 @@ void print_usage() {
 
 void print_contam_usage() {
   std::cout
-      << "Usage: ivar contam -e [<evol_rate>] -d <sample_date> [-s <variants>] [-r "
-         "<ref_date>]\n\n"
+      << "Usage: ivar contam \n\n"
          "Input Options    Description\n"
          "           -i    BAM file, with aligned reads, to "
          "trim primers and quality. If not specified will use standard in\n"
@@ -337,7 +332,6 @@ int main(int argc, char *argv[]) {
     g_args.bed = "";
     g_args.primer_pair_file = "";
     g_args.primer_offset = 0;
-    g_args.evol_rate = 0.0;
     opt = getopt(argc, argv, contam_opt_str);
     while (opt != -1) {
       switch (opt) {
@@ -359,15 +353,6 @@ int main(int argc, char *argv[]) {
         case 's':
           g_args.variants = optarg;
           break;
-        case 'e':
-          g_args.evol_rate = std::stof(optarg);
-          break;
-        case 'd':
-          g_args.sample_date = optarg;
-          break;
-        case 'r':
-          g_args.ref_date = optarg;
-          break;
         case 'h':
         case '?':
           print_trim_usage();
@@ -376,11 +361,7 @@ int main(int argc, char *argv[]) {
       }
       opt = getopt(argc, argv, contam_opt_str);
     }
-    if (!(g_args.evol_rate == 0.0) && !g_args.variants.empty() && !g_args.sample_date.empty() && !g_args.ref_date.empty()) {
-      res = estimate_populations(g_args.variants, g_args.evol_rate, g_args.sample_date, g_args.ref_date);
-      //print_contam_usage();
-      //return -1;
-    } else if (!g_args.variants.empty() && !g_args.prefix.empty()) {
+    if (!g_args.variants.empty() && !g_args.prefix.empty()) {
       std::vector<uint32_t> populations_iterate;
       for(uint32_t i= 2; i <= 6; i++){
         populations_iterate.push_back(i);
