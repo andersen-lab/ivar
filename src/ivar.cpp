@@ -363,7 +363,7 @@ int main(int argc, char *argv[]) {
     }
     if (!g_args.variants.empty() && !g_args.prefix.empty()) {
       std::vector<uint32_t> populations_iterate;
-      for(uint32_t i= 2; i <= 6; i++){
+      for(uint32_t i= 2; i <= 7; i++){
         populations_iterate.push_back(i);
       }
       res = gmm_model(g_args.variants, populations_iterate, g_args.prefix);
