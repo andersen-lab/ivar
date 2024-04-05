@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "call_consensus_pileup.h"
+#include "call_consensus_clustering.h"
 #include "call_variants.h"
 #include "get_common_variants.h"
 #include "get_masked_amplicons.h"
@@ -366,14 +367,12 @@ int main(int argc, char *argv[]) {
       for(uint32_t i= 2; i <= 7; i++){
         populations_iterate.push_back(i);
       }
-      res = gmm_model(g_args.variants, populations_iterate, g_args.prefix);
+      std::vector<variant> variants = gmm_model(g_args.variants, populations_iterate, g_args.prefix);
+      cluster_consensus(variants, g_args.prefix);
     }
     res = 0; 
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
-    //res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
-    //                           cl_cmd.str(),
-    //                           g_args.primer_pair_file, g_args.primer_offset);
-    //res = gmm_model(g_args.prefix);
+    //cluster_consensus();
   }
 
   //ivar saga

@@ -20,7 +20,6 @@ add_executable(ivar
         interval_tree.cpp
         saga.cpp
         gmm.cpp
-        population_estimate.cpp
         call_consensus_clustering.cpp
         ${armadillo_src}
 )

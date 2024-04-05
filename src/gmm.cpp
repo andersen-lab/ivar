@@ -68,8 +68,7 @@ std::vector<double> determine_clusters(std::vector<variant> variants, uint32_t n
         squared_sum += std::pow(num - mean, 2);
     }
     double stddev = std::sqrt(squared_sum / clusters[i].size());
-    std::cerr << "mean " << mean << " std " << stddev << std::endl;
-
+    //std::cerr << "mean " << mean << " std " << stddev << std::endl;
     std_devs.push_back(stddev);
   }
   return(std_devs);
@@ -739,7 +738,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
   } 
 }
 
-int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std::string output_prefix){
+std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std::string output_prefix){
   int retval = 0;
   float lower_bound = 0.01;
   float upper_bound = 0.99;
@@ -778,7 +777,6 @@ int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std
   std::vector<double> all_aic; //aic for each population
   std::vector<std::vector<variant>> all_variants;
   //try various clusters
-  std::cerr << "num useful vars " << useful_var << std::endl;
   for(auto n : populations_iterate){
     variants.clear();
     parse_internal_variants(prefix, variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, low_quality_positions, round_val);
@@ -816,7 +814,7 @@ int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std
     model.set_means(mean_fill);
     means.clear();
     for(auto x : model.means){
-      std::cerr << x << std::endl;
+      //std::cerr << x << std::endl;
       means.push_back((double) x);
     }
 
@@ -829,10 +827,10 @@ int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std
           cov.col(l) = 0.001;
         }
     }
-    std::cerr << "hefts " << model.hefts << std::endl; 
-    std::cerr << model.means << std::endl;
+    //std::cerr << "hefts " << model.hefts << std::endl; 
+    //std::cerr << model.means << std::endl;
     model.set_dcovs(cov);
-    std::cerr << model.dcovs << std::endl;
+    //std::cerr << model.dcovs << std::endl;
 
     //get the probability of each frequency being assigned to each gaussian
     std::vector<std::vector<double>> prob_matrix;
@@ -865,16 +863,16 @@ int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std
     for(uint32_t i=0; i < variants.size(); i++){
       if(!variants[i].amplicon_flux && !variants[i].depth_flag && !variants[i].outside_freq_range && !variants[i].qual_flag && !variants[i].del_flag && !variants[i].amplicon_masked && !variants[i].primer_masked){
         double prob = variants[i].probabilities[variants[i].cluster_assigned];
-        if(variants[i].freq > 0.75 && variants[i].freq < 0.85){
+        /*if(variants[i].freq > 0.75 && variants[i].freq < 0.85){
           std::cerr << variants[i].cluster_assigned << " " << variants[i].freq << " " << variants[i].position << " " << prob << std::endl;
-        }
+        }*/
         prob_sum += prob;
       }
     }
     solutions.push_back(means);
     means.clear();  
     double aic = (2 * (double)n) - (2 * prob_sum / (double)useful_var);
-    std::cerr << "aic " << aic << "\n" << std::endl;
+    //std::cerr << "aic " << aic << "\n" << std::endl;
     all_aic.push_back(aic);
     //draw the actual threshold
     //double threshold = calculate_cluster_bounds(variants, n);
@@ -897,10 +895,9 @@ int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std
     }
   }
 
-  //std::vector<double> means = determine_clusters(used_variants, populations_iterate[index]);
-  for(auto x : means){
+  /*for(auto x : means){
     std::cerr << x << std::endl;
-  }
+  }*/
 
   std::ofstream file;  
   file.open(output_prefix + ".txt", std::ios::trunc);
@@ -912,23 +909,12 @@ int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std
   }
   means_string += "]";
 
-  std::vector<double> std_devs = determine_clusters(used_variants, means.size());
-
-  std::string std_dev_string = "[";
-  for(uint32_t j=0; j < std_devs.size(); j++){
-    if(j != 0) std_dev_string += ",";
-    std_dev_string += std::to_string(std_devs[j]);
-  }
-  std_dev_string += "]";
-
-  file << "means\tcluster_stddev\tuseful_var\n";
+  file << "means\tuseful_var\n";
   file << means_string << "\t";
-  file << std_dev_string << "\t";
   file << std::to_string(useful_var) << "\n";
   file.close();
 
- 
-  exit(1);
+  return(used_variants);
 
   //here we now define the two criteria in which we eliminate things as being contaminated
   //1. the solution is not solveable for identity reasons
@@ -966,7 +952,6 @@ int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std
     max_solution = *std::max_element(sizes.begin(), sizes.end());  
     max_solution = 1;
   }
-  bool solveable = true;
   for(uint32_t i=0; i < max_solution; i++){
     std::vector<double> values;
     for(auto vec : kept_solutions){
@@ -978,7 +963,6 @@ int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std
     double first_val = values[0];
     for(auto x : values){
       if(x != first_val){ 
-        solveable = false;
         break;
       }
     }
@@ -1005,21 +989,4 @@ int gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std
     }
   }
   means_string += "]";
-  //std::ofstream file;  
-  file.open(output_prefix + ".txt", std::ios::trunc);
-  file << "means\tsolutions\taic\tnum_solutions\tidentity_issue\tuseful_var\n";
-  file << peaks_string << "\t";
-  file << means_string << "\t";
-  file << std::to_string(all_aic[index]) << "\t";
-  file << std::to_string(kept_solutions.size()) << "\t";
-  if(solveable){
-    file << "false\t";
-  } else {
-    file << "true\t";
-  }
-  file << std::to_string(useful_var) << "\n";
-  file.close();
-  cluster_consensus();
-
-  return(retval);
 }
