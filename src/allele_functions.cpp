@@ -55,7 +55,9 @@ uint32_t sum_allele_depths(std::vector<allele> test){
 
 void position::update_alleles(std::string nt, uint32_t count, uint32_t qual, bool ref){
   //update overall positions depth
-  depth += count;
+  if(nt.find("+") == std::string::npos){
+    depth += count;
+  }
   //check if in allele vector
   int exists = check_allele_exists(nt, alleles);
   //TODO we haven't accounted for quality yet

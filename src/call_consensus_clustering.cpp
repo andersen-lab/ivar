@@ -6,12 +6,14 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
+#include <numeric>
 
-void determine_assignment_status(variant var){
-  std::cerr << var.position << " " << var.nuc << std::endl;
-  std::cerr << "cluster outlier " << var.cluster_outlier << std::endl;
-  std::cerr << "low prob " << var.low_prob_flag << std::endl;
-  exit(1);
+int determine_assignment_status(variant var){
+  if(!var.cluster_outlier && !var.low_prob_flag){
+    return(var.cluster_assigned);
+  }else{
+    return(-1);
+  }
 }
 
 std::vector<float> parse_string_to_vector(const std::string& str) {
@@ -55,7 +57,6 @@ std::vector<float> parse_clustering_results(std::string clustering_file){
 void cluster_consensus(std::vector<variant> variants, std::string clustering_file){ 
   //output string
   float freq_upper_bound = 0.99;
-  std::string consensus_sequence = "";
   
   //techncially what we should do here is reload the model and reassign all variants including those that got excluded in the first pass
     
@@ -65,6 +66,11 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   auto largest = std::max_element(means.begin(), means.end());
   int index_max_cluster = std::distance(means.begin(), largest);   
 
+  for(auto x : means){
+    std::cerr <<  x << " ";
+  } 
+  std::cerr << "\n";
+  std::cerr << "index max cluster " << index_max_cluster << std::endl;
   //find the largest position in the variants file
   uint32_t max_position = 0;
   for(auto x : variants){
@@ -75,27 +81,30 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
 
   //populate a consensus vector with empty strings
   std::vector<std::string> consensus_vector(max_position, "N");  
-
+  
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
-    if(variants[i].cluster_assigned == index_max_cluster){
-      uint32_t position = variants[i].position;
-      determine_assignment_status(variants[i]);
-      consensus_vector[position-1] = variants[i].nuc;
+   uint32_t position = variants[i].position;
+   if(position == 23){
+    std::cerr << variants[i].freq << " " << variants[i].nuc << " " << variants[i].cluster_assigned << std::endl;
+   }
+   if(variants[i].cluster_assigned == index_max_cluster){
+      int assign = determine_assignment_status(variants[i]);
+      if(assign == index_max_cluster){
+        consensus_vector[position-1] = variants[i].nuc;
+      }
       //std::cerr << variants[i].nuc << " " << variants[i].position << std::endl;
     } else if(variants[i].freq > freq_upper_bound) {
-      uint32_t position = variants[i].position;
       consensus_vector[position-1] = variants[i].nuc;
     }
   }
- 
-  //count number of N
-  uint32_t empty = 0;
-  for(uint32_t i=0; i < consensus_vector.size(); i++){
-    if(consensus_vector[i] == "N"){
-      empty += 1;    
-    }  
-  }
-  std::cerr << empty << std::endl;
- 
+  std::cerr << consensus_vector[22] << std::endl;
+  //stitch to a consensus string 
+  std::string consensus_sequence = std::accumulate(consensus_vector.begin(), consensus_vector.end(), std::string(""));
+  //write the consensus string to file
+  std::string consensus_filename = clustering_file + ".fa";
+  std::ofstream file(consensus_filename);
+  file << ">test_sequence_name" << "\n";
+  file << consensus_sequence;
+  file.close(); 
 }
