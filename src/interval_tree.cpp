@@ -80,7 +80,6 @@ void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
 }
 
 void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, uint8_t* qual, std::string qname) {
-  std::string test = "";
   uint32_t consumed_query = 0;
   uint32_t consumed_ref = 0;
   std::vector<uint32_t> sc_positions; //sc positions            
@@ -128,9 +127,6 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
       nuc.clear();
       nuc = convert.str();
       int avg_q = (int)q/nuc.size();
-      if(qname == test){
-        std::cerr << nuc << " " << q << " avg qual " << avg_q << " " << start_pos+consumed_ref << std::endl;
-      }
       std::string nuc = "+" + convert.str();
       //check if this position exists
       int  exists = check_position_exists(start_pos+consumed_ref, variants);
@@ -226,6 +222,7 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
   nuc.clear();
   std::vector<uint32_t> seen_insertions;
   std::vector<uint32_t>::iterator i_it;
+  std::string test = "";
   //j is relative to the sequence and current pos to the reference
   for(uint32_t j=0; j < sequence.size(); j++){
     if(qname == test){
@@ -315,13 +312,6 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
           root->amp_positions[j].depth += tmp_pos[i].depth;
           std::vector<allele> new_alleles = add_allele_vectors(tmp_pos[i].alleles, root->amp_positions[j].alleles);
           root->amp_positions[j].alleles = new_alleles;
-          if(here_pos.pos == 28912){
-            for(uint32_t z =0; z < new_alleles.size(); z++){
-                if(new_alleles[z].nuc == "T"){
-                    std::cerr << new_alleles[z].is_ref << std::endl;
-                }
-            }
-          }
           break;
         }
       }

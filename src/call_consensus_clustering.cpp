@@ -56,8 +56,8 @@ std::vector<float> parse_clustering_results(std::string clustering_file){
 }
 void cluster_consensus(std::vector<variant> variants, std::string clustering_file){ 
   //output string
-  float freq_upper_bound = 0.99;
-  
+  float freq_upper_bound = 0.97;
+  float depth_cutoff = 10;  
   //techncially what we should do here is reload the model and reassign all variants including those that got excluded in the first pass
     
   //read in the cluster values
@@ -84,9 +84,16 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
+   //TODO
+   if(((float)variants[i].depth)*(1/variants[i].freq) < depth_cutoff){
+     continue;
+   } 
+   if(variants[i].qual < 20){
+     continue;
+   }
    uint32_t position = variants[i].position;
-   if(position == 23){
-    std::cerr << variants[i].freq << " " << variants[i].nuc << " " << variants[i].cluster_assigned << std::endl;
+   if(position == 2265){
+     std::cerr << " GMM pos " << variants[i].position << " freq " << variants[i].freq <<  " cluster " << variants[i].cluster_assigned << std::endl;
    }
    if(variants[i].cluster_assigned == index_max_cluster){
       int assign = determine_assignment_status(variants[i]);
@@ -95,10 +102,12 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       }
       //std::cerr << variants[i].nuc << " " << variants[i].position << std::endl;
     } else if(variants[i].freq > freq_upper_bound) {
+      if(position == 1930){
+        std::cerr << "here" << std::endl;
+      } 
       consensus_vector[position-1] = variants[i].nuc;
     }
   }
-  std::cerr << consensus_vector[22] << std::endl;
   //stitch to a consensus string 
   std::string consensus_sequence = std::accumulate(consensus_vector.begin(), consensus_vector.end(), std::string(""));
   //write the consensus string to file

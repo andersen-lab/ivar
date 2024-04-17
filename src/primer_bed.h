@@ -17,7 +17,7 @@ class cigarotype{
     std::vector<std::vector<uint8_t>> aux_tags; //auxillary tags
     std::vector<std::vector<uint8_t>> sequences; //sequences                        
     std::vector<std::vector<uint32_t>> qualities; //qualities                                             
-    std::vector<std::string> qnames; //TODO remove this at the end, qname
+    std::vector<std::vector<std::string>> qnames; //TODO remove this at the end, qname
   public:
     std::vector<std::vector<uint32_t>> get_cigarotypes();
     std::vector<std::vector<uint8_t>> get_aux_tags();
@@ -26,7 +26,7 @@ class cigarotype{
     std::vector<uint32_t> get_count_cigarotypes();
     std::vector<uint32_t> get_start_positions();
     std::vector<uint32_t> get_nlengths();
-    std::vector<std::string> get_qnames(); 
+    std::vector<std::vector<std::string>> get_qnames(); 
     void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality);
     int test = 12;
 
@@ -93,7 +93,7 @@ std::vector<std::vector<uint8_t>> get_sequences();
 std::vector<uint32_t> get_count_cigarotypes();
 std::vector<uint32_t> get_nlengths();
 std::vector<uint32_t> get_start_positions();
-std::vector<std::string> get_qnames();
+std::vector<std::vector<std::string>> get_qnames();
 void transform_mutations();
 void set_positions(position pos);
 std::vector<position> get_positions();

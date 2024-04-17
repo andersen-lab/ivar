@@ -819,11 +819,11 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
 
     for(uint32_t l=0; l < n;l++){
         if(means[l] >= 0.90 || means[l] <= 0.05){
-          cov.col(l) = 0.0005;
+          cov.col(l) = 0.005;
         } else if (means[l] < 0.80 && means[l] > 0.20) {
-          cov.col(l) = 0.0001;
+          cov.col(l) = 0.005;
         }else {
-          cov.col(l) = 0.001;
+          cov.col(l) = 0.005;
         }
     }
     //std::cerr << "hefts " << model.hefts << std::endl; 
@@ -859,7 +859,7 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
 
     for(uint32_t i=0; i < variants.size(); i++){
       double prob = variants[i].probabilities[variants[i].cluster_assigned];
-        /*if(variants[i].freq > 0.94 && variants[i].freq < 0.96){
+        /*if(variants[i].freq > 0.10 && variants[i].freq < 0.90){
           std::cerr << variants[i].cluster_assigned << " " << variants[i].freq << " " << variants[i].position << " " << prob << std::endl;
         }*/
       prob_sum += prob;
@@ -887,9 +887,14 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
   //look at all variants despite other parameters
   base_variants.clear();
   variants.clear();
+  deletion_positions.clear();
+  low_quality_positions.clear();
   parse_internal_variants(prefix, base_variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, low_quality_positions, round_val);
   for(uint32_t i=0; i < base_variants.size(); i++){
-    if(!base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag){
+    //if(base_variants[i].position == 2265){
+    //  std::cerr << base_variants[i].depth_flag << " " << base_variants[i].qual_flag << " " << base_variants[i].outside_freq_range << std::endl;
+    //}
+    if(!base_variants[i].outside_freq_range){
       useful_var += 1;
       variants.push_back(base_variants[i]);
     }
@@ -923,13 +928,19 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
   assign_variants_simple(variants, prob_matrix, index_mean, means);  
   std::ofstream file;  
   file.open(output_prefix + ".txt", std::ios::trunc);
-
   std::string means_string = "[";
   for(uint32_t j=0; j < means.size(); j++){
     if(j != 0) means_string += ",";
     means_string += std::to_string(means[j]);
   }
   means_string += "]";
+
+  //lets add back in the 100% variants
+  for(uint32_t i=0; i < base_variants.size(); i++){
+    if(base_variants[i].outside_freq_range){
+      variants.push_back(base_variants[i]);
+    }
+  }
 
   file << "means\n";
   file << means_string << "\n";

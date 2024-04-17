@@ -13,7 +13,7 @@ std::vector<std::vector<uint32_t>> cigarotype::get_qualities() { return qualitie
 
 std::vector<std::vector<uint8_t>> cigarotype::get_sequences() { return sequences; }
 
-std::vector<std::string> cigarotype::get_qnames() { return qnames; }
+std::vector<std::vector<std::string>> cigarotype::get_qnames() { return qnames; }
 
 std::vector<uint32_t> cigarotype::get_count_cigarotypes() { return count_cigarotypes; }
 
@@ -331,7 +331,7 @@ void primer::transform_mutations() {
   std::vector<std::vector<uint8_t>> sequences = this->get_sequences();
   std::vector<std::vector<uint8_t>> aux_tags = this->get_aux_tags();
   std::vector<uint32_t> counts = this->get_count_cigarotypes();
-  std::vector<std::string> qnames = this->get_qnames();
+  std::vector<std::vector<std::string>> qnames = this->get_qnames();
   std::vector<std::vector<uint32_t>> qualities = this->get_qualities(); 
   //this tracks all mutations at all positions
   std::string test = "";
@@ -346,7 +346,8 @@ void primer::transform_mutations() {
     std::vector<uint32_t> sc_positions; //sc positions            
     uint32_t ccount = counts[i];                                                     
     uint32_t start_pos = start_positions[i]; // pos after soft-clipped region
-    std::string qname = qnames[i];                                             
+    std::vector<std::string> all_qnames = qnames[i];                                             
+    std::string qname = all_qnames[0];
     uint32_t consumed_query = 0;
     uint32_t consumed_ref = 0;
     std::string nuc;
@@ -450,6 +451,18 @@ void primer::transform_mutations() {
         deleted_char = "";
         deletion = false;
         gather_digits += character;
+        int exists = check_position_exists(current_pos, positions);
+        if (exists != -1) {
+          positions[exists].update_alleles("-", ccount, 0, false);  
+        } else {
+          //add position to vector
+          position add_pos;
+          add_pos.pos = current_pos; //don't add a position
+          add_pos.update_alleles("-", ccount, 0, false);            
+          positions.push_back(add_pos);
+        } 
+        deletion_positions.push_back(current_pos);
+       
       } else if (isalpha(character) && deletion) {
         int exists = check_position_exists(current_pos, positions);
         if (exists != -1) {
@@ -635,6 +648,7 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
       }
       found = true;
       count_cigarotypes[i] += 1;
+      qnames[i].push_back(qname);
       for(uint32_t k = 0; k < qual_reformat.size(); k++){
         qualities[i][k] += (uint32_t) qual_reformat[k];
       }
@@ -655,8 +669,9 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
     ncigarotypes.push_back(start_pos);
     sequences.push_back(seq_reformat);
     aux_tags.push_back(aux_reformat);
-    qnames.push_back(qname);
-
+    std::vector<std::string> tmp;
+    tmp.push_back(qname);
+    qnames.push_back(tmp);
     uint32_t digit = 1;
     count_cigarotypes.push_back(digit);
     nlengths.push_back(nlength);

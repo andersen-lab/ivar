@@ -159,6 +159,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         if (overlapping_primers.size() > 0) break;
       }
     }
+
+
     bam1_t *r = aln;
     //get the md tag
     uint8_t *aux = bam_aux_get(aln, "MD");
@@ -188,7 +190,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       bool cont = true;
       for(uint32_t k =0; k < unpaired_primers.size(); k++){
         if (unpaired_primers[k].get_start() == start && unpaired_primers[k].get_end() == end){
-          amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln));
+          amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln));         
           outside_amp += 1;
           cont = false;
           continue;
