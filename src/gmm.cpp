@@ -332,22 +332,13 @@ void noise_resampler(int n, int index, std::vector<std::vector<uint32_t>> &possi
     }
   }
   std::vector<std::vector<uint32_t>> other_tmp;
-  if(n >= 2){
-    generate_permutations(tmp, 2, index, other_tmp);
-  }
-  if(n >= 3){
-    generate_permutations(tmp, 3, index, other_tmp);
-  }
+  generate_permutations(tmp, 2, index, other_tmp);
+  generate_permutations(tmp, 3, index, other_tmp);
   if(n >= 4){
     generate_permutations(tmp, 4, index, other_tmp);
   }
+   
   deduplicate_solutions(other_tmp, possible_permutations);
-  /*for(auto x : possible_permutations){
-    for(auto y : x){
-      std::cerr << y;
-    }
-    std::cerr << "\n";
-  }*/
 }
 
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations){
@@ -419,18 +410,14 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
   }
   //determine all possible permutations of assignments, disregard sum condition of E(u) ~= 1
   std::vector<std::vector<uint32_t>> possible_permutations;
-  perm_generator(n, 1, possible_permutations);
-  perm_generator(n, 2, possible_permutations);
-  perm_generator(n, 3, possible_permutations);
-  perm_generator(n, 4, possible_permutations);
+
+  //what do we do here when we have fewer than two groups
+  for(uint32_t i=1; i <= means.size(); i++){
+    perm_generator(n, i, possible_permutations);
+  } 
   if(smallest_peak < 0.05){
-    noise_resampler(n, index, possible_permutations, n-1);
-  }
-  /*for(uint32_t j=0; j <  means.size(); j++){
-    if(means[j] < 0.55 && means[j] > 0.45){
-      noise_resampler(n, j, possible_permutations, 2); 
-    }
-  }*/
+    noise_resampler(n, index, possible_permutations, 3);
+  } 
   //now we loop every unique position and assign the max prob combo of variants
   for(uint32_t i=0; i < unique_pos.size(); i++){
     std::vector<uint32_t> pos_idxs;
@@ -925,6 +912,7 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
   }
   //assign variants out based on probability, not taking into account condition of all variants for a pos ~= 1 
   uint32_t index_mean = smallest_value_index(means);
+  std::cerr << "smallest value index mean " << index_mean << std::endl;
   assign_variants_simple(variants, prob_matrix, index_mean, means);  
   std::ofstream file;  
   file.open(output_prefix + ".txt", std::ios::trunc);
