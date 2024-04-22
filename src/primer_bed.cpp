@@ -335,6 +335,7 @@ void primer::transform_mutations() {
   std::vector<std::vector<uint32_t>> qualities = this->get_qualities(); 
   //this tracks all mutations at all positions
   std::string test = "";
+  bool test_boolean = false;
   //here let's turn the cigar string into a vector of alleles specific to this primer
   //iterate all unique sequences
   for(uint32_t i=0; i < cigarotypes.size(); i++){
@@ -346,7 +347,20 @@ void primer::transform_mutations() {
     std::vector<uint32_t> sc_positions; //sc positions            
     uint32_t ccount = counts[i];                                                     
     uint32_t start_pos = start_positions[i]; // pos after soft-clipped region
-    std::vector<std::string> all_qnames = qnames[i];                                             
+    std::vector<std::string> all_qnames = qnames[i];
+    test_boolean = false;
+    for(auto xx : all_qnames){
+      if(xx == test){
+        std::cerr << "found test" << std::endl;
+        test_boolean = true;
+        std::cerr << cigarotype.size() << " " << sequence.size() << " " << start_pos << std::endl;
+        /*for(uint32_t j=0; j < cigarotype.size(); j++){
+          uint32_t op = bam_cigar_op(cigarotype[j]);
+          uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
+          std::cerr << op << " " << oplen << std::endl;
+        }*/
+      }
+    }                                             
     std::string qname = all_qnames[0];
     uint32_t consumed_query = 0;
     uint32_t consumed_ref = 0;
@@ -355,9 +369,6 @@ void primer::transform_mutations() {
     uint32_t total_soft_clipped = 0;
     uint32_t total_read_length = 0;
     //we'll use the cigar string to handle insertions
-    if(qname == test){
-      std::cerr << "current pos " << start_pos << std::endl;
-    }
     //if a ton of this read has been soft clipped, toss it out for quality reasons
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
@@ -369,13 +380,15 @@ void primer::transform_mutations() {
         total_read_length += oplen;
       }
     }
-    if((float)total_soft_clipped / (float)total_read_length > 0.50){
+    //std::cerr << "here" << std::endl;
+    /*if((float)total_soft_clipped / (float)total_read_length > 0.75){
       continue;
-    }
+    }*/
+    //std::cerr << "here again" << std::endl;
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
       uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
-      if (qname == test){
+      if (test_boolean){
         std::cerr << op << " " << oplen << std::endl;
       }
       //honestly this whole bit could be better - more general
@@ -440,9 +453,6 @@ void primer::transform_mutations() {
     uint32_t last_char = 0;
     for(uint32_t j=1; j < aux_tag.size(); j++){
       char character = (char) aux_tag[j];
-      if(test == qname){
-        std::cerr << "aux " << aux_tag[j] << " digits " << gather_digits << " current pos " << current_pos << " deletion " << deletion << " is digit " << isdigit(character) <<  std::endl;
-      }
       if (character == '^'){
         current_pos += std::stoi(gather_digits);
         gather_digits = "";
@@ -473,7 +483,7 @@ void primer::transform_mutations() {
           add_pos.pos = current_pos; //don't add a position
           add_pos.update_alleles("-", ccount, 0, false);            
           positions.push_back(add_pos);
-        } 
+        }
         deletion_positions.push_back(current_pos);
         current_pos += 1;
         deleted_char += character;
@@ -509,22 +519,14 @@ void primer::transform_mutations() {
     std::vector<uint32_t> seen_insertions;
     std::vector<uint32_t>::iterator i_it;
 
-    if(qname == test){
-      for(uint32_t z=0; z < deletion_positions.size(); z++){
-        std::cerr << "del " << deletion_positions[z] << std::endl;
-      }
-    }
-
+    bool last_del = false;
     //j is relative to the sequence and current pos to the reference
     for(uint32_t j=0; j < sequence.size(); j++){
-      if(test == qname){
-        std::cerr << "j " << j << " " << sequence[j] << " " << current_pos << std::endl;
-      }
-      //auto start = std::chrono::high_resolution_clock::now();
       std::vector<uint32_t>::iterator it = find(deletion_positions.begin(), deletion_positions.end(), current_pos); 
       if (it != deletion_positions.end()) {
         current_pos += 1;
         j -= 1;
+        last_del = true;
         continue;
       }
       it = find(ignore_sequence.begin(), ignore_sequence.end(), current_pos);
@@ -532,9 +534,6 @@ void primer::transform_mutations() {
       
       //handle insertions
       if (it != ignore_sequence.end() && i_it == seen_insertions.end()) {
-        if(qname == test){
-          std::cerr << j << " " << current_pos << " insertion" << std::endl;
-        }
         std::ostringstream convert;
         convert << sequence[j];
         nuc += convert.str();
@@ -560,7 +559,11 @@ void primer::transform_mutations() {
       //auto end2 = std::chrono::high_resolution_clock::now();
       //std::chrono::duration<double> duration2 = end2 - end;
       //std::cout << "Execution time 2: " << duration2.count() << " seconds." << std::endl;
-      current_pos += 1;
+      if(!last_del){
+        current_pos += 1;
+      } else{
+        last_del = false;
+      }
       std::ostringstream convert;
       bool ref = false;
       convert << sequence[j];
@@ -568,8 +571,11 @@ void primer::transform_mutations() {
       if (std::find(substitutions.begin(), substitutions.end(), current_pos) == substitutions.end()){
         ref = true;
       }
-      /*if(current_pos == 21661 && nuc == "T"){
-        std::cerr << qname << " " << ref << std::endl;
+      /*if(qname == test){
+        std::cerr << "j " << j << " cp " << current_pos << " " << nuc << std::endl;
+      }*/
+      /*if(test_boolean){
+        std::cerr << "j " << j << " current pos " << current_pos << " " << sequence[j] << std::endl;
       }*/
       int exists = check_position_exists(current_pos, positions);
       if (exists != -1) {
@@ -602,11 +608,11 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
   uint32_t length=0;
   uint32_t ll=0;
   std::vector<uint32_t> useful;
-
   //first handle the array decay aspect
   for(uint32_t i=0; i < nlength; i++){
     cigar_reformat.push_back(cigar[i]);
     uint32_t op = bam_cigar_op(cigar[i]);
+    //std::cerr << op << " " << bam_cigar_oplen(cigar[i]) << std::endl;
     //consumes query
     if (bam_cigar_type(op) & 1){
       length = bam_cigar_oplen(cigar[i]);

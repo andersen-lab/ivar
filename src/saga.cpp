@@ -159,8 +159,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         if (overlapping_primers.size() > 0) break;
       }
     }
-
-
     bam1_t *r = aln;
     //get the md tag
     uint8_t *aux = bam_aux_get(aln, "MD");
@@ -177,7 +175,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     uint32_t *cigar = bam_get_cigar(r); 
     uint32_t nlength = r->core.n_cigar; 
     uint8_t *qualities = bam_get_qual(r);
-
+    std::string test =  "A01535:8:HJ3YYDSX2:4:2102:8106:18630";
     //this handles the case of reads outside of an amplicon
     if (overlapping_primers.size() == 0){
       amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln));

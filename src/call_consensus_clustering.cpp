@@ -92,7 +92,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
      continue;
    }
    uint32_t position = variants[i].position;
-   if(position == 2265){
+   if(position == 28){
      std::cerr << " GMM pos " << variants[i].position << " freq " << variants[i].freq <<  " cluster " << variants[i].cluster_assigned << std::endl;
    }
    if(variants[i].cluster_assigned == index_max_cluster){
