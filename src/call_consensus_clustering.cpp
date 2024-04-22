@@ -92,9 +92,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
      continue;
    }
    uint32_t position = variants[i].position;
-   if(position == 28){
-     std::cerr << " GMM pos " << variants[i].position << " freq " << variants[i].freq <<  " cluster " << variants[i].cluster_assigned << std::endl;
-   }
    if(variants[i].cluster_assigned == index_max_cluster){
       int assign = determine_assignment_status(variants[i]);
       if(assign == index_max_cluster){
@@ -102,9 +99,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       }
       //std::cerr << variants[i].nuc << " " << variants[i].position << std::endl;
     } else if(variants[i].freq > freq_upper_bound) {
-      if(position == 1930){
-        std::cerr << "here" << std::endl;
-      } 
       consensus_vector[position-1] = variants[i].nuc;
     }
   }

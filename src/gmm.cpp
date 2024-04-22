@@ -334,9 +334,7 @@ void noise_resampler(int n, int index, std::vector<std::vector<uint32_t>> &possi
   std::vector<std::vector<uint32_t>> other_tmp;
   generate_permutations(tmp, 2, index, other_tmp);
   generate_permutations(tmp, 3, index, other_tmp);
-  if(n >= 4){
-    generate_permutations(tmp, 4, index, other_tmp);
-  }
+  generate_permutations(tmp, 4, index, other_tmp);
    
   deduplicate_solutions(other_tmp, possible_permutations);
 }
@@ -914,6 +912,12 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
   uint32_t index_mean = smallest_value_index(means);
   std::cerr << "smallest value index mean " << index_mean << std::endl;
   assign_variants_simple(variants, prob_matrix, index_mean, means);  
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].position == 5094){
+      std::cerr << variants[i].freq << " " << variants[i].position << " " << variants[i].nuc << std::endl;
+      std::cerr << "cluster assign " << variants[i].cluster_assigned << std::endl;
+    }
+  }
   std::ofstream file;  
   file.open(output_prefix + ".txt", std::ios::trunc);
   std::string means_string = "[";
