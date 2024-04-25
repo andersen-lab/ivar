@@ -642,7 +642,6 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
   std::vector<primer> sorted_primers = insertionSort(primers, primers.size());
 
   std::vector<bam1_t *>::iterator aln_itr = alns.begin();
-
   // Iterate through reads
   while (iterate_aln(aln_itr, alns, header, in, aln) >= 0) {
     unmapped_flag = false;
@@ -665,7 +664,6 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
           continue;
         }
       }
-
       // isize is insert size
       // l_qseq is the query length
       isize_flag =
@@ -719,10 +717,8 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
           cit = std::find(primers.begin(), primers.end(), cand_primer);
           if (cit != primers.end()) cit->add_read_count(1);
         }
-
         // reverse primer unpaired read
         get_overlapping_primers(aln, primers, overlapping_primers, true);
-
         if (overlapping_primers.size() > 0) {
           primer_trimmed = true;
           cand_primer = get_min_start(overlapping_primers);
@@ -732,8 +728,8 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
           cit = std::find(primers.begin(), primers.end(), cand_primer);
           if (cit != primers.end()) cit->add_read_count(1);
         }
-        t = quality_trim(aln, min_qual, sliding_window);  // Quality Trimming
-        if (bam_is_rev(aln))                              // if reverse strand
+        t = quality_trim(aln, min_qual, sliding_window);  // Quality Trimming                                           
+        if (bam_is_rev(aln) && overlapping_primers.size() > 0) // if reverse strand with reverse primers trimmed
           aln->core.pos = t.start_pos;
         condense_cigar(&t);
         replace_cigar(aln, t.nlength, t.cigar);
