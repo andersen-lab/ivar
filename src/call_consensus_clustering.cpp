@@ -66,11 +66,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   auto largest = std::max_element(means.begin(), means.end());
   int index_max_cluster = std::distance(means.begin(), largest);   
 
-  for(auto x : means){
-    std::cerr <<  x << " ";
-  } 
-  std::cerr << "\n";
-  std::cerr << "index max cluster " << index_max_cluster << std::endl;
   //find the largest position in the variants file
   uint32_t max_position = 0;
   for(auto x : variants){
@@ -107,7 +102,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   //write the consensus string to file
   std::string consensus_filename = clustering_file + ".fa";
   std::ofstream file(consensus_filename);
-  file << ">test_sequence_name" << "\n";
+  file << ">"+clustering_file << "\n";
   file << consensus_sequence;
   file.close(); 
 }
