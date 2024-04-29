@@ -83,7 +83,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
    if(((float)variants[i].depth)*(1/variants[i].freq) < depth_cutoff){
      continue;
    } 
-   if(variants[i].qual < 20){
+   if(variants[i].qual < 20 && variants[i].nuc != "-"){
      continue;
    }
    uint32_t position = variants[i].position;
