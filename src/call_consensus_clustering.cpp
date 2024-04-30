@@ -62,6 +62,13 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     
   //read in the cluster values
   std::vector<float> means = parse_clustering_results(clustering_file);
+  //erase the largest "100%" cluster
+  float value_to_remove = 0.97;
+  // Remove the first occurrence of 'value_to_remove'
+  auto it = std::find(means.begin(), means.end(), value_to_remove);
+  if (it != means.end()) {
+    means.erase(it);
+  }
   //index the largest cluster
   auto largest = std::max_element(means.begin(), means.end());
   int index_max_cluster = std::distance(means.begin(), largest);   
