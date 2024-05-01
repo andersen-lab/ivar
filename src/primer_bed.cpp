@@ -335,7 +335,6 @@ void primer::transform_mutations() {
   std::vector<std::vector<uint32_t>> qualities = this->get_qualities(); 
   //this tracks all mutations at all positions
   std::string test = "";
-  bool test_boolean = false;
   //here let's turn the cigar string into a vector of alleles specific to this primer
   //iterate all unique sequences
   for(uint32_t i=0; i < cigarotypes.size(); i++){
@@ -348,19 +347,6 @@ void primer::transform_mutations() {
     uint32_t ccount = counts[i];                                                     
     uint32_t start_pos = start_positions[i]; // pos after soft-clipped region
     std::vector<std::string> all_qnames = qnames[i];
-    test_boolean = false;
-    for(auto xx : all_qnames){
-      if(xx == test){
-        std::cerr << "found test" << std::endl;
-        test_boolean = true;
-        std::cerr << cigarotype.size() << " " << sequence.size() << " " << start_pos << std::endl;
-        /*for(uint32_t j=0; j < cigarotype.size(); j++){
-          uint32_t op = bam_cigar_op(cigarotype[j]);
-          uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
-          std::cerr << op << " " << oplen << std::endl;
-        }*/
-      }
-    }                                             
     std::string qname = all_qnames[0];
     uint32_t consumed_query = 0;
     uint32_t consumed_ref = 0;
@@ -388,9 +374,7 @@ void primer::transform_mutations() {
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
       uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
-      if (test_boolean){
-        std::cerr << op << " " << oplen << std::endl;
-      }
+      //std::cerr << op << " " << oplen << std::endl;
       //honestly this whole bit could be better - more general
       //insertions
       if(op == 1){
@@ -444,7 +428,7 @@ void primer::transform_mutations() {
     //we will use the aux tag to handle deletions and substituitons
     bool deletion = false;
     bool substitution = false;
-    uint32_t current_pos = start_pos;
+    uint32_t current_pos = start_pos+1;
     std::vector<uint32_t> deletion_positions; //the aux tag does NOT recognize insertions
     std::vector<uint32_t> substitutions; //handle substitutions                                              
     std::string gather_digits = "";
@@ -461,6 +445,7 @@ void primer::transform_mutations() {
         deleted_char = "";
         deletion = false;
         gather_digits += character;
+        /*
         int exists = check_position_exists(current_pos, positions);
         if (exists != -1) {
           positions[exists].update_alleles("-", ccount, 0, false);  
@@ -471,8 +456,9 @@ void primer::transform_mutations() {
           add_pos.update_alleles("-", ccount, 0, false);            
           positions.push_back(add_pos);
         } 
+        std::cerr <<"h " << current_pos << std::endl;
         deletion_positions.push_back(current_pos);
-       
+        */
       } else if (isalpha(character) && deletion) {
         int exists = check_position_exists(current_pos, positions);
         if (exists != -1) {
@@ -511,6 +497,7 @@ void primer::transform_mutations() {
         gather_digits = "";
       } 
     }
+
     //now that we know where the insertions and deletions are, let's just iterate the query sequence and add it in, skipping problem positions
     current_pos = start_pos;
     bool prev_insertion = false;
@@ -522,8 +509,11 @@ void primer::transform_mutations() {
     bool last_del = false;
     //j is relative to the sequence and current pos to the reference
     for(uint32_t j=0; j < sequence.size(); j++){
-      std::vector<uint32_t>::iterator it = find(deletion_positions.begin(), deletion_positions.end(), current_pos); 
-      if (it != deletion_positions.end()) {
+      std::vector<uint32_t>::iterator it = find(deletion_positions.begin(), deletion_positions.end(), current_pos);
+      std::vector<uint32_t>::iterator it2 = find(deletion_positions.begin(), deletion_positions.end(), current_pos+1); 
+
+      if (it != deletion_positions.end() || it2 != deletion_positions.end()) {
+        //std::cerr << "in seq loop " << current_pos << std::endl;
         current_pos += 1;
         j -= 1;
         last_del = true;
@@ -571,12 +561,7 @@ void primer::transform_mutations() {
       if (std::find(substitutions.begin(), substitutions.end(), current_pos) == substitutions.end()){
         ref = true;
       }
-      /*if(qname == test){
-        std::cerr << "j " << j << " cp " << current_pos << " " << nuc << std::endl;
-      }*/
-      /*if(test_boolean){
-        std::cerr << "j " << j << " current pos " << current_pos << " " << sequence[j] << std::endl;
-      }*/
+      //std::cerr  << current_pos << " " << nuc << " " << j << std::endl;
       int exists = check_position_exists(current_pos, positions);
       if (exists != -1) {
         positions[exists].update_alleles(nuc, ccount, quality[j], ref);  

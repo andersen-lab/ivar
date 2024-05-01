@@ -124,7 +124,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   header = sam_hdr_read(in);
   add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
   aln = bam_init1();
-
   // Iterate through reads
   while (sam_read1(in, header, aln) >= 0) {
     strand = '+';
@@ -175,7 +174,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     uint32_t *cigar = bam_get_cigar(r); 
     uint32_t nlength = r->core.n_cigar; 
     uint8_t *qualities = bam_get_qual(r);
-    std::string test =  "A01535:8:HJ3YYDSX2:4:2102:8106:18630";
     //this handles the case of reads outside of an amplicon
     if (overlapping_primers.size() == 0){
       amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln));

@@ -908,16 +908,10 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
     variants[i].probabilities = tv[j];
     j++;
   }
+
   //assign variants out based on probability, not taking into account condition of all variants for a pos ~= 1 
   uint32_t index_mean = smallest_value_index(means);
-  std::cerr << "smallest value index mean " << index_mean << std::endl;
   assign_variants_simple(variants, prob_matrix, index_mean, means);  
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].position == 5094){
-      std::cerr << variants[i].freq << " " << variants[i].position << " " << variants[i].nuc << std::endl;
-      std::cerr << "cluster assign " << variants[i].cluster_assigned << std::endl;
-    }
-  }
   std::ofstream file;  
   file.open(output_prefix + ".txt", std::ios::trunc);
   std::string means_string = "[";

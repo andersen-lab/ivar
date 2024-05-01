@@ -56,22 +56,28 @@ std::vector<float> parse_clustering_results(std::string clustering_file){
 }
 void cluster_consensus(std::vector<variant> variants, std::string clustering_file){ 
   //output string
-  float freq_upper_bound = 0.97;
-  float depth_cutoff = 10;  
+  float depth_cutoff = 10; 
+  float freq_upper_bound = 0.97; 
   //techncially what we should do here is reload the model and reassign all variants including those that got excluded in the first pass
     
   //read in the cluster values
   std::vector<float> means = parse_clustering_results(clustering_file);
-  //erase the largest "100%" cluster
-  float value_to_remove = 0.97;
-  // Remove the first occurrence of 'value_to_remove'
-  auto it = std::find(means.begin(), means.end(), value_to_remove);
-  if (it != means.end()) {
-    means.erase(it);
-  }
-  //index the largest cluster
   auto largest = std::max_element(means.begin(), means.end());
-  int index_max_cluster = std::distance(means.begin(), largest);   
+  //index of the "100%" cluster
+  int universal_cluster = std::distance(means.begin(), largest);   
+
+  float largest_value = 0;
+  int index_max_cluster = -2;
+  //index the largest cluster
+  for(uint32_t j=0; j < means.size(); j++) {
+    if(means[j] > largest_value && means[j] != freq_upper_bound){
+      largest_value = means[j];
+      index_max_cluster = (int)j;
+    }
+  }
+  if(means[index_max_cluster] < 0.50){
+    index_max_cluster = -2;
+  }
 
   //find the largest position in the variants file
   uint32_t max_position = 0;
@@ -80,13 +86,10 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       max_position = x.position;
     }
   }  
-
   //populate a consensus vector with empty strings
   std::vector<std::string> consensus_vector(max_position, "N");  
-  
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
-   //TODO
    if(((float)variants[i].depth)*(1/variants[i].freq) < depth_cutoff){
      continue;
    } 
@@ -94,13 +97,13 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
      continue;
    }
    uint32_t position = variants[i].position;
+  
    if(variants[i].cluster_assigned == index_max_cluster){
       int assign = determine_assignment_status(variants[i]);
       if(assign == index_max_cluster){
         consensus_vector[position-1] = variants[i].nuc;
       }
-      //std::cerr << variants[i].nuc << " " << variants[i].position << std::endl;
-    } else if(variants[i].freq > freq_upper_bound) {
+    } else if(variants[i].cluster_assigned == universal_cluster || variants[i].freq > freq_upper_bound) {
       consensus_vector[position-1] = variants[i].nuc;
     }
   }
