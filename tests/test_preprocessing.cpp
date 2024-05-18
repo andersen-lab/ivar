@@ -1,7 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-
+#include "../src/ref_seq.h"
 #include "../src/allele_functions.h"
 
 int main(){

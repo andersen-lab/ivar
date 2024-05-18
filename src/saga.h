@@ -4,6 +4,7 @@
 #include "htslib/hts.h"
 #include "htslib/sam.h"
 #include "interval_tree.h"
+#include "ref_seq.h"
 #include "primer_bed.h"
 #ifndef saga
 #define saga

@@ -62,10 +62,19 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     
   //read in the cluster values
   std::vector<float> means = parse_clustering_results(clustering_file);
-  auto largest = std::max_element(means.begin(), means.end());
+  /*for(auto xx : means){
+    std::cerr << xx << " ";
+  }
+  std::cerr << "\n";*/
+ 
+  //solve the clustering?
   //index of the "100%" cluster
-  int universal_cluster = std::distance(means.begin(), largest);   
-
+  int universal_cluster = 0;
+  for(uint32_t j=0; j < means.size(); j++){
+    if(means[j] == freq_upper_bound){
+      universal_cluster = (int)j;
+    }
+  }
   float largest_value = 0;
   int index_max_cluster = -2;
   //index the largest cluster
@@ -85,7 +94,8 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     if(x.position > max_position){
       max_position = x.position;
     }
-  }  
+  } 
+  //std::cerr << index_max_cluster << " " << universal_cluster << std::endl;
   //populate a consensus vector with empty strings
   std::vector<std::string> consensus_vector(max_position, "N");  
   //iterate all variants and determine
@@ -97,7 +107,13 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
      continue;
    }
    uint32_t position = variants[i].position;
-  
+   if(variants[i].vague_assignment){
+     std::cerr << "vague assignment " << position << " " << variants[i].freq << " " << variants[i].nuc << " " << variants[i].amplicon_flux << " " << variants[i].primer_masked << std::endl;
+    for(auto xx : variants[i].probabilities){
+      std::cerr << xx << " ";
+    }
+    std::cerr << "\n";
+   }
    if(variants[i].cluster_assigned == index_max_cluster){
       int assign = determine_assignment_status(variants[i]);
       if(assign == index_max_cluster){

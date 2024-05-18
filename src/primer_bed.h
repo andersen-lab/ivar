@@ -4,6 +4,7 @@
 #include <sstream>
 #include <vector>
 #include "htslib/sam.h"
+#include "ref_seq.h"
 #include "allele_functions.h"
 #ifndef primer_bed
 #define primer_bed
@@ -70,7 +71,7 @@ class primer : public cigarotype{
   void set_indice(int16_t i);
   void set_read_count(uint32_t rc);
   void add_read_count(uint32_t rc);
-  void transform_mutations();
+  void transform_mutations(std::string ref_path);
   bool operator==(const primer& p) const {
     return (indice == p.get_indice()) ? true : false;
   }
@@ -94,7 +95,7 @@ std::vector<uint32_t> get_count_cigarotypes();
 std::vector<uint32_t> get_nlengths();
 std::vector<uint32_t> get_start_positions();
 std::vector<std::vector<std::string>> get_qnames();
-void transform_mutations();
+void transform_mutations(std::string ref_path);
 void set_positions(position pos);
 std::vector<position> get_positions();
 void populate_positions();

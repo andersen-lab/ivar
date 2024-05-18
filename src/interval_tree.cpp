@@ -53,7 +53,7 @@ void IntervalTree::detect_amplicon_overlaps(ITNode *root, uint32_t find_position
 void IntervalTree::detect_primer_issues(ITNode *root, uint32_t find_position){
   if (root==NULL) return;
   if (find_position < (uint32_t)root->data->low) return;
-  if(((uint32_t)root->data->low == find_position) || (find_position == (uint32_t)root->data->high+1)){
+  if(((uint32_t)root->data->low == find_position) || (find_position == (uint32_t)root->data->high)){
     std::vector<uint32_t> tmp;
     tmp.push_back((uint32_t)root->data->low);
     tmp.push_back((uint32_t)root->data->high);
@@ -67,14 +67,15 @@ void IntervalTree::detect_primer_issues(ITNode *root, uint32_t find_position){
 void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
   if (root==NULL) return;
   if (find_position < (uint32_t)root->data->low) return;
-  if(((uint32_t)root->data->low < find_position) && (find_position < (uint32_t)root->data->high)){
+  //if(((uint32_t)root->data->low < find_position) && (find_position < (uint32_t)root->data->high)){
     for(uint32_t i=0; i < root->amp_positions.size(); i++){
       if(find_position == root->amp_positions[i].pos){
         test_flux.push_back(root->amp_positions[i]);
+        test_test.push_back(root->data->low);
         break;
       }
     }
-  }
+  //}
   detect_abberations(root->right, find_position);
 
 }
@@ -304,6 +305,11 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
     for (uint32_t i=0; i < tmp_pos.size(); i++){
       position add_pos = tmp_pos[i];
       bool found = false;
+      if((prim.get_start() == 27623 || prim.get_start() == 27735) && add_pos.pos == 27752){
+        for(auto xx : add_pos.alleles){
+            std::cerr << xx.nuc << " " << xx.depth << std::endl;
+        }  
+      }
       // check if we already have a pos for this pos
       for(uint32_t j=0; j < root->amp_positions.size(); j++){
         position here_pos = root->amp_positions[j];
@@ -312,6 +318,12 @@ void IntervalTree::set_haplotypes(ITNode *root, primer prim){
           root->amp_positions[j].depth += tmp_pos[i].depth;
           std::vector<allele> new_alleles = add_allele_vectors(tmp_pos[i].alleles, root->amp_positions[j].alleles);
           root->amp_positions[j].alleles = new_alleles;
+          if((prim.get_start() == 27623 || prim.get_start() == 27735) && add_pos.pos == 27752){
+            std::cerr << root->data->low << " " << root->data->high << std::endl;
+            for(auto xx : root->amp_positions[j].alleles){
+                std::cerr << xx.nuc << " " << xx.depth << std::endl;
+            }
+          }
           break;
         }
       }

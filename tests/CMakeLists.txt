@@ -4,6 +4,8 @@ add_executable(check_primer_trim
         ../src/primer_bed.cpp
         ../src/interval_tree.cpp
         ../src/allele_functions.cpp
+        ../src/ref_seq.cpp
+        ../src/parse_gff.cpp
 )
 
 add_executable(check_trim
@@ -12,10 +14,12 @@ add_executable(check_trim
         ../src/primer_bed.cpp
         ../src/interval_tree.cpp
         ../src/allele_functions.cpp
+        ../src/ref_seq.cpp
+        ../src/parse_gff.cpp
 )
 
 add_executable(check_quality_trim
-        check_quality_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp
+        check_quality_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
 add_executable(check_consensus
@@ -51,40 +55,40 @@ add_executable(check_common_variants
 )
 
 add_executable(check_primer_bed
-        test_primer_bed.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp
+        test_primer_bed.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
 
 add_executable(check_getmasked
-        test_getmasked.cpp ../src/get_masked_amplicons.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp
+        test_getmasked.cpp ../src/get_masked_amplicons.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
 add_executable(check_removereads
-        test_removereads.cpp ../src/remove_reads_from_amplicon.cpp ../src/primer_bed.cpp ../src/trim_primer_quality.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp
+        test_removereads.cpp ../src/remove_reads_from_amplicon.cpp ../src/primer_bed.cpp ../src/trim_primer_quality.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
 add_executable(check_unpaired_trim
-        test_unpaired_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp
+        test_unpaired_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
 add_executable(check_primer_trim_edge_cases
-        test_primer_trim_edge_cases.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp
+        test_primer_trim_edge_cases.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
 add_executable(check_isize_trim
-        test_isize_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp
+        test_isize_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
 add_executable(check_interval_tree
-        test_interval_tree.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp
+        test_interval_tree.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
 add_executable(check_amplicon_search
-        test_amplicon_search.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp
+        test_amplicon_search.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
 add_executable(check_preprocessing
-        test_preprocessing.cpp ../src/allele_functions.cpp ../src/saga.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp
+        test_preprocessing.cpp ../src/allele_functions.cpp ../src/saga.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp
 )
 
 set(ALL_TEST_EXECUTABLES check_primer_trim

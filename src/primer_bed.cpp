@@ -1,5 +1,6 @@
 #include "primer_bed.h"
 #include "allele_functions.h"
+#include "ref_seq.h"
 #include <chrono>
 std::string primer::get_name() { return name; }
 
@@ -322,7 +323,7 @@ int populate_pair_indices(std::vector<primer>& primers, std::string path) {
   return 0;
 }
 
-void primer::transform_mutations() {
+void primer::transform_mutations(std::string ref_path) {
   /*
    * Take all recorded cigarotypes and transform them into positions relative to primer
    */
@@ -335,6 +336,7 @@ void primer::transform_mutations() {
   std::vector<std::vector<uint32_t>> qualities = this->get_qualities(); 
   //this tracks all mutations at all positions
   std::string test = "";
+  ref_antd refantd(ref_path, ""); 
   //here let's turn the cigar string into a vector of alleles specific to this primer
   //iterate all unique sequences
   for(uint32_t i=0; i < cigarotypes.size(); i++){
@@ -352,25 +354,74 @@ void primer::transform_mutations() {
     uint32_t consumed_ref = 0;
     std::string nuc;
     std::vector<uint32_t> ignore_sequence; //positions in query that are insertions
-    uint32_t total_soft_clipped = 0;
-    uint32_t total_read_length = 0;
+    //transform things over 
+    bool start = true;
+    uint32_t position_val = start_positions[i];
+    uint32_t relative_position = 0;
+    std::vector<std::vector<uint32_t>> soft_clipped;
+    std::vector<std::vector<uint32_t>> relative_soft_clipped;
+    uint32_t mismatched = 0;
+    uint32_t total = 0;
     //we'll use the cigar string to handle insertions
     //if a ton of this read has been soft clipped, toss it out for quality reasons
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
       uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
       if(op == 4){
-        total_soft_clipped += oplen;
-      }
-      if (bam_cigar_type(op) & 1){
-        total_read_length += oplen;
+        std::vector<uint32_t> tmp;
+        if(start){
+          tmp.push_back(position_val - oplen);
+          tmp.push_back(position_val);
+          soft_clipped.push_back(tmp);
+          tmp.clear();
+          tmp.push_back(relative_position);
+          tmp.push_back(relative_position + oplen);
+          relative_soft_clipped.push_back(tmp);
+          start = false;
+          relative_position += oplen;
+        } else{
+          tmp.clear();
+          tmp.push_back(position_val);
+          tmp.push_back(position_val+oplen);
+          soft_clipped.push_back(tmp);
+          tmp.clear();
+          tmp.push_back(relative_position);
+          tmp.push_back(relative_position + oplen);
+          relative_soft_clipped.push_back(tmp);
+        }
+      } else if(bam_cigar_type(op) & 1){
+        relative_position += oplen;
+        position_val += oplen;
       }
     }
-    //std::cerr << "here" << std::endl;
-    /*if((float)total_soft_clipped / (float)total_read_length > 0.75){
+    std::string soft_clipped_seq = "";
+    std::string ref_seq_val = "";
+
+    for (uint32_t k = 0; k < soft_clipped.size(); k++) {
+      uint32_t start = soft_clipped[k][0] + 1;
+      uint32_t end = soft_clipped[k][1] + 1;
+      uint32_t rel_start = relative_soft_clipped[k][0];
+      uint32_t rel_end = relative_soft_clipped[k][1];
+      soft_clipped_seq = "";
+      ref_seq_val = "";
+      // Retrieve soft-clipped sequence
+      for (uint32_t l = rel_start; l < rel_end; ++l) {
+        soft_clipped_seq += sequence[l];
+      }
+      for(uint32_t l = start; l < end; l++){
+        char ref = refantd.get_base(l, region);
+        ref_seq_val += ref;
+      }
+      for(uint32_t l=0; l < soft_clipped_seq.size(); l++){
+        total += 1;
+        if(soft_clipped_seq[l] != ref_seq_val[l]){
+          mismatched += 1;
+        }
+      }
+    }
+    if((float)mismatched / (float)total > 0.50){
       continue;
-    }*/
-    //std::cerr << "here again" << std::endl;
+    }
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
       uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
@@ -445,20 +496,6 @@ void primer::transform_mutations() {
         deleted_char = "";
         deletion = false;
         gather_digits += character;
-        /*
-        int exists = check_position_exists(current_pos, positions);
-        if (exists != -1) {
-          positions[exists].update_alleles("-", ccount, 0, false);  
-        } else {
-          //add position to vector
-          position add_pos;
-          add_pos.pos = current_pos; //don't add a position
-          add_pos.update_alleles("-", ccount, 0, false);            
-          positions.push_back(add_pos);
-        } 
-        std::cerr <<"h " << current_pos << std::endl;
-        deletion_positions.push_back(current_pos);
-        */
       } else if (isalpha(character) && deletion) {
         int exists = check_position_exists(current_pos, positions);
         if (exists != -1) {
@@ -477,7 +514,7 @@ void primer::transform_mutations() {
       } else if (isdigit(character) && !deletion) {
         if(substitution){
           for(uint32_t z=0; z < sub_char.size(); z++){
-            substitutions.push_back(current_pos + z + 1);
+            substitutions.push_back(current_pos + z);
           }
           substitution = false;
           sub_char.clear();
@@ -497,7 +534,6 @@ void primer::transform_mutations() {
         gather_digits = "";
       } 
     }
-
     //now that we know where the insertions and deletions are, let's just iterate the query sequence and add it in, skipping problem positions
     current_pos = start_pos;
     bool prev_insertion = false;
@@ -539,16 +575,10 @@ void primer::transform_mutations() {
         prev_insertion = false;
         nuc = "";
       }
-      //auto end = std::chrono::high_resolution_clock::now();
-      //std::chrono::duration<double> duration = end - start;
-      //std::cout << "Execution time: " << duration.count() << " seconds." << std::endl;
       it = find(sc_positions.begin(), sc_positions.end(), j);
       if (it != sc_positions.end()){
         continue;
       }
-      //auto end2 = std::chrono::high_resolution_clock::now();
-      //std::chrono::duration<double> duration2 = end2 - end;
-      //std::cout << "Execution time 2: " << duration2.count() << " seconds." << std::endl;
       if(!last_del){
         current_pos += 1;
       } else{
@@ -561,7 +591,6 @@ void primer::transform_mutations() {
       if (std::find(substitutions.begin(), substitutions.end(), current_pos) == substitutions.end()){
         ref = true;
       }
-      //std::cerr  << current_pos << " " << nuc << " " << j << std::endl;
       int exists = check_position_exists(current_pos, positions);
       if (exists != -1) {
         positions[exists].update_alleles(nuc, ccount, quality[j], ref);  
@@ -571,9 +600,6 @@ void primer::transform_mutations() {
         add_pos.update_alleles(nuc, ccount, quality[j], ref);            
         positions.push_back(add_pos);
       }
-      //auto end3 = std::chrono::high_resolution_clock::now();
-      //std::chrono::duration<double> duration3 = end3 - end2;
-      //std::cout << "Execution time 3: " << duration3.count() << " seconds." << std::endl; 
     }
   }
 }

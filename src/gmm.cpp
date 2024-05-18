@@ -38,42 +38,6 @@ std::vector<std::vector<double>> cluster_data(const std::vector<double>& data, c
     return clusters;
 }
 
-std::vector<double> determine_clusters(std::vector<variant> variants, uint32_t n){
-  std::vector<std::vector<double>> clusters(n); 
-  std::vector<double> std_devs;   
-
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(!variants[i].amplicon_flux && !variants[i].depth_flag && !variants[i].outside_freq_range && !variants[i].qual_flag && !variants[i].del_flag && !variants[i].amplicon_masked && !variants[i].primer_masked){
-      clusters[variants[i].cluster_assigned].push_back(variants[i].freq);
-      //std::cerr << variants[i].cluster_assigned << " " << variants[i].freq << std::endl;
-      /*if(variants[i].vague_assignment){
-        std::cerr << "cluster vague assignment " << variants[i].freq << " " << variants[i].position << std::endl;
-        continue;
-      }
-      if(variants[i].low_prob_flag){
-        std::cerr << "cluster low prob " << variants[i].freq << " " << variants[i].position << std::endl;
-        continue;
-      }
-      if(variants[i].cluster_outlier){
-        std::cerr << "cluster outlier " << variants[i].freq << " " << variants[i].position << std::endl;
-        continue;
-      }*/
-    }
-  } 
-  for(uint32_t i=0; i < clusters.size(); i++){
-    double sum = std::accumulate(clusters[i].begin(), clusters[i].end(), 0.0);
-    double mean = sum / clusters[i].size();
-    double squared_sum = 0.0;
-    for (double num : clusters[i]) {
-        squared_sum += std::pow(num - mean, 2);
-    }
-    double stddev = std::sqrt(squared_sum / clusters[i].size());
-    //std::cerr << "mean " << mean << " std " << stddev << std::endl;
-    std_devs.push_back(stddev);
-  }
-  return(std_devs);
-}
-
 uint32_t smallest_value_index(std::vector<double> values){
   double smallest_value = std::numeric_limits<double>::max();
   size_t index = 0;
@@ -353,7 +317,7 @@ void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_p
 }
 
 std::vector<uint32_t> compare_cluster_assignment(std::vector<std::vector<double>> prob_matrix, std::vector<uint32_t> assigned){
-  double threshold = 3;
+  double threshold = 2;
   std::vector<uint32_t> flagged_idx;
   for(uint32_t i=0; i < prob_matrix.size(); i++){
     double assigned_prob = prob_matrix[i][assigned[i]];
@@ -445,7 +409,7 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
        //this pos was flagged as poorly assigned
         if(tmp != assignment_flagged.end() && k == pos_idxs[j]){
           //technically this could use work as it's repetitive
-          //std::cerr << variants[z].position << " " << variants[z].freq << " " << assigned[j] << std::endl;
+          //std::cerr << variants[z].freq << " " << variants[z].position << std::endl;
           variants[z].vague_assignment = true; 
           variants[z].cluster_assigned = assigned[j];
           break;
@@ -661,7 +625,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     flag = row_values[5];
     amp_flag = row_values[6];
     primer_flag = row_values[7];
-    is_ref = row_values[8];
+    is_ref = row_values[9];
    
     variant tmp;
     tmp.position = pos;
@@ -682,7 +646,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       tmp.amplicon_masked = false;
     }
     if (primer_flag == "TRUE"){
-        tmp.primer_masked = true;
+        tmp.primer_masked = false;
     } else {
         tmp.primer_masked = false;
     }
@@ -803,16 +767,14 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
     }
 
     for(uint32_t l=0; l < n;l++){
-        if(means[l] >= 0.90 || means[l] <= 0.05){
+        if(means[l] >= 0.95 || means[l] <= 0.05){
           cov.col(l) = 0.005;
-        } else if (means[l] < 0.80 && means[l] > 0.20) {
-          cov.col(l) = 0.005;
-        }else {
-          cov.col(l) = 0.005;
+        } else {
+          cov.col(l) = 0.001;
         }
     }
     //std::cerr << "hefts " << model.hefts << std::endl; 
-    //std::cerr << model.means << std::endl;
+    std::cerr << model.means << std::endl;
     model.set_dcovs(cov);
     //std::cerr << model.dcovs << std::endl;
 
@@ -853,7 +815,7 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
     models.push_back(model);
     means.clear();  
     double aic = (2 * (double)n) - (2 * prob_sum / (double)useful_var);
-    //std::cerr << "aic " << aic << "\n" << std::endl;
+    std::cerr << "aic " << aic << "\n" << std::endl;
     all_aic.push_back(aic);
   }
   double smallest_value = std::numeric_limits<double>::max();
@@ -876,9 +838,9 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
   low_quality_positions.clear();
   parse_internal_variants(prefix, base_variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, low_quality_positions, round_val);
   for(uint32_t i=0; i < base_variants.size(); i++){
-    //if(base_variants[i].position == 2265){
-    //  std::cerr << base_variants[i].depth_flag << " " << base_variants[i].qual_flag << " " << base_variants[i].outside_freq_range << std::endl;
-    //}
+    /*if(base_variants[i].position == 1070){
+      std::cerr << base_variants[i].depth_flag << " " << base_variants[i].qual_flag << " " << base_variants[i].outside_freq_range << std::endl;
+    }*/
     if(!base_variants[i].outside_freq_range){
       useful_var += 1;
       variants.push_back(base_variants[i]);
@@ -927,7 +889,6 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
       variants.push_back(base_variants[i]);
     }
   }
-
   file << "means\n";
   file << means_string << "\n";
   file.close();

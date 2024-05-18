@@ -1,9 +1,10 @@
 #include "saga.h"
+#include "ref_seq.h"
 #include "trim_primer_quality.h"
 #include <fstream>
 #include <cmath>
 #include <chrono>
-
+#include <tuple>
 using namespace std::chrono;
 
 void generate_range(uint32_t start, uint32_t end, std::vector<uint32_t> &result) {
@@ -44,6 +45,10 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       return -1;
     }
   }
+  //load the reference sequence
+  std::string gff_path = "";
+  std::string ref_path = "/home/chrissy/sequence.fasta";
+  ref_antd refantd(ref_path, gff_path);  
 
   // calculate the primers that should cover each position
   std::vector<std::map<uint32_t, std::vector<primer>>> hash = find_primer_per_position(primers);
@@ -125,6 +130,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
   aln = bam_init1();
   // Iterate through reads
+  std::string test = "";
   while (sam_read1(in, header, aln) >= 0) {
     strand = '+';
     if (bam_is_rev(aln)) {
@@ -149,8 +155,12 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         if (overlapping_primers.size() > 0) break;
       }
     }else{
-      for (uint32_t i=lower_search; i < start_pos+10; i++)
-      {
+      if(start_pos >= 10){
+        lower_search = start_pos-10;
+      } else{
+        lower_search = 0;
+      }
+      for (uint32_t i=lower_search; i < start_pos+10; i++){
         if (i > amplicons.max_pos) continue;
         if (primer_map_reverse.find(i) != primer_map_reverse.end()){
           overlapping_primers = primer_map_reverse[i];
@@ -158,6 +168,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         if (overlapping_primers.size() > 0) break;
       }
     }
+    uint32_t ref_id = aln->core.tid;
+    std::string region = header->target_name[ref_id];
     bam1_t *r = aln;
     //get the md tag
     uint8_t *aux = bam_aux_get(aln, "MD");
@@ -174,6 +186,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     uint32_t *cigar = bam_get_cigar(r); 
     uint32_t nlength = r->core.n_cigar; 
     uint8_t *qualities = bam_get_qual(r);
+        
     //this handles the case of reads outside of an amplicon
     if (overlapping_primers.size() == 0){
       amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln));
@@ -207,54 +220,19 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   std::cerr << "counter " << counter << std::endl;
   std::cerr << "number of reads outside an amplicon: " << outside_amp << std::endl;
   //this is super time costly
+
   for(uint32_t i=0; i < primers.size(); i++){
     primers[i].populate_positions();
-    primers[i].transform_mutations();
+    primers[i].transform_mutations(ref_path);
   }
   std::cerr << "setting amplicon level haplotypes" << std::endl;
   for (uint32_t i=0; i < primers.size(); i++){
     amplicons.set_haplotypes(primers[i]);      
   }
-  std::vector<uint32_t> flagged_positions; 
-  std::cerr << "detecting variant abberations" << std::endl;
-  //detect fluctuating variants
-  for(uint32_t i=0; i < amplicons.max_pos; i++){
-    amplicons.test_flux.clear();
-    //this bit pushes all amp position vectors back to test_flux object
-    amplicons.detect_abberations(i);
-    if (amplicons.test_flux.size() < 2) continue;
-    std::map<std::string, std::vector<float>> allele_maps;
-    for(uint32_t j=0; j < amplicons.test_flux.size(); j++){
-      uint32_t total_depth = amplicons.test_flux[j].depth;
-      if(total_depth < 20){
-        break;
-      }
-      std::vector<allele> ad  = amplicons.test_flux[j].alleles;
-      for(uint32_t k=0; k < ad.size(); k++){
-        std::string nuc = ad[k].nuc;
-        uint32_t ad_depth = ad[k].depth;
-        float t = (float)ad_depth / (float)total_depth; 
-        if (allele_maps.find(nuc) != allele_maps.end()){
-          allele_maps[nuc].push_back(t);  
-        } else {
-          std::vector<float> tmp;
-          tmp.push_back(t);
-          allele_maps[nuc] = tmp;
-        }
-      }
-    }
-    std::map<std::string, std::vector<float>>::iterator it;
-    for (it = allele_maps.begin(); it != allele_maps.end(); it++){
-      float sd = calculate_standard_deviation(it->second);
-      //TODO this is hard coded, consider it
-      if (sd >= 0.05){
-        flagged_positions.push_back(i);
-        break;
-      }
-    }
-  }
+  //exit(1);  
   //combine amplicon counts to get total variants 
   amplicons.combine_haplotypes();
+  //detect primer binding issues
   std::vector<position> variants = amplicons.variants;
   //add in primer info
   for(uint32_t i=0; i < variants.size(); i++){
@@ -273,12 +251,102 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
           //find the amplicon associated with this primer
           amplicons.detect_primer_issues(primers[j].get_start());
         } else {
-          amplicons.detect_primer_issues(primers[j].get_end());
+          amplicons.detect_primer_issues(primers[j].get_end() + 1);
         }
       }
     }
   }
-
+  //then when we experience flux on primer bound issue amplicon, save adjusted depths
+  std::vector<uint32_t> flagged_positions; 
+  std::vector<std::tuple<uint32_t, uint32_t, std::string>> adjusted_depths; //holds adjusted depth info
+  std::cerr << "detecting variant abberations" << std::endl;
+  uint32_t test_pos = 0;
+  //detect fluctuating variants
+  for(uint32_t i=0; i < amplicons.max_pos; i++){
+    amplicons.test_flux.clear();
+    amplicons.test_test.clear();
+    
+    //this bit pushes all amp position vectors back to test_flux object
+    amplicons.detect_abberations(i);
+    if(i == test_pos){
+      for(auto xx : amplicons.test_test){
+        std::cerr << "test flux " << xx << std::endl;
+      }
+    }
+    if (amplicons.test_flux.size() < 2) continue;
+    
+    std::map<std::string, std::vector<float>> allele_maps;
+    for(uint32_t j=0; j < amplicons.test_flux.size(); j++){
+      if(i == test_pos){
+        std::cerr << "\n" << amplicons.test_test[j] << std::endl;
+      }
+      uint32_t total_depth = amplicons.test_flux[j].depth;
+      if(total_depth < 20){
+         continue;
+      }
+      std::vector<allele> ad  = amplicons.test_flux[j].alleles;
+      for(uint32_t k=0; k < ad.size(); k++){
+        std::string nuc = ad[k].nuc;
+        uint32_t ad_depth = ad[k].depth;
+        if(i == test_pos){
+          std::cerr << nuc << " " << ad_depth << " " << total_depth << std::endl;
+        }
+        float t = (float)ad_depth / (float)total_depth; 
+        if (allele_maps.find(nuc) != allele_maps.end()){
+          if(i == test_pos){
+            std::cerr << "allele map " << nuc << " " << t << std::endl;
+           }
+          allele_maps[nuc].push_back(t);  
+        } else {
+          std::vector<float> tmp;
+          tmp.push_back(t);
+          if(i == test_pos){
+            std::cerr << "allele map " << nuc << " " << t << std::endl;
+          }
+          allele_maps[nuc] = tmp;
+        }
+      }
+    }
+    std::map<std::string, std::vector<float>>::iterator it;
+    for (it = allele_maps.begin(); it != allele_maps.end(); it++){
+      float sd = calculate_standard_deviation(it->second);
+      if(i == test_pos){
+        std::cerr << i << " " << sd << " " << it->first << std::endl;
+      }
+      //TODO this is hard coded, consider it
+      if (sd >= 0.03){
+        for(auto overlap : amplicons.overlaps){
+            //identify amplicons with primer binding for this site
+            if(i < overlap[1] && i > overlap[0]){
+              //index this amplicon within the allele map
+              auto it = std::find(amplicons.test_test.begin(), amplicons.test_test.end(), overlap[0]);
+              uint32_t index;
+              if (it != amplicons.test_test.end()) {
+                index = (uint32_t)std::distance(amplicons.test_test.begin(), it);
+                position removal = amplicons.test_flux[index];
+                for(auto ad : removal.alleles){
+                  adjusted_depths.push_back(std::make_tuple(i, ad.depth, ad.nuc));
+                  //std::cerr << "remove this depth " << ad.nuc << " " << ad.depth << std::endl;
+                }
+              }
+            }
+        }
+        flagged_positions.push_back(i);
+        break;
+      }
+    }
+  }
+  //exit(1);
+  //TESTLINES print out the adjusted depth for sanity check
+  /*
+  for(uint32_t k=0; k < adjusted_depths.size(); k++){
+    uint32_t pos = std::get<0>(adjusted_depths[k]);
+    uint32_t depth = std::get<1>(adjusted_depths[k]);
+    std::string nuc = std::get<2>(adjusted_depths[k]);
+    std::cerr << pos << " " << nuc << " " << depth << std::endl;
+  }*/
+  //exit(1);
+ 
   std::vector<uint32_t> primer_binding_error;
   for(uint32_t i=0; i < amplicons.overlaps.size(); i++){
     generate_range(amplicons.overlaps[i][0], amplicons.overlaps[i][1], primer_binding_error);    
@@ -298,9 +366,18 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   //write variants to a file
   ofstream file;
   file.open(bam_out + ".txt", ios::trunc);
-  file << "POS\tALLELE\tDEPTH\tFREQ\tAVG_QUAL\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\tREF\n";
+  file << "POS\tALLELE\tDEPTH\tFREQ\tAVG_QUAL\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\tADJUSTED_DEPTH\tREF\n";
   for(uint32_t i=0; i < variants.size(); i++){
     for(uint32_t j=0; j < variants[i].alleles.size(); j++){
+      uint32_t adjusted_depth = 0;
+      for(uint32_t k=0; k < adjusted_depths.size(); k++){
+          uint32_t pos = std::get<0>(adjusted_depths[k]);
+          uint32_t depth = std::get<1>(adjusted_depths[k]);
+          std::string nuc = std::get<2>(adjusted_depths[k]);
+          if(pos == variants[i].pos && nuc == variants[i].alleles[j].nuc){
+            adjusted_depth = depth;
+          }
+      } 
       float freq = (float)variants[i].alleles[j].depth / (float)variants[i].depth;
       if((float)variants[i].alleles[j].depth == 0){
         continue;
@@ -330,6 +407,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       } else {
         file << "FALSE\t";
       }
+      //insert the adjusted depth into the file for potential primer binding locations
+      file << std::to_string(variants[i].alleles[j].depth-adjusted_depth) << "\t";
       if (variants[i].alleles[j].is_ref){
         file << "TRUE";
       } else {
