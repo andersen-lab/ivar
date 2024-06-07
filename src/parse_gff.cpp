@@ -85,6 +85,8 @@ int gff3_feature::get_phase() { return phase; }
 
 std::string gff3_feature::get_type() { return type; }
 
+char gff3_feature::get_strand() { return strand; }
+
 int64_t gff3_feature::get_edit_position() {
   int64_t edit_pos = -1;
   std::map<std::string, std::string>::iterator it;

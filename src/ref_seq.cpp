@@ -1,5 +1,25 @@
 #include "ref_seq.h"
 
+// Complement base array
+const unsigned char comp_base[256] = {
+    0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,
+   16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,
+   32, '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
+  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?',
+  '@', 'T', 'V', 'G', 'H', 'E', 'F', 'C', 'D', 'I', 'J', 'M', 'L', 'K', 'N', 'O',
+  'P', 'Q', 'Y', 'S', 'A', 'A', 'B', 'W', 'X', 'R', 'Z', '[', '\\',']', '^', '_',
+  '`', 't', 'v', 'g', 'h', 'e', 'f', 'c', 'd', 'i', 'j', 'm', 'l', 'k', 'n', 'o',
+  'p', 'q', 'y', 's', 'a', 'a', 'b', 'w', 'x', 'r', 'z', '{', '|', '}', '~', 127,
+ 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143,
+ 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
+ 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175,
+ 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191,
+ 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207,
+ 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223,
+ 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239,
+ 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
+};
+
 char ref_antd::get_base(int64_t pos, std::string region) {  // 1-based position
   int len;
   char base = 0;
@@ -9,6 +29,13 @@ char ref_antd::get_base(int64_t pos, std::string region) {  // 1-based position
   if (seq) base = *(seq + (pos - 1));
   free(seq);
   return base;
+}
+
+void ref_antd::reverse_complement_codon(char* codon) {
+    char temp = comp_base[(unsigned char)codon[2]];
+    codon[2] = comp_base[(unsigned char)codon[0]];
+    codon[0] = temp;
+    codon[1] = comp_base[(unsigned char)codon[1]];
 }
 
 char *ref_antd::get_codon(int64_t pos, std::string region,
@@ -53,6 +80,11 @@ char *ref_antd::get_codon(int64_t pos, std::string region,
       codon[i] = *(seq + codon_start_pos + i - edit_offset);
     }
   }
+
+  if (feature.get_strand() == '-') {
+      reverse_complement_codon(codon);
+  }
+
   free(seq);
   return codon;
 }
@@ -104,6 +136,11 @@ char *ref_antd::get_codon(int64_t pos, std::string region, gff3_feature feature,
   }
   alt_pos += edit_offset;
   codon[alt_pos - 1 - codon_start_pos] = alt;
+
+  if (feature.get_strand() == '-') {
+      reverse_complement_codon(codon);
+  }
+
   free(seq);
   return codon;
 }
@@ -168,10 +205,17 @@ int ref_antd::codon_aa_stream(std::string region,
     fout << codon2aa(alt_codon[0], alt_codon[1], alt_codon[2]) << "\t";
 
     // adding amino acid position
-    int64_t start = it->get_start();
-    int64_t aa_pos = ((pos - start) / 3) + 1;
-    fout << aa_pos;
-    fout << std::endl;
+    // factor in translation direction
+    char strand = it->get_strand();
+    int64_t aa_pos;
+    if (strand == '-') {
+      int64_t end = it->get_end();
+      aa_pos = ((end - pos) / 3) + 1;
+    } else { // when strand is equal to '+', '?', or others
+      int64_t start = it->get_start();
+      aa_pos = ((pos - start) / 3) + 1;
+    }
+    fout << aa_pos << std::endl;
 
     delete[] ref_codon;
     delete[] alt_codon;
