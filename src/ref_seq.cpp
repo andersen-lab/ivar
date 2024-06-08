@@ -3,21 +3,21 @@
 // Complement base array
 const unsigned char comp_base[256] = {
     0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,
-   16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,
-   32, '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
-  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?',
-  '@', 'T', 'V', 'G', 'H', 'E', 'F', 'C', 'D', 'I', 'J', 'M', 'L', 'K', 'N', 'O',
-  'P', 'Q', 'Y', 'S', 'A', 'A', 'B', 'W', 'X', 'R', 'Z', '[', '\\',']', '^', '_',
-  '`', 't', 'v', 'g', 'h', 'e', 'f', 'c', 'd', 'i', 'j', 'm', 'l', 'k', 'n', 'o',
-  'p', 'q', 'y', 's', 'a', 'a', 'b', 'w', 'x', 'r', 'z', '{', '|', '}', '~', 127,
- 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143,
- 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
- 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175,
- 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191,
- 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207,
- 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223,
- 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239,
- 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
+    16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,
+    32, '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?',
+    '@', 'T', 'V', 'G', 'H', 'E', 'F', 'C', 'D', 'I', 'J', 'M', 'L', 'K', 'N', 'O',
+    'P', 'Q', 'Y', 'S', 'A', 'A', 'B', 'W', 'X', 'R', 'Z', '[', '\\',']', '^', '_',
+    '`', 't', 'v', 'g', 'h', 'e', 'f', 'c', 'd', 'i', 'j', 'm', 'l', 'k', 'n', 'o',
+    'p', 'q', 'y', 's', 'a', 'a', 'b', 'w', 'x', 'r', 'z', '{', '|', '}', '~', 127,
+    128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143,
+    144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
+    160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175,
+    176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191,
+    192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207,
+    208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223,
+    224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239,
+    240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
 };
 
 char ref_antd::get_base(int64_t pos, std::string region) {  // 1-based position
@@ -46,7 +46,6 @@ char *ref_antd::get_codon(int64_t pos, std::string region,
   std::string edit_sequence = feature.get_edit_sequence();
   int64_t edit_sequence_size = edit_sequence.size();
   char *codon = new char[3];
-  int i;
   int64_t edit_offset = 0;
   if (pos > edit_pos + edit_sequence_size && edit_pos != -1) {
     edit_offset =
@@ -54,12 +53,22 @@ char *ref_antd::get_codon(int64_t pos, std::string region,
             ? edit_sequence_size
             : (pos - edit_pos);  // Account for edits in position of insertion
   }
-  codon_start_pos =
-      (feature.get_start() - 1) + feature.get_phase() +
-      (((pos + edit_offset - (feature.get_start() + feature.get_phase()))) /
-       3) *
-          3;
-  for (i = 0; i < 3; ++i) {
+  // codon_start_pos is w.r.t the reference sequence
+  if (feature.get_strand() == '-'){
+    codon_start_pos =
+        (feature.get_end() - 1) - feature.get_phase() -
+        (((feature.get_end() - feature.get_phase() - (pos + edit_offset))) /
+         3) *
+            3;
+    codon_start_pos -= 2; // This is to get to codon start from the 3' end and then take reverse complement
+  } else {
+    codon_start_pos =
+        (feature.get_start() - 1) + feature.get_phase() +
+        (((pos + edit_offset - (feature.get_start() + feature.get_phase()))) /
+         3) *
+            3;
+  }
+  for (int i = 0; i < 3; i++) {
     if (codon_start_pos + i < (int32_t)feature.get_start() - 1 ||
         codon_start_pos + i >
             (int32_t)feature.get_end() -
@@ -105,11 +114,22 @@ char *ref_antd::get_codon(int64_t pos, std::string region, gff3_feature feature,
             ? edit_sequence_size
             : (pos - edit_pos);  // Account for edits in position of insertion
   }
-  codon_start_pos =
-      (feature.get_start() - 1) + feature.get_phase() +
-      (((pos + edit_offset - (feature.get_start() + feature.get_phase()))) /
-       3) *
-          3;
+  //  TODO: Remove code duplication with function above
+  // codon_start_pos is w.r.t the reference sequence
+  if (feature.get_strand() == '-'){
+    codon_start_pos =
+        (feature.get_end() - 1) - feature.get_phase() -
+        (((feature.get_end() - feature.get_phase() - (pos + edit_offset))) /
+         3) *
+            3;
+    codon_start_pos -= 2; // This is to get to codon start from the 3' end and then take reverse complement
+  } else {
+    codon_start_pos =
+        (feature.get_start() - 1) + feature.get_phase() +
+        (((pos + edit_offset - (feature.get_start() + feature.get_phase()))) /
+         3) *
+            3;
+  }
   for (i = 0; i < 3; ++i) {
     if (codon_start_pos + i < edit_pos - 1 ||
         edit_pos == -1) {  // If before edit or with no edit
