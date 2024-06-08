@@ -1,6 +1,7 @@
 #include "ref_seq.h"
 
 // Complement base array
+// Source: https://github.com/samtools/samtools/blob/024e3d5ef0a2b0b7049f1fde6faebe8249988a06/faidx.c#L56
 const unsigned char comp_base[256] = {
     0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,
     16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,
