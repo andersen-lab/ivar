@@ -2,8 +2,8 @@ LIBS = -lhts -lz -lpthread
 
 CXXFLAGS = -g -std=c++11 -Wall -Wextra -Werror
 
-TESTS = check_primer_trim check_trim check_quality_trim check_consensus check_allele_depth check_consensus_threshold check_consensus_min_depth check_consensus_seq_id check_primer_bed check_getmasked check_removereads check_variants check_common_variants check_unpaired_trim check_primer_trim_edge_cases check_isize_trim check_interval_tree check_amplicon_search check_consensus_min_insert_threshold
-check_PROGRAMS = check_primer_trim check_trim check_quality_trim check_consensus check_allele_depth check_consensus_threshold check_consensus_min_depth check_consensus_seq_id check_primer_bed check_getmasked check_removereads check_variants check_common_variants check_unpaired_trim check_primer_trim_edge_cases check_isize_trim check_interval_tree check_amplicon_search check_consensus_min_insert_threshold
+TESTS = check_primer_trim check_trim check_quality_trim check_consensus check_allele_depth check_consensus_threshold check_consensus_min_depth check_consensus_seq_id check_primer_bed check_getmasked check_removereads check_variants check_common_variants check_unpaired_trim check_primer_trim_edge_cases check_isize_trim check_interval_tree check_amplicon_search check_consensus_min_insert_threshold check_strand_variants
+check_PROGRAMS = check_primer_trim check_trim check_quality_trim check_consensus check_allele_depth check_consensus_threshold check_consensus_min_depth check_consensus_seq_id check_primer_bed check_getmasked check_removereads check_variants check_common_variants check_unpaired_trim check_primer_trim_edge_cases check_isize_trim check_interval_tree check_amplicon_search check_consensus_min_insert_threshold check_strand_variants
 check_primer_trim_SOURCES = test_primer_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp
 check_trim_SOURCES = test_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp
 check_quality_trim_SOURCES = check_quality_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp
@@ -23,3 +23,4 @@ check_primer_trim_edge_cases_SOURCES = test_primer_trim_edge_cases.cpp ../src/tr
 check_isize_trim_SOURCES = test_isize_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp
 check_interval_tree_SOURCES = test_interval_tree.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp
 check_amplicon_search_SOURCES = test_amplicon_search.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp
+check_strand_variants_SOURCES = test_variants_reverse_strand.cpp ../src/call_variants.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
