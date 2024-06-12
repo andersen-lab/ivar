@@ -18,6 +18,7 @@ class cigarotype{
     std::vector<std::vector<uint8_t>> aux_tags; //auxillary tags
     std::vector<std::vector<uint8_t>> sequences; //sequences                        
     std::vector<std::vector<uint32_t>> qualities; //qualities                                             
+    std::vector<bool> forward; //direction
     std::vector<std::vector<std::string>> qnames; //TODO remove this at the end, qname
   public:
     std::vector<std::vector<uint32_t>> get_cigarotypes();
@@ -26,9 +27,10 @@ class cigarotype{
     std::vector<std::vector<uint32_t>> get_qualities();
     std::vector<uint32_t> get_count_cigarotypes();
     std::vector<uint32_t> get_start_positions();
+    std::vector<bool> get_direction();
     std::vector<uint32_t> get_nlengths();
     std::vector<std::vector<std::string>> get_qnames(); 
-    void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality);
+    void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality, bool is_rev);
     int test = 12;
 
 };
@@ -86,7 +88,7 @@ void print_primer_info(primer primers);
 void print_all_primer_info(std::vector<primer> primers);
 primer get_min_start(std::vector<primer> primers);
 primer get_max_end(std::vector<primer> primers);
-void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality);
+void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality, bool is_rev);
 std::vector<std::vector<uint32_t>> get_cigarotypes();
 std::vector<std::vector<uint8_t>> get_aux_tags();
 std::vector<std::vector<uint32_t>> get_qualities();   
@@ -94,6 +96,7 @@ std::vector<std::vector<uint8_t>> get_sequences();
 std::vector<uint32_t> get_count_cigarotypes();
 std::vector<uint32_t> get_nlengths();
 std::vector<uint32_t> get_start_positions();
+std::vector<bool> get_direction();
 std::vector<std::vector<std::string>> get_qnames();
 void transform_mutations(std::string ref_path);
 void set_positions(position pos);

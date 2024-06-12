@@ -31,4 +31,6 @@ std::vector<variant> gmm_model(std::string prefix, std::vector<uint32_t> populat
 void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions, std::vector<uint32_t> low_quality_positions, uint32_t round_val);
 std::vector<uint32_t> find_deletion_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, uint32_t round_val);
 std::vector<uint32_t> find_low_quality_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, float quality_threshold, uint32_t round_val);
- #endif
+std::vector<std::vector<double>> solve_possible_solutions(std::vector<float> tmp_means, double error);
+
+#endif

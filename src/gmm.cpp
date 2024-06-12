@@ -10,6 +10,7 @@ double calculate_distance(double point, double mean) {
     // Euclidean distance for a single dimension
     return std::abs(point - mean);
 }
+
 int find_closest_mean_index(double data_point, const std::vector<double>& means) {
     // Find the index of the closest mean to the data point
     int closest_index = 0;
@@ -23,19 +24,6 @@ int find_closest_mean_index(double data_point, const std::vector<double>& means)
         }
     }
     return closest_index;
-}
-
-std::vector<std::vector<double>> cluster_data(const std::vector<double>& data, const std::vector<double>& means) {
-    // Initialize clusters
-    std::vector<std::vector<double>> clusters(means.size());
-
-    // Assign each data point to the closest cluster
-    for (double data_point : data) {
-        int closest_index = find_closest_mean_index(data_point, means);
-        clusters[closest_index].push_back(data_point);
-    }
-
-    return clusters;
 }
 
 uint32_t smallest_value_index(std::vector<double> values){
@@ -91,28 +79,6 @@ void deduplicate_solutions(std::vector<std::vector<uint32_t>> vectors, std::vect
 }
 
 
-std::vector<std::vector<double>> deduplicate_solutions(std::vector<std::vector<double>> vectors){
-  std::vector<std::vector<double>> solutions;
-  for(uint32_t i=0; i < vectors.size(); i++){
-    if(i == 0){
-      solutions.push_back(vectors[i]);
-      continue;
-    }
-    bool add = true;
-    for(uint32_t j=0; j < solutions.size(); j++){
-      bool same = std::equal(solutions[j].begin(), solutions[j].end(), vectors[i].begin());
-      if(same && (solutions[j].size() == vectors[i].size())){
-        add = false;
-        break;
-      }
-    }
-    if(add){
-      solutions.push_back(vectors[i]);
-    }
-  }  
-  return(solutions);
-}
-
 void generate_combinations(std::vector<double> &input, std::vector<double>& current_combination, uint32_t start_index, uint32_t length, std::vector<std::vector<double>> &collect_combos) {
   if (length == 0) {
     collect_combos.push_back(current_combination);
@@ -128,7 +94,7 @@ void generate_combinations(std::vector<double> &input, std::vector<double>& curr
 
 
 std::vector<std::vector<double>> remove_unexplainable_solutions(std::vector<std::vector<double>> solutions, std::vector<double> means){
-  double error = 0.10;
+  double error = 0.05;
   std::vector<std::vector<double>> kept_solutions;
   for(auto vec : solutions){
     std::vector<double> possible_peaks;
@@ -175,23 +141,22 @@ std::vector<std::vector<double>> remove_unexplainable_solutions(std::vector<std:
   return(kept_solutions);
 }
 
-std::vector<std::vector<double>> solve_possible_solutions(std::vector<double> tmp_means){
+std::vector<std::vector<double>> solve_possible_solutions(std::vector<float> tmp_means, double error){
   uint32_t n = 6;
-  double error = 0.10;
   std::vector<double> means;
   for(auto &x : tmp_means){
     for(uint32_t i=1; i < n; i++){
-      if(x * i < 1+error){
+      if(x * i < 1+error && x > error){
         means.push_back(x);
       }
     }
+    if(x <= error){
+      means.push_back(x);
+    }
   }
-  /*for(auto x : means){
-    std::cerr << x << std::endl;
-  }
-  exit(1);*/
+  
   std::vector<std::vector<double>> all_combinations;
-  for (uint32_t i= 1; i < means.size(); i++) {
+  for (uint32_t i= 1; i <= means.size(); i++) {
     std::vector<double> current_combination;
     generate_combinations(means, current_combination, 0, i, all_combinations);
     
@@ -209,7 +174,7 @@ std::vector<std::vector<double>> solve_possible_solutions(std::vector<double> tm
     }
   }
   //check that these solutions explain all peaks
-  std::vector<std::vector<double>> kept_solutions = remove_unexplainable_solutions(viable_solutions, means);  
+  std::vector<std::vector<double>> kept_solutions = remove_unexplainable_solutions(viable_solutions, means); 
   return(kept_solutions);
 }
 
@@ -324,8 +289,10 @@ std::vector<uint32_t> compare_cluster_assignment(std::vector<std::vector<double>
     std::vector<double> tmp = prob_matrix[i];
     std::sort(tmp.begin(), tmp.end(), std::greater<double>());
     for(uint32_t j=0; j < tmp.size(); j++){
-      if(tmp[j] >= assigned_prob) continue;
+      //std::cerr << "here " << tmp[j] << " " << assigned_prob << " " << exp(tmp[j]) << " " << exp(assigned_prob) << std::endl;
+      if(tmp[j] == assigned_prob) continue;
         if(exp(tmp[j]) * threshold > exp(assigned_prob)){
+          //std::cerr << "hola" << std::endl;
           //std::cerr << exp(tmp[j]) << " " << exp(assigned_prob) << std::endl;
           flagged_idx.push_back(i);
         }
@@ -409,8 +376,9 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
        //this pos was flagged as poorly assigned
         if(tmp != assignment_flagged.end() && k == pos_idxs[j]){
           //technically this could use work as it's repetitive
-          //std::cerr << variants[z].freq << " " << variants[z].position << std::endl;
-          variants[z].vague_assignment = true; 
+          if(std::abs(variants[z].freq - means[assigned[j]]) > 0.03) {
+            variants[z].vague_assignment = true; 
+          }
           variants[z].cluster_assigned = assigned[j];
           break;
         }
@@ -452,12 +420,11 @@ void solve_solution_sets(std::vector<double> means, uint32_t n){
 void determine_low_prob_positions(std::vector<variant> &variants){
   std::vector<uint32_t> low_prob_pos;
   for(uint32_t i=0; i< variants.size(); i++){
-    if(!variants[i].amplicon_flux && !variants[i].depth_flag && !variants[i].outside_freq_range && !variants[i].qual_flag && !variants[i].del_flag && !variants[i].amplicon_masked && !variants[i].primer_masked){
-      if(variants[i].cluster_assigned == -1) continue;
-      double prob = exp(variants[i].probabilities[variants[i].cluster_assigned]);
-      if(prob < 0.00001){
-        low_prob_pos.push_back(variants[i].position);
-      }
+    if(variants[i].cluster_assigned == -1) continue;
+    double prob = exp(variants[i].probabilities[variants[i].cluster_assigned]);
+    double compare = (double)variants[i].depth / 1000000000;
+    if(prob < compare){
+      low_prob_pos.push_back(variants[i].position);
     }
   }
   //flag these positions with low confidence in the variants
@@ -672,7 +639,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       tmp.qual_flag = false;
     }
     if(del_pos){
-      tmp.del_flag = true;
+      tmp.del_flag = false;
     } else {
       tmp.del_flag = false;
     }
@@ -687,7 +654,7 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
   float upper_bound = 0.99;
   uint32_t depth_cutoff = 20;
   float quality_threshold = 20;
-  uint32_t round_val = 4;
+  uint32_t round_val = 4;  
   std::vector<variant> base_variants;
   std::vector<uint32_t> deletion_positions = find_deletion_positions(prefix, depth_cutoff, lower_bound, upper_bound, round_val);
   std::vector<uint32_t> low_quality_positions = find_low_quality_positions(prefix, depth_cutoff, lower_bound, upper_bound, quality_threshold, round_val);
@@ -704,6 +671,11 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
       all_var.push_back(base_variants[i].freq);
     }
   }
+  if(useful_var == 0){
+    variants.clear();
+    return(variants);
+  }
+
   //initialize armadillo dataset and populate with frequency data
   arma::mat data(1, useful_var, arma::fill::zeros);
 
@@ -731,7 +703,8 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
     if(((float)n > (float)(useful_var/2)) && (n > 2)) continue; //this is because it's recommended to have 10 points per gaussian
     arma::gmm_diag model;
     arma::mat cov (1, n, arma::fill::zeros);
-    bool status = model.learn(data, n, arma::eucl_dist, arma::random_spread, 15, 15, 1e-12, false);
+    std::cerr << "n " << n << " useful var " << useful_var << std::endl;
+    bool status = model.learn(data, n, arma::eucl_dist, arma::random_spread, 15, 10, 0.001, false);
     if(status == false){
       std::cerr << "gmm model failed" << std::endl;
       continue;
@@ -740,7 +713,6 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
     std::vector<double> means;
     
     for(auto x : model.means){
-      //std::cerr << x << std::endl;
       means.push_back((double) x);
     }
 
@@ -755,28 +727,38 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
         mean_fill.col(l) = 0.03;
       } else if(l == max_index){
         mean_fill.col(l) = 0.97;
+      } else if(means[l] > 0.97){
+        //mean_fill.col(l) = means[l];
+        continue;
       } else{
         mean_fill.col(l) = means[l];
       }
     }    
     model.set_means(mean_fill);
     means.clear();
+
     for(auto x : model.means){
       //std::cerr << x << std::endl;
       means.push_back((double) x);
     }
 
-    for(uint32_t l=0; l < n;l++){
-        if(means[l] >= 0.95 || means[l] <= 0.05){
-          cov.col(l) = 0.005;
-        } else {
-          cov.col(l) = 0.001;
-        }
+    std::vector<double> tmp_dcovs;
+    for(auto x : model.dcovs){
+        tmp_dcovs.push_back(x);
     }
-    //std::cerr << "hefts " << model.hefts << std::endl; 
     std::cerr << model.means << std::endl;
+    //found 0.0001, 0.001
+    //found 0.00005, 0.001
+    //cleaner data 0.0005, 0.001
+    for(uint32_t l=0; l < n;l++){
+      if(means[l] >= 0.97 || means[l] <= 0.03){
+        cov.col(l) = 0.0005;
+      } else {
+        cov.col(l) = 0.001;
+      }
+    }
+    std::cerr << model.dcovs << std::endl;
     model.set_dcovs(cov);
-    //std::cerr << model.dcovs << std::endl;
 
     //get the probability of each frequency being assigned to each gaussian
     std::vector<std::vector<double>> prob_matrix;
@@ -805,19 +787,22 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
     determine_low_prob_positions(variants);
 
     for(uint32_t i=0; i < variants.size(); i++){
-      double prob = variants[i].probabilities[variants[i].cluster_assigned];
-        /*if(variants[i].freq > 0.10 && variants[i].freq < 0.90){
-          std::cerr << variants[i].cluster_assigned << " " << variants[i].freq << " " << variants[i].position << " " << prob << std::endl;
+        double prob = variants[i].probabilities[variants[i].cluster_assigned];
+        /*if(variants[i].cluster_assigned == 4){
+          std::cerr << variants[i].freq << " " << variants[i].cluster_assigned << " " << prob << std::endl;
         }*/
-      prob_sum += prob;
+        prob_sum += prob;
     }
+    
     solutions.push_back(means);
     models.push_back(model);
     means.clear();  
     double aic = (2 * (double)n) - (2 * prob_sum / (double)useful_var);
-    std::cerr << "aic " << aic << "\n" << std::endl;
+    std::cerr << "aic " << aic << " " << prob_sum << "\n" << std::endl;
     all_aic.push_back(aic);
   }
+
+  //final model selection
   double smallest_value = std::numeric_limits<double>::max();
   size_t index = 0;
   for (size_t i = 0; i < all_aic.size(); ++i) {
@@ -838,13 +823,11 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
   low_quality_positions.clear();
   parse_internal_variants(prefix, base_variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, low_quality_positions, round_val);
   for(uint32_t i=0; i < base_variants.size(); i++){
-    /*if(base_variants[i].position == 1070){
-      std::cerr << base_variants[i].depth_flag << " " << base_variants[i].qual_flag << " " << base_variants[i].outside_freq_range << std::endl;
-    }*/
     if(!base_variants[i].outside_freq_range){
       useful_var += 1;
       variants.push_back(base_variants[i]);
     }
+    
   }
   arma::mat final_data(1, useful_var, arma::fill::zeros);
   count=0;
@@ -874,6 +857,8 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
   //assign variants out based on probability, not taking into account condition of all variants for a pos ~= 1 
   uint32_t index_mean = smallest_value_index(means);
   assign_variants_simple(variants, prob_matrix, index_mean, means);  
+  determine_low_prob_positions(variants);
+  
   std::ofstream file;  
   file.open(output_prefix + ".txt", std::ios::trunc);
   std::string means_string = "[";
@@ -894,33 +879,3 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
   file.close();
   return(variants);
 }
-/*
-  //here we now define the two criteria in which we eliminate things as being contaminated
-  //1. the solution is not solveable for identity reasons
-  //2. the clustered solution had too many outliers
-  //3. unexplained peaks
-
-  //here we make sure that we have no unexplained peaks  
-  std::vector<std::vector<double>> viable_solutions = solve_possible_solutions(means); 
-  if(viable_solutions.size() == 0){
-    std::cerr << "no viable solutions" << std::endl;
-    retval = -1;
-  }
-
-  std::vector<std::vector<double>> kept_solutions;
-  if(viable_solutions.size() > 0){  
-    kept_solutions = deduplicate_solutions(viable_solutions);
-    if(kept_solutions.size() == 0){
-      std::cerr << "no solutions after deduplication" << std::endl;
-      retval = -1;
-    }
-  } 
-  //check to see if this is solveable
-  std::vector<uint32_t> sizes;
-  for(auto &vec : kept_solutions){
-    std::sort(vec.begin(), vec.end(), std::greater<double>());
-    sizes.push_back(vec.size());
-  } 
-  uint32_t max_solution=0;
-}
-*/

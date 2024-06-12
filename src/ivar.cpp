@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "call_consensus_pileup.h"
-#include "call_consensus_clustering.h"
 #include "call_variants.h"
 #include "get_common_variants.h"
 #include "get_masked_amplicons.h"
@@ -18,6 +17,7 @@
 #include "suffix_tree.h"
 #include "trim_primer_quality.h"
 #include "gmm.h"
+#include "call_consensus_clustering.h"
 #include "saga.h"
 
 const std::string VERSION = "1.4.2";

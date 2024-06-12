@@ -20,6 +20,8 @@ std::vector<uint32_t> cigarotype::get_count_cigarotypes() { return count_cigarot
 
 std::vector<uint32_t> cigarotype::get_start_positions() { return ncigarotypes; }
 
+std::vector<bool> cigarotype::get_direction() { return forward; }
+
 std::vector<uint32_t> cigarotype::get_nlengths() { return nlengths; }
 
 int primer::get_score() { return score; }
@@ -69,6 +71,26 @@ void print_bed_format() {
   std::cerr << "It requires the following columns delimited by a tab: chrom, "
                "chromStart, chromEnd, name, score, strand"
             << std::endl;
+}
+
+float weighted_similarity(std::string string_1, std::string string_2){
+  size_t max_len = string_1.length();
+  // Calculate the total weight
+  double total_weight = 0.0;
+  for (size_t i = 0; i < max_len; ++i) {
+    total_weight += static_cast<double>(max_len - i) / max_len;
+  }
+  // Compute the weighted similarity score
+  double similarity_score = 0.0;
+  for (size_t i = 0; i < max_len; ++i) {
+    double weight = static_cast<double>(max_len - i) / max_len;
+    if (string_1[i] == string_2[i]) {
+      similarity_score += weight;
+    }
+  }
+
+  // Normalize the score to be between 0 and 1
+  return similarity_score / total_weight;
 }
 
 void primer::populate_positions(){
@@ -334,12 +356,14 @@ void primer::transform_mutations(std::string ref_path) {
   std::vector<uint32_t> counts = this->get_count_cigarotypes();
   std::vector<std::vector<std::string>> qnames = this->get_qnames();
   std::vector<std::vector<uint32_t>> qualities = this->get_qualities(); 
+  std::vector<bool> all_forward = this->get_direction();
   //this tracks all mutations at all positions
   std::string test = "";
   ref_antd refantd(ref_path, ""); 
   //here let's turn the cigar string into a vector of alleles specific to this primer
   //iterate all unique sequences
   for(uint32_t i=0; i < cigarotypes.size(); i++){
+    bool forward = all_forward[i];
     //get the cigar string and start pos
     std::vector<uint32_t> quality = qualities[i];
     std::vector<uint32_t> cigarotype = cigarotypes[i]; //carries the insertions
@@ -362,6 +386,7 @@ void primer::transform_mutations(std::string ref_path) {
     std::vector<std::vector<uint32_t>> relative_soft_clipped;
     uint32_t mismatched = 0;
     uint32_t total = 0;
+    bool useful = false;
     //we'll use the cigar string to handle insertions
     //if a ton of this read has been soft clipped, toss it out for quality reasons
     for(uint32_t j=0; j < cigarotype.size(); j++){
@@ -389,19 +414,23 @@ void primer::transform_mutations(std::string ref_path) {
           tmp.push_back(relative_position + oplen);
           relative_soft_clipped.push_back(tmp);
         }
-      } else if(bam_cigar_type(op) & 1){
-        relative_position += oplen;
+      } else if(bam_cigar_type(op) & 2){
+        start = false;
+        if(bam_cigar_type(op) & 1){
+          relative_position += oplen;
+        }
         position_val += oplen;
       }
     }
     std::string soft_clipped_seq = "";
     std::string ref_seq_val = "";
-
+    double weighed_score = 1.0;
     for (uint32_t k = 0; k < soft_clipped.size(); k++) {
       uint32_t start = soft_clipped[k][0] + 1;
       uint32_t end = soft_clipped[k][1] + 1;
       uint32_t rel_start = relative_soft_clipped[k][0];
       uint32_t rel_end = relative_soft_clipped[k][1];
+      
       soft_clipped_seq = "";
       ref_seq_val = "";
       // Retrieve soft-clipped sequence
@@ -409,6 +438,9 @@ void primer::transform_mutations(std::string ref_path) {
         soft_clipped_seq += sequence[l];
       }
       for(uint32_t l = start; l < end; l++){
+        if(qname == test){
+          std::cerr << l << std::endl;
+        }
         char ref = refantd.get_base(l, region);
         ref_seq_val += ref;
       }
@@ -419,7 +451,17 @@ void primer::transform_mutations(std::string ref_path) {
         }
       }
     }
-    if((float)mismatched / (float)total > 0.50){
+    if(soft_clipped_seq != ref_seq_val){      
+      if(!forward){
+        std::reverse(soft_clipped_seq.begin(), soft_clipped_seq.end());
+        std::reverse(ref_seq_val.begin(), ref_seq_val.end());
+      } 
+      weighed_score = weighted_similarity(soft_clipped_seq, ref_seq_val);
+      if(useful){
+        std::cerr << weighed_score << " " << (float)mismatched / (float)total << std::endl;
+      }
+    }
+    if(weighed_score < 0.50){
       continue;
     }
     for(uint32_t j=0; j < cigarotype.size(); j++){
@@ -605,7 +647,7 @@ void primer::transform_mutations(std::string ref_path) {
 }
 
 //cigar must be passed by pointer due to array decay
-void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality) {
+void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality, bool is_rev) {
   bool found = false; //have we seen this before
   std::vector<uint8_t> saved_aux; //placeholder for saved sequence
   std::vector<uint32_t> saved_cigarotype; //placeholder for saved cigarotypes
@@ -680,6 +722,11 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
         nt = seq_nt16_str[bam_seqi(seq, useful[k])];
         seq_reformat.push_back(nt);
       }
+    }
+    if(is_rev){
+      forward.push_back(false);
+    } else {
+      forward.push_back(true);
     }
     qualities.push_back(qual_reformat);
     cigarotypes.push_back(cigar_reformat);    

@@ -212,7 +212,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         uint32_t pstart = primers[j].get_start();
         uint32_t pend = primers[j].get_end(); 
         if (start == pstart && end == pend){
-          primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln), qualities);
+          primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln), qualities, bam_is_rev(aln));
         }
       }
     }
