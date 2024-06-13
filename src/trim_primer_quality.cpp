@@ -89,7 +89,7 @@ cigar_ quality_trim(bam1_t *r, uint8_t qual_threshold, uint8_t sliding_window) {
       *cigar = bam_get_cigar(r);
   uint8_t *qual = bam_get_qual(r);
   int32_t start_pos;
-  if (((r->core.flag & BAM_FPAIRED) != 0) && bam_is_rev(r)) {
+  if (bam_is_rev(r)) {
     reverse = true;
     reverse_qual(qual, r->core.l_qseq);
   }
@@ -713,6 +713,7 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
           // Update read's left-most coordinate
           aln->core.pos += t.start_pos;
           replace_cigar(aln, t.nlength, t.cigar);
+          free(t.cigar);
           // Add count to primer
           cit = std::find(primers.begin(), primers.end(), cand_primer);
           if (cit != primers.end()) cit->add_read_count(1);
@@ -724,12 +725,13 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
           cand_primer = get_min_start(overlapping_primers);
           t = primer_trim(aln, isize_flag, cand_primer.get_start() - 1, true);
           replace_cigar(aln, t.nlength, t.cigar);
+          free(t.cigar);
           // Add count to primer
           cit = std::find(primers.begin(), primers.end(), cand_primer);
           if (cit != primers.end()) cit->add_read_count(1);
         }
-        t = quality_trim(aln, min_qual, sliding_window);  // Quality Trimming                                           
-        if (bam_is_rev(aln) && overlapping_primers.size() > 0) // if reverse strand with reverse primers trimmed
+        t = quality_trim(aln, min_qual, sliding_window);  // Quality Trimming
+        if (bam_is_rev(aln))  // if reverse strand with reverse primers trimmed
           aln->core.pos = t.start_pos;
         condense_cigar(&t);
         replace_cigar(aln, t.nlength, t.cigar);
