@@ -11,6 +11,7 @@
 #define ref_seq
 
 const char UNKNOWN_BASE = 'N';
+extern const unsigned char comp_base[256];
 
 class ref_antd {
  public:
@@ -18,6 +19,7 @@ class ref_antd {
   ref_antd(std::string ref_path, std::string gff_path);
   ~ref_antd();
   char get_base(int64_t pos, std::string region);
+  void reverse_complement_codon(char* codon);
   int add_gff(std::string path);
   int add_seq(std::string path);
   int codon_aa_stream(std::string region, std::ostringstream &line_stream,

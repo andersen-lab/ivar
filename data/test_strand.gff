@@ -1,0 +1,3 @@
+## GFF3 file format
+test	Genbank	CDS	1	9	.	+	.	ID=test1;Note=positiveStrand;gene=A;
+test	Genbank	CDS	11	20	.	-	.	ID=test2;Note=negativeStrand;gene=B;
