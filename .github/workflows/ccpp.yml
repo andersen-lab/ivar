@@ -75,6 +75,9 @@ jobs:
     - name: install htslib
       run: |
         cd htslib-1.10.2/
+        curl -O http://git.savannah.gnu.org/cgit/config.git/plain/config.sub
+        curl -O http://git.savannah.gnu.org/cgit/config.git/plain/config.guess
+        chmod +x config.guess config.sub
         autoheader
         autoconf
         ./configure

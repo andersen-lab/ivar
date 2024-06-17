@@ -34,12 +34,12 @@ RUN cd root/ &&\
     make install
 # bwa
 RUN cd root/ &&\
-    wget https://github.com/lh3/bwa/archive/v0.7.17.tar.gz &&\
-    tar xvf v0.7.17.tar.gz &&\
-    cd bwa-0.7.17/ &&\
+    wget https://github.com/lh3/bwa/archive/v0.7.18.tar.gz &&\
+    tar xvf v0.7.18.tar.gz &&\
+    cd bwa-0.7.18/ &&\
     make &&\
     cd ../ &&\
-    rm v0.7.17.tar.gz
-ENV PATH /root/bwa-0.7.17:$PATH
+    rm v0.7.18.tar.gz
+ENV PATH /root/bwa-0.7.18:$PATH
 # Snakemake
 RUN pip3 install pandas snakemake
