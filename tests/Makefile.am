@@ -1,6 +1,6 @@
 LIBS = -lhts -lz -lpthread
 
-CXXFLAGS = -g -std=c++11 -Wall -Wextra -Werror
+CXXFLAGS = -g -std=c++11 -Wall -Wextra -Werror -Wno-unused-variable 
 
 TESTS = check_primer_trim check_trim check_quality_trim check_consensus check_allele_depth check_consensus_threshold check_consensus_min_depth check_consensus_seq_id check_primer_bed check_getmasked check_removereads check_variants check_common_variants check_unpaired_trim check_primer_trim_edge_cases check_isize_trim check_interval_tree check_amplicon_search check_consensus_min_insert_threshold check_quality_trim_unpaired check_strand_variants
 check_PROGRAMS = check_primer_trim check_trim check_quality_trim check_consensus check_allele_depth check_consensus_threshold check_consensus_min_depth check_consensus_seq_id check_primer_bed check_getmasked check_removereads check_variants check_common_variants check_unpaired_trim check_primer_trim_edge_cases check_isize_trim check_interval_tree check_amplicon_search check_consensus_min_insert_threshold check_quality_trim_unpaired check_strand_variants
