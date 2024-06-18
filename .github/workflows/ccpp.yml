@@ -86,7 +86,7 @@ jobs:
     - name: autoconf
       run: ./autogen.sh
     - name: configure
-      run: ./configure
+      run: ./configure CFLAGS="-Wno-unused-but-set-variable"
     - name: make
       run: make
     - name: make check
