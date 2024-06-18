@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([ivar], [1.4.2], [gkarthik@scripps.edu])
+AC_INIT([ivar], [1.4.3], [gkarthik@scripps.edu])
 AM_INIT_AUTOMAKE([foreign subdir-objects])
 AC_CONFIG_HEADERS([config.h])
 
