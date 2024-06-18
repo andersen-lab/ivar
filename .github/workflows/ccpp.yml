@@ -80,7 +80,7 @@ jobs:
         chmod +x config.guess config.sub
         autoheader
         autoconf
-        ./configure
+        ./configure --build=aarch64-apple-darwin --host=aarch64-apple-darwin
         make
         sudo make install
     - name: autoconf
