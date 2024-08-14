@@ -229,7 +229,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   for (uint32_t i=0; i < primers.size(); i++){
     amplicons.set_haplotypes(primers[i]);      
   }
-  //exit(1);  
   //combine amplicon counts to get total variants 
   amplicons.combine_haplotypes();
   //detect primer binding issues
@@ -260,7 +259,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   std::vector<uint32_t> flagged_positions; 
   std::vector<std::tuple<uint32_t, uint32_t, std::string>> adjusted_depths; //holds adjusted depth info
   std::cerr << "detecting variant abberations" << std::endl;
-  uint32_t test_pos = 0;
+  uint32_t test_pos = 21792;
   //detect fluctuating variants
   for(uint32_t i=0; i < amplicons.max_pos; i++){
     amplicons.test_flux.clear();
@@ -268,11 +267,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     
     //this bit pushes all amp position vectors back to test_flux object
     amplicons.detect_abberations(i);
-    if(i == test_pos){
-      for(auto xx : amplicons.test_test){
-        std::cerr << "test flux " << xx << std::endl;
-      }
-    }
     if (amplicons.test_flux.size() < 2) continue;
     
     std::map<std::string, std::vector<float>> allele_maps;
@@ -281,6 +275,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         std::cerr << "\n" << amplicons.test_test[j] << std::endl;
       }
       uint32_t total_depth = amplicons.test_flux[j].depth;
+      if(i == test_pos){
+        std::cerr << "total depth " << total_depth << std::endl;
+      }
       if(total_depth < 20){
          continue;
       }
@@ -311,7 +308,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     for (it = allele_maps.begin(); it != allele_maps.end(); it++){
       float sd = calculate_standard_deviation(it->second);
       if(i == test_pos){
-        std::cerr << i << " " << sd << " " << it->first << std::endl;
+        std::cerr << i << " std " << sd << " " << it->first << std::endl;
       }
       //TODO this is hard coded, consider it
       if (sd >= 0.03){
@@ -366,8 +363,16 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   //write variants to a file
   ofstream file;
   file.open(bam_out + ".txt", ios::trunc);
-  file << "POS\tALLELE\tDEPTH\tFREQ\tAVG_QUAL\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\tADJUSTED_DEPTH\tREF\n";
+  file << "POS\tALLELE\tDEPTH\tFREQ\tAVG_QUAL\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\tADJUSTED_DEPTH\tREF\tCLUSTER\n";
   for(uint32_t i=0; i < variants.size(); i++){
+    //find the depth of the deletion to calculate upgapped depth
+    float del_depth = 0;
+    for(uint32_t j=0; j < variants[i].alleles.size(); j++){
+      if(variants[i].alleles[j].nuc == "-"){
+        del_depth += (float)variants[i].alleles[j].depth;
+        break;  
+      }
+    }
     for(uint32_t j=0; j < variants[i].alleles.size(); j++){
       uint32_t adjusted_depth = 0;
       for(uint32_t k=0; k < adjusted_depths.size(); k++){
@@ -377,8 +382,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
           if(pos == variants[i].pos && nuc == variants[i].alleles[j].nuc){
             adjusted_depth = depth;
           }
-      } 
-      float freq = (float)variants[i].alleles[j].depth / (float)variants[i].depth;
+      }
+      float freq = (float)variants[i].alleles[j].depth / ((float)variants[i].depth-del_depth);
+    
       if((float)variants[i].alleles[j].depth == 0){
         continue;
       }
