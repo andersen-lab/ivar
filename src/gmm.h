@@ -27,7 +27,7 @@ struct variant {
 
 };
 void split(const std::string &s, char delim, std::vector<std::string> &elems);
-std::vector<variant> gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std::string output_prefix);
+std::vector<variant> gmm_model(std::string prefix, std::vector<uint32_t> populations_iterate, std::string output_prefix, float dcov_first, float dcov_second);
 void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions, std::vector<uint32_t> low_quality_positions, uint32_t round_val);
 std::vector<uint32_t> find_deletion_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, uint32_t round_val);
 std::vector<uint32_t> find_low_quality_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, float quality_threshold, uint32_t round_val);

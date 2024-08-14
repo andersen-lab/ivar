@@ -176,16 +176,12 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
    }
    uint32_t position = variants[i].position;
    if(variants[i].low_prob_flag && means[variants[i].cluster_assigned] != (float)0.97 && variants[i].freq < max_mean){
-      std::cerr << "low prob " << position << " " << variants[i].freq << " " << variants[i].nuc << " " << variants[i].probabilities[variants[i].cluster_assigned] << " " << variants[i].cluster_assigned << std::endl;
-      std::cerr << means[variants[i].cluster_assigned] << std::endl;
+      //std::cerr << "low prob " << position << " " << variants[i].freq << " " << variants[i].nuc << " " << variants[i].probabilities[variants[i].cluster_assigned] << " " << variants[i].cluster_assigned << std::endl;
+      //std::cerr << means[variants[i].cluster_assigned] << std::endl;
       continue;
    }
    if(variants[i].vague_assignment && variants[i].freq < 0.97 && variants[i].freq < max_mean){      
-     std::cerr << "vague assignment " << position << " " << variants[i].freq << " " << variants[i].nuc << std::endl;
-    for(auto xx : variants[i].probabilities){
-      std::cerr << xx << " ";
-    }
-    std::cerr << "\n";
+     //std::cerr << "vague assignment " << position << " " << variants[i].freq << " " << variants[i].nuc << std::endl;
     continue;
    }
    auto it = std::find(major_indexes.begin(), major_indexes.end(), variants[i].cluster_assigned);
