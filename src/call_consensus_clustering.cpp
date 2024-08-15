@@ -93,15 +93,10 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
    
   //read in the cluster values
   std::vector<float> means = parse_clustering_results(clustering_file);
-  for(auto xx : means){
-    std::cerr << xx << " ";
-  }
-  std::cerr << "\n";
- 
+
   //TODO: Solve clustering
   std::vector<float> other_means;
   for(uint32_t m=0; m < means.size(); m++){
-    std::cerr << "m " << means[m] << std::endl;
     if(means[m] < (float)0.97 && means[m] > (float)0.03){
       other_means.push_back(means[m]);
     }
