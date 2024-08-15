@@ -6,6 +6,79 @@
 #include <algorithm>
 #include <limits>
 
+// Function to calculate the mean of a vector
+float calculate_mean(const std::vector<float>& data) {
+    if (data.empty()) {
+        return 0.0f;
+    }
+    float sum = std::accumulate(data.begin(), data.end(), 0.0f);
+    return sum / data.size();
+}
+
+// Function to calculate the standard deviation of a vector
+float calculate_std_dev(const std::vector<float>& data, float mean) {
+    if (data.empty()) {
+        return 0.0f;
+    }
+    float sum = 0.0f;
+    for (float value : data) {
+        sum += std::pow(value - mean, 2);
+    }
+    return std::sqrt(sum / data.size());
+}
+
+// Function to calculate the z-score of each element in a vector
+std::vector<float> calculate_z_scores(const std::vector<float>& data) {
+    std::vector<float> z_scores;
+    if (data.empty()) {
+        return z_scores;
+    }
+
+    float mean = calculate_mean(data);
+    float std_dev = calculate_std_dev(data, mean);
+
+    if (std_dev == 0.0f) {
+        // If the standard deviation is 0, all elements are the same, and z-scores are undefined
+        z_scores.resize(data.size(), 0.0f);
+        return z_scores;
+    }
+
+    for (float value : data) {
+        float z_score = (value - mean) / std_dev;
+        z_scores.push_back(z_score);
+    }
+
+    return z_scores;
+}
+
+
+std::vector<uint32_t> determine_new_n(std::vector<double> means){
+  uint32_t new_n = 0;
+  std::vector<uint32_t> exclude_cluster_indices;
+  std::vector<float> seen_means;
+  for(uint32_t i=0; i < means.size(); i++){
+    float round_mean = std::round(means[i] * 100.0) / 100.0;
+    if(means[i] == (float)0.97){
+      exclude_cluster_indices.push_back(i);
+      continue;
+    } else if(means[i] == (float)0.03){
+      exclude_cluster_indices.push_back(i);
+      continue;
+    } else if(means[i] == (float)0.0){
+      exclude_cluster_indices.push_back(i);
+    } else {
+      auto it = std::find(seen_means.begin(), seen_means.end(), round_mean);
+      if (it != seen_means.end()) {
+        continue;
+      }
+      new_n += 1;
+    }
+      seen_means.push_back(round_mean);
+  }
+  exclude_cluster_indices.push_back(new_n);
+  return(exclude_cluster_indices);
+}
+
 double calculate_distance(double point, double mean) {
     // Euclidean distance for a single dimension
     return std::abs(point - mean);
@@ -706,14 +779,14 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
     if(((float)n > (float)(useful_var/2)) && (n > 2)) continue; //this is because it's recommended to have 10 points per gaussian
     arma::gmm_diag model;
     arma::mat cov (1, n, arma::fill::zeros);
-    bool status = model.learn(data, n, arma::eucl_dist, arma::random_spread, 15, 10, 0.001, false);
+    bool status = model.learn(data, n, arma::eucl_dist, arma::random_spread, 10, 20, 0.000001, false);
     if(status == false){
       std::cerr << "gmm model failed" << std::endl;
       continue;
     }
     //get the means of the gaussians
     std::vector<double> means;
-    
+    std::cerr << model.dcovs << std::endl;
     for(auto x : model.means){
       means.push_back((double) x);
     }
@@ -786,27 +859,16 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
     determine_outlier_variants(variants, n);
     double prob_sum = 0;
     determine_low_prob_positions(variants);
+    std::vector<float> hefts;
+    for(auto h : model.hefts){
+      hefts.push_back((float) h);
+    }
 
     std::vector<variant> retraining_set;
-    std::vector<uint32_t> exclude_cluster_indices;
+    std::vector<uint32_t> exclude_cluster_indices = determine_new_n(means);
     uint32_t retrain_size = 0;
-
-    //std::vector<float> n_hefts;
-    uint32_t new_n = 0;
-    for(uint32_t i=0; i < means.size(); i++){
-      if(means[i] == (float)0.97){
-        exclude_cluster_indices.push_back(i);
-        continue;
-      } else if(means[i] == (float)0.03){
-        exclude_cluster_indices.push_back(i);
-        continue;
-      } else if(means[i] == (float)0.0){
-        exclude_cluster_indices.push_back(i);
-      } else {
-        new_n += 1;
-      }
-    }
-    
+    uint32_t new_n = exclude_cluster_indices.back();
+    exclude_cluster_indices.pop_back();
     for(uint32_t i=0; i < variants.size(); i++){
       auto it = std::find(exclude_cluster_indices.begin(), exclude_cluster_indices.end(), variants[i].cluster_assigned);
 
@@ -826,14 +888,39 @@ std::vector<variant>  gmm_model(std::string prefix, std::vector<uint32_t> popula
       double tmp = static_cast<double>(retraining_set[i].freq);
       data.col(i) = tmp;
     }
+    bool retrain = true;
     arma::gmm_diag model_final;
-    bool status_2 = model_final.learn(data, new_n, arma::eucl_dist, arma::random_spread, 15, 10, 0.001, false);
-    
-    std::cerr << "start mean " << model.means << std::endl; 
-    std::cerr << "start heft " << model.hefts << std::endl; 
+    while(retrain){
+      std::cerr << "new n " << new_n << std::endl;
+      bool status_2 = model_final.learn(data, new_n, arma::eucl_dist, arma::random_spread, 10, 20, 0.01, false);
+      //check to see if the model converged on a specific cluster        
+      std::cerr << "start mean " << model.means << std::endl; 
+      std::cerr << "start heft " << model.hefts << std::endl; 
 
-    std::cerr << "end mean " << model_final.means << std::endl; 
-    std::cerr << "end heft " << model_final.hefts << std::endl; 
+      std::cerr << "end mean " << model_final.means << std::endl; 
+      std::cerr << "end heft " << model_final.hefts << std::endl; 
+      hefts.clear();
+      means.clear();
+      for(auto h : model_final.hefts){
+        hefts.push_back((float) h);
+      }
+      for(auto m : model_final.means){
+        means.push_back((float)m);
+      }
+      exclude_cluster_indices.clear();
+      exclude_cluster_indices = determine_new_n(means);
+      uint32_t end_new_n = exclude_cluster_indices.back();
+      std::cerr << "final n " << new_n << std::endl;
+      if(end_new_n == new_n){
+        retrain=false;
+      } else{
+        new_n = end_new_n;
+      }
+    }
+    //calculate z scores
+    //drop clusters based on z score    
+    
+
 
     std::string tmp = "[";
     for(uint32_t l=0; l < model_final.hefts.size(); l++){
