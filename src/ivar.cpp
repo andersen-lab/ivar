@@ -371,11 +371,7 @@ int main(int argc, char *argv[]) {
       opt = getopt(argc, argv, contam_opt_str);
     }
     if (!g_args.variants.empty() && !g_args.prefix.empty()) {
-      std::vector<uint32_t> populations_iterate;
-      for(uint32_t i=6; i <= 6; i++){
-        populations_iterate.push_back(i);
-      }
-      std::vector<variant> variants = gmm_model(g_args.variants, populations_iterate, g_args.prefix, g_args.dcov_1, g_args.dcov_2);
+      std::vector<variant> variants = gmm_model(g_args.variants, 6, g_args.prefix, g_args.dcov_1, g_args.dcov_2);
       cluster_consensus(variants, g_args.prefix);
     }
     res = 0; 
