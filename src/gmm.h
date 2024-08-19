@@ -1,7 +1,16 @@
 #include <vector>
 #include <fstream>
+#include "./include/armadillo"
 #ifndef gmm
 #define gmm
+
+struct gaussian_mixture_model {
+  std::vector<std::vector<double>> prob_matrix;
+  uint32_t n;
+  float var_floor;
+  std::vector<double> means;
+  std::vector<double> hefts; 
+};
 
 struct variant {
   uint32_t position;
@@ -32,5 +41,8 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
 std::vector<uint32_t> find_deletion_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, uint32_t round_val);
 std::vector<uint32_t> find_low_quality_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, float quality_threshold, uint32_t round_val);
 std::vector<std::vector<double>> solve_possible_solutions(std::vector<float> tmp_means, double error);
-
+uint32_t smallest_value_index(std::vector<double> values);
+std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
+void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, std::vector<double> means);
+std::vector<double> calculate_z_scores(const std::vector<double>& data);
 #endif
