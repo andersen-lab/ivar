@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <limits>
 
-
 void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel){
   std::vector<std::vector<double>> tv = transpose_vector(gmodel.prob_matrix);
   uint32_t j = 0;
@@ -24,7 +23,7 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float var_floor
   arma::mat mmeans;
   std::vector<double> kmeans;
   std::vector<uint32_t> n_counts(n, 0);
-  bool status2 = arma::kmeans(mmeans, data, n, arma::random_subset, 15, true); 
+  bool status2 = arma::kmeans(mmeans, data, n, arma::random_spread, 15, true); 
   for(auto m : mmeans){
     std::cerr << m << std::endl;
     kmeans.push_back((double)m);
@@ -41,16 +40,18 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float var_floor
   }
   n = 0;
   std::vector<double> means;
+  std::cerr << "percents" << std::endl;
   for(uint32_t i =0; i < mmeans.size(); i++){
     double percent_assigned = n_counts[i] / (double)data.size();
+    std::cerr << percent_assigned << std::endl;
     if(percent_assigned > 0.10){
       means.push_back((double) mmeans[i]);
       n += 1;
     }
   }
-  float dcov_first = 0.001;
-  float dcov_second = 0.001;
-  var_floor = 0.0001;
+  float dcov_first = 0.0001;
+  float dcov_second = 0.0001;
+  var_floor = 0.01;
   auto min_iterator = std::min_element(means.begin(), means.end());
   uint32_t min_index = std::distance(means.begin(), min_iterator);
   auto max_iterator = std::max_element(means.begin(), means.end());
