@@ -7,6 +7,7 @@
 struct gaussian_mixture_model {
   std::vector<std::vector<double>> prob_matrix;
   uint32_t n;
+  uint32_t new_n;
   float var_floor;
   std::vector<double> means;
   std::vector<double> hefts; 
