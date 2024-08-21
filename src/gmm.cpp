@@ -19,38 +19,146 @@ void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmod
 
 }
 
+gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float var_floor, float universal_cluster, float noise_cluster, bool fix_clusters){
+  gaussian_mixture_model gmodel; 
+  arma::mat mmeans;
+  std::vector<double> kmeans;
+  std::vector<uint32_t> n_counts(n, 0);
+  bool status2 = arma::kmeans(mmeans, data, n, arma::random_subset, 15, true); 
+  for(auto m : mmeans){
+    std::cerr << m << std::endl;
+    kmeans.push_back((double)m);
+  }
+  for(auto d : data){
+    double dd = (double)d;
+    auto it = std::min_element(kmeans.begin(), kmeans.end(), 
+        [dd](double a, double b) {
+            return std::abs(a - dd) < std::abs(b - dd);
+        });
+    uint32_t index = std::distance(kmeans.begin(), it);  
+    n_counts[index] += 1;
+    //std::cerr << d << " " << index << std::endl;
+  }
+  n = 0;
+  std::vector<double> means;
+  for(uint32_t i =0; i < mmeans.size(); i++){
+    double percent_assigned = n_counts[i] / (double)data.size();
+    if(percent_assigned > 0.10){
+      means.push_back((double) mmeans[i]);
+      n += 1;
+    }
+  }
+  float dcov_first = 0.001;
+  float dcov_second = 0.001;
+  var_floor = 0.0001;
+  auto min_iterator = std::min_element(means.begin(), means.end());
+  uint32_t min_index = std::distance(means.begin(), min_iterator);
+  auto max_iterator = std::max_element(means.begin(), means.end());
+  uint32_t max_index = std::distance(means.begin(), max_iterator);
+
+  arma::mat mean_fill (1, n, arma::fill::zeros);
+  for(uint32_t l=0; l < n; l++){
+    if(l == min_index){
+      mean_fill.col(l) = noise_cluster;
+    } else if(l == max_index){
+      mean_fill.col(l) = universal_cluster;
+    } else if(means[l] > universal_cluster || means[l] < noise_cluster){
+      continue;
+    } else{
+      mean_fill.col(l) = means[l];
+    }
+  }      
+ 
+  //gaussian_mixture_model gmodel;
+  arma::mat cov (1, n, arma::fill::zeros);
+  for(uint32_t l=0; l < n;l++){
+    if(means[l] >= universal_cluster){
+      cov.col(l) = dcov_first;
+    } else if (means[l] <= noise_cluster) {
+      cov.col(l) = dcov_first;
+    }else {
+      cov.col(l) = dcov_second;
+    }
+  }
+  float val = 1 / (float)n;
+  arma::rowvec hef (n);
+  hef.fill(val);
+  arma::gmm_diag model;
+  model.reset(1, n);
+  model.set_means(mean_fill);
+  model.set_hefts(hef);
+  model.set_dcovs(cov);
+  std::cerr << "pre dcovs " << model.dcovs << std::endl;  
+  std::cerr << "pre hefts " << model.hefts << std::endl;
+  std::cerr << universal_cluster << " " << noise_cluster << " " << fix_clusters << std::endl;
+  //train model
+  bool status = model.learn(data, n, arma::eucl_dist, arma::keep_existing, 10, 15, var_floor, false);
+  if(!status){
+    std::cerr << "model failed to converge" << std::endl;
+  }
+  std::cerr << "means " << model.means << std::endl;
+  std::cerr << "hefts " << model.hefts << std::endl;
+  std::cerr << "dcovs " << model.dcovs << std::endl;
+  means.clear();
+  std::vector<double> hefts;
+  for(uint32_t i=0; i < model.means.size(); i++){
+    means.push_back((double)model.means[i]);
+    hefts.push_back((double)model.hefts[i]);
+  }
+
+  std::vector<std::vector<double>> prob_matrix;
+  std::vector<double> tmp;
+  for(uint32_t i=0; i < n; i++){
+    arma::rowvec set_likelihood = model.log_p(data, i);
+    tmp.clear();
+    for(uint32_t j=0; j < data.n_cols; j++){
+      tmp.push_back((double)set_likelihood[j]);
+    }
+    prob_matrix.push_back(tmp);
+  }
+  gmodel.prob_matrix = prob_matrix;
+
+  gmodel.means = means;
+  gmodel.hefts = hefts;
+  return(gmodel);
+}
+
 //full model training from start to finish
-gaussian_mixture_model train_model(uint32_t n, arma::mat data, float var_floor, float universal_cluster, float noise_cluster){
+gaussian_mixture_model train_model(uint32_t n, arma::mat data, float var_floor, float universal_cluster, float noise_cluster, bool fix_clusters, arma::gmm_diag &model){
 
   gaussian_mixture_model gmodel;
   //need to find means and hefts
   std::vector<double> means;
   std::vector<double> hefts;
 
-  arma::gmm_diag model;
   //train model
   bool status = model.learn(data, n, arma::eucl_dist, arma::random_spread, 10, 20, var_floor, false);
   if(!status){
     std::cerr << "model failed to converge" << std::endl;
   }
-  
-  for(auto m : model.means){
-    if(m > universal_cluster){
+
+  //find the largest and smallest mean in the dataset
+  auto max_it = std::max_element(model.means.begin(), model.means.end());
+  auto min_it = std::min_element(model.means.begin(), model.means.end());
+
+  uint32_t max_index = std::distance(model.means.begin(), max_it);
+  uint32_t min_index = std::distance(model.means.begin(), min_it);
+
+  for(uint32_t i=0; i < model.means.size(); i++){
+    double m = (double) model.means[i];
+    if(m > universal_cluster || (i == max_index && fix_clusters)){
       means.push_back((double) 0.97);
-    } else if(m < noise_cluster){
+    } else if(m < noise_cluster || (i == min_index && fix_clusters)){
       means.push_back((double) 0.03);
     } else{
-      means.push_back((double) m);
+      means.push_back(m);
     }
   }
  
   for(auto h : model.hefts){
     hefts.push_back((double) h);
   }
-  std::vector<std::vector<double>> means_hefts;
-  means_hefts.push_back(means);
-  means_hefts.push_back(hefts);
-  
+ 
   std::vector<std::vector<double>> prob_matrix;
   std::vector<double> tmp;
   for(uint32_t i=0; i < n; i++){
@@ -770,8 +878,8 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     } else {
       tmp.qual_flag = false;
     }
-    if(del_pos){
-      tmp.del_flag = false;
+    if(del_pos && row_values[1] == "-"){
+      tmp.del_flag = true;
     } else {
       tmp.del_flag = false;
     }
@@ -838,19 +946,18 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
   std::vector<double> means;
   std::vector<double> hefts;
   std::vector<uint32_t> exclude_cluster_indices;
-  uint32_t new_n;
-
   //HERE WE USE TRAIN MODEL FUNCTION INSTEAD
-  float var_floor = 0.0001;
-  gaussian_mixture_model gmodel = train_model(n, data, var_floor, universal_cluster, noise_cluster);
-  
-  assign_clusters(variants, gmodel);
-
+  float var_floor = 0.01;
+  arma::gmm_diag model;
+  gaussian_mixture_model gmodel = train_model(n, data, var_floor, universal_cluster, noise_cluster, true, model);
+  gaussian_mixture_model retrained = retrain_model(n, data, var_floor, universal_cluster, noise_cluster, true);
+  assign_clusters(variants, retrained);
+  /*
   std::vector<variant> retraining_set;
   exclude_cluster_indices = determine_new_n(gmodel.means);
   uint32_t retrain_size = 0;
   new_n = exclude_cluster_indices.back();
-
+   
   //here we exlcude points that belong to universal and noise clusters
   exclude_cluster_indices.pop_back();
   for(uint32_t i=0; i < variants.size(); i++){
@@ -860,46 +967,12 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
       retrain_size += 1;
     }
   }
-  arma::mat retrain_data(1, retrain_size, arma::fill::zeros);
-  //(rows, cols) where each columns is a sample  
-  for(uint32_t i = 0; i < retraining_set.size(); i++){  
-    double tmp = static_cast<double>(retraining_set[i].freq);
-    retrain_data.col(i) = tmp;
-  }
-  std::cerr << "retrain size " << retrain_size << std::endl;
-  std::cerr << new_n << std::endl;
-  var_floor = 0.0001;
-  gaussian_mixture_model gmodel2 = train_model(new_n, retrain_data, var_floor, universal_cluster, noise_cluster);
-  for(auto x : gmodel2.means){
-    std::cerr << "mean " << x << std::endl;
-  }
-  for(auto h : gmodel2.hefts){
-    std::cerr << "heft " << h << std::endl;
-  }
-  new_n = 0;
-  std::vector<double> z_scores = calculate_z_scores(gmodel2.hefts);
-  for(auto z : z_scores){
-    std::cerr << "z score " << z << std::endl;
-    if(z > 0){
-      new_n += 1;
-    }
-  }
-  //add back in the universal and noise clusters
-  new_n += 2;
-  gaussian_mixture_model gmodel3 = train_model(new_n, data, var_floor, universal_cluster, noise_cluster);
- 
-
-  //TEST LINES
-  //gaussian_mixture_model gmodel3 = train_model(new_n, retrain_data, var_floor, universal_cluster, noise_cluster);
-  for(auto x : gmodel3.means){
-    std::cerr << "mean " << x << std::endl;
-  }
-
+  */
   //write hefts to strings for use
   std::string tmp = "[";
-  for(uint32_t l=0; l < gmodel3.hefts.size(); l++){
+  for(uint32_t l=0; l < retrained.hefts.size(); l++){
     if(l != 0) tmp += ",";
-    tmp += std::to_string(gmodel3.hefts[l]);
+    tmp += std::to_string(retrained.hefts[l]);
   }
   tmp += "]";
   heft_strings.push_back(tmp); 
@@ -908,9 +981,9 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
   std::ofstream file;  
   file.open(output_prefix + ".txt", std::ios::trunc);
   std::string means_string = "[";
-  for(uint32_t j=0; j < gmodel3.means.size(); j++){
+  for(uint32_t j=0; j < retrained.means.size(); j++){
     if(j != 0) means_string += ",";
-    means_string += std::to_string(gmodel3.means[j]);
+    means_string += std::to_string(retrained.means[j]);
   }
   means_string += "]";
   file << "means\n";
