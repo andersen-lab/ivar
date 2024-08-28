@@ -7,10 +7,10 @@
 struct gaussian_mixture_model {
   std::vector<std::vector<double>> prob_matrix;
   uint32_t n;
-  uint32_t new_n;
   float var_floor;
   std::vector<double> means;
   std::vector<double> hefts; 
+  std::vector<double> dcovs;
 };
 
 struct variant {
@@ -21,6 +21,8 @@ struct variant {
   float freq;
   bool is_ref=false; 
   int cluster_assigned = -1;
+
+  bool fake = false;
 
   //for these true means flagged as problematic
   bool vague_assignment=false; //cannot be distinguished between two groups
