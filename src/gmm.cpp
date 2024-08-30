@@ -7,6 +7,19 @@
 #include <limits>
 #include <unordered_map>
 
+// Function to calculate the standard deviation of a vector
+double calculate_std_dev(const std::vector<double>& data, double mean) {
+    if (data.empty()) {
+        return 0.0f;
+    }
+    double sum = 0.0f;
+    for (double value : data) {
+        sum += std::pow(value - mean, 2);
+    }
+    return std::sqrt(sum / data.size());
+}
+
+
 // Function to calculate the mean of a vector
 double calculate_mean(const std::vector<double>& data) {
     if (data.empty()) {
@@ -65,42 +78,12 @@ uint32_t count_repeated_values(const std::vector<double>& vec) {
     return(count);
 }
 //function used for production
-gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float universal_cluster, float noise_cluster, bool fix_clusters){
+gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float universal_cluster, float noise_cluster, bool fix_clusters, std::vector<variant> variants){
   gaussian_mixture_model gmodel; 
   gmodel.n = n;
-  
-  float var_floor = 0.01; 
-  arma::mat kmeans;
- 
-  bool k_status = arma::kmeans(kmeans, data, n, arma::static_spread, 15, false);
-
-  auto kmin_iterator = std::min_element(kmeans.begin(), kmeans.end());
-  uint32_t kmin_index = std::distance(kmeans.begin(), kmin_iterator);
-  auto kmax_iterator = std::max_element(kmeans.begin(), kmeans.end());
-  uint32_t kmax_index = std::distance(kmeans.begin(), kmax_iterator);
-
-  std::vector<uint32_t> kmeans_heft(n);
-  for(auto point : data){
-    uint32_t min_index = 0;
-    double diff = 1;
-    for(uint32_t i=0; i < kmeans.size(); i++){
-      double dval = std::abs(kmeans[i] - point);
-      if(dval < diff){
-        diff = dval;
-        min_index = i;
-      }
-    }
-    kmeans_heft[min_index] += 1;
-  }
-
-  for(uint32_t i=0; i < kmeans.size(); i++){
-    if(i == kmin_index){
-      kmeans[i] = 0.03;
-    } else if(i == kmax_index){
-      kmeans[i] = 0.97;
-    }
-  }
-
+  //original had this a 0.001 
+  float var_floor = 0.001; 
+  arma::mat kmeans(1, n, arma::fill::zeros); 
   arma::mat cov (1, n, arma::fill::zeros);
   for(uint32_t l=0; l < n;l++){
     cov.col(l) = 0.001;
@@ -109,27 +92,16 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float universal
   arma::rowvec mhefts(n);
   double hval = 1/(double)n;
   for(uint32_t i=0; i < n; i++){
-    mhefts[i] = (double)kmeans_heft[i] / (double)data.size();
-    //mhefts[i] = hval;
+    mhefts[i] = hval;
   }
   arma::gmm_diag model;
-  model.reset(1, n);
-  model.set_means(kmeans);
-  model.set_dcovs(cov);
-  model.set_hefts(mhefts);
- 
-  std::cerr << "pre means " << model.means << std::endl;
-  std::cerr << "pre hefts " << model.hefts << std::endl;
-  std::cerr << "pre dcovs " << model.dcovs << std::endl;
-
-  //train model 
-  bool status = model.learn(data, n, arma::eucl_dist, arma::keep_existing, 15, 15, var_floor, false);
+  bool status = model.learn(data, n, arma::eucl_dist, arma::static_spread, 15, 15, var_floor, false);
   if(!status){
     std::cerr << "model failed to converge" << std::endl;
   }
-  std::cerr << "means " << model.means << std::endl;
+  /*std::cerr << "means " << model.means << std::endl;
   std::cerr << "hefts " << model.hefts << std::endl;
-  std::cerr << "dcovs " << model.dcovs << std::endl;
+  std::cerr << "dcovs " << model.dcovs << std::endl;*/
 
   std::vector<double> means;
   std::vector<double> hefts;
@@ -140,6 +112,7 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float universal
   uint32_t max_index = std::distance(model.means.begin(), max_iterator);
   arma::mat mean_fill2 (1, n, arma::fill::zeros);
 
+  
   for(uint32_t i=0; i < model.means.size(); i++){
     double m = (double)model.means[i];
     double factor = std::pow(10.0, 2);
@@ -175,71 +148,78 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float universal
   gmodel.means = means;
   gmodel.hefts = hefts;
 
-  return(gmodel);
-}
-
-// Function to calculate the standard deviation of a vector
-double calculate_std_dev(const std::vector<double>& data, double mean) {
-    if (data.empty()) {
-        return 0.0f;
-    }
-    double sum = 0.0f;
-    for (double value : data) {
-        sum += std::pow(value - mean, 2);
-    }
-    return std::sqrt(sum / data.size());
-}
-
-// Function to calculate the z-score of each element in a vector
-std::vector<double> calculate_z_scores(const std::vector<double>& data) {
-    std::vector<double> z_scores;
-    if (data.empty()) {
-        return z_scores;
-    }
-
-    double mean = calculate_mean(data);
-    double std_dev = calculate_std_dev(data, mean);
-
-    if (std_dev == 0.0f) {
-        // If the standard deviation is 0, all elements are the same, and z-scores are undefined
-        z_scores.resize(data.size(), 0.0f);
-        return z_scores;
-    }
-
-    for (double value : data) {
-        double z_score = (value - mean) / std_dev;
-        z_scores.push_back(z_score);
-    }
-
-    return z_scores;
-}
-
-
-std::vector<uint32_t> determine_new_n(std::vector<double> means){
-  uint32_t new_n = 0;
-  std::vector<uint32_t> exclude_cluster_indices;
-  std::vector<float> seen_means;
-  for(uint32_t i=0; i < means.size(); i++){
-    float round_mean = std::round(means[i] * 100.0) / 100.0;
-    if(means[i] == (double)0.97){
-      exclude_cluster_indices.push_back(i);
-      continue;
-    } else if(means[i] == (double)0.03){
-      exclude_cluster_indices.push_back(i);
-      continue;
-    } else if(means[i] == (double)0.0){
-      exclude_cluster_indices.push_back(i);
-    } else {
-      auto it = std::find(seen_means.begin(), seen_means.end(), round_mean);
-      if (it != seen_means.end()) {
-        continue;
-      }
-      new_n += 1;
-    }
-      seen_means.push_back(round_mean);
+  assign_clusters(variants, gmodel);
+  std::vector<std::vector<double>> clusters(n);
+  for(auto var : variants){
+    int cluster = var.cluster_assigned;
+    clusters[cluster].push_back(var.freq);
   }
-  exclude_cluster_indices.push_back(new_n);
-  return(exclude_cluster_indices);
+  
+  for(uint32_t i=0; i < clusters.size(); i++){
+    double mean = calculate_mean(clusters[i]);
+    double std_dev = calculate_std_dev(clusters[i], mean);
+    double tmp = (double)clusters[i].size() / (double)data.size();
+    cov(i) = 0.001;
+    kmeans[i] = mean;
+    //std::cerr << "mean " << mean << " heft " << tmp << " dev " << std_dev << std::endl;
+  }
+  model.reset(1, n);
+  model.set_means(kmeans);
+  model.set_dcovs(cov);
+  model.set_hefts(mhefts);
+ 
+  //train model 
+  //orignal is 0.01
+  var_floor = 0.01;
+  bool status3 = model.learn(data, n, arma::eucl_dist, arma::keep_existing, 1, 15, var_floor, false);
+  /*std::cerr << "means " << model.means << std::endl;
+  std::cerr << "hefts " << model.hefts << std::endl;
+  std::cerr << "dcovs " << model.dcovs << std::endl;*/
+
+  means.clear();
+  hefts.clear();
+  dcovs.clear();
+  min_iterator = std::min_element(model.means.begin(), model.means.end());
+  min_index = std::distance(model.means.begin(), min_iterator);
+  max_iterator = std::max_element(model.means.begin(), model.means.end());
+  max_index = std::distance(model.means.begin(), max_iterator);
+  arma::mat mean_fill3 (1, n, arma::fill::zeros);
+
+  for(uint32_t i=0; i < model.means.size(); i++){
+    double m = (double)model.means[i];
+    double factor = std::pow(10.0, 2);
+    double rounded = std::round(m * factor) / factor;
+    if(i == min_index || rounded < noise_cluster){
+      mean_fill3.col(i) = noise_cluster;
+      means.push_back((double)0.03);
+    } else if(i == max_index || rounded > universal_cluster){
+      mean_fill3.col(i) = universal_cluster;;
+      means.push_back((double)0.97);
+    }else{
+      mean_fill3.col(i) = rounded;
+      means.push_back(rounded);
+    }
+  }
+  for(uint32_t i=0; i < means.size(); i++){
+    hefts.push_back((double)model.hefts[i]);
+    dcovs.push_back((double)model.dcovs[i]);
+  }
+  model.set_means(mean_fill3);
+  prob_matrix.clear();
+  tmp.clear();
+  for(uint32_t i=0; i < n; i++){
+    arma::rowvec set_likelihood = model.log_p(data, i);
+    tmp.clear();
+    for(uint32_t j=0; j < data.n_cols; j++){
+      tmp.push_back((double)set_likelihood[j]);
+    }
+    prob_matrix.push_back(tmp);
+  }
+  gmodel.dcovs = dcovs;
+  gmodel.prob_matrix = prob_matrix;
+  gmodel.means = means;
+  gmodel.hefts = hefts;
+  return(gmodel);
 }
 
 double calculate_distance(double point, double mean) {
@@ -584,7 +564,7 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
     perm_generator(n, i, possible_permutations);
   } 
   if(smallest_peak < 0.05){
-    noise_resampler(n, index, possible_permutations, 20);
+    noise_resampler(n, index, possible_permutations, 10);
   } 
   //allow resample for 50/50 peaks
   /*for(uint32_t i=0; i < means.size(); i++){
@@ -944,12 +924,6 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
       all_var.push_back(base_variants[i].freq);      
     }
   }
-  for(uint32_t i=0; i < 4; i++){
-    variants.push_back(fake);
-    variants.push_back(fake2);
-    useful_var += 2;
-  }
-
   if(useful_var == 0){
     variants.clear();
     return(variants);
@@ -978,69 +952,79 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
   std::vector<double> means;
   std::vector<double> hefts;
   std::vector<uint32_t> exclude_cluster_indices;
+  
   //HERE WE USE TRAIN MODEL FUNCTION INSTEAD
   uint32_t counter = 2;
   uint32_t optimal_n = 0;
   gaussian_mixture_model retrained;
+  std::vector<double> widest_cluster;
   while(counter <= n){
     std::cerr << "counter " << counter << " n " << n << std::endl;
     retrained.means.clear();
     retrained.hefts.clear();
     retrained.prob_matrix.clear();
-    retrained = retrain_model(counter, data, universal_cluster, noise_cluster, true);
+    retrained = retrain_model(counter, data, universal_cluster, noise_cluster, true, variants);
     bool optimal = true;
-    /*for(auto d : retrained.dcovs){
-      if(d > 0.01){
-        optimal = false;
-      }
-    }*/
     assign_clusters(variants, retrained);
     std::vector<std::vector<double>> clusters(counter);
     for(auto var : variants){
       int cluster = var.cluster_assigned;
       clusters[cluster].push_back(var.freq);
     }
+    bool empty_cluster = false;
+    uint32_t total = data.size();
+    std::vector<double> save_std;
     for(auto data : clusters){
       double mean = calculate_mean(data);
       double std_dev = calculate_std_dev(data, mean);
+      save_std.push_back(std_dev);
       if(std_dev > 0.10){
-        for(auto a : data){
-          std::cerr << a << std::endl;
-        }
         optimal = false;
       }
-      std::cerr << mean << " " << std_dev << std::endl;
+      if(data.size() <= 1){
+        empty_cluster = true;
+      }
+      std::cerr << "main " << mean << " " << std_dev << " " << (double)data.size()/(double)total  << std::endl;
+    }
+    if(empty_cluster){
+      optimal_n = counter-1;
+      //break;
     }
     if(optimal){
       optimal_n = counter;
-      break;
+      //break;
     }
     counter++;     
+    auto max_element = std::max_element(save_std.begin(), save_std.end());
+    widest_cluster.push_back(*max_element);
+    std::cerr << "max std " << *max_element << std::endl;
   }
-  std::cerr << "optimal n " << optimal_n << std::endl;   
-  retrained = retrain_model(optimal_n, data, universal_cluster, noise_cluster, true);
-  assign_clusters(variants, retrained);
-  /*
-  std::vector<variant> retraining_set;
-  exclude_cluster_indices = determine_new_n(gmodel.means);
-  uint32_t retrain_size = 0;
-  new_n = exclude_cluster_indices.back();
-   
-  //here we exlcude points that belong to universal and noise clusters
-  exclude_cluster_indices.pop_back();
-  for(uint32_t i=0; i < variants.size(); i++){
-    auto it = std::find(exclude_cluster_indices.begin(), exclude_cluster_indices.end(), variants[i].cluster_assigned);
-    if(it == exclude_cluster_indices.end()){
-      retraining_set.push_back(variants[i]);
-      retrain_size += 1;
-    }
+  //optimal_n = 6;
+  //std::cerr << "optimal n " << optimal_n << std::endl;   
+  //retrained = retrain_model(optimal_n, data, universal_cluster, noise_cluster, true, variants);
+  //assign_clusters(variants, retrained);
+
+  std::vector<std::vector<double>> clusters(optimal_n);
+  for(auto var : variants){
+    int cluster = var.cluster_assigned;
+    clusters[cluster].push_back(var.freq);
   }
-  */
+  std::vector<double> std_devs;
+  std::vector<double> final_means;
+  double total = (double)data.size();
+  for(auto data : clusters){
+    double mean = calculate_mean(data);
+    double std_dev = calculate_std_dev(data, mean); 
+    std_devs.push_back((double)data.size()/total);
+    std::cerr << mean << " " << std_dev << std::endl;
+    final_means.push_back(mean);
+  } 
+  
   //write hefts to strings for use
   std::string tmp = "[";
-  for(uint32_t l=0; l < retrained.hefts.size(); l++){
+  for(uint32_t l=0; l < widest_cluster.size(); l++){
     if(l != 0) tmp += ",";
-    tmp += std::to_string(retrained.hefts[l]);
+    tmp += std::to_string(widest_cluster[l]);
   }
   tmp += "]";
   heft_strings.push_back(tmp); 
@@ -1049,9 +1033,9 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
   std::ofstream file;  
   file.open(output_prefix + ".txt", std::ios::trunc);
   std::string means_string = "[";
-  for(uint32_t j=0; j < retrained.means.size(); j++){
+  for(uint32_t j=0; j < final_means.size(); j++){
     if(j != 0) means_string += ",";
-    means_string += std::to_string(retrained.means[j]);
+    means_string += std::to_string(final_means[j]);
   }
   means_string += "]";
   file << "means\n";
