@@ -381,7 +381,6 @@ std::vector<std::vector<double>> solve_possible_solutions(std::vector<float> tmp
       means.push_back(x);
     }
   }
-  
   std::vector<std::vector<double>> all_combinations;
   for (uint32_t i= 1; i <= means.size(); i++) {
     std::vector<double> current_combination;
@@ -482,12 +481,27 @@ void noise_resampler(int n, int index, std::vector<std::vector<uint32_t>> &possi
       tmp.push_back(i);
     }
   }
+  std::cerr << "N " << n << std::endl;
   std::vector<std::vector<uint32_t>> other_tmp;
   generate_permutations(tmp, 2, index, other_tmp);
   generate_permutations(tmp, 3, index, other_tmp);
   generate_permutations(tmp, 4, index, other_tmp);
    
   deduplicate_solutions(other_tmp, possible_permutations);
+  std::vector<std::vector<uint32_t>> keep_solutions;
+  for(auto perm : possible_permutations){
+    bool keep = false;
+    for(auto clust : perm){
+      if(clust != index) keep = true;
+    }
+    if(keep && perm.size() > 1){
+      keep_solutions.push_back(perm);
+    } else if(perm.size() == 1){
+      keep_solutions.push_back(perm);
+    }
+  }
+  possible_permutations.clear();
+  possible_permutations = keep_solutions;
 }
 
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations){
@@ -575,7 +589,7 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
     perm_generator(n, i, possible_permutations);
   } 
   if(smallest_peak < 0.05){
-    noise_resampler(n, index, possible_permutations, 10);
+    noise_resampler(n, index, possible_permutations, n);
   } 
   //allow resample for 50/50 peaks
   /*for(uint32_t i=0; i < means.size(); i++){
@@ -583,7 +597,7 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
       noise_resampler(n, i, possible_permutations, 2);
     }
   }*/
-
+  
   //now we loop every unique position and assign the max prob combo of variants
   for(uint32_t i=0; i < unique_pos.size(); i++){
     std::vector<uint32_t> pos_idxs;
@@ -601,6 +615,7 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
       }
       j++;
     }
+    
     //assign variants based on most probable position-wise
     std::vector<uint32_t> assigned = calculate_joint_probabilities(tmp_prob, possible_permutations);
     if(assigned.size() == 0) continue;
@@ -952,14 +967,6 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
     count += 1;
   }
   base_variants.clear();
-  /*variants.clear();
-  parse_internal_variants(prefix, base_variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, low_quality_positions, round_val);
-  for(uint32_t i=0; i < base_variants.size(); i++){
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].del_flag && !base_variants[i].amplicon_masked && !base_variants[i].primer_masked){
-      variants.push_back(base_variants[i]);
-    }
-  }*/
-
   std::vector<double> means;
   std::vector<double> hefts;
   std::vector<uint32_t> exclude_cluster_indices;
@@ -970,6 +977,14 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
   gaussian_mixture_model retrained;
   std::vector<double> widest_cluster;
   while(counter <= n){
+    variants.clear();
+    parse_internal_variants(prefix, base_variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, low_quality_positions, round_val);
+    for(uint32_t i=0; i < base_variants.size(); i++){
+      if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].del_flag && !base_variants[i].amplicon_masked && !base_variants[i].primer_masked){
+      variants.push_back(base_variants[i]);
+      }
+    }
+
     std::cerr << "counter " << counter << " n " << n << std::endl;
     retrained.means.clear();
     retrained.hefts.clear();
@@ -981,6 +996,7 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
     for(auto var : variants){
       int cluster = var.cluster_assigned;
       clusters[cluster].push_back(var.freq);
+      //std::cerr << var.position << " " << cluster << " " << var.freq << std::endl;
     }
     bool empty_cluster = false;
     uint32_t total = data.size();
