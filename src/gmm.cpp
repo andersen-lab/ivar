@@ -7,6 +7,53 @@
 #include <limits>
 #include <unordered_map>
 
+// Function to calculate the median of a vector
+double calculate_median(std::vector<double> &data) {
+    std::sort(data.begin(), data.end());
+    size_t size = data.size();
+
+    if (size % 2 == 0) {
+        return (data[size / 2 - 1] + data[size / 2]) / 2.0;
+    } else {
+        return data[size / 2];
+    }
+}
+
+// Function to calculate the interquartile range (IQR)
+double calculate_interquartile_range(std::vector<double> data) {
+    std::sort(data.begin(), data.end()); // Sort the data
+    
+    size_t n = data.size();
+    size_t mid = n / 2;
+
+    // Split data into lower half (Q1 range) and upper half (Q3 range)
+    std::vector<double> lower_half(data.begin(), data.begin() + mid);
+    std::vector<double> upper_half(data.begin() + (n % 2 == 0 ? mid : mid + 1), data.end());
+
+    // Calculate Q1 (median of lower half) and Q3 (median of upper half)
+    double q1 = calculate_median(lower_half);
+    double q3 = calculate_median(upper_half);
+
+    // Return the interquartile range
+    return q3 - q1;
+}
+
+
+uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
+    std::unordered_map<uint32_t, uint32_t> frequency_map;
+    uint32_t max_count = 0;
+
+    // Count frequency of each number
+    for (const auto& num : nums) {
+        frequency_map[num]++;
+        if (frequency_map[num] > max_count) {
+            max_count = frequency_map[num];
+        }
+    }
+
+    return max_count;
+}
+
 double calculate_mad(const std::vector<double>& data, double mean){
     //Calculate the sum of absolute deviations
     double absDevSum = 0.0;
@@ -59,7 +106,7 @@ double calculate_variance(const std::vector<double>& data) {
     return variance;
 }
 
-void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel){
+void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, uint32_t lower_n){
   std::vector<std::vector<double>> tv = transpose_vector(gmodel.prob_matrix);
   uint32_t j = 0;
   for(uint32_t i=0; i < variants.size(); i++){
@@ -67,7 +114,7 @@ void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmod
     j++;
   }
   uint32_t index = smallest_value_index(gmodel.means);
-  assign_variants_simple(variants, gmodel.prob_matrix, index, gmodel.means);
+  assign_variants_simple(variants, gmodel.prob_matrix, index, gmodel.means, lower_n);
 
 }
 
@@ -89,18 +136,14 @@ uint32_t count_repeated_values(const std::vector<double>& vec) {
     return(count);
 }
 //function used for production
-gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float universal_cluster, float noise_cluster, bool fix_clusters, std::vector<variant> variants){
+gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float universal_cluster, float noise_cluster, bool fix_clusters, std::vector<variant> variants, uint32_t lower_n){
   gaussian_mixture_model gmodel; 
   gmodel.n = n;
 
   //original had this a 0.001 
-  float var_floor = 0.001; 
+  float var_floor = 0.8;
   arma::mat kmeans(1, n, arma::fill::zeros); 
   arma::mat cov (1, n, arma::fill::zeros);
-  for(uint32_t l=0; l < n;l++){
-    cov.col(l) = 0.001;
-  }
- 
   arma::rowvec mhefts(n);
   double hval = 1/(double)n;
   for(uint32_t i=0; i < n; i++){
@@ -111,9 +154,13 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float universal
   if(!status){
     std::cerr << "model failed to converge" << std::endl;
   }
-  /*std::cerr << "means " << model.means << std::endl;
+  for(auto m : model.means){
+    //std::cerr << pow(10, m) << std::endl;
+    std::cerr << 1.0 / (1.0 + exp(-m)) << std::endl;
+  }
+  std::cerr << "means " << model.means << std::endl;
   std::cerr << "hefts " << model.hefts << std::endl;
-  std::cerr << "dcovs " << model.dcovs << std::endl;*/
+  std::cerr << "dcovs " << model.dcovs << std::endl;
 
   std::vector<double> means;
   std::vector<double> hefts;
@@ -123,31 +170,28 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float universal
   auto max_iterator = std::max_element(model.means.begin(), model.means.end());
   uint32_t max_index = std::distance(model.means.begin(), max_iterator);
   arma::mat mean_fill2 (1, n, arma::fill::zeros);
-
-  
+  //TEST LINES
+  noise_cluster = -3.4760;
+  universal_cluster = 3.4760; 
   for(uint32_t i=0; i < model.means.size(); i++){
     double m = (double)model.means[i];
     double factor = std::pow(10.0, 2);
     double rounded = std::round(m * factor) / factor;
-    if(i == min_index || rounded < noise_cluster){
+    //std::cerr << 1.0 / (1.0 + exp(-m)) << std::endl;
+    /*if(i == min_index || rounded < noise_cluster){
       mean_fill2.col(i) = noise_cluster;
-      means.push_back((double)0.03);
+      means.push_back((double)noise_cluster);
     } else if(i == max_index || rounded > universal_cluster){
       mean_fill2.col(i) = universal_cluster;;
-      means.push_back((double)0.97);
-    }else{
+      means.push_back((double)universal_cluster);
+    }else{*/
       mean_fill2.col(i) = rounded;
       means.push_back(rounded);
-    }
-  }
-  for(uint32_t i=0; i < means.size(); i++){
-    hefts.push_back((double)model.hefts[i]);
-    dcovs.push_back((double)model.dcovs[i]);
+    //}
   }
   model.set_means(mean_fill2);
   std::vector<std::vector<double>> prob_matrix;
   std::vector<double> tmp;
-
   for(uint32_t i=0; i < n; i++){
     arma::rowvec set_likelihood = model.log_p(data, i);
     tmp.clear();
@@ -160,31 +204,38 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float universal
   gmodel.prob_matrix = prob_matrix;
   gmodel.means = means;
   gmodel.hefts = hefts;
+  gmodel.model = model;
+  //assign_clusters(variants, gmodel, lower_n);
 
-  assign_clusters(variants, gmodel);
-  std::vector<std::vector<double>> clusters(n);
+  /*std::vector<std::vector<double>> clusters(n);
   for(auto var : variants){
     int cluster = var.cluster_assigned;
+    //std::cerr << var.freq << " " << cluster << " " << var.position << std::endl;
     clusters[cluster].push_back(var.freq);
   }
-  
   for(uint32_t i=0; i < clusters.size(); i++){
     double mean = calculate_mean(clusters[i]);
-    cov(i) = 0.001;
-    kmeans[i] = mean;
-  }
-  model.reset(1, n);
-  model.set_means(kmeans);
-  model.set_dcovs(cov);
-  model.set_hefts(mhefts);
- 
+    //std::cerr << "set mean " << 1.0 / (1.0 + exp(-mean)) << std::endl;
+    //cov(i) = 0.001;
+    //kmeans[i] = mean;
+  }*/
+  /*model.reset(1, n);
+  model.set_means(mean_fill2);
+  //model.set_dcovs(cov);
+  //model.set_hefts(mhefts);
+   
   //train model 
   //orignal is 0.01
-  var_floor = 0.01;
+  //var_floor = 0.19;
   bool status3 = model.learn(data, n, arma::eucl_dist, arma::keep_existing, 1, 15, var_floor, false);
-  /*std::cerr << "means " << model.means << std::endl;
+  for(auto m : model.means){
+    //std::cerr << pow(10, m) << std::endl;
+    std::cerr << 1.0 / (1.0 + exp(-m)) << std::endl;
+
+  }
+  std::cerr << "means " << model.means << std::endl;
   std::cerr << "hefts " << model.hefts << std::endl;
-  std::cerr << "dcovs " << model.dcovs << std::endl;*/
+  std::cerr << "dcovs " << model.dcovs << std::endl;
 
   means.clear();
   hefts.clear();
@@ -199,16 +250,16 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float universal
     double m = (double)model.means[i];
     double factor = std::pow(10.0, 2);
     double rounded = std::round(m * factor) / factor;
-    if(i == min_index || rounded < noise_cluster){
-      mean_fill3.col(i) = noise_cluster;
-      means.push_back((double)0.03);
-    } else if(i == max_index || rounded > universal_cluster){
-      mean_fill3.col(i) = universal_cluster;;
-      means.push_back((double)0.97);
-    }else{
+    //if(i == min_index || rounded < noise_cluster){
+    //  mean_fill3.col(i) = noise_cluster;
+    //  means.push_back((double)noise_cluster);
+    //} else if(i == max_index || rounded > universal_cluster){
+    //  mean_fill3.col(i) = universal_cluster;;
+    //  means.push_back((double)universal_cluster);
+    //}else{
       mean_fill3.col(i) = rounded;
       means.push_back(rounded);
-    }
+    //}
   }
   for(uint32_t i=0; i < means.size(); i++){
     hefts.push_back((double)model.hefts[i]);
@@ -225,11 +276,13 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, float universal
     }
     prob_matrix.push_back(tmp);
   }
+
   gmodel.dcovs = dcovs;
   gmodel.prob_matrix = prob_matrix;
   gmodel.means = means;
   gmodel.hefts = hefts;
   gmodel.model = model;
+  */
   return(gmodel);
 }
 
@@ -481,7 +534,6 @@ void noise_resampler(int n, int index, std::vector<std::vector<uint32_t>> &possi
       tmp.push_back(i);
     }
   }
-  std::cerr << "N " << n << std::endl;
   std::vector<std::vector<uint32_t>> other_tmp;
   generate_permutations(tmp, 2, index, other_tmp);
   generate_permutations(tmp, 3, index, other_tmp);
@@ -523,10 +575,13 @@ std::vector<uint32_t> compare_cluster_assignment(std::vector<std::vector<double>
   for(uint32_t i=0; i < prob_matrix.size(); i++){
     double assigned_prob = prob_matrix[i][assigned[i]];
     std::vector<double> tmp = prob_matrix[i];
+    tmp.erase(tmp.begin() + assigned[i]);
     std::sort(tmp.begin(), tmp.end(), std::greater<double>());
     for(uint32_t j=0; j < tmp.size(); j++){
       //std::cerr << "here " << tmp[j] << " " << assigned_prob << " " << exp(tmp[j]) << " " << exp(assigned_prob) << std::endl;
-      if(tmp[j] == assigned_prob) continue;
+      //std::cerr << i << " " << j << std::endl;
+      //if(tmp[j] == assigned_prob) continue;
+       //if(i == j) continue;
         if(exp(tmp[j]) * threshold > exp(assigned_prob)){
           //std::cerr << "hola" << std::endl;
           //std::cerr << exp(tmp[j]) << " " << exp(assigned_prob) << std::endl;
@@ -545,7 +600,11 @@ std::vector<uint32_t> calculate_joint_probabilities(std::vector<std::vector<doub
   std::vector<double> scores; //score for every permuation of assignment
   //on the permutation level                            
   for(uint32_t i=0; i < permutations.size(); i++){   
-   double score = 0; 
+    double score = 0; 
+    /*for(auto p : permutations[i]){
+      std::cerr << p << " ";
+    }
+    std::cerr << "\n";*/
     for(uint32_t j = 0; j < permutations[i].size(); j++){
       //num of variants in position must match permutation
       if(permutations[i].size() != prob_matrix.size()){ 
@@ -554,16 +613,17 @@ std::vector<uint32_t> calculate_joint_probabilities(std::vector<std::vector<doub
       }
       score += prob_matrix[j][permutations[i][j]];
     }
+    //std::cerr << score << std::endl;
     scores.push_back(score);
   }
   uint32_t max_idx = std::distance(scores.begin(), std::max_element(scores.begin(), scores.end()));
   return(permutations[max_idx]);
 }
 
-void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, std::vector<double> means){
-  uint32_t n = prob_matrix.size();
+void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, std::vector<double> means, uint32_t lower_n){
   double smallest_peak = *std::min_element(means.begin(), means.end()); 
-
+  uint32_t n = prob_matrix.size();
+  
   //find the unique positions
   std::vector<uint32_t> unique_pos;
   for(uint32_t i = 0; i < variants.size(); i++){
@@ -583,13 +643,12 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
   }
   //determine all possible permutations of assignments, disregard sum condition of E(u) ~= 1
   std::vector<std::vector<uint32_t>> possible_permutations;
-
   //what do we do here when we have fewer than two groups
-  for(uint32_t i=1; i <= means.size(); i++){
+  for(uint32_t i=1; i <= lower_n; i++){
     perm_generator(n, i, possible_permutations);
-  } 
-  if(smallest_peak < 0.05){
-    noise_resampler(n, index, possible_permutations, n);
+  }
+  if(smallest_peak < 0.15){
+    noise_resampler(n, index, possible_permutations, 6);
   } 
   //allow resample for 50/50 peaks
   /*for(uint32_t i=0; i < means.size(); i++){
@@ -597,7 +656,13 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
       noise_resampler(n, i, possible_permutations, 2);
     }
   }*/
-  
+  /*for(auto perm : possible_permutations){
+    for(auto p : perm){
+      std::cerr << p << " ";
+    }
+    std::cerr << "\n";
+  }*/
+
   //now we loop every unique position and assign the max prob combo of variants
   for(uint32_t i=0; i < unique_pos.size(); i++){
     std::vector<uint32_t> pos_idxs;
@@ -605,7 +670,7 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
     uint32_t j = 0;
     //all locations in the prob matrix for this position
     for(uint32_t k = 0;  k < variants.size(); k++){    
-      if(variants[k].position  == unique_pos[i]){
+      if(variants[k].position  == unique_pos[i] && !variants[k].depth_flag){
         pos_idxs.push_back(j);
         std::vector<double> tmp;
         for(uint32_t l=0; l < n; l++){
@@ -617,7 +682,10 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
     }
     
     //assign variants based on most probable position-wise
-    std::vector<uint32_t> assigned = calculate_joint_probabilities(tmp_prob, possible_permutations);
+    std::vector<uint32_t> assigned;
+    //if(unique_pos[i] == 18688){
+      assigned = calculate_joint_probabilities(tmp_prob, possible_permutations);
+    //}
     if(assigned.size() == 0) continue;
     //make sure the assignment is concrete
     std::vector<uint32_t> assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
@@ -628,9 +696,10 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
         //this pos was flagged as poorly assigned
         if(tmp != assignment_flagged.end() && k == pos_idxs[j]){
           //technically this could use work as it's repetitive
-          if(std::abs(variants[z].freq - means[assigned[j]]) > 0.03) {
-            variants[z].vague_assignment = true; 
-          }
+          //if(std::abs(variants[z].freq - means[assigned[j]]) > 0.03) {
+          //  variants[z].vague_assignment = true; 
+          //}
+          variants[z].vague_assignment = true;
           variants[z].cluster_assigned = assigned[j];
           break;
         }
@@ -852,6 +921,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
   
     tmp.depth = depth;
     tmp.freq = freq;
+    tmp.transformed_freq = log(freq / (1 - freq));;
     tmp.qual = qual;
 
     if (flag == "TRUE"){
@@ -869,7 +939,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     } else {
         tmp.primer_masked = false;
     }
-
     if(1/freq * depth < depth_cutoff){
       tmp.depth_flag = true;
     } else {
@@ -901,9 +970,8 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
 }
 
 std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string output_prefix, float dcov_first, float dcov_second){
-  int retval = 0;
-  float lower_bound = 0.01;
-  float upper_bound = 0.99;
+  float lower_bound = 0.03;
+  float upper_bound = 0.97;
   uint32_t depth_cutoff = 10;
   float quality_threshold = 20;
   uint32_t round_val = 4; 
@@ -924,32 +992,18 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
   std::vector<double> all_var;
   std::vector<variant> variants;
 
-  variant fake;
-  fake.position = 1;
-  fake.amplicon_flux=false;
-  fake.freq = 0.03;
-  fake.del_flag = false;
-  fake.outside_freq_range = false;
-  fake.amplicon_masked = false;
-  fake.qual_flag = false;
-  fake.fake= true;
-
-  variant fake2;
-  fake2.position = 1;
-  fake2.amplicon_flux=false;
-  fake2.freq = 0.97;
-  fake2.del_flag = false;
-  fake2.outside_freq_range = false;
-  fake2.amplicon_masked = false;
-  fake2.qual_flag = false;
-  fake2.fake = true;
+  std::vector<uint32_t> count_pos;
   for(uint32_t i=0; i < base_variants.size(); i++){
     if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].del_flag && !base_variants[i].amplicon_masked && !base_variants[i].primer_masked){
       useful_var += 1;
       variants.push_back(base_variants[i]);
       all_var.push_back(base_variants[i].freq);      
+      count_pos.push_back(base_variants[i].position);
+      //std::cerr << base_variants[i].freq <<  " " << base_variants[i].position << " " << base_variants[i].qual <<  " " << base_variants[i].depth << std::endl;
     }
   }
+  uint32_t lower_n = find_max_frequency_count(count_pos);
+  std::cerr << "lower n " << lower_n << std::endl;
   if(useful_var == 0){
     variants.clear();
     return(variants);
@@ -962,7 +1016,7 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
   uint32_t count=0;
   for(uint32_t i = 0; i < variants.size(); i++){   
     //check if variant should be filtered for first pass model
-    double tmp = static_cast<double>(variants[i].freq);
+    double tmp = static_cast<double>(variants[i].transformed_freq);
     data.col(count) = tmp;
     count += 1;
   }
@@ -977,47 +1031,46 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
   gaussian_mixture_model retrained;
   std::vector<double> widest_cluster;
   while(counter <= n){
-    variants.clear();
-    parse_internal_variants(prefix, base_variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, low_quality_positions, round_val);
-    for(uint32_t i=0; i < base_variants.size(); i++){
-      if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].del_flag && !base_variants[i].amplicon_masked && !base_variants[i].primer_masked){
-      variants.push_back(base_variants[i]);
+    if((float)useful_var / (float)n < 5){
+      if(counter > 2){
+        optimal_n = counter - 1;
+      } else {
+        optimal_n = counter;
       }
+      break;
     }
-
     std::cerr << "counter " << counter << " n " << n << std::endl;
     retrained.means.clear();
     retrained.hefts.clear();
     retrained.prob_matrix.clear();
-    retrained = retrain_model(counter, data, universal_cluster, noise_cluster, true, variants);
+    retrained = retrain_model(counter, data, universal_cluster, noise_cluster, true, variants, lower_n);
     bool optimal = true;
-    assign_clusters(variants, retrained);
+    assign_clusters(variants, retrained, lower_n);
     std::vector<std::vector<double>> clusters(counter);
     for(auto var : variants){
       int cluster = var.cluster_assigned;
       clusters[cluster].push_back(var.freq);
-      //std::cerr << var.position << " " << cluster << " " << var.freq << std::endl;
     }
     bool empty_cluster = false;
-    uint32_t total = data.size();
     std::vector<double> save_std;
     for(auto data : clusters){
+      /*for(auto d : data){
+        std::cerr << d << " ";
+      }
+      std::cerr << "\n";*/
       double mean = calculate_mean(data);
-      //double std_dev = calculate_std_dev(data, mean);
       double mad = calculate_mad(data, mean);
-      std::cerr << mean << " mad " << mad << std::endl;
+      if(data.size() <= 1){
+        empty_cluster = true;
+        continue;
+      }
+      double iqr = calculate_interquartile_range(data);
+      std::cerr << "mean " << mean << " mad " << mad << " iqr " << iqr << std::endl;
       if(mean > 0){ 
         save_std.push_back(mad);
       }
-      if(mad > 0.10){
+      if(mad > 0.10 && (iqr > 0.10)){
         optimal = false;
-        for(auto d : data){
-          std::cerr << d << " ";
-        }
-        std::cerr << "\n";
-      }
-      if(data.size() <= 1){
-        empty_cluster = true;
       }
     }
     if(empty_cluster){
@@ -1032,9 +1085,14 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
     widest_cluster.push_back(*me);
     counter++;     
   }
-  retrained = retrain_model(optimal_n, data, universal_cluster, noise_cluster, true, variants);
-  assign_clusters(variants, retrained);
-
+  std::cerr << "optimal n " << optimal_n << std::endl;
+  if(optimal_n != counter || retrained.means.size() == 0){
+    retrained.means.clear();
+    retrained.hefts.clear();
+    retrained.prob_matrix.clear();
+    retrained = retrain_model(optimal_n, data, universal_cluster, noise_cluster, true, variants, lower_n);
+    assign_clusters(variants, retrained, lower_n);
+  }
   std::vector<std::vector<double>> clusters(optimal_n);
   for(auto var : variants){
     int cluster = var.cluster_assigned;
@@ -1042,20 +1100,21 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
   }
   std::vector<double> std_devs;
   std::vector<double> final_means;
+ 
   double total = (double)data.size();
   for(auto data : clusters){
     double mean = calculate_mean(data);
+    //std::cerr << "final mean " << mean << std::endl;
     double std_dev = calculate_mad(data, mean); 
     std_devs.push_back((double)data.size()/total);
-    std::cerr << mean << " " << std_dev << std::endl;
     final_means.push_back(mean);
   } 
   std::ofstream file;  
   //write hefts to strings for use
-  /*std::string tmp_str = "[";
-  for(uint32_t l=0; l < widest_cluster.size(); l++){
+  std::string tmp_str = "[";
+  for(uint32_t l=0; l < std_devs.size(); l++){
     if(l != 0) tmp_str += ",";
-    tmp_str += std::to_string(widest_cluster[l]);
+    tmp_str += std::to_string(std_devs[l]);
   }
   tmp_str += "]";
   heft_strings.push_back(tmp_str);
@@ -1066,7 +1125,7 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
     file << x << "\n";
   }
   file.close(); 
-  */
+
   //write means to string
   file.open(output_prefix + ".txt", std::ios::trunc);
   std::string means_string = "[";
@@ -1079,69 +1138,12 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
   file << means_string << "\n";
   file.close();
 
-  //exit(1);
-  /*
-  arma::mat cov (1, n, arma::fill::zeros);
-  bool status = model.learn(data, n, arma::eucl_dist, arma::random_spread, 10, 20, 0.001, false);
-  //get the means of the gaussians
-  auto min_iterator = std::min_element(means.begin(), means.end());
-  uint32_t min_index = std::distance(means.begin(), min_iterator);
-  auto max_iterator = std::max_element(means.begin(), means.end());
-  uint32_t max_index = std::distance(means.begin(), max_iterator);
-
-  arma::mat mean_fill (1, n, arma::fill::zeros);
-  for(uint32_t l=0; l < n; l++){
-    if(l == min_index){
-      mean_fill.col(l) = noise_cluster;
-    } else if(l == max_index){
-      mean_fill.col(l) = universal_cluster;
-    } else if(means[l] > universal_cluster || means[l] < noise_cluster){
-      continue;
-    } else{
-      mean_fill.col(l) = means[l];
-    }
-  }      
-  model.set_means(mean_fill);
-  means.clear();
-  */
-  //DCOV CODE NOT IN USE
-  /*
-  std::vector<double> tmp_dcovs;
-  for(auto x : model.dcovs){
-    tmp_dcovs.push_back(x);
-  }
-  //found 0.0001, 0.001
-  //found 0.00005, 0.001
-  //cleaner data 0.0005, 0.001
-  for(uint32_t l=0; l < n;l++){
-    if(means[l] >= universal_cluster){
-      cov.col(l) = dcov_first;
-    } else if (means[l] <= noise_cluster) {
-      cov.col(l) = dcov_first;
-    }else {
-      cov.col(l) = dcov_second;
-    }
-  }
-  model.set_dcovs(cov);*/
-
   //get the probability of each frequency being assigned to each gaussian
-  /*
   //double prob_sum = 0;
   determine_low_prob_positions(variants);
-  */
-  /*
-  std::vector<float> hefts;
-  std::vector<variant> retraining_set;
-  means.clear();
-  for(uint32_t i=0; i < model_final.means.size(); i++){
-    means.push_back((double)model_final.means[i]);
-  }   
-  */
-
   useful_var = 0;
   //look at all variants despite other parameters
-  retrained = retrain_model(optimal_n, data, universal_cluster, noise_cluster, true, variants);
-
+  retrained = retrain_model(optimal_n, data, universal_cluster, noise_cluster, true, variants, lower_n);
   base_variants.clear();
   variants.clear();
   deletion_positions.clear();
@@ -1158,15 +1160,13 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
   count=0;
   for(uint32_t i = 0; i < variants.size(); i++){   
     //check if variant should be filtered for first pass model
-    double tmp = static_cast<double>(variants[i].freq);
+    double tmp = static_cast<double>(variants[i].transformed_freq);
     final_data.col(count) = tmp;
     count += 1;
   }
-
   //recalcualte the prob matrix based on the new dataset
   std::vector<std::vector<double>> prob_matrix;
   std::vector<double> tmp;
-  tmp.clear();
   for(uint32_t i=0; i < optimal_n; i++){
     arma::rowvec set_likelihood = retrained.model.log_p(final_data, i);
     tmp.clear();
@@ -1176,9 +1176,8 @@ std::vector<variant>  gmm_model(std::string prefix, uint32_t n, std::string outp
     prob_matrix.push_back(tmp);
   }
   retrained.prob_matrix = prob_matrix;
-  assign_clusters(variants, retrained);
-  determine_low_prob_positions(variants);
-  
+  assign_clusters(variants, retrained, lower_n);
+  //determine_low_prob_positions(variants);
   //lets add back in the 100% variants
   for(uint32_t i=0; i < base_variants.size(); i++){
     if(base_variants[i].outside_freq_range){
