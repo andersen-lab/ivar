@@ -387,6 +387,7 @@ void primer::transform_mutations(std::string ref_path) {
     uint32_t mismatched = 0;
     uint32_t total = 0;
     bool useful = false;
+
     //we'll use the cigar string to handle insertions
     //if a ton of this read has been soft clipped, toss it out for quality reasons
     for(uint32_t j=0; j < cigarotype.size(); j++){
@@ -461,9 +462,10 @@ void primer::transform_mutations(std::string ref_path) {
         std::cerr << weighed_score << " " << (float)mismatched / (float)total << std::endl;
       }
     }
-    if(weighed_score < 0.50){
+    /*if(weighed_score < 0.50){
+      std::cerr << "yolo" << std::endl;
       continue;
-    }
+    }*/
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
       uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
@@ -629,14 +631,14 @@ void primer::transform_mutations(std::string ref_path) {
       std::ostringstream convert;
       bool ref = false;
       convert << sequence[j];
-      std::string nuc = convert.str(); 
+      std::string nuc = convert.str();
+      if(current_pos == 23664 && ccount > 5){
+        std::cerr << nuc << " " << ccount << " " << qname << std::endl;
+      }
       if (std::find(substitutions.begin(), substitutions.end(), current_pos) == substitutions.end()){
         ref = true;
       }
       int exists = check_position_exists(current_pos, positions);
-      if(current_pos == 27121 && nuc == "A"){
-        std::cerr << "HERE " << qname << std::endl;
-      }
       if (exists != -1) {
         positions[exists].update_alleles(nuc, ccount, quality[j], ref);  
       } else {

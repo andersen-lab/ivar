@@ -130,7 +130,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
   aln = bam_init1();
   // Iterate through reads
-  std::string test = "";
   while (sam_read1(in, header, aln) >= 0) {
     strand = '+';
     if (bam_is_rev(aln)) {
@@ -211,21 +210,17 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       for(uint32_t j=0; j < primers.size(); j++){
         uint32_t pstart = primers[j].get_start();
         uint32_t pend = primers[j].get_end(); 
-        if (start == pstart && end == pend){
+        if (start == pstart && end == pend){          
           primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln), qualities, bam_is_rev(aln));
         }
       }
     }
   }
-  std::cerr << "counter " << counter << std::endl;
-  std::cerr << "number of reads outside an amplicon: " << outside_amp << std::endl;
   //this is super time costly
-
   for(uint32_t i=0; i < primers.size(); i++){
     primers[i].populate_positions();
     primers[i].transform_mutations(ref_path);
   }
-  std::cerr << "setting amplicon level haplotypes" << std::endl;
   for (uint32_t i=0; i < primers.size(); i++){
     amplicons.set_haplotypes(primers[i]);      
   }
@@ -258,8 +253,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   //then when we experience flux on primer bound issue amplicon, save adjusted depths
   std::vector<uint32_t> flagged_positions; 
   std::vector<std::tuple<uint32_t, uint32_t, std::string>> adjusted_depths; //holds adjusted depth info
-  std::cerr << "detecting variant abberations" << std::endl;
-  uint32_t test_pos = 21792;
   //detect fluctuating variants
   for(uint32_t i=0; i < amplicons.max_pos; i++){
     amplicons.test_flux.clear();
@@ -271,13 +264,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     
     std::map<std::string, std::vector<float>> allele_maps;
     for(uint32_t j=0; j < amplicons.test_flux.size(); j++){
-      if(i == test_pos){
-        std::cerr << "\n" << amplicons.test_test[j] << std::endl;
-      }
       uint32_t total_depth = amplicons.test_flux[j].depth;
-      if(i == test_pos){
-        std::cerr << "total depth " << total_depth << std::endl;
-      }
       if(total_depth < 20){
          continue;
       }
@@ -285,21 +272,12 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       for(uint32_t k=0; k < ad.size(); k++){
         std::string nuc = ad[k].nuc;
         uint32_t ad_depth = ad[k].depth;
-        if(i == test_pos){
-          std::cerr << nuc << " " << ad_depth << " " << total_depth << std::endl;
-        }
         float t = (float)ad_depth / (float)total_depth; 
         if (allele_maps.find(nuc) != allele_maps.end()){
-          if(i == test_pos){
-            std::cerr << "allele map " << nuc << " " << t << std::endl;
-           }
           allele_maps[nuc].push_back(t);  
         } else {
           std::vector<float> tmp;
           tmp.push_back(t);
-          if(i == test_pos){
-            std::cerr << "allele map " << nuc << " " << t << std::endl;
-          }
           allele_maps[nuc] = tmp;
         }
       }
@@ -307,9 +285,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     std::map<std::string, std::vector<float>>::iterator it;
     for (it = allele_maps.begin(); it != allele_maps.end(); it++){
       float sd = calculate_standard_deviation(it->second);
-      if(i == test_pos){
-        std::cerr << i << " std " << sd << " " << it->first << std::endl;
-      }
       //TODO this is hard coded, consider it
       if (sd >= 0.03){
         for(auto overlap : amplicons.overlaps){
@@ -323,7 +298,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
                 position removal = amplicons.test_flux[index];
                 for(auto ad : removal.alleles){
                   adjusted_depths.push_back(std::make_tuple(i, ad.depth, ad.nuc));
-                  //std::cerr << "remove this depth " << ad.nuc << " " << ad.depth << std::endl;
                 }
               }
             }
@@ -333,17 +307,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       }
     }
   }
-  //exit(1);
-  //TESTLINES print out the adjusted depth for sanity check
-  /*
-  for(uint32_t k=0; k < adjusted_depths.size(); k++){
-    uint32_t pos = std::get<0>(adjusted_depths[k]);
-    uint32_t depth = std::get<1>(adjusted_depths[k]);
-    std::string nuc = std::get<2>(adjusted_depths[k]);
-    std::cerr << pos << " " << nuc << " " << depth << std::endl;
-  }*/
-  //exit(1);
- 
+
   std::vector<uint32_t> primer_binding_error;
   for(uint32_t i=0; i < amplicons.overlaps.size(); i++){
     generate_range(amplicons.overlaps[i][0], amplicons.overlaps[i][1], primer_binding_error);    
