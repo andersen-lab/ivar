@@ -359,113 +359,48 @@ void primer::transform_mutations(std::string ref_path) {
   std::vector<bool> all_forward = this->get_direction();
   //this tracks all mutations at all positions
   std::string test = "";
-  ref_antd refantd(ref_path, ""); 
+  //ref_antd refantd(ref_path, ""); 
+
   //here let's turn the cigar string into a vector of alleles specific to this primer
   //iterate all unique sequences
   for(uint32_t i=0; i < cigarotypes.size(); i++){
-    bool forward = all_forward[i];
     //get the cigar string and start pos
-    std::vector<uint32_t> quality = qualities[i];
-    std::vector<uint32_t> cigarotype = cigarotypes[i]; //carries the insertions
-    std::vector<uint8_t> aux_tag = aux_tags[i]; //carries deletions
-    std::vector<uint8_t> sequence = sequences[i]; //carries NT values
+    std::vector<uint32_t>& quality = qualities[i];
+    std::vector<uint32_t>& cigarotype = cigarotypes[i]; //carries the insertions
+    std::vector<uint8_t>& aux_tag = aux_tags[i]; //carries deletions
+    std::vector<uint8_t>& sequence = sequences[i]; //carries NT values
+
     std::vector<uint32_t> sc_positions; //sc positions            
     uint32_t ccount = counts[i];                                                     
     uint32_t start_pos = start_positions[i]; // pos after soft-clipped region
     std::vector<std::string> all_qnames = qnames[i];
     std::string qname = all_qnames[0];
-    uint32_t consumed_query = 0;
-    uint32_t consumed_ref = 0;
+    uint32_t consumed_query = 0, consumed_ref = 0;
     std::string nuc;
     std::vector<uint32_t> ignore_sequence; //positions in query that are insertions
-    //transform things over 
-    bool start = true;
     uint32_t position_val = start_positions[i];
     uint32_t relative_position = 0;
-    std::vector<std::vector<uint32_t>> soft_clipped;
-    std::vector<std::vector<uint32_t>> relative_soft_clipped;
-    uint32_t mismatched = 0;
-    uint32_t total = 0;
-    bool useful = false;
+    std::vector<std::vector<uint32_t>> soft_clipped, relative_soft_clipped;
 
     //we'll use the cigar string to handle insertions
-    //if a ton of this read has been soft clipped, toss it out for quality reasons
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
       uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
       if(op == 4){
-        std::vector<uint32_t> tmp;
-        if(start){
-          tmp.push_back(position_val - oplen);
-          tmp.push_back(position_val);
-          soft_clipped.push_back(tmp);
-          tmp.clear();
-          tmp.push_back(relative_position);
-          tmp.push_back(relative_position + oplen);
-          relative_soft_clipped.push_back(tmp);
-          start = false;
-          relative_position += oplen;
-        } else{
-          tmp.clear();
-          tmp.push_back(position_val);
-          tmp.push_back(position_val+oplen);
-          soft_clipped.push_back(tmp);
-          tmp.clear();
-          tmp.push_back(relative_position);
-          tmp.push_back(relative_position + oplen);
-          relative_soft_clipped.push_back(tmp);
-        }
-      } else if(bam_cigar_type(op) & 2){
-        start = false;
-        if(bam_cigar_type(op) & 1){
-          relative_position += oplen;
-        }
+        std::vector<uint32_t> tmp = {position_val, position_val + oplen};
+        soft_clipped.push_back(tmp);
+        tmp = {relative_position, relative_position + oplen};
+        relative_soft_clipped.push_back(tmp);
         position_val += oplen;
-      }
-    }
-    std::string soft_clipped_seq = "";
-    std::string ref_seq_val = "";
-    double weighed_score = 1.0;
-    for (uint32_t k = 0; k < soft_clipped.size(); k++) {
-      uint32_t start = soft_clipped[k][0] + 1;
-      uint32_t end = soft_clipped[k][1] + 1;
-      uint32_t rel_start = relative_soft_clipped[k][0];
-      uint32_t rel_end = relative_soft_clipped[k][1];
-      
-      soft_clipped_seq = "";
-      ref_seq_val = "";
-      // Retrieve soft-clipped sequence
-      for (uint32_t l = rel_start; l < rel_end; ++l) {
-        soft_clipped_seq += sequence[l];
-      }
-      for(uint32_t l = start; l < end; l++){
-        if(qname == test){
-          std::cerr << l << std::endl;
-        }
-        char ref = refantd.get_base(l, region);
-        ref_seq_val += ref;
-      }
-      for(uint32_t l=0; l < soft_clipped_seq.size(); l++){
-        total += 1;
-        if(soft_clipped_seq[l] != ref_seq_val[l]){
-          mismatched += 1;
+        relative_position += oplen;
+      } else if (bam_cigar_type(op) & 2) { // Ref-consuming
+        position_val += oplen;
+        if (bam_cigar_type(op) & 1) { // Query-consuming
+          relative_position += oplen;
         }
       }
     }
-    if(soft_clipped_seq != ref_seq_val){      
-      if(!forward){
-        std::reverse(soft_clipped_seq.begin(), soft_clipped_seq.end());
-        std::reverse(ref_seq_val.begin(), ref_seq_val.end());
-      } 
-      weighed_score = weighted_similarity(soft_clipped_seq, ref_seq_val);
-      if(useful){
-        std::cerr << weighed_score << " " << (float)mismatched / (float)total << std::endl;
-      }
-    }
-    /*if(weighed_score < 0.50){
-      std::cerr << "yolo" << std::endl;
-      continue;
-    }*/
+
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
       uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
@@ -593,7 +528,6 @@ void primer::transform_mutations(std::string ref_path) {
       std::vector<uint32_t>::iterator it2 = find(deletion_positions.begin(), deletion_positions.end(), current_pos+1); 
 
       if (it != deletion_positions.end() || it2 != deletion_positions.end()) {
-        //std::cerr << "in seq loop " << current_pos << std::endl;
         current_pos += 1;
         j -= 1;
         last_del = true;
@@ -632,9 +566,10 @@ void primer::transform_mutations(std::string ref_path) {
       bool ref = false;
       convert << sequence[j];
       std::string nuc = convert.str();
-      if(current_pos == 23664 && ccount > 5){
+      if(nuc == "L") continue; //this nucleotide was below the threshold of quality
+      /*if(current_pos == 23664 && ccount > 5){
         std::cerr << nuc << " " << ccount << " " << qname << std::endl;
-      }
+      }*/
       if (std::find(substitutions.begin(), substitutions.end(), current_pos) == substitutions.end()){
         ref = true;
       }
@@ -657,10 +592,12 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
   std::vector<uint8_t> saved_aux; //placeholder for saved sequence
   std::vector<uint32_t> saved_cigarotype; //placeholder for saved cigarotypes
   std::vector<uint8_t> saved_seq;
+  std::vector<uint32_t> saved_qual;
   uint32_t sp; //placeholder for saved starting position
-  std::vector<uint32_t> qual_reformat;
+  
   std::vector<uint32_t> cigar_reformat;
-  std::vector<uint8_t> seq_reformat;
+  cigar_reformat.reserve(nlength);
+
   std::vector<uint8_t> aux_reformat;
   std::string test = "";
   uint32_t length=0;
@@ -690,9 +627,22 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
     i++;
   } while(aux[i] != '\0');
 
+  std::vector<uint8_t> seq_reformat;
+  std::vector<uint32_t> qual_reformat;
+  qual_reformat.reserve(useful.size());
+  seq_reformat.reserve(useful.size());
+
+  //TESTLINES
+  uint32_t qual_threshold = 20;
+  char sub_nt = 'L';
   for(uint32_t k=0; k < useful.size(); k++){
-    qual_reformat.push_back(quality[useful[k]]);
-    if(substitution){
+    bool above_thresh=true;
+    if((uint32_t)quality[useful[k]] < qual_threshold){
+      seq_reformat.push_back(sub_nt);
+      above_thresh = false;
+    }
+    qual_reformat.push_back((uint32_t)quality[useful[k]]);
+    if(substitution && above_thresh){
       uint8_t nt = 0;
       nt = seq_nt16_str[bam_seqi(seq, useful[k])]; //this operation is costly....
       seq_reformat.push_back(nt);
@@ -706,13 +656,15 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
     saved_aux = aux_tags[i];
     saved_cigarotype = cigarotypes[i];
     saved_seq = sequences[i];
+    saved_qual = qualities[i];
+    if(saved_qual.size() != qual_reformat.size()) continue;
     if(cigar_reformat == saved_cigarotype && start_pos == sp && aux_reformat == saved_aux){
       if(substitution && seq_reformat != saved_seq){
         continue;
       }
       found = true;
-      count_cigarotypes[i] += 1;
-      qnames[i].push_back(qname);
+      count_cigarotypes[i]++;
+      qnames[i].push_back(std::move(qname));
       for(uint32_t k = 0; k < qual_reformat.size(); k++){
         qualities[i][k] += (uint32_t) qual_reformat[k];
       }
@@ -721,10 +673,10 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
   }
   //haven't seen this cigar/start pos combo before
   if(!found){
-    if(seq_reformat.size() == 0){ 
-      uint8_t nt = 0;
+    if(seq_reformat.empty()){
+      seq_reformat.reserve(useful.size()); 
       for(uint32_t k=0; k < useful.size(); k++){
-        nt = seq_nt16_str[bam_seqi(seq, useful[k])];
+        uint8_t nt = seq_nt16_str[bam_seqi(seq, useful[k])];
         seq_reformat.push_back(nt);
       }
     }
@@ -733,16 +685,13 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
     } else {
       forward.push_back(true);
     }
-    qualities.push_back(qual_reformat);
-    cigarotypes.push_back(cigar_reformat);    
+    qualities.push_back(std::move(qual_reformat));
+    cigarotypes.push_back(std::move(cigar_reformat));    
     ncigarotypes.push_back(start_pos);
-    sequences.push_back(seq_reformat);
-    aux_tags.push_back(aux_reformat);
-    std::vector<std::string> tmp;
-    tmp.push_back(qname);
-    qnames.push_back(tmp);
-    uint32_t digit = 1;
-    count_cigarotypes.push_back(digit);
+    sequences.push_back(std::move(seq_reformat));
+    aux_tags.push_back(std::move(aux_reformat));
+    qnames.emplace_back(1, std::move(qname));
+    count_cigarotypes.push_back(1);
     nlengths.push_back(nlength);
   }
 }
