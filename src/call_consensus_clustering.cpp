@@ -20,9 +20,8 @@ bool cluster_gravity_analysis(std::vector<std::vector<float>> solutions){
   return(all_same);
 }
 
-bool account_for_clusters(std::vector<float> means, std::vector<std::vector<float>> results){
+bool account_for_clusters(std::vector<float> means, std::vector<std::vector<float>> results, float error){
   bool keep = false;
-  float error = 0.10;
   std::vector<float> accounted_means;
 
   for(uint32_t i=0; i < results.size(); i++){
@@ -46,9 +45,6 @@ bool account_for_clusters(std::vector<float> means, std::vector<std::vector<floa
   if(means.size() == 0){
     keep = true;
   } else{
-    for(auto m : means){
-      std::cerr << "remaining means " << m << std::endl;
-    }
     keep = false;
   }
   return(keep);
@@ -65,9 +61,7 @@ void find_combinations(std::vector<float> means, uint32_t index, std::vector<flo
   }
 }
 
-std::vector<std::vector<float>> find_solutions(std::vector<float> means){
-  float error = 0.10;
-
+std::vector<std::vector<float>> find_solutions(std::vector<float> means, float error){
   std::vector<float> current;
   std::vector<std::vector<float>> results;
   find_combinations(means, 0, current, results);
@@ -110,7 +104,7 @@ std::vector<std::vector<float>> find_solutions(std::vector<float> means){
     //find combinations of the clusters
     find_combinations(final_results[i], 0, current, results);
     //account for points
-    bool keep = account_for_clusters(useable_means, results);    
+    bool keep = account_for_clusters(useable_means, results, error);    
     if(keep){
       final_final_results.push_back(final_results[i]);
     }    
@@ -148,11 +142,6 @@ std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<float> sol
   find_combinations(solution, 0, current, results);
   for(uint32_t i=0; i < results.size(); i++){
     float sum = std::accumulate(results[i].begin(), results[i].end(), 0.0f); 
-    for(auto x : results[i]){
-        std::cerr << x << " ";
-    }
-    std::cerr << "\n";
-    std::cerr << "sum " << sum << std::endl;
     totals.push_back(sum);
   }
   //given a solution and the means, map each cluster to the cluster it contains
@@ -223,8 +212,8 @@ std::vector<float> parse_clustering_results(std::string clustering_file){
 void cluster_consensus(std::vector<variant> variants, std::string clustering_file, std::string variants_file){ 
   //output string
   float depth_cutoff = 10; 
-  double error = 0.15; //acceptable error when forming solutions 
-  
+  double error = 0.05;
+   
   float error_rate = cluster_error(variants_file);
   float freq_lower_bound = error_rate;
   float freq_upper_bound = 1 - error_rate;
@@ -235,8 +224,9 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     std::cerr << "consensus means " << m << std::endl;
   }
   
-  std::vector<std::vector<float>> solutions = find_solutions(means);
+  std::vector<std::vector<float>> solutions = find_solutions(means, error);
   std::vector<float> solution;
+
   if(solutions.size() == 0){
     std::cerr << "no solution found" << std::endl;
     exit(1);
