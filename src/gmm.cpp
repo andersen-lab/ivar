@@ -949,9 +949,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
 
   bool development_mode=true;
 
-  float error_rate = cluster_error(prefix);
-  lower_bound = error_rate;
-  upper_bound = 1 - error_rate;
+  std::vector<float> error_rate = cluster_error(prefix);
+  lower_bound = error_rate[0];
+  upper_bound = error_rate[1];
   std::cerr << lower_bound << " " << upper_bound << std::endl;
 
   //TESTLINES HEFTS CODE
@@ -1042,7 +1042,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
       }
       int count_far = 0;
       for(auto d : data){
-        //std::cerr << d << " ";
+        std::cerr << d << " ";
         //this is for 2 standard dev
         if(std::abs(d-mean) > 0.05){
           count_far++;
