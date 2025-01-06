@@ -45,6 +45,7 @@ int read_variant_file(
         case 16:  // REF_AA
         case 17:  // ALT_CODON
         case 18:  // ALT_AA
+        case 19:  // POS_AA
           tab_delimited_key += cell + "\t";
           break;
         case 4:
