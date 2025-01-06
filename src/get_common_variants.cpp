@@ -1,11 +1,11 @@
 #include "get_common_variants.h"
 
-const int NUM_FIELDS = 19;
+const int NUM_FIELDS = 20;
 const std::string fields[NUM_FIELDS] = {
     "REGION",    "POS",      "REF",       "ALT",    "REF_DP",
     "REF_RV",    "REF_QUAL", "ALT_DP",    "ALT_RV", "ALT_QUAL",
     "ALT_FREQ",  "TOTAL_DP", "PVAL",      "PASS",   "GFF_FEATURE",
-    "REF_CODON", "REF_AA",   "ALT_CODON", "ALT_AA"};
+    "REF_CODON", "REF_AA",   "ALT_CODON", "ALT_AA", "POS_AA"};
 
 const std::string na_tab_delimited_str =
     "NA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA";
