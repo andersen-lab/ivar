@@ -104,7 +104,7 @@ int common_variants(std::string out, double min_threshold, char *files[],
   for (i = 0; i < 4; ++i) {
     fout << fields[i] << "\t";
   }
-  for (i = 14; i < 19; ++i) {
+  for (i = 14; i < 20; ++i) {
     fout << fields[i] << "\t";
   }
   for (i = 0; i < nfiles; ++i) {
