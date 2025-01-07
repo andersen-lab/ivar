@@ -109,7 +109,10 @@ int common_variants(std::string out, double min_threshold, char *files[],
   }
   for (i = 0; i < nfiles; ++i) {
     for (j = 4; j < 14; ++j) {
-      fout << fields[j] << "_" << files[i] << "\t";
+      fout << fields[j] << "_" << files[i];
+      if (!(i == nfiles - 1 && j == 13)) {  // Avoid adding a tab at the end
+        fout << "\t";
+      }
     }
   }
   fout << "\n";
