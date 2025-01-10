@@ -29,6 +29,8 @@ class cigarotype{
     std::vector<uint32_t> get_start_positions();
     std::vector<bool> get_direction();
     std::vector<uint32_t> get_nlengths();
+    uint32_t low_qual=0;
+    uint32_t low_count=0;
     std::vector<std::vector<std::string>> get_qnames(); 
     void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality, bool is_rev);
     int test = 12;
@@ -49,7 +51,7 @@ class primer : public cigarotype{
   std::vector<position> positions; //allele counts for this primer
 
  public:
-  uint32_t hardcoded_length=300;
+  uint32_t hardcoded_length=300; //CHANGE
   std::string get_name();
   std::string get_region();
   std::vector<position> get_positions();
@@ -73,7 +75,7 @@ class primer : public cigarotype{
   void set_indice(int16_t i);
   void set_read_count(uint32_t rc);
   void add_read_count(uint32_t rc);
-  void transform_mutations(std::string ref_path);
+  void transform_mutations();
   bool operator==(const primer& p) const {
     return (indice == p.get_indice()) ? true : false;
   }
@@ -98,7 +100,7 @@ std::vector<uint32_t> get_nlengths();
 std::vector<uint32_t> get_start_positions();
 std::vector<bool> get_direction();
 std::vector<std::vector<std::string>> get_qnames();
-void transform_mutations(std::string ref_path);
+void transform_mutations();
 void set_positions(position pos);
 std::vector<position> get_positions();
 void populate_positions();

@@ -49,6 +49,7 @@ class IntervalTree {
   void insert(ITNode *root, Interval data);
   bool envelopSearch(ITNode *root, Interval data);
   void inOrder(ITNode *root);
+  void amplicon_position_pop(ITNode *root);
   void print_amplicons(ITNode *root);
   void get_max_pos(ITNode *root);
   void set_haplotypes(ITNode *root, primer prim);
@@ -57,12 +58,15 @@ class IntervalTree {
   void detect_abberations(ITNode *root, uint32_t pos);
   void detect_amplicon_overlaps(ITNode *root, uint32_t pos);
   void detect_primer_issues(ITNode *root, uint32_t pos);
+  void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint8_t> qualities);
   public:
   uint32_t max_pos=0;
   std::vector<std::vector<uint32_t>> overlaps;
   std::vector<position> test_flux; //storage for looking at pos across all amps
   std::vector<uint32_t> test_test;
   std::vector<position> variants; //all variants across every position                                 
+  uint32_t total_bases=0;
+  uint32_t total_qual=0;
   std::vector<uint32_t> flagged_positions; //positions where freq flux occurs MIGHT NOT NEED
   IntervalTree();  // constructor
   void insert(Interval data) { insert(_root, data); }
@@ -78,7 +82,8 @@ class IntervalTree {
   void combine_haplotypes() {combine_haplotypes(_root);}
   void add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *sequence, uint8_t *aux, uint8_t *quality, std::string qname);
   void populate_variants();
-  
+  void find_read_amplicon(uint32_t lower, uint32_t upper, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint8_t> qualities) {find_read_amplicon(_root, lower, upper, positions, bases, qualities);}
+  void amplicon_position_pop() {amplicon_position_pop(_root);}
 };
 
 void combine_haplotypes();
@@ -90,6 +95,7 @@ void populate_variants();
 int unpaired_primers(ITNode *root, primer prim);
 void detect_primer_issues(ITNode *root, uint32_t find_position);
 void detect_amplicon_overlaps(ITNode *root, uint32_t find_position);
-IntervalTree populate_amplicons(std::string pair_info_file,
-                                std::vector<primer> &primers);
+void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint8_t> qualities);
+IntervalTree populate_amplicons(std::string pair_info_file, std::vector<primer> &primers);
+IntervalTree amplicon_position_pop();
 #endif

@@ -345,7 +345,7 @@ int populate_pair_indices(std::vector<primer>& primers, std::string path) {
   return 0;
 }
 
-void primer::transform_mutations(std::string ref_path) {
+void primer::transform_mutations() {
   /*
    * Take all recorded cigarotypes and transform them into positions relative to primer
    */
@@ -357,9 +357,8 @@ void primer::transform_mutations(std::string ref_path) {
   std::vector<std::vector<std::string>> qnames = this->get_qnames();
   std::vector<std::vector<uint32_t>> qualities = this->get_qualities(); 
   std::vector<bool> all_forward = this->get_direction();
-  //this tracks all mutations at all positions
+
   std::string test = "";
-  //ref_antd refantd(ref_path, ""); 
 
   //here let's turn the cigar string into a vector of alleles specific to this primer
   //iterate all unique sequences
@@ -381,6 +380,7 @@ void primer::transform_mutations(std::string ref_path) {
     uint32_t position_val = start_positions[i];
     uint32_t relative_position = 0;
     std::vector<std::vector<uint32_t>> soft_clipped, relative_soft_clipped;
+    char ch = 'L';
 
     //we'll use the cigar string to handle insertions
     for(uint32_t j=0; j < cigarotype.size(); j++){
@@ -404,7 +404,6 @@ void primer::transform_mutations(std::string ref_path) {
     for(uint32_t j=0; j < cigarotype.size(); j++){
       uint32_t op = bam_cigar_op(cigarotype[j]);
       uint32_t oplen = bam_cigar_oplen(cigarotype[j]);
-      //std::cerr << op << " " << oplen << std::endl;
       //honestly this whole bit could be better - more general
       //insertions
       if(op == 1){
@@ -422,9 +421,9 @@ void primer::transform_mutations(std::string ref_path) {
         std::string nuc = "+" + convert.str();
         //check if this position exists
         int exists = check_position_exists(start_pos+consumed_ref, positions);
-        if (exists != -1) {
+        if (exists != -1 && (nuc.find(ch) == std::string::npos)) {
           positions[exists].update_alleles(nuc, ccount, avg_q, false);  
-        } else {
+        } else if (nuc.find(ch) == std::string::npos){
           //add position to vector
           position add_pos;
           add_pos.pos = start_pos+consumed_ref; //don't add a position
@@ -566,10 +565,9 @@ void primer::transform_mutations(std::string ref_path) {
       bool ref = false;
       convert << sequence[j];
       std::string nuc = convert.str();
-      if(nuc == "L") continue; //this nucleotide was below the threshold of quality
-      /*if(current_pos == 23664 && ccount > 5){
-        std::cerr << nuc << " " << ccount << " " << qname << std::endl;
-      }*/
+      if(nuc == "L") {
+        continue;
+      } //this nucleotide was below the threshold of quality
       if (std::find(substitutions.begin(), substitutions.end(), current_pos) == substitutions.end()){
         ref = true;
       }
@@ -588,6 +586,7 @@ void primer::transform_mutations(std::string ref_path) {
 
 //cigar must be passed by pointer due to array decay
 void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality, bool is_rev) {
+
   bool found = false; //have we seen this before
   std::vector<uint8_t> saved_aux; //placeholder for saved sequence
   std::vector<uint32_t> saved_cigarotype; //placeholder for saved cigarotypes
@@ -600,14 +599,13 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
 
   std::vector<uint8_t> aux_reformat;
   std::string test = "";
-  uint32_t length=0;
-  uint32_t ll=0;
+  uint32_t length=0, ll=0;
+
   std::vector<uint32_t> useful;
   //first handle the array decay aspect
   for(uint32_t i=0; i < nlength; i++){
     cigar_reformat.push_back(cigar[i]);
     uint32_t op = bam_cigar_op(cigar[i]);
-    //std::cerr << op << " " << bam_cigar_oplen(cigar[i]) << std::endl;
     //consumes query
     if (bam_cigar_type(op) & 1){
       length = bam_cigar_oplen(cigar[i]);
@@ -636,14 +634,13 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
   uint32_t qual_threshold = 20;
   char sub_nt = 'L';
   for(uint32_t k=0; k < useful.size(); k++){
-    bool above_thresh=true;
-    if((uint32_t)quality[useful[k]] < qual_threshold){
-      seq_reformat.push_back(sub_nt);
-      above_thresh = false;
-    }
     qual_reformat.push_back((uint32_t)quality[useful[k]]);
-    if(substitution && above_thresh){
-      uint8_t nt = 0;
+    if((uint32_t)quality[useful[k]] < qual_threshold){
+      low_count++;
+      low_qual += (uint32_t)quality[useful[k]];
+    }
+    if(substitution){
+        uint8_t nt = 0;
       nt = seq_nt16_str[bam_seqi(seq, useful[k])]; //this operation is costly....
       seq_reformat.push_back(nt);
     }
@@ -676,8 +673,12 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
     if(seq_reformat.empty()){
       seq_reformat.reserve(useful.size()); 
       for(uint32_t k=0; k < useful.size(); k++){
-        uint8_t nt = seq_nt16_str[bam_seqi(seq, useful[k])];
-        seq_reformat.push_back(nt);
+        if(qual_reformat[k] >= qual_threshold){
+          uint8_t nt = seq_nt16_str[bam_seqi(seq, useful[k])];
+          seq_reformat.push_back(nt);
+        } else{
+          seq_reformat.push_back(sub_nt);
+        }
       }
     }
     if(is_rev){
@@ -695,6 +696,9 @@ void cigarotype::add_cigarotype(uint32_t *cigar , uint32_t start_pos, uint32_t n
     nlengths.push_back(nlength);
   }
 }
+
+
+
 
 primer get_min_start(std::vector<primer> primers) {
   std::vector<primer>::iterator it;

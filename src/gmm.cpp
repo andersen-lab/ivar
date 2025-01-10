@@ -183,6 +183,7 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
 
   gaussian_mixture_model gmodel; 
   gmodel.n = n;
+
   // Matrix to store the centroids
   arma::mat centroids;
   arma::mat initial_means(1, n, arma::fill::zeros);
@@ -191,9 +192,9 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
   std::vector<double> total_distances;
   std::vector<std::vector<double>> all_centroids;
  
-  for(uint32_t j=0; j < 5; j++){
+  for(uint32_t j=0; j < 15; j++){
     //std::cerr << "iteration j " << j << std::endl;
-    bool status2 = arma::kmeans(centroids, data, n, arma::random_subset, 15, false);
+    bool status2 = arma::kmeans(centroids, data, n, arma::random_subset, 10, false);
     if(!status2) continue;
 
     double total_dist = 0;
@@ -220,10 +221,10 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
     std::cerr << range << std::endl;*/
     std::vector<double> tmp;
     for(auto c : centroids){
-      std::cerr << c << " ";
+      //std::cerr << c << " ";
       tmp.push_back((double)c);
     }
-    std::cerr << "\n";
+    //std::cerr << "\n";
     all_centroids.push_back(tmp);
     total_distances.push_back(total_dist);
   }
@@ -975,7 +976,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
       variants.push_back(base_variants[i]);
       all_var.push_back(base_variants[i].freq);      
       count_pos.push_back(base_variants[i].position);
-      //std::cerr << base_variants[i].freq << " " << base_variants[i].position << " " << base_variants[i].nuc << std::endl;
+      std::cerr << base_variants[i].freq << " " << base_variants[i].position << " " << base_variants[i].nuc << std::endl;
     }
   }
   std::cerr << "useful var " << useful_var << std::endl;
@@ -1050,16 +1051,25 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
       }
       std::cerr << "\n";
       float percent_far = (float)count_far / (float)useful_var;
-      std::cerr << "mean " << mean << " mad " << mad << " cluster size " << data.size() << " count far " << count_far << " percent far " << percent_far << std::endl;
        
       tmp_mads.push_back(mad);
       tmp_percent_far.push_back(percent_far);
-
-      if(mad <= 0.10 && percent_far <= 0.10){
-        optimal = true;
+      float ratio = (float)useful_var / (float) counter;
+      std::cerr << "mean " << mean << " mad " << mad << " cluster size " << data.size() << " count far " << count_far << " percent far " << percent_far << " ratio " << ratio << std::endl;
+      if(ratio >= 5){
+        if(mad <= 0.10 && percent_far <= 0.10){
+          optimal = true;
+        } else {
+          optimal = false;
+          break;
+        }
       } else {
-        optimal = false;
-        break;
+        if(mad <= 0.03 && percent_far <= 0.05){
+          optimal = true;
+        }  else{
+          optimal = false;
+          break;
+        }
       }
     }
 
@@ -1077,11 +1087,13 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
     percents.push_back(tmp_percent_far);
   }
   std::cerr << "optimal n " << optimal_n << std::endl;
-  retrained.means.clear();
-  retrained.hefts.clear();
-  retrained.prob_matrix.clear();
-  retrained = retrain_model(optimal_n, data, variants, lower_n, 0.001);
-  assign_clusters(variants, retrained, lower_n);
+  if(optimal_n != retrained.means.size()){
+    retrained.means.clear();
+    retrained.hefts.clear();
+    retrained.prob_matrix.clear();
+    retrained = retrain_model(optimal_n, data, variants, lower_n, 0.001);
+    assign_clusters(variants, retrained, lower_n);
+  }
   std::vector<double> centroids;
   std::vector<std::vector<double>> c_clusters(optimal_n);
   for(auto var : variants){
