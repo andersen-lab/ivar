@@ -19,6 +19,7 @@ add_executable(ivar
         ref_seq.cpp
         interval_tree.cpp
         saga.cpp
+        estimate_error.cpp
         gmm.cpp
         call_consensus_clustering.cpp
         ${armadillo_src}
