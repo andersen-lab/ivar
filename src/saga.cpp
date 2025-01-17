@@ -195,7 +195,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     amplicons.inOrder();
     amplicons.get_max_pos();
     amplicons.populate_variants();
-    amplicons.amplicon_position_pop();
+    //amplicons.amplicon_position_pop();
     std::cerr << "Maximum position " << amplicons.max_pos << std::endl;
   } else{
     std::cerr << "Exiting." << std::endl;
@@ -276,7 +276,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     } else {
       start_pos = aln->core.pos;
     }
-
+    //TESTLINES
+    if(start_pos > 450) continue;
     bam1_t *r = aln;
     //get the md tag
     uint8_t *aux = bam_aux_get(aln, "MD");
@@ -413,7 +414,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     bool mutation = false;
     //establish a mutation at this position
     for(auto al : variants[i].alleles){
-      if(!al.is_ref && (((float)al.depth/(float)variants[i].depth) > 0.05)){
+      if(((float)al.depth/(float)variants[i].depth) > 0.05){
         mutation = true;
       }
     }
@@ -432,7 +433,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   }
   //then when we experience flux on primer bound issue amplicon, save adjusted depths
   std::vector<uint32_t> flagged_positions; 
-  std::vector<std::tuple<uint32_t, uint32_t, std::string>> adjusted_depths; //holds adjusted depth info
   uint32_t test_pos = 0;
   //detect fluctuating variants
   for(uint32_t i=0; i < amplicons.max_pos; i++){
@@ -494,6 +494,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       float sd = calculate_standard_deviation(it->second);
       if(i == test_pos){
         std::cerr << i << " std " << sd << " " << it->first << std::endl;
+        for(auto x : it->second){
+          std::cerr << x << std::endl;
+        }
       }
       //TODO this is hard coded, consider it
       if (sd >= 0.03){
@@ -506,9 +509,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
               if (it != amplicons.test_test.end()) {
                 index = (uint32_t)std::distance(amplicons.test_test.begin(), it);
                 position removal = amplicons.test_flux[index];
-                for(auto ad : removal.alleles){
-                  adjusted_depths.push_back(std::make_tuple(i, ad.depth, ad.nuc));
-                }
               }
             }
         }
@@ -517,7 +517,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       }
     }
   }
-
   std::vector<uint32_t> primer_binding_error;
   for(uint32_t i=0; i < amplicons.overlaps.size(); i++){
     generate_range(amplicons.overlaps[i][0], amplicons.overlaps[i][1], primer_binding_error);    

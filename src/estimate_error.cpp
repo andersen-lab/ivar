@@ -15,7 +15,6 @@ std::vector<float> cluster_error(std::string filename){
   std::vector<uint32_t> deletion_positions = find_deletion_positions(filename, depth_cutoff, lower_bound, upper_bound, round_val);
   std::vector<variant> base_variants;
   parse_internal_variants(filename, base_variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, round_val);
-
   gaussian_mixture_model retrained_original;
   std::vector<variant> variants_original;
   uint32_t useful_count_original = 0;
@@ -29,6 +28,7 @@ std::vector<float> cluster_error(std::string filename){
       variants_original.push_back(base_variants[i]);
     }
   }
+  std::cerr << "C" << std::endl;
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
   //std::cerr << useful_count_original << std::endl;
   uint32_t count_original=0;
@@ -39,7 +39,9 @@ std::vector<float> cluster_error(std::string filename){
     count_original += 1;
   }
   uint32_t n = 5;
+  std::cerr << count_original << std::endl;
   retrained_original = retrain_model(n, data_original, variants_original, 2, 0.0001);
+  std::cerr << "D" << std::endl;
   assign_clusters(variants_original, retrained_original, 2);
   std::vector<std::vector<double>> clusters(n);
   for(auto var : variants_original){
@@ -66,7 +68,7 @@ std::vector<float> cluster_error(std::string filename){
 
   float max_error = 0;  
   for(auto x : max_error_pos){
-    if(x > *max_it && x > max_error){
+    if(x >= *max_it && x > max_error){
       max_error = x;
     }
   }

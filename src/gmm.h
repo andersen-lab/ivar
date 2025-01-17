@@ -23,7 +23,6 @@ struct variant {
   float gapped_freq = 0;
   float transformed_freq;
   float transformed_gap_freq;
-  bool is_ref=false; 
   int cluster_assigned = -1;
 
   bool fake = false;

@@ -858,7 +858,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     std::string flag = "";
     std::string amp_flag = "";
     std::string primer_flag = "";
-    std::string is_ref = "";
     split(line, '\t', row_values);
     pos = std::stoi(row_values[0]);
     bool del_pos = std::find(deletion_positions.begin(), deletion_positions.end(), pos) != deletion_positions.end();
@@ -874,7 +873,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     flag = row_values[6];
     amp_flag = row_values[7];
     primer_flag = row_values[8];
-    is_ref = row_values[9];
   
     variant tmp;
     tmp.position = pos;
@@ -913,11 +911,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     } else {
       tmp.outside_freq_range = false;
     }
-    if (is_ref == "TRUE"){
-      tmp.is_ref = true;
-    } else {
-      tmp.is_ref = false;
-    }
     //TESTLINES
     if(qual < 20){
       tmp.qual_flag = true;
@@ -949,7 +942,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
   double noise_cluster = 0.03;
 
   bool development_mode=true;
-
   std::vector<float> error_rate = cluster_error(prefix);
   lower_bound = error_rate[0];
   upper_bound = error_rate[1];
@@ -959,9 +951,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
   std::vector<std::string> heft_strings;
   std::vector<variant> base_variants;
   std::vector<uint32_t> deletion_positions = find_deletion_positions(prefix, depth_cutoff, lower_bound, upper_bound, round_val);
-
   parse_internal_variants(prefix, base_variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, round_val);
-  
+ 
   std::string filename = prefix + ".txt";
 
   //this whole things needs to be reconfigured
@@ -1178,7 +1169,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
   //look at all variants despite other parameters
   base_variants.clear();
   variants.clear();
- 
+   
   parse_internal_variants(prefix, base_variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, round_val);
  
   calculate_gapped_frequency(base_variants, universal_cluster, noise_cluster);

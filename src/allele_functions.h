@@ -14,7 +14,7 @@ struct allele {
   uint32_t beg;
   uint32_t end;
   float tmp_mean_qual;
-  bool is_ref;
+  bool ref;
   bool operator<(const allele& a) const {
     return (nuc.compare(a.nuc) > 0) ? true : false;
   }
@@ -29,13 +29,13 @@ class position {
     uint32_t pos;
     uint32_t depth=0;
     std::vector<allele> alleles;
-    void update_alleles(std::string nt, uint32_t count, uint32_t qual, bool is_ref);
+    void update_alleles(std::string nt, uint32_t count, uint32_t qual);
     bool flux;
     bool in_primer=false;
 };
 
 int check_position_exists(uint32_t p, std::vector<position> positions);
-void update_alleles(std::string nt, uint32_t count, uint32_t qual, bool is_ref);
+void update_alleles(std::string nt, uint32_t count, uint32_t qual);
 int check_allele_exists(std::string n, std::vector<allele> ad);
 std::vector<allele> update_allele_depth(char ref, std::string bases,
                                         std::string qualities,

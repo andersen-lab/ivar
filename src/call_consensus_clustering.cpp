@@ -9,6 +9,88 @@
 #include <algorithm>
 #include <numeric>
 
+float find_nearest_distance(const std::vector<float> all_sums, float value) {
+    float min_distance = std::numeric_limits<float>::max();
+    for (auto num : all_sums) {
+        float distance = std::abs(num - value);
+        if (distance < min_distance) {
+            min_distance = distance;
+        }
+    }
+    return min_distance;
+}
+
+bool account_peaks(std::vector<float> possible_solution, std::vector<float> means, float total, float error){
+  bool valid = true;
+  std::vector<float> current;
+  std::vector<std::vector<float>> results;
+  find_combinations(possible_solution, 0, current, results);
+ 
+  std::vector<float> all_sums; 
+  for(auto result : results){
+    float sum = std::accumulate(result.begin(), result.end(), 0.0f);
+    all_sums.push_back(sum);
+  }
+
+  //check if all means can be accounted for
+  for(auto mean : means){
+    float dist = find_nearest_distance(all_sums, mean);
+    if(dist > error){
+      valid = false;
+      break;
+    }
+  }
+  return(valid);
+}
+
+bool within_error_range(std::vector<float> values, float target, float error){
+  //test if the sum of the vector equals the target value within some error
+  float sum = std::accumulate(values.begin(), values.end(), 0.0f);
+  if(sum < target+error && sum > target-error){
+    return(true);  
+  } else{
+    return(false);
+  }
+}
+
+std::vector<std::vector<float>> find_subsets_with_error(std::vector<float> means, float target, float error){
+  //first we find all the possible combinations
+  std::vector<float> current;
+  std::vector<std::vector<float>> results;
+  find_combinations(means, 0, current, results);
+
+  std::vector<std::vector<float>> valid_combinations;  
+  for(uint32_t i=0; i < results.size(); i++){
+    bool in_range = within_error_range(results[i], target, error);
+    if(in_range){
+      valid_combinations.push_back(results[i]);
+    }
+  }
+  return(valid_combinations);
+}
+
+std::vector<std::vector<float>> frequency_pair_finder(std::vector<variant> variants, float lower_bound, float upper_bound, std::vector<float> means){ 
+  std::vector<std::vector<float>> pairs;
+  std::vector<uint32_t> track_positions;
+
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(!variants[i].depth_flag && !variants[i].qual_flag && !variants[i].outside_freq_range && variants[i].cluster_assigned != -1){
+      auto it = std::find(track_positions.begin(), track_positions.end(), variants[i].position);
+      //found
+      if(it != track_positions.end()){
+        size_t index = std::distance(track_positions.begin(), it);
+        pairs[index].push_back(means[variants[i].cluster_assigned]);
+      } else{
+        std::vector<float> tmp = {means[variants[i].cluster_assigned]};
+        pairs.push_back(tmp);
+        track_positions.push_back(variants[i].position);
+      }
+    }    
+  } 
+
+  return(pairs);
+}
+
 bool cluster_gravity_analysis(std::vector<std::vector<float>> solutions){
   //in the event of multiple solutions, check that the largest cluster is the same
   std::vector<float> max_values;
@@ -75,43 +157,12 @@ std::vector<std::vector<float>> find_solutions(std::vector<float> means, float e
   std::vector<std::vector<float>> final_results;
   //constrain that the solutions must add to 1
   for(uint32_t i=0; i < results.size(); i++){
-    float sum = std::accumulate(results[i].begin(), results[i].end(), 0.0f);
-    if(sum > 1-error && sum < 1+error){
-      bool keep = true;
-      if(keep){
-        final_results.push_back(results[i]);
-      }
-    }
-  }
-
-  std::vector<float> useable_means;
-  for(auto val : means){
-    if(val != *min_iter && val != *max_iter){
-      useable_means.push_back(val);
-    }
-  }
- 
-  //constrain that every solution must account for every cluster
-  std::vector<std::vector<float>> final_final_results;
-  
-  for(uint32_t i=0; i < final_results.size(); i++){
-    results.clear();
-    current.clear();
-    //our solution must contain more than one cluster (noise / universal min)
-    if(final_results[i].size() < 2){
-      continue;
-    }
-    //find combinations of the clusters
-    find_combinations(final_results[i], 0, current, results);
-    //account for points
-    bool keep = account_for_clusters(useable_means, results, error);    
+    bool keep = within_error_range(results[i], 1, error);
     if(keep){
-      final_final_results.push_back(final_results[i]);
-    }    
+      final_results.push_back(results[i]);
+    }
   }
-    
-
-  return(final_final_results);  
+  return(final_results);  
 }
 
 std::vector<float> parse_string_to_vector(const std::string& str) {
@@ -210,10 +261,10 @@ std::vector<float> parse_clustering_results(std::string clustering_file){
   return(numbers);
 }
 void cluster_consensus(std::vector<variant> variants, std::string clustering_file, std::string variants_file){ 
-  //output string
   float depth_cutoff = 10; 
-  double error = 0.05;
-   
+  double error = 0.05; 
+  float solution_error = 0.05;
+ 
   std::vector<float> error_rate = cluster_error(variants_file);
   float freq_lower_bound = error_rate[0];
   float freq_upper_bound = error_rate[1];
@@ -223,35 +274,74 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   for(auto m : means){
     std::cerr << "consensus means " << m << std::endl;
   }
-  
-  std::vector<std::vector<float>> solutions = find_solutions(means, error);
-  std::vector<float> solution;
+  std::cerr << " A " << std::endl; 
+  std::vector<std::vector<float>> clusters(means.size());
+  for(auto var : variants){
+    if(var.cluster_assigned != -1){
+      clusters[var.cluster_assigned].push_back(var.freq);
+    }
+  }
+  //find the largest position in the variants file
+  uint32_t max_position = 0;
+  for(auto x : variants){
+    if(x.position > max_position){
+      max_position = x.position;
+    }
+  }
+  //find position wise frequency pairs
+  std::vector<std::vector<float>> pairs = frequency_pair_finder(variants, freq_lower_bound, freq_upper_bound, means); 
+  std::vector<std::vector<float>> solutions = find_solutions(means, error);  
 
-  if(solutions.size() == 0){
-    std::cerr << "no solution found" << std::endl;
+  //find peaks that can't be a subset of other peaks
+  std::vector<float> non_subset_means;
+  for(uint32_t i=0; i < means.size(); i++){
+    std::vector<std::vector<float>> tmp = find_subsets_with_error(means, means[i], solution_error);    
+    if(tmp.size() <= 1){
+      non_subset_means.push_back(means[i]);
+    }
+  }
+  //TEST LINES
+  for(auto nsm : non_subset_means){
+    std::cerr << "non subset means " << nsm << std::endl;
+  }
+  //reduce solution space to things that contain the non subset peaks
+  std::vector<std::vector<float>> realistic_solutions;
+  for(uint32_t i=0; i < solutions.size(); i++){  
+      std::vector<float> tmp = solutions[i];
+      bool found = std::all_of(non_subset_means.begin(), non_subset_means.end(), [&tmp](float value) {return std::find(tmp.begin(), tmp.end(), value) != tmp.end();});
+     if(found){
+        realistic_solutions.push_back(solutions[i]);
+     }
+  }
+
+  //check each solution that every possible peak is accounted for
+  std::vector<std::vector<float>> solution_sets;
+  for(uint32_t i=0; i < realistic_solutions.size(); i++){
+    for(auto r : realistic_solutions[i]){
+      std::cerr << r << " ";
+    }
+    std::cerr << "\n";
+    bool keep = account_peaks(realistic_solutions[i], means, 1, solution_error);
+    if(keep){
+      solution_sets.push_back(realistic_solutions[i]);
+    }
+  }
+  std::vector<float> solution;
+  if(solution_sets.size() == 0){
+    std::cerr << clustering_file << " no solution found" << std::endl;
     exit(1);
-  } else if(solutions.size() > 1){
+  } else if(solution_sets.size() > 1){
     std::cerr << "too many solutions" << std::endl;
-    bool all_same = cluster_gravity_analysis(solutions);
-    for(auto solution : solutions){
-      for(auto s : solution){
-        std::cerr << s << " ";
-      }
-      std::cerr << "\n";
-    }
-    if(all_same){
-      solution = solutions[0];
-    } else {
       exit(1);
-    }
   } else{
-    solution = solutions[0];
+    solution = solution_sets[0];
   }
   for(auto x : solution){
     std::cerr << x << std::endl;
   }
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means);
   std::vector<std::vector<uint32_t>> inverse_groups(means.size());
+
   for(uint32_t i=0; i < cluster_groups.size(); i++){
     for(uint32_t j=0; j < cluster_groups[i].size(); j++){
       //std::cerr << cluster_groups[i][j] << " i " << i << " j " << j << std::endl; 
@@ -305,7 +395,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   //a list of cluster assignments that we assign to consensus
   std::vector<int> major_indexes;
   std::vector<int> minor_indexes;
-  int max_index;
   //index of the "100%" cluster
   for(uint32_t j=0; j < means.size(); j++){
     float tmp = means[j];
@@ -318,7 +407,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       std::cerr << "major index " << means[j] << " " << j << std::endl;
       if(tmp != largest){
         std::cerr << "adding to minor" << std::endl;
-        max_index = (int)j;
         //minor_indexes.push_back((int)j);
       }        
       major_indexes.push_back((int)j);
@@ -328,18 +416,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   // Find the index of the largest element directly
   int index = std::distance(solution.begin(), max_element);
   float max_mean = solution[index];
-  //if our largest cluster is under 0.50 we don't call
-  if(max_mean < 0.50){
-    std::cerr << "mean under 50" << std::endl;
-    exit(1);
-  }
-  //find the largest position in the variants file
-  uint32_t max_position = 0;
-  for(auto x : variants){
-    if(x.position > max_position){
-      max_position = x.position;
-    }
-  } 
+
   bool print = false;
   std::vector<std::vector<std::string>> all_consensus_seqs;
   for(uint32_t i=0; i < means.size(); i++){
@@ -430,7 +507,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
     std::string tmp = std::accumulate(all_consensus_seqs[i].begin(), all_consensus_seqs[i].end(), std::string(""));
     all_sequences.push_back(tmp);
-    std::cerr << i << " " << tmp[1054] << std::endl;
   }
 
   //write the consensus string to file

@@ -422,12 +422,12 @@ void primer::transform_mutations() {
         //check if this position exists
         int exists = check_position_exists(start_pos+consumed_ref, positions);
         if (exists != -1 && (nuc.find(ch) == std::string::npos)) {
-          positions[exists].update_alleles(nuc, ccount, avg_q, false);  
+          positions[exists].update_alleles(nuc, ccount, avg_q);  
         } else if (nuc.find(ch) == std::string::npos){
           //add position to vector
           position add_pos;
           add_pos.pos = start_pos+consumed_ref; //don't add a position
-          add_pos.update_alleles(nuc, ccount, avg_q, false);            
+          add_pos.update_alleles(nuc, ccount, avg_q);            
           positions.push_back(add_pos);
         }
         consumed_query += oplen;
@@ -477,12 +477,12 @@ void primer::transform_mutations() {
       } else if (isalpha(character) && deletion) {
         int exists = check_position_exists(current_pos, positions);
         if (exists != -1) {
-          positions[exists].update_alleles("-", ccount, 0, false);  
+          positions[exists].update_alleles("-", ccount, 0);  
         } else {
           //add position to vector
           position add_pos;
           add_pos.pos = current_pos; //don't add a position
-          add_pos.update_alleles("-", ccount, 0, false);            
+          add_pos.update_alleles("-", ccount, 0);            
           positions.push_back(add_pos);
         }
         deletion_positions.push_back(current_pos);
@@ -562,22 +562,18 @@ void primer::transform_mutations() {
         last_del = false;
       }
       std::ostringstream convert;
-      bool ref = false;
       convert << sequence[j];
       std::string nuc = convert.str();
       if(nuc == "L") {
         continue;
       } //this nucleotide was below the threshold of quality
-      if (std::find(substitutions.begin(), substitutions.end(), current_pos) == substitutions.end()){
-        ref = true;
-      }
       int exists = check_position_exists(current_pos, positions);
       if (exists != -1) {
-        positions[exists].update_alleles(nuc, ccount, quality[j], ref);  
+        positions[exists].update_alleles(nuc, ccount, quality[j]);  
       } else {
         position add_pos;
         add_pos.pos = current_pos; //don't add a position
-        add_pos.update_alleles(nuc, ccount, quality[j], ref);            
+        add_pos.update_alleles(nuc, ccount, quality[j]);            
         positions.push_back(add_pos);
       }
     }
