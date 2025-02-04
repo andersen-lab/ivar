@@ -94,7 +94,6 @@ void calculate_gapped_frequency(std::vector<variant> &variants, double universal
         }
       }
       variants[i].gapped_freq = variants[i].depth / total_depth;
-      variants[i].transformed_gap_freq = log(variants[i].gapped_freq / (1 - variants[i].gapped_freq));
       if(variants[i].gapped_freq > universal_cluster || variants[i].gapped_freq < noise_cluster){
         variants[i].gap_outside_freq_range = true;
       }
@@ -236,7 +235,7 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
   
   for(uint32_t c=0; c < centroid_vec.size(); c++){
     //std::cerr << 0.5 + (1.0 / 20) * std::log(centroid_vec[c] / (1.0 - centroid_vec[c])) << std::endl;
-    std::cerr << "initial means " << centroid_vec[c] << std::endl;
+    //std::cerr << "initial means " << centroid_vec[c] << std::endl;
     initial_means.col(i) = (double)centroid_vec[c];
     //initial_means.col(i) = 0.5 + (1.0 / 1) * std::log(centroid_vec[c] / (1.0 - centroid_vec[c]));
     cov.col(i) = 0.005;
@@ -819,14 +818,14 @@ std::vector<uint32_t> find_deletion_positions(std::string filename, uint32_t dep
       continue;
     }
     std::vector<std::string> row_values;
-    //split the line by delimiter
     split(line, '\t', row_values);
-    depth = std::stoi(row_values[2]);
-    pos = std::stoi(row_values[0]);
-    freq = std::stof(row_values[3]);
+
+    depth = std::stoi(row_values[7]);
+    pos = std::stoi(row_values[1]);
+    freq = std::stof(row_values[10]);
     float multiplier = pow(10, round_val);
     freq = round(freq * multiplier) / multiplier;
-    std::string nuc = row_values[1];
+    std::string nuc = row_values[3];
     count++;
     if(1/freq * depth < depth_cutoff || freq < lower_bound) continue;
     if (is_substring(nuc, "+") || is_substring(nuc, "-")) {
@@ -859,28 +858,26 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     std::string amp_flag = "";
     std::string primer_flag = "";
     split(line, '\t', row_values);
-    pos = std::stoi(row_values[0]);
+    pos = std::stoi(row_values[1]);
     bool del_pos = std::find(deletion_positions.begin(), deletion_positions.end(), pos) != deletion_positions.end();
 
-    depth = std::stoi(row_values[2]);
-    freq = std::stof(row_values[3]);
-   
+    depth = std::stoi(row_values[7]);
+    freq = std::stof(row_values[10]);
+  
     float multiplier = pow(10, round_val);
     freq = round(freq * multiplier) / multiplier;
     
-    gapped_freq = std::stof(row_values[4]);
-    qual = std::stof(row_values[5]);
-    flag = row_values[6];
-    amp_flag = row_values[7];
-    primer_flag = row_values[8];
+    gapped_freq = std::stof(row_values[20]);
+    qual = std::stof(row_values[9]);
+    flag = row_values[21];
+    amp_flag = row_values[22];
+    primer_flag = row_values[23];
   
     variant tmp;
     tmp.position = pos;
-    tmp.nuc = row_values[1];
+    tmp.nuc = row_values[3];
     tmp.depth = depth;
     tmp.freq = freq;
-    //tmp.transformed_freq = log(freq / (1 - freq));;
-    tmp.transformed_freq = 1.0 / (1.0 + std::exp(-1 * (freq - 0.5)));
     tmp.qual = qual;
    
     if (flag == "TRUE"){
@@ -931,7 +928,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
 }
 
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
-  uint32_t n=6;
+  uint32_t n=8;
   //changes based on error rate
   float lower_bound = 0.01;
   float upper_bound = 0.99;
@@ -1015,7 +1012,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
     retrained.means.clear();
     retrained.hefts.clear();
     retrained.prob_matrix.clear();
-    retrained = retrain_model(counter, data, variants, lower_n, 0.001);
+    retrained = retrain_model(counter, data, variants, lower_n, 0.0001);
     bool optimal = true;
     assign_clusters(variants, retrained, lower_n);
     std::vector<std::vector<double>> clusters(counter);
@@ -1036,7 +1033,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
       for(auto d : data){
         std::cerr << d << " ";
         //this is for 2 standard dev
-        if(std::abs(d-mean) > 0.05){
+        if(std::abs(d-mean) > 0.10){
           count_far++;
         }
       }
@@ -1105,11 +1102,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
   std::vector<double> final_means; 
   for(auto data : clusters){
     double mean = calculate_mean(data);
-    /*for(auto d : data){
-      std::cerr << d << " ";
-    }
-    std::cerr <<"\n";
-    std::cerr << "end mean " << mean << std::endl;*/
     final_means.push_back(mean);
   }
   std::ofstream file;  
@@ -1125,7 +1117,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
     mads_string += tmp_str;
   }
   
-  std::cerr << mads_string << std::endl;
   std::string mad_output = output_prefix + "_mad.txt";
   file.open(mad_output, std::ios::trunc);
   file << "MADS\n";
@@ -1142,7 +1133,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
     tmp_str += "]\n";
     percent_string += tmp_str;
   }
-  std::cerr << percent_string << std::endl;
   std::string percent_output = output_prefix + "_percent.txt";
   file.open(percent_output, std::ios::trunc);
   file << "PERCENTS\n";
@@ -1184,9 +1174,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
       variants.push_back(base_variants[i]);
     }
   }
+  count=0;
   //populate a new armadillo dataset with more frequencies
   arma::mat final_data(1, useful_var, arma::fill::zeros);
-  count=0;
   for(uint32_t i = 0; i < variants.size(); i++){   
     double tmp;
     //check if variant should be filtered for first pass model

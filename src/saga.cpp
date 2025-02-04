@@ -151,18 +151,19 @@ void generate_range(uint32_t start, uint32_t end, std::vector<uint32_t> &result)
   }
 }
 
-float calculate_standard_deviation(std::vector<float> frequencies) {
-  float sum = 0.0, mean = 0.0, sd = 0.0;
-  uint32_t i = 0;
-  for(i = 0; i < frequencies.size(); ++i) {
-    sum += frequencies[i];
+float calculate_standard_deviation(std::vector<float> frequencies, std::vector<uint32_t> depths) {
+  double weighted_sum = 0.0, total_weight = 0.0;
+  for(uint32_t i = 0; i < frequencies.size(); i++) {
+    weighted_sum += frequencies[i] * depths[i];
+    total_weight += depths[i];
   }
-  mean = sum / frequencies.size();
-
-  for(i = 0; i < frequencies.size(); ++i) {
-    sd += pow(frequencies[i] - mean, 2);
+  double mean = weighted_sum / total_weight;
+  double weighted_variance = 0.0;
+  for (uint32_t i = 0; i < frequencies.size(); i++) {
+    weighted_variance += depths[i] * std::pow(frequencies[i] - mean, 2);
   }
-  return sqrt(sd / frequencies.size());
+  weighted_variance /= total_weight;
+  return std::sqrt(weighted_variance);
 }
 
 //first main function call
@@ -276,8 +277,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     } else {
       start_pos = aln->core.pos;
     }
-    //TESTLINES
-    if(start_pos > 450) continue;
     bam1_t *r = aln;
     //get the md tag
     uint8_t *aux = bam_aux_get(aln, "MD");
@@ -328,7 +327,10 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       read_map[read_name] = bam_dup1(aln);  // Duplicate the read to avoid overwriting
     }*/
 
-    //if(start_pos > 22664 || start_pos < 24664) continue;
+    //TEST LINES
+    //if(start_pos > 3500) continue;
+    //std::string test = bam_get_qname(aln);
+    //if(test != "A01535:8:HJ3YYDSX2:4:1126:24433:27305") continue;
     counter += 1;
     overlapping_primers.clear();
     if(strand == '+'){
@@ -404,7 +406,15 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   for (uint32_t i=0; i < primers.size(); i++){
     amplicons.set_haplotypes(primers[i]);      
   }
-  
+  /*
+  //TEST LINES
+  std::string amp_file = "/home/chrissy/paper_ivar_2.0/real_primer_binding/var/file_121_all.txt";
+  std::ofstream file_amp(amp_file, std::ios::trunc); 
+  file_amp << "POS\tALLELE\tDEPTH\tFREQ\tAMP_START\tAMP_END\n";
+  file_amp.close();
+  amplicons.write_out_frequencies(amp_file);
+  */
+
   //combine amplicon counts to get total variants 
   amplicons.combine_haplotypes();
   //detect primer binding issues
@@ -444,6 +454,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     if (amplicons.test_flux.size() < 2) continue;
     
     std::map<std::string, std::vector<float>> allele_maps;
+    std::map<std::string, std::vector<uint32_t>> allele_depths;  
     for(uint32_t j=0; j < amplicons.test_flux.size(); j++){
       if(i == test_pos){
         std::cerr << "\n" << amplicons.test_test[j] << std::endl;
@@ -451,25 +462,26 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       uint32_t total_depth = amplicons.test_flux[j].depth;
       //actually, we use ungapped depth
       for(auto pos : amplicons.test_flux[j].alleles){
-        if(pos.nuc == "-"){
-          total_depth -= pos.depth;
-        }
+        //if(pos.nuc == "-"){
+        //  total_depth -= pos.depth;
+        //}
         if(i == test_pos){
           std::cerr << pos.nuc << " " << pos.depth << std::endl;
         }
       }
 
-      if(i == test_pos){
-        std::cerr << "total depth " << total_depth << std::endl;
-      }
       if(total_depth < 50){
          continue;
+      }
+      if(i == test_pos){
+        std::cerr << "total depth " << total_depth << std::endl;
       }
       std::vector<allele> ad  = amplicons.test_flux[j].alleles;
       for(uint32_t k=0; k < ad.size(); k++){
         std::string nuc = ad[k].nuc;
-        if(nuc == "-") continue;
+        //if(nuc == "-") continue;
         uint32_t ad_depth = ad[k].depth;
+        if(ad_depth == 0) continue;
         if(i == test_pos){
           std::cerr << nuc << " " << ad_depth << " " << total_depth << std::endl;
         }
@@ -478,22 +490,34 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
           if(i == test_pos){
             std::cerr << "allele map " << nuc << " " << t << std::endl;
           }
-          allele_maps[nuc].push_back(t);  
+          allele_maps[nuc].push_back(t);
+          allele_depths[nuc].push_back(ad_depth);
         } else {
           std::vector<float> tmp;
+          std::vector<uint32_t> tmp_depths;
           tmp.push_back(t);
+          tmp_depths.push_back(ad_depth);
           if(i == test_pos){
             std::cerr << "allele map " << nuc << " " << t << std::endl;
           }
           allele_maps[nuc] = tmp;
+          allele_depths[nuc] = tmp_depths;
         }
       }
     }
     std::map<std::string, std::vector<float>>::iterator it;
     for (it = allele_maps.begin(); it != allele_maps.end(); it++){
-      float sd = calculate_standard_deviation(it->second);
+      float sd = (float)calculate_standard_deviation(it->second, allele_depths[it->first]);
       if(i == test_pos){
+        for (auto bit = allele_depths.begin(); bit != allele_depths.end(); ++bit) {
+          std::cerr << "allele depths " << bit->first << std::endl;
+          for(auto b : bit->second){
+            std::cerr << b << " ";
+          }
+          std::cerr << "\n";
+        }
         std::cerr << i << " std " << sd << " " << it->first << std::endl;
+        std::cerr << "allele frequencies" << std::endl;
         for(auto x : it->second){
           std::cerr << x << std::endl;
         }
@@ -536,7 +560,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   //write variants to a file
   ofstream file;
   file.open(bam_out + ".txt", ios::trunc);
-  file << "POS\tALLELE\tDEPTH\tFREQ\tGAPPED_FREQ\tAVG_QUAL\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\n";
+  //file << "POS\tALLELE\tDEPTH\tFREQ\tGAPPED_FREQ\tAVG_QUAL\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\n";
+  file << "REGION\tPOS\tREF\tALT\tREF_DP\tREF_RV\tREF_QUAL\tALT_DP\tALT_RV\tALT_QUAL\tALT_FREQ\tTOTAL_DP\tPVAL\tPASS\tGFF_FEATURE\tREF_CODON\tREF_AA\tALT_CODON\tALT_AA\tPOS_AA\tGAPPED_FREQ\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\n";
   for(uint32_t i=0; i < variants.size(); i++){
     //find the depth of the deletion to calculate upgapped depth
     float del_depth = 0;
@@ -552,13 +577,28 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       if((float)variants[i].alleles[j].depth == 0){
         continue;
       }
+      file << "NA\t"; //region
       file << std::to_string(variants[i].pos) << "\t";
+      file << "NA\t"; //ref
       std::string test_string = variants[i].alleles[j].nuc;
       file << variants[i].alleles[j].nuc << "\t";
-      file << std::to_string(variants[i].alleles[j].depth) << "\t";   
-      file << std::to_string(freq) << "\t";    
+      file << "NA\t"; //ref dp
+      file << "NA\t"; //ref rv
+      file << "NA\t"; //ref qual   
+      file << std::to_string(variants[i].alleles[j].depth) << "\t"; //alt dp
+      file << "NA\t"; //alt rv
+      file << std::to_string((float)variants[i].alleles[j].mean_qual / (float)variants[i].alleles[j].depth) << "\t"; //alt qual
+      file << std::to_string(freq) << "\t"; //alt freq
+      file << std::to_string(variants[i].depth) << "\t"; //total dp
+      file << "NA\t"; //pval
+      file << "NA\t"; //pass
+      file << "NA\t"; //gff feature
+      file << "NA\t"; //ref codon
+      file << "NA\t"; //ref aa
+      file << "NA\t"; //alt codon
+      file << "NA\t"; //alt aa
+      file << "NA\t"; //pos aa
       file << std::to_string(gapped_freq) << "\t";
-      file << std::to_string((float)variants[i].alleles[j].mean_qual / (float)variants[i].alleles[j].depth) << "\t";
       std::vector<uint32_t>::iterator it; 
       it = find(flagged_positions.begin(), flagged_positions.end(), variants[i].pos);
       if (it != flagged_positions.end()){
