@@ -27,6 +27,33 @@ std::vector<allele> add_allele_vectors(std::vector<allele> new_alleles, std::vec
   return(return_alleles);
 }
 
+void IntervalTree::write_out_frequencies(ITNode *root, std::string filename){
+  //POS\tALLELE\tDEPTH\tFREQ\tAMP_START\tAMP_END\n
+  if (root==NULL) return;
+  std::fstream file(filename, std::ios::in | std::ios::out | std::ios::app);
+  for(uint32_t i=0; i < root->amp_positions.size(); i++){
+    if(root->amp_positions[i].depth == (uint32_t)0) continue;
+    uint32_t total_depth = 0;
+    for(uint32_t j=0; j < root->amp_positions[i].alleles.size(); j++){
+      //if(root->amp_positions[i].alleles[j].nuc != "-"){
+        total_depth += root->amp_positions[i].alleles[j].depth;
+      //}
+    }
+    for(uint32_t j=0; j < root->amp_positions[i].alleles.size(); j++){
+      if(root->amp_positions[i].alleles[j].depth == 0) continue;
+      file << std::to_string(root->amp_positions[i].pos) << "\t";
+      file << root->amp_positions[i].alleles[j].nuc << "\t";
+      file << std::to_string(root->amp_positions[i].alleles[j].depth) << "\t";
+      file << std::to_string((double)root->amp_positions[i].alleles[j].depth/(double)total_depth) << "\t";
+      file << std::to_string(root->data->low) << "\t";
+      file << std::to_string(root->data->high) << "\n";
+
+    }
+  } 
+  file.close();
+  write_out_frequencies(root->right, filename);
+}
+
 void IntervalTree::combine_haplotypes(ITNode *root){
   if (root==NULL) return;
   for(uint32_t i=0; i < root->amp_positions.size(); i++){
@@ -91,7 +118,8 @@ void IntervalTree::detect_primer_issues(ITNode *root, uint32_t find_position){
 
 void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
   if (root==NULL) return;
-  if (find_position < (uint32_t)root->data->low) return;
+  //unsure why this line is wrogn, but it is
+  //if (find_position < (uint32_t)root->data->low) return;
     for(uint32_t i=0; i < root->amp_positions.size(); i++){
       if(find_position == root->amp_positions[i].pos){
         test_flux.push_back(root->amp_positions[i]);
@@ -114,10 +142,8 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
   std::vector<uint8_t> quality;
 
   uint32_t quality_threshold=20;
-
   uint8_t nt = 0;
   uint32_t length = 0, ll=0, op=0;
-
   //auto start = high_resolution_clock::now();
   for(uint32_t i=0; i < nlength; i++){
     op = bam_cigar_op(cigar[i]);
@@ -146,7 +172,6 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
   }
   useful.clear();
   std::string nuc;
-
   for(uint32_t j=0; j < nlength; j++){
     op = bam_cigar_op(cigar[j]);
     uint32_t oplen = bam_cigar_oplen(cigar[j]);
@@ -224,7 +249,7 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
       deletion = false;
       gather_digits += character;
     } else if (isalpha(character) && deletion) {
-      variants[current_pos].update_alleles("-", 1, 0);
+      variants[current_pos].update_alleles("-", 1, 0);  
       deletion_positions.push_back(current_pos);
       current_pos += 1;
       deleted_char += character;
@@ -253,7 +278,6 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
     }
     j++;
   } while(aux[j] != '\0');
-
   //now that we know where the insertions and deletions are, let's just iterate the query sequence and add it in, skipping problem positions
   current_pos = start_pos;
   bool prev_insertion = false;
@@ -303,12 +327,15 @@ void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32
     if((uint32_t)quality[j] < quality_threshold){
       continue;
     }
-    variants[current_pos].update_alleles(nuc, 1, quality[j]);  
-  }    
+    char ch = 'L';
+    if (nuc.find(ch) == std::string::npos) {
+      variants[current_pos].update_alleles(nuc, 1, quality[j]);  
+    }   
+  }
 }
 
-void IntervalTree::populate_variants(){
-  for(uint32_t i=0; i <= max_pos; i++){
+void IntervalTree::populate_variants(uint32_t last_position){
+  for(uint32_t i=0; i <= last_position; i++){
     position tmp;
     tmp.alleles = populate_basic_alleles();
     tmp.pos = i;

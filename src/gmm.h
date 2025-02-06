@@ -24,9 +24,7 @@ struct variant {
   float transformed_freq;
   float transformed_gap_freq;
   int cluster_assigned = -1;
-
-  bool fake = false;
-
+  bool version_1_var=false;  
   //for these true means flagged as problematic
   bool vague_assignment=false; //cannot be distinguished between two groups
   bool amplicon_flux=false; //fluctuation frequency across amplicons
@@ -52,9 +50,8 @@ std::vector<std::vector<double>> solve_possible_solutions(std::vector<float> tmp
 uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
 void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, std::vector<double> means, uint32_t lower_n);
-std::vector<double> calculate_z_scores(const std::vector<double>& data);
-void calculate_gapped_frequency(std::vector<variant> &variants);
 gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> variants, uint32_t lower_n, double var_floor);
 void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, uint32_t lower_n);
 double calculate_mean(const std::vector<double>& data);
+void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions);
 #endif

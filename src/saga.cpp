@@ -2,6 +2,7 @@
 #include "trim_primer_quality.h"
 #include <fstream>
 #include <cmath>
+#include <numeric>
 #include <unordered_map>
 #include <chrono>
 #include <tuple>
@@ -151,61 +152,76 @@ void generate_range(uint32_t start, uint32_t end, std::vector<uint32_t> &result)
   }
 }
 
-float calculate_standard_deviation(std::vector<float> frequencies, std::vector<uint32_t> depths) {
-  double weighted_sum = 0.0, total_weight = 0.0;
-  for(uint32_t i = 0; i < frequencies.size(); i++) {
-    weighted_sum += frequencies[i] * depths[i];
-    total_weight += depths[i];
-  }
-  double mean = weighted_sum / total_weight;
-  double weighted_variance = 0.0;
-  for (uint32_t i = 0; i < frequencies.size(); i++) {
-    weighted_variance += depths[i] * std::pow(frequencies[i] - mean, 2);
-  }
-  weighted_variance /= total_weight;
-  return std::sqrt(weighted_variance);
+float calculate_standard_deviation(std::vector<float> data) {
+    float sum = 0, mean;
+    mean = std::accumulate(data.begin(), data.end(), 0.0f) / data.size();
+    for (float val : data) {
+        sum += std::pow(val - mean, 2);
+    }
+    return std::sqrt(sum / data.size());
+}
+
+float calculate_standard_deviation_weighted(std::vector<float> values, std::vector<uint32_t> weights) {
+    float weighted_sum = 0.0f, total_weight = 0.0f;
+
+    // Compute weighted mean
+    for (size_t i = 0; i < values.size(); ++i) {
+        weighted_sum += values[i] * (float)weights[i];
+        total_weight += (float)weights[i];
+    }
+    float mean = weighted_sum / total_weight;
+
+    // Compute weighted variance
+    float variance = 0.0f;
+    for (size_t i = 0; i < values.size(); ++i) {
+        variance += (float)weights[i] * std::pow(values[i] - mean, 2);
+    }
+    variance /= total_weight;
+
+    return std::sqrt(variance);
 }
 
 //first main function call
 int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
                              std::string cmd,
                              std::string pair_info, int32_t primer_offset){
- 
+  bool calculate_amplicons = true; 
+  bool development_mode = true;
   int retval = 0;
   std::vector<primer> primers;
   if (!bed.empty()) {
     primers = populate_from_file(bed, primer_offset);
     if (primers.size() == 0) {
-      std::cerr << "Exiting." << std::endl;
-      return -1;
+      calculate_amplicons = false;
+      //std::cerr << "Exiting." << std::endl;
+      //return -1;
     }
   }
   std::string gff_path = "";
 
-  // calculate the primers that should cover each position
-  std::vector<std::map<uint32_t, std::vector<primer>>> hash = find_primer_per_position(primers);
-  std::map<uint32_t, std::vector<primer>> primer_map_forward = hash[0];
-  std::map<uint32_t, std::vector<primer>> primer_map_reverse = hash[1];
-
   //int max_primer_len = get_bigger_primer(primers);
   // get coordinates of each amplicon
   IntervalTree amplicons;
-  if (!pair_info.empty()) {
+  if (!pair_info.empty() && calculate_amplicons) {
     amplicons = populate_amplicons(pair_info, primers);
     std::cerr << "Amplicons detected: " << std::endl;
     amplicons.inOrder();
     amplicons.get_max_pos();
-    amplicons.populate_variants();
     //amplicons.amplicon_position_pop();
     std::cerr << "Maximum position " << amplicons.max_pos << std::endl;
   } else{
-    std::cerr << "Exiting." << std::endl;
-    return -1;
+    //std::cerr << "Exiting." << std::endl;
+    //return -1;
+    calculate_amplicons = false;
   }
-  /*if(amplicons.size() == 0){
-    std::cerr << "Exiting." << std::endl;
-    return(-1);
-  }*/
+  // calculate the primers that should cover each position
+  std::map<uint32_t, std::vector<primer>> primer_map_forward;
+  std::map<uint32_t, std::vector<primer>> primer_map_reverse;
+  if(calculate_amplicons){
+    std::vector<std::map<uint32_t, std::vector<primer>>> hash = find_primer_per_position(primers);
+    primer_map_forward = hash[0];
+    primer_map_reverse = hash[1];
+  } 
 
   // Read in input file
   samFile *in;
@@ -264,10 +280,26 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
   aln = bam_init1();
 
+  uint32_t last_position=0;
+  while (sam_read1(in, header, aln) >= 0) {
+    uint32_t end_pos = aln->core.pos + bam_cigar2rlen(aln->core.n_cigar, bam_get_cigar(aln));
+    if (end_pos > last_position) {
+      last_position = end_pos;
+    }
+  }
+  bam_destroy1(aln);
+  bam_hdr_destroy(header);
+  sam_close(in);
+
+  in = sam_open(bam.c_str(), "r");
+  header = sam_hdr_read(in);
+  add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
+  aln = bam_init1();
+  amplicons.populate_variants(last_position);
+
   //hold the reads until it's mate can be found
   std::unordered_map<std::string, bam1_t*> read_map;
    
-
   // Iiterate through reads
   while (sam_read1(in, header, aln) >= 0) {
     strand = '+';  
@@ -277,6 +309,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     } else {
       start_pos = aln->core.pos;
     }
+    //TEST LINES
     bam1_t *r = aln;
     //get the md tag
     uint8_t *aux = bam_aux_get(aln, "MD");
@@ -293,8 +326,10 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     uint32_t *cigar = bam_get_cigar(r); 
     uint32_t nlength = r->core.n_cigar; 
     uint8_t *qualities = bam_get_qual(r);
-
-
+    if(!calculate_amplicons){
+      amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln));
+      continue;
+    }
     /*
     if (aln->core.flag & BAM_FPAIRED){
       //std::cerr << bam_get_qname(aln) << std::endl;
@@ -328,7 +363,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     }*/
 
     //TEST LINES
-    //if(start_pos > 3500) continue;
     //std::string test = bam_get_qname(aln);
     //if(test != "A01535:8:HJ3YYDSX2:4:1126:24433:27305") continue;
     counter += 1;
@@ -406,14 +440,15 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   for (uint32_t i=0; i < primers.size(); i++){
     amplicons.set_haplotypes(primers[i]);      
   }
-  /*
+  
   //TEST LINES
-  std::string amp_file = "/home/chrissy/paper_ivar_2.0/real_primer_binding/var/file_121_all.txt";
-  std::ofstream file_amp(amp_file, std::ios::trunc); 
-  file_amp << "POS\tALLELE\tDEPTH\tFREQ\tAMP_START\tAMP_END\n";
-  file_amp.close();
-  amplicons.write_out_frequencies(amp_file);
-  */
+  if(development_mode){
+    std::string amp_file = bam_out + "_all.txt";
+    std::ofstream file_amp(amp_file, std::ios::trunc); 
+    file_amp << "POS\tALLELE\tDEPTH\tFREQ\tAMP_START\tAMP_END\n";
+    file_amp.close();
+    amplicons.write_out_frequencies(amp_file);
+  }
 
   //combine amplicon counts to get total variants 
   amplicons.combine_haplotypes();
@@ -487,9 +522,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         }
         float t = (float)ad_depth / (float)total_depth; 
         if (allele_maps.find(nuc) != allele_maps.end()){
-          if(i == test_pos){
+          /*if(i == test_pos){
             std::cerr << "allele map " << nuc << " " << t << std::endl;
-          }
+          }*/
           allele_maps[nuc].push_back(t);
           allele_depths[nuc].push_back(ad_depth);
         } else {
@@ -497,9 +532,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
           std::vector<uint32_t> tmp_depths;
           tmp.push_back(t);
           tmp_depths.push_back(ad_depth);
-          if(i == test_pos){
+          /*if(i == test_pos){
             std::cerr << "allele map " << nuc << " " << t << std::endl;
-          }
+          }*/
           allele_maps[nuc] = tmp;
           allele_depths[nuc] = tmp_depths;
         }
@@ -507,20 +542,21 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     }
     std::map<std::string, std::vector<float>>::iterator it;
     for (it = allele_maps.begin(); it != allele_maps.end(); it++){
-      float sd = (float)calculate_standard_deviation(it->second, allele_depths[it->first]);
+      if(it->second.size() == 1) continue; //we don't standard dev one thing
+      //float sd = (float)calculate_standard_deviation_weighted(it->second, allele_depths[it->first]);
+      float sd = (float)calculate_standard_deviation(it->second);
       if(i == test_pos){
-        for (auto bit = allele_depths.begin(); bit != allele_depths.end(); ++bit) {
-          std::cerr << "allele depths " << bit->first << std::endl;
-          for(auto b : bit->second){
-            std::cerr << b << " ";
-          }
-          std::cerr << "\n";
-        }
         std::cerr << i << " std " << sd << " " << it->first << std::endl;
+        std::cerr << "allele depths" << std::endl;
+        for(auto x : allele_depths[it->first]){
+          std::cerr << x << " ";
+        }
+        std::cerr << "\n";
         std::cerr << "allele frequencies" << std::endl;
         for(auto x : it->second){
-          std::cerr << x << std::endl;
+          std::cerr << x << " ";
         }
+        std::cerr << "\n";
       }
       //TODO this is hard coded, consider it
       if (sd >= 0.03){

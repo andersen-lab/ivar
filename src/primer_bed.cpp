@@ -568,6 +568,7 @@ void primer::transform_mutations() {
         continue;
       } //this nucleotide was below the threshold of quality
       int exists = check_position_exists(current_pos, positions);
+      //std::cerr << "ADD NUC " << nuc << " " << ccount << std::endl;
       if (exists != -1) {
         positions[exists].update_alleles(nuc, ccount, quality[j]);  
       } else {
