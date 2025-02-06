@@ -9,6 +9,12 @@
 #include <unordered_map>
 
 void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions){
+  //also account for things NOT in the variants file
+  uint32_t max_pos = 0;
+  for(auto var : variants){
+    if(var.position > max_pos) max_pos = var.position;
+  }
+  
   //if we use ivar 1.0 calculate the ref and add in it's freq
   std::vector<uint32_t> unique_pos;
   std::ifstream infile(filename);
@@ -73,7 +79,6 @@ void calculate_reference_frequency(std::vector<variant> &variants, std::string f
     variants.push_back(tmp); 
     count += 1;
   } 
-
 }
 
 double calculate_range(const std::vector<double>& vec) {
@@ -127,29 +132,6 @@ double calculate_median(std::vector<double> &data) {
     } else {
         return data[size / 2];
     }
-}
-
-double calculate_stddev(const std::vector<double>& data, double mean) {
-    double sum = 0;
-    for (double val : data) {
-        sum += std::pow(val - mean, 2);
-    }
-    return std::sqrt(sum / data.size());
-}
-
-int count_outliers_z_score(const std::vector<double>& data) {
-    double mean = calculate_mean(data);
-    double stddev = calculate_stddev(data, mean);
-
-    int outlier_count = 0;
-    for (double value : data) {
-        double z_score = (value - mean) / stddev;
-        if (std::abs(z_score) > 3) { // Typically consider |Z| > 3 as an outlier
-            outlier_count++;
-        }
-    }
-
-    return outlier_count;
 }
 
 void calculate_gapped_frequency(std::vector<variant> &variants, double universal_cluster, double noise_cluster){
@@ -364,7 +346,7 @@ gaussian_mixture_model retrain_model_seeded(uint32_t n, arma::mat data, std::vec
 
   for(uint32_t i=0; i < centroids.size(); i++){
     initial_means.col(i) = centroids[i];
-    cov.col(i) = 0.001;
+    cov.col(i) = 0.0001;
   } 
 
   double var_floor = 0.0001;
@@ -744,9 +726,7 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
     if(assigned.size() == 0) continue;
     //make sure the assignment is concrete
     std::vector<uint32_t> assignment_flagged;
-    //if(unique_pos[i] == 29692){
     assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
-    //}
     for(uint32_t j=0; j < pos_idxs.size(); j++){
       std::vector<uint32_t>::iterator tmp = std::find(assignment_flagged.begin(), assignment_flagged.end(), j);
       uint32_t k = 0;
@@ -1003,12 +983,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
   float quality_threshold = 20;
   uint32_t round_val = 4; 
 
-  bool development_mode=false;
+  bool development_mode=true;
   std::vector<float> error_rate = cluster_error(prefix);
   lower_bound = error_rate[0];
   upper_bound = error_rate[1];
   std::cerr << lower_bound << " " << upper_bound << std::endl;
-
+  //exit(0);
   std::vector<variant> base_variants;
   std::vector<uint32_t> deletion_positions = find_deletion_positions(prefix, depth_cutoff, lower_bound, upper_bound, round_val);
   
@@ -1031,7 +1011,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
       variants.push_back(base_variants[i]);
       all_var.push_back(base_variants[i].freq);      
       count_pos.push_back(base_variants[i].position);
-      std::cerr << base_variants[i].freq << " " << base_variants[i].position << " " << base_variants[i].nuc << std::endl;
+      //std::cerr << base_variants[i].freq << " " << base_variants[i].position << " " << base_variants[i].nuc << " " << base_variants[i].depth << std::endl;
     }
   }
   std::cerr << "useful var " << useful_var << std::endl;
@@ -1079,7 +1059,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
     retrained.means.clear();
     retrained.hefts.clear();
     retrained.prob_matrix.clear();
-    retrained = retrain_model(counter, data, variants, lower_n, 0.0001);
+    retrained = retrain_model(counter, data, variants, lower_n, 0.001);
     bool optimal = true;
     assign_clusters(variants, retrained, lower_n);
     std::vector<std::vector<double>> clusters(counter);
@@ -1097,6 +1077,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
         continue;
       }
       int count_far = 0;
+      int count_far_far = 0;
       for(auto d : data){
         std::cerr << d << " ";
         if(std::abs(d-mean) > 0.10){
@@ -1105,11 +1086,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
       }
       std::cerr << "\n";
       float percent_far = (float)count_far / (float)useful_var;
-       
+      float percent_far_far = (float)count_far_far / (float)useful_var;
+      
       tmp_mads.push_back(mad);
       tmp_percent_far.push_back(percent_far);
       float ratio = (float)useful_var / (float) counter;
-      std::cerr << "mean " << mean << " mad " << mad << " cluster size " << data.size() << " count far " << count_far << " percent far " << percent_far << " ratio " << ratio << std::endl;
+      std::cerr << "mean " << mean << " mad " << mad << " cluster size " << data.size() << " count far " << count_far << " percent far " << std::endl;
       if(ratio >= 5){
         if(mad <= 0.10 && percent_far <= 0.10){
           optimal = true;
@@ -1171,39 +1153,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
     final_means.push_back(mean);
   }
   std::ofstream file;  
-  //write mad to strings for use
-  if(development_mode){
-    std::string mads_string;
-    for(uint32_t l=0; l < mads.size(); l++){
-      std::string tmp_str = "[";
-      for(uint32_t d=0; d < mads[l].size(); d++){
-        if(d != 0) tmp_str += ",";
-        tmp_str += std::to_string(mads[l][d]);
-      }
-      tmp_str += "]\n";
-      mads_string += tmp_str;
-    } 
-    std::string mad_output = output_prefix + "_mad.txt";
-    file.open(mad_output, std::ios::trunc);
-    file << "MADS\n";
-    file << mads_string;
-    file.close(); 
-  }
-  std::string percent_string;
-  for(uint32_t l=0; l < percents.size(); l++){
-    std::string tmp_str = "[";
-    for(uint32_t d=0; d < percents[l].size(); d++){
-      if(d != 0) tmp_str += ",";
-      tmp_str += std::to_string(percents[l][d]);
-    }
-    tmp_str += "]\n";
-    percent_string += tmp_str;
-  }
-  std::string percent_output = output_prefix + "_percent.txt";
-  file.open(percent_output, std::ios::trunc);
-  file << "PERCENTS\n";
-  file << percent_string;
-  file.close(); 
 
   //write means to string
   file.open(output_prefix + ".txt", std::ios::trunc);
@@ -1235,6 +1184,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
   }*/
   //could benefit from redoing lines in variants file as gapped/ungapped depth
   for(uint32_t i=0; i < base_variants.size(); i++){
+    if(base_variants[i].del_flag){
+      continue;
+    }
     if(!base_variants[i].outside_freq_range && !base_variants[i].pos_del_flag){
       useful_var += 1;
       variants.push_back(base_variants[i]);
