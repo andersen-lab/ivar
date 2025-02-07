@@ -11,7 +11,7 @@ int call_var_check_outfile(std::string prefix, uint8_t min_qual,
   std::string path = "../data/test.indel.mpileup";
   std::ifstream mplp(path);
   call_variants_from_plup(mplp, prefix, min_qual, min_threshold, min_depth,
-                          "../data/db/test_ref.fa", "../data/test.gff");
+                          "../data/db/test_ref.fa", "../data/test.gff", false);
   std::ifstream outFile(prefix + ".tsv");
   std::string l;
   getline(outFile, l);  // Ignore first line
