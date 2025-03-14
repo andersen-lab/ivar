@@ -49,8 +49,6 @@ struct args_t {
   bool keep_for_reanalysis;      // -k
   //contam params
   std::string variants;          // -s
-  float dcov_1;                  // -d
-  float dcov_2;                  // -D
 } g_args;
 
 void print_usage() {
@@ -287,7 +285,7 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
-static const char *contam_opt_str = "i:b:f:x:p:m:q:s:d:D:e:r:kh?";
+static const char *contam_opt_str = "p:s:t:h?";
 
 std::string get_filename_without_extension(std::string f, std::string ext) {
   if (ext.length() > f.length())  // If extension longer than filename
@@ -332,35 +330,18 @@ int main(int argc, char *argv[]) {
 
   //ivar contam
   if (cmd.compare("contam") == 0) {
-    g_args.bed = "";
-    g_args.primer_pair_file = "";
-    g_args.primer_offset = 0;
+    g_args.min_threshold = 0;
     opt = getopt(argc, argv, contam_opt_str);
     while (opt != -1) {
       switch (opt) {
-        case 'i':
-          g_args.bam = optarg;
-          break;
-        case 'b':
-          g_args.bed = optarg;
-          break;
-        case 'f':
-          g_args.primer_pair_file = optarg;
-          break;
-        case 'x':
-          g_args.primer_offset = std::stoi(optarg);
-          break;
         case 'p':
           g_args.prefix = optarg;
           break;
         case 's':
           g_args.variants = optarg;
           break;
-        case 'd':
-          g_args.dcov_1 = std::stof(optarg);
-          break;
-        case 'D':
-          g_args.dcov_2 = std::stof(optarg);
+        case 't':
+          g_args.min_threshold = atof(optarg);
           break;
         case 'h':
         case '?':
@@ -372,7 +353,7 @@ int main(int argc, char *argv[]) {
     }
     if (!g_args.variants.empty() && !g_args.prefix.empty()) {
       std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix);
-      cluster_consensus(variants, g_args.prefix, g_args.variants);
+      cluster_consensus(variants, g_args.prefix, g_args.variants, g_args.min_threshold);
     }
     res = 0; 
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
