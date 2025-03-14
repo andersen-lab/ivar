@@ -12,4 +12,5 @@
 int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
                              std::string cmd,
                              std::string pair_info, int32_t primer_offset);
+double calculate_standard_deviation(std::vector<double> data);
 #endif

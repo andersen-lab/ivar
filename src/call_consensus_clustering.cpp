@@ -1,6 +1,7 @@
 #include "call_consensus_clustering.h"
 #include "estimate_error.h"
 #include "gmm.h"
+#include "saga.h"
 #include <ostream>
 #include <iostream>
 #include <vector>
@@ -8,6 +9,33 @@
 #include <string>
 #include <algorithm>
 #include <numeric>
+
+bool test_cluster_deviation(float nearest_cluster, float variant_cluster, float std_dev){
+  bool fluctuation = false;
+  //CLEANUP THIS CAN BE CALCULATED ONCE PER ALL CLUSTERS
+  //determine if the assigned and nearest cluster can be resolved based on variant fluctuation
+  std::vector<double> tmp = {(double) nearest_cluster, (double) variant_cluster};
+  double cluster_dev = calculate_standard_deviation(tmp);
+  if((double)std_dev > cluster_dev){
+    fluctuation = true;
+  }
+  return(fluctuation);
+}
+
+double find_neighboring_cluster(double freq, uint32_t cluster_assigned, std::vector<double> means){
+  //find closest cluster by mean value
+  double min_dist = 1;
+  uint32_t index = 0;
+  for(uint32_t i=0; i < means.size(); i++){
+    if(i == cluster_assigned) continue;
+    double dist = std::abs(means[i]-freq);
+    if(dist < min_dist){
+      min_dist = dist;
+      index = i;
+    }
+  }
+  return(means[index]);
+}
 
 void call_majority_consensus(std::vector<variant> variants, uint32_t max_position, std::string clustering_file, double default_threshold){
   //if we can't find a solution simply take the majority variant per position
@@ -229,12 +257,15 @@ std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<float> sol
   //given a solution and the means, map each cluster to the cluster it contains
   for(uint32_t i=0; i < means.size(); i++){
     auto it = std::find(solution.begin(), solution.end(), means[i]);
+    //th mean is part of the solution
     if(it != solution.end()){
         cluster_indexes[i].push_back(i);
         float target = means[i];
         std::vector<float> distances(totals.size());
         std::transform(totals.begin(), totals.end(), distances.begin(), [target](float num) { return std::abs(target - num); }); 
         uint32_t count = 0;
+        
+        //this checks the distances from the mean to all other possible peaks
         for(uint32_t d=0; d < distances.size(); d++){
           if(distances[d] < 0.03) count += 1;
         }
@@ -313,9 +344,10 @@ std::vector<float> parse_clustering_results(std::string clustering_file){
 void cluster_consensus(std::vector<variant> variants, std::string clustering_file, std::string variants_file, double default_threshold){ 
   float depth_cutoff = 10; 
   double error = 0.10; 
-  float solution_error = 0.10;
- 
-  std::vector<float> error_rate = cluster_error(variants_file);
+  float solution_error = 0.05;
+  double quality_threshold = 20; 
+
+  std::vector<float> error_rate = cluster_error(variants_file, quality_threshold);
   float freq_lower_bound = error_rate[0];
   float freq_upper_bound = error_rate[1];
 
@@ -340,7 +372,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   //find position wise frequency pairs
   std::vector<std::vector<float>> pairs = frequency_pair_finder(variants, freq_lower_bound, freq_upper_bound, means); 
   std::vector<std::vector<float>> solutions = find_solutions(means, error);  
-
+  
   //find peaks that can't be a subset of other peaks
   std::vector<float> non_subset_means;
   for(uint32_t i=0; i < means.size(); i++){
@@ -358,7 +390,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
         realistic_solutions.push_back(solutions[i]);
      }
   }
-
   //check each solution that every possible peak is accounted for
   std::vector<std::vector<float>> solution_sets;
   for(uint32_t i=0; i < realistic_solutions.size(); i++){
@@ -367,6 +398,15 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       solution_sets.push_back(realistic_solutions[i]);
     }
   }
+
+  for(auto sol : solution_sets){
+    std::cerr << "\nsolution" << std::endl;
+    for(auto s : sol){
+      std::cerr << s << " ";
+    }
+  }
+  std::cerr << "\n" << std::endl;
+
   std::vector<float> solution;
   bool traditional_majority= false; //if we can't find a solution call a traditional majority consensus
   if(solution_sets.size() == 0){
@@ -389,11 +429,10 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   }
   std::vector<float> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved);
-  for(auto u : unresolved) std::cerr << "unresolved " << u << std::endl;
+  
   std::vector<std::vector<uint32_t>> inverse_groups(means.size());
   for(uint32_t i=0; i < cluster_groups.size(); i++){
     for(uint32_t j=0; j < cluster_groups[i].size(); j++){
-      //std::cerr << cluster_groups[i][j] << " i " << i << " j " << j << std::endl; 
       inverse_groups[cluster_groups[i][j]].push_back(i);
     }
   }
@@ -465,7 +504,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     //TESTLINES
     if(variants[i].nuc.find('+') != std::string::npos) continue;
     //TESTLINES
-    if(variants[i].position == 0){
+    if(variants[i].position == 13572){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " del pos " << variants[i].pos_del_flag << " depth flag " << variants[i].depth_flag << std::endl;
@@ -482,11 +521,33 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       continue;
     }
     //if this position is experiencing fluctuation across amplicons, call ambiguity
-    if(variants[i].amplicon_flux && variants[i].freq < freq_upper_bound){
-      if(print){
-        std::cerr << "position is experiencing fluctuation" << std::endl;
+    if(variants[i].amplicon_flux && variants[i].freq < freq_upper_bound && variants[i].freq > freq_lower_bound){
+
+      //find all clusters not part of the same assignment
+      std::vector<double> other_population_clusters;
+      for(uint32_t j=0; j < inverse_groups.size(); j++){
+        //check to make sure you're lookin at a group that's part of the solution
+        auto mit = std::find(solution.begin(), solution.end(), means[j]);
+        if(mit == solution.end()) continue;
+        auto it = std::find(inverse_groups[j].begin(), inverse_groups[j].end(), variants[i].cluster_assigned);      
+        //assigned cluster is not apart of the population
+        if(it == inverse_groups[j].end())
+        for(auto ig : inverse_groups[j]){
+          //CLEAN UP this will push redundant things back
+          other_population_clusters.push_back(means[ig]);
+        }
       }
-      continue;
+
+      //find the second closest cluster index
+      double closest_mean = find_neighboring_cluster((double)variants[i].gapped_freq, variants[i].cluster_assigned, other_population_clusters);
+      //check if the cluster is within the standard dev of the variant
+      bool fluctuating = test_cluster_deviation(closest_mean, means[variants[i].cluster_assigned], variants[i].std_dev);       
+      if(print){
+        std::cerr << "fluctuating " << fluctuating << std::endl;
+      }
+      if(fluctuating){
+        continue;
+      }
     }
 
     //if this amplicon is experiencing fluctuation across amplicons, call ambiguity
@@ -541,6 +602,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       }
       continue;
     }
+
     for(uint32_t j=0; j < inverse_groups.size(); j++){
       //check to make sure you're lookin at a group that's part of the solution
       auto mit = std::find(solution.begin(), solution.end(), means[j]);
@@ -566,6 +628,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     auto it = std::find(solution.begin(), solution.end(), tmp_mean);
     if(it == solution.end()) continue;
     file << ">"+clustering_file+"_cluster_"+ std::to_string(means[i]) << "\n";
+    std::cerr << all_sequences[i][13571] << std::endl;
     file << all_sequences[i] << "\n";
   }
   file.close(); 

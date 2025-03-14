@@ -57,6 +57,9 @@ void IntervalTree::write_out_frequencies(ITNode *root, std::string filename){
 void IntervalTree::combine_haplotypes(ITNode *root){
   if (root==NULL) return;
   for(uint32_t i=0; i < root->amp_positions.size(); i++){
+    if(root->amp_positions[i].depth == 0){
+      continue;
+    }
     variants[root->amp_positions[i].pos].depth += root->amp_positions[i].depth;
     std::vector<allele> new_alleles = add_allele_vectors(root->amp_positions[i].alleles, variants[root->amp_positions[i].pos].alleles);
     variants[root->amp_positions[i].pos].alleles = new_alleles;
@@ -64,7 +67,7 @@ void IntervalTree::combine_haplotypes(ITNode *root){
   combine_haplotypes(root->right);
 }
 
-void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint8_t> qualities){
+void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities){
   if (root==NULL) return;
   //if ((uint32_t)root->data->low > upper) return;
   if(((uint32_t)root->data->low <= lower) && (upper <= (uint32_t)root->data->high)){
