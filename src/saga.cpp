@@ -9,7 +9,7 @@
 #include <tuple>
 using namespace std::chrono;
 
-void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, uint32_t total_ref_pos, uint32_t total_query_pos, uint32_t ref_start_pos, std::vector<std::string> &overlap_seq, uint32_t o_lower, uint32_t o_upper, std::vector<uint32_t> &insertion_positions){
+void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, uint32_t total_ref_pos, uint32_t total_query_pos, uint32_t ref_start_pos){
   //ref_start_pos describe the point after which we start recording bases
   const uint8_t* seq_field1 = bam_get_seq(read1);
   uint32_t *cigar1 = bam_get_cigar(read1);
@@ -23,29 +23,17 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
       for(uint32_t j=total_query_pos; j < total_query_pos+len; j++){
         char nuc = seq_nt16_str[bam_seqi(seq_field1, j)];
         std::string tmp = std::string(1, nuc);
-        if(total_ref_pos+counter >= ref_start_pos){
-          positions.push_back(total_ref_pos+counter);
-          bases.push_back(tmp);
-          qualities.push_back((uint32_t)qual[j]);
-        }
-        if(total_ref_pos+counter >= o_lower && total_ref_pos+counter <= o_upper){
-          //std::cerr << total_ref_pos+counter << " this " << std::endl;
-          overlap_seq.push_back(tmp);
-        }
+        positions.push_back(total_ref_pos+counter);
+        bases.push_back(tmp);
+        qualities.push_back((uint32_t)qual[j]);
         counter++;
       }
     }
     if(op == 2){    
-       for(uint32_t j=0; j < len; j++){
-        if(total_ref_pos+counter >= ref_start_pos){
-          positions.push_back(total_ref_pos+counter);
-          bases.push_back("-");
-          qualities.push_back((uint32_t)20);
-        }
-        if(total_ref_pos+counter >= o_lower && total_ref_pos+counter <= o_upper){
-          overlap_seq.push_back("-");
-          //std::cerr << total_ref_pos+counter << " - " << std::endl;      
-        }
+      for(uint32_t j=0; j < len; j++){
+        positions.push_back(total_ref_pos+counter);
+        bases.push_back("-");
+        qualities.push_back((uint32_t)20);
         counter++;
       }
     }
@@ -53,16 +41,9 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
       for(uint32_t j=total_query_pos; j < total_query_pos+len; j++){
         char nuc = seq_nt16_str[bam_seqi(seq_field1, j)];
         std::string tmp = "+" + std::string(1, nuc);
-        if(total_ref_pos+counter >= ref_start_pos){
-          positions.push_back(total_ref_pos+counter);
-          bases.push_back(tmp);
-          qualities.push_back((uint32_t)qual[j]);
-        }
-        if(total_ref_pos+counter >= o_lower && total_ref_pos+counter <= o_upper){
-          overlap_seq.push_back(tmp);
-          insertion_positions.push_back(total_query_pos+counter);
-          //std::cerr << total_ref_pos << " " << nuc << std::endl;
-        }
+        positions.push_back(total_ref_pos+counter);
+        bases.push_back(tmp);
+        qualities.push_back((uint32_t)qual[j]);
         counter++;
       }
     }
@@ -103,7 +84,7 @@ uint32_t find_sequence_end(const bam1_t* read){
   return start;
 }
 
-void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree amplicons){
+void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplicons){
   //pass the forward first then reverse 
   //underlying assumption here is that the overlap region is identical
   //also assumes that the forward read starts more "left" than  the reverse
@@ -128,10 +109,6 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree amplicon
   std::vector<std::string> bases2;
   std::vector<uint32_t> qualities2;
 
-  //CLEANUP can probably get rid of this 
-  std::vector<std::string> overlap_seq1;
-  std::vector<std::string> overlap_seq2; 
-
   //we use all of the first read 
   uint32_t end_overlap, begin_overlap;
   if(end_reverse <= end_forward){
@@ -141,57 +118,107 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree amplicon
   } 
   begin_overlap = start_reverse;
 
-  //std::cerr << start_forward << " " << end_forward << std::endl;
-  //std::cerr << start_reverse << " " << end_reverse << std::endl;
-  std::vector<uint32_t> insertion_positions1;
-  std::vector<uint32_t> insertion_positions2;
-
-  parse_cigar(read1, positions1, bases1, qualities1, total_ref_pos, total_query_pos, start_forward, overlap_seq1, begin_overlap, end_overlap, insertion_positions1);
-  parse_cigar(read2, positions2, bases2, qualities2, start_reverse, total_query_pos, end_forward, overlap_seq2, begin_overlap, end_overlap, insertion_positions2);  
-
-  std::vector<uint32_t> removal;
+  parse_cigar(read1, positions1, bases1, qualities1, total_ref_pos, total_query_pos, start_forward);
+  parse_cigar(read2, positions2, bases2, qualities2, start_reverse, total_query_pos, end_forward);  
 
   //find all unique positions we need to cover
-  std::unordered_set<int> unique_elements(positions1.begin(), positions1.end());
+  std::unordered_set<uint32_t> unique_elements(positions1.begin(), positions1.end());
   unique_elements.insert(positions2.begin(), positions2.end());
+
+  std::vector<uint32_t> final_positions;
+  std::vector<uint32_t> final_qualities;
+  std::vector<std::string> final_bases;
 
   //for every position make sure the bases and qualities match
   //make sure insertions match
   for(auto pos : unique_elements){
-    std::cerr << p << std::endl;
-  }
-  exit(0);
-  /*if(overlap_seq1.size() == overlap_seq2.size(){
-    for(uint32_t j=0; j < overlap_seq1.size(); j++){
-      if(overlap_seq1[j] != overlap_seq2[j]){
-        removal.push_back(j);
+    auto first_it = std::find(positions1.begin(), positions1.end(), pos);
+    auto second_it = std::find(positions2.begin(), positions2.end(), pos);
+    
+    //if its in the first read but not the second
+    if(first_it != positions1.end() && second_it == positions2.end()){
+      auto it = positions1.begin();
+      while ((it = std::find(it, positions1.end(), pos)) != positions1.end()) {
+        uint32_t index1 = std::distance(positions1.begin(), it);
+        final_positions.push_back(positions1[index1]);
+        final_qualities.push_back(qualities1[index1]);
+        final_bases.push_back(bases1[index1]);
+        ++it;
       }
-    }
-  } else {
-    uint32_t max_range = std::max(overlap_seq1.size(), overlap_seq2.size());
-    uint32_t counter1=0;
-    uint32_t counter2=0;
-    for(uint32_t j=0; j < max_range; j++){
-      //check if this position is marked as an insertion in either sequence
-      bool exists1 = std::count(insertion_positions1.begin(), insertion_positions1.end(), j) > 0;
-      bool exists2 = std::count(insertion_positions2.begin(), insertion_positions2.end(), j) > 0;
-      if(exists1 == exists2){
-        if(overlap_seq1[counter1] != overlap_seq2[counter2]){
-          removal.push_back();
+    } else if(first_it == positions1.end() && second_it != positions2.end()){
+      //if its in the second read but not the first
+      auto it = positions2.begin();
+      while ((it = std::find(it, positions2.end(), pos)) != positions2.end()) {
+        uint32_t index2 = std::distance(positions2.begin(), it);
+        final_positions.push_back(positions2[index2]);
+        final_qualities.push_back(qualities2[index2]);
+        final_bases.push_back(bases2[index2]);
+        ++it;
+      }
+    } else if(first_it != positions1.end() && second_it != positions2.end()){
+      //if its in both reads
+      //check if the number of times the position occurs is the same
+      uint32_t count1 = std::count(positions1.begin(), positions1.end(), pos);
+      uint32_t count2 = std::count(positions2.begin(), positions2.end(), pos);
+      if(count1 != count2) continue;
+   
+      std::vector<uint32_t> tmp_pos2; 
+      std::vector<std::string> tmp_base2; 
+      std::vector<uint32_t> tmp_qual2; 
+      //go get all the second read info
+      auto sit = positions2.begin();
+      while ((sit = std::find(sit, positions2.end(), pos)) != positions2.end()) {
+        uint32_t index2 = std::distance(positions2.begin(), sit);
+        tmp_pos2.push_back(positions2[index2]);
+        tmp_qual2.push_back(qualities2[index2]);
+        tmp_base2.push_back(bases2[index2]);
+        ++sit;
+      }
+      std::vector<uint32_t> tmp_pos1; 
+      std::vector<std::string> tmp_base1; 
+      std::vector<uint32_t> tmp_qual1; 
+      //go get all the first read info
+      auto fit = positions1.begin();
+      while ((fit = std::find(fit, positions1.end(), pos)) != positions1.end()) {
+        uint32_t index1 = std::distance(positions1.begin(), fit);
+        tmp_pos1.push_back(positions1[index1]);
+        tmp_qual1.push_back(qualities1[index1]);
+        tmp_base1.push_back(bases1[index1]);
+        ++fit;
+      }
+      //now do the base and quality comparison
+      bool use= true;
+      for(uint32_t j=0; j < tmp_pos1.size(); j++){
+        if(tmp_base1[j] != tmp_base2[j]){
+          use = false;
+          break;
+        }
+      }
+      if(use) {
+        for(uint32_t j=0; j < tmp_pos1.size(); j++){
+          final_positions.push_back(tmp_pos1[j]);
+          final_qualities.push_back(tmp_qual1[j]);
+          final_bases.push_back(tmp_base1[j]);
         }
       }
     }
-  }*/
+  }
 
-  //remove positions, bases, and qualitieis where it is not the same
-  /*std::sort(removal.rbegin(), removal.rend());
-  for (uint32_t idx : removal) {
-    positions.erase(positions.begin() + idx);
-    bases.erase(bases.begin() + idx);
-    qualities.erase(qualities.begin() + idx);
-  }*/
+  //TESTLINES
+  /*
+  for(uint32_t i=0; i < final_positions.size(); i++){
+    std::cerr << final_positions[i] << " " << final_qualities[i] << " " << final_bases[i] << std::endl;
+  } 
+  exit(0);*/
+
+
   //find assigned amplicon and populate position vector
-  amplicons.find_read_amplicon(start_forward, end_reverse, positions1, bases1, qualities1);    
+  bool found_amplicon = false;
+  amplicons.find_read_amplicon(start_forward, end_reverse, final_positions, final_bases, final_qualities, found_amplicon);   
+  if(!found_amplicon){
+    amplicons.add_read_variants(final_positions, final_bases, final_qualities);
+    std::cerr << "back " << found_amplicon << std::endl;  
+  }
 }
 
 void generate_range(uint32_t start, uint32_t end, std::vector<uint32_t> &result) {
@@ -356,7 +383,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   while (sam_read1(in, header, aln) >= 0) {
     //get the name of the read    
     std::string read_name = bam_get_qname(aln);
-    if(read_name != "A01535:8:HJ3YYDSX2:4:1103:6840:26052") continue;
+    //if(read_name != "A01535:8:HJ3YYDSX2:4:1103:6840:26052") continue;
     std::cerr << read_name << std::endl;
     //std::cerr << read_name << std::endl;
     strand = '+';  
@@ -367,7 +394,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       start_pos = aln->core.pos;
     }
     //TEST LINES
-    if(start_pos < 13000 || start_pos > 15000) continue;
+    //if(start_pos < 13000 || start_pos > 15000) continue;
     bam1_t *r = aln;
     //get the md tag
     uint8_t *aux = bam_aux_get(aln, "MD");

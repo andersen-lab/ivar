@@ -67,7 +67,7 @@ void IntervalTree::combine_haplotypes(ITNode *root){
   combine_haplotypes(root->right);
 }
 
-void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities){
+void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, bool &found){
   if (root==NULL) return;
   //if ((uint32_t)root->data->low > upper) return;
   if(((uint32_t)root->data->low <= lower) && (upper <= (uint32_t)root->data->high)){
@@ -75,11 +75,12 @@ void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upp
       for(uint32_t j=0; j < root->amp_positions.size(); j++){
         if(positions[i] == root->amp_positions[j].pos){
           root->amp_positions[j].update_alleles(bases[i], 1, qualities[i]);
+          found = true;
         }
       }
     }
   }
-  find_read_amplicon(root->right, lower, upper, positions, bases, qualities);
+  find_read_amplicon(root->right, lower, upper, positions, bases, qualities, found);
 }
 
 void IntervalTree::amplicon_position_pop(ITNode *root){
@@ -132,6 +133,12 @@ void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
     }
   detect_abberations(root->right, find_position);
 
+}
+
+void IntervalTree::add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities){
+  for(uint32_t i=0; i < positions.size(); i++){
+    variants[positions[i]].update_alleles(bases[i], 1, qualities[i]);  
+  }
 }
 
 void IntervalTree::add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, uint8_t* qual, std::string qname) {
