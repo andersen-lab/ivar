@@ -67,20 +67,34 @@ void IntervalTree::combine_haplotypes(ITNode *root){
   combine_haplotypes(root->right);
 }
 
-void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, bool &found){
+void IntervalTree::assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities){
   if (root==NULL) return;
-  //if ((uint32_t)root->data->low > upper) return;
-  if(((uint32_t)root->data->low <= lower) && (upper <= (uint32_t)root->data->high)){
+  if((uint32_t)root->data->low == amp_start){
     for(uint32_t i=0; i < positions.size(); i++){
       for(uint32_t j=0; j < root->amp_positions.size(); j++){
         if(positions[i] == root->amp_positions[j].pos){
           root->amp_positions[j].update_alleles(bases[i], 1, qualities[i]);
-          found = true;
         }
       }
     }
   }
-  find_read_amplicon(root->right, lower, upper, positions, bases, qualities, found);
+  assign_read_amplicon(root->right, amp_start, positions, bases, qualities);
+}
+
+void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist){
+  //read name here is for TEST
+  if (root==NULL) return;
+  //if ((uint32_t)root->data->low > upper) return;
+  if(((uint32_t)root->data->low <= lower) && (upper <= (uint32_t)root->data->high)){
+    //describes how far the ends of this are from the start/end of the amplicon
+    uint32_t dist = (lower - root->data->low) + (root->data->high - upper);
+    if(dist < amp_dist) { 
+      amp_dist = dist;
+      amp_start = root->data->low;
+    }
+    found = true;
+  }
+  find_read_amplicon(root->right, lower, upper, found, read_name, amp_start, amp_dist);
 }
 
 void IntervalTree::amplicon_position_pop(ITNode *root){

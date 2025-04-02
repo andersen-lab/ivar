@@ -59,7 +59,9 @@ class IntervalTree {
   void detect_abberations(ITNode *root, uint32_t pos);
   void detect_amplicon_overlaps(ITNode *root, uint32_t pos);
   void detect_primer_issues(ITNode *root, uint32_t pos);
-  void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, bool &found);
+  void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist);
+  void assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
+  
   public:
   uint32_t max_pos=0;
   std::vector<std::vector<uint32_t>> overlaps;
@@ -85,7 +87,8 @@ class IntervalTree {
   void add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *sequence, uint8_t *aux, uint8_t *quality, std::string qname);
   void populate_variants(uint32_t last_position);
   void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
-  void find_read_amplicon(uint32_t lower, uint32_t upper, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, bool &found) {find_read_amplicon(_root, lower, upper, positions, bases, qualities, found);}
+  void find_read_amplicon(uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist) {find_read_amplicon(_root, lower, upper, found, read_name, amp_start, amp_dist);}
+  void assign_read_amplicon(uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities) {assign_read_amplicon(_root, amp_start, positions, bases, qualities);}
   void amplicon_position_pop() {amplicon_position_pop(_root);}
 };
 
@@ -99,8 +102,9 @@ void populate_variants(uint32_t last_position);
 int unpaired_primers(ITNode *root, primer prim);
 void detect_primer_issues(ITNode *root, uint32_t find_position);
 void detect_amplicon_overlaps(ITNode *root, uint32_t find_position);
-void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, bool &found);
+void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist);
 IntervalTree populate_amplicons(std::string pair_info_file, std::vector<primer> &primers);
 IntervalTree amplicon_position_pop();
+void assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
 void write_out_frequencies(ITNode *root, std::string filename);
 #endif
