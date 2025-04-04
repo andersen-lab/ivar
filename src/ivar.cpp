@@ -364,6 +364,8 @@ int main(int argc, char *argv[]) {
     g_args.bed = "";
     g_args.primer_pair_file = "";
     g_args.primer_offset = 0;
+    g_args.min_depth = 10;
+    g_args.min_qual = 20;
     opt = getopt(argc, argv, trim_opt_str);
     while (opt != -1) {
       switch (opt) {
@@ -404,7 +406,7 @@ int main(int argc, char *argv[]) {
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
     res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
                                cl_cmd.str(),
-                               g_args.primer_pair_file, g_args.primer_offset);
+                               g_args.primer_pair_file, g_args.primer_offset, g_args.min_depth, g_args.min_qual);
     //std::vector<uint32_t> populations_iterate;
     //for(uint32_t i= 2; i < 6; i++){
     //  populations_iterate.push_back(i);

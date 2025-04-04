@@ -9,35 +9,7 @@
 #ifndef primer_bed
 #define primer_bed
 
-class cigarotype{
-  protected:
-    std::vector<std::vector<uint32_t>> cigarotypes; //unique cigar value 
-    std::vector<uint32_t> nlengths; //this is just for printing, record length og cig ops TODO can remove
-    std::vector<uint32_t> ncigarotypes; //starting pos of these cigars
-    std::vector<uint32_t> count_cigarotypes; //count of amount found
-    std::vector<std::vector<uint8_t>> aux_tags; //auxillary tags
-    std::vector<std::vector<uint8_t>> sequences; //sequences                        
-    std::vector<std::vector<uint32_t>> qualities; //qualities                                             
-    std::vector<bool> forward; //direction
-    std::vector<std::vector<std::string>> qnames; //TODO remove this at the end, qname
-  public:
-    std::vector<std::vector<uint32_t>> get_cigarotypes();
-    std::vector<std::vector<uint8_t>> get_aux_tags();
-    std::vector<std::vector<uint8_t>> get_sequences();   
-    std::vector<std::vector<uint32_t>> get_qualities();
-    std::vector<uint32_t> get_count_cigarotypes();
-    std::vector<uint32_t> get_start_positions();
-    std::vector<bool> get_direction();
-    std::vector<uint32_t> get_nlengths();
-    uint32_t low_qual=0;
-    uint32_t low_count=0;
-    std::vector<std::vector<std::string>> get_qnames(); 
-    void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality, bool is_rev);
-    int test = 12;
-
-};
-
-class primer : public cigarotype{
+class primer {
  private:
   std::string region;
   uint32_t start;  // 0 based
@@ -75,7 +47,6 @@ class primer : public cigarotype{
   void set_indice(int16_t i);
   void set_read_count(uint32_t rc);
   void add_read_count(uint32_t rc);
-  void transform_mutations();
   bool operator==(const primer& p) const {
     return (indice == p.get_indice()) ? true : false;
   }
@@ -90,17 +61,10 @@ void print_primer_info(primer primers);
 void print_all_primer_info(std::vector<primer> primers);
 primer get_min_start(std::vector<primer> primers);
 primer get_max_end(std::vector<primer> primers);
-void add_cigarotype(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *seq, uint8_t *aux, std::string qname, uint8_t *quality, bool is_rev);
-std::vector<std::vector<uint32_t>> get_cigarotypes();
-std::vector<std::vector<uint8_t>> get_aux_tags();
-std::vector<std::vector<uint32_t>> get_qualities();   
-std::vector<std::vector<uint8_t>> get_sequences();   
-std::vector<uint32_t> get_count_cigarotypes();
 std::vector<uint32_t> get_nlengths();
 std::vector<uint32_t> get_start_positions();
 std::vector<bool> get_direction();
 std::vector<std::vector<std::string>> get_qnames();
-void transform_mutations();
 void set_positions(position pos);
 std::vector<position> get_positions();
 void populate_positions();

@@ -52,7 +52,6 @@ class IntervalTree {
   void amplicon_position_pop(ITNode *root);
   void print_amplicons(ITNode *root);
   void get_max_pos(ITNode *root);
-  void set_haplotypes(ITNode *root, primer prim);
   int unpaired_primers(ITNode *root, primer prim);
   void combine_haplotypes(ITNode *root);
   void write_out_frequencies(ITNode *root, std::string filename);
@@ -60,7 +59,7 @@ class IntervalTree {
   void detect_amplicon_overlaps(ITNode *root, uint32_t pos);
   void detect_primer_issues(ITNode *root, uint32_t pos);
   void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist);
-  void assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
+  void assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual);
   
   public:
   uint32_t max_pos=0;
@@ -77,27 +76,23 @@ class IntervalTree {
   void inOrder() { inOrder(_root); }
   void print_amplicons() {print_amplicons(_root);}
   void get_max_pos() {get_max_pos(_root);}
-  void set_haplotypes(primer prim) {set_haplotypes(_root, prim);}
   int unpaired_primers(primer prim) { return unpaired_primers(_root, prim);}
   void detect_abberations(uint32_t pos) {detect_abberations(_root, pos);}
   void detect_amplicon_overlaps(uint32_t pos) {detect_amplicon_overlaps(_root, pos);}
   void detect_primer_issues(uint32_t pos) {detect_primer_issues(_root, pos);}
   void combine_haplotypes() {combine_haplotypes(_root);}
   void write_out_frequencies(std::string filename){write_out_frequencies(_root, filename);}
-  void add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *sequence, uint8_t *aux, uint8_t *quality, std::string qname);
   void populate_variants(uint32_t last_position);
-  void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
+  void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual);
   void find_read_amplicon(uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist) {find_read_amplicon(_root, lower, upper, found, read_name, amp_start, amp_dist);}
-  void assign_read_amplicon(uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities) {assign_read_amplicon(_root, amp_start, positions, bases, qualities);}
+void assign_read_amplicon(uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual) {assign_read_amplicon(_root, amp_start, positions, bases, qualities, min_qual);}
   void amplicon_position_pop() {amplicon_position_pop(_root);}
 };
 
 void combine_haplotypes();
 void detect_abberations(ITNode *root, uint32_t find_position);
 void get_max_pos();
-void set_haplotypes(ITNode *root, primer prim);
-void add_read_variants(uint32_t *cigar, uint32_t start_pos, uint32_t nlength, uint8_t *sequence, uint8_t *aux, uint8_t *quality, std::string qname);
-void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
+void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual);
 void populate_variants(uint32_t last_position);
 int unpaired_primers(ITNode *root, primer prim);
 void detect_primer_issues(ITNode *root, uint32_t find_position);
@@ -105,6 +100,6 @@ void detect_amplicon_overlaps(ITNode *root, uint32_t find_position);
 void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist);
 IntervalTree populate_amplicons(std::string pair_info_file, std::vector<primer> &primers);
 IntervalTree amplicon_position_pop();
-void assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
+void assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual);
 void write_out_frequencies(ITNode *root, std::string filename);
 #endif

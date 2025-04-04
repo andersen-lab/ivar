@@ -9,7 +9,7 @@
 #include <tuple>
 using namespace std::chrono;
 
-void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, uint32_t total_ref_pos){
+void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, uint32_t total_ref_pos, uint8_t min_qual){
   uint32_t total_query_pos=0;
   const uint8_t* seq_field1 = bam_get_seq(read1);
   uint32_t *cigar1 = bam_get_cigar(read1);
@@ -28,16 +28,14 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
         qualities.push_back((uint32_t)qual[j]);
         counter++;
       }
-    }
-    if(op == 2){    
+    } else if(op == 2){    
       for(uint32_t j=0; j < len; j++){
         positions.push_back(total_ref_pos+counter);
         bases.push_back("-");
-        qualities.push_back((uint32_t)20);
+        qualities.push_back((uint32_t)min_qual);
         counter++;
       }
-    }
-    if(op == 1){
+    } else if(op == 1){
       for(uint32_t j=total_query_pos; j < total_query_pos+len; j++){
         char nuc = seq_nt16_str[bam_seqi(seq_field1, j)];
         std::string tmp = "+" + std::string(1, nuc);
@@ -47,7 +45,7 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
         counter++;
       }
     }
-
+ 
     //consumes ref
     if(bam_cigar_type(op) & 2){
       total_ref_pos += len;
@@ -84,15 +82,11 @@ uint32_t find_sequence_end(const bam1_t* read){
   return start;
 }
 
-void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplicons){
+void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplicons, uint8_t min_qual){
   //pass the forward first then reverse 
-  //underlying assumption here is that the overlap region is identical
   //also assumes that the forward read starts more "left" than  the reverse
   //std::cerr << "merging reads"<< std::endl;  
-  //get coordinates for potential overlap area
-  //uint32_t end_forward = find_sequence_end(read1);
-  uint32_t start_reverse = read2->core.pos;
- 
+  uint32_t start_reverse = read2->core.pos; 
   uint32_t start_forward = read1->core.pos;
   uint32_t end_reverse = find_sequence_end(read2);
   
@@ -106,8 +100,8 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
   std::vector<uint32_t> qualities2;
   
   //start of read, 
-  parse_cigar(read1, positions1, bases1, qualities1, start_forward);
-  parse_cigar(read2, positions2, bases2, qualities2, start_reverse);  
+  parse_cigar(read1, positions1, bases1, qualities1, start_forward, min_qual);
+  parse_cigar(read2, positions2, bases2, qualities2, start_reverse, min_qual);  
 
   //find all unique positions we need to cover
   std::unordered_set<uint32_t> unique_elements(positions1.begin(), positions1.end());
@@ -148,7 +142,7 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
       //check if the number of times the position occurs is the same
       uint32_t count1 = std::count(positions1.begin(), positions1.end(), pos);
       uint32_t count2 = std::count(positions2.begin(), positions2.end(), pos);
-      if(count1 != count2) continue;
+      if(count1 != count2){continue;}
    
       std::vector<uint32_t> tmp_pos2; 
       std::vector<std::string> tmp_base2; 
@@ -192,28 +186,16 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
     }
   }
 
-  //TESTLINES
-  uint32_t test_counter = 0;
-  for(uint32_t i=0; i < final_positions.size(); i++){
-    if(final_positions[i] == 16176){
-      test_counter ++;
-      //std::cerr << bam_get_qname(read1) << std::endl;
-      //std::cerr << final_positions[i] << " " << final_qualities[i] << " " << final_bases[i] << std::endl;
-    }
-  }
-  //exit(0);
-
   //find assigned amplicon and populate position vector
   bool found_amplicon = false;
-  //std::cerr << bam_get_qname(read1) << std::endl;
   uint32_t amp_dist = 429496729;
   uint32_t amp_start = 0;
+
   amplicons.find_read_amplicon(start_forward, end_reverse, found_amplicon, bam_get_qname(read1), amp_start, amp_dist);   
-  //std::cerr << found_amplicon << std::endl;
   if(!found_amplicon){
-    amplicons.add_read_variants(final_positions, final_bases, final_qualities);
+    amplicons.add_read_variants(final_positions, final_bases, final_qualities, min_qual);
   } else {
-    amplicons.assign_read_amplicon(amp_start, final_positions, final_bases, final_qualities);
+    amplicons.assign_read_amplicon(amp_start, final_positions, final_bases, final_qualities, min_qual);
   }
 }
 
@@ -256,10 +238,7 @@ float calculate_standard_deviation_weighted(std::vector<float> values, std::vect
 }
 
 //first main function call
-int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
-                             std::string cmd,
-                             std::string pair_info, int32_t primer_offset){
-  uint32_t depth_cutoff = 10;
+int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std::string cmd, std::string pair_info, int32_t primer_offset, uint32_t min_depth, uint8_t min_qual){
   bool calculate_amplicons = true; 
   bool development_mode = true;
   int retval = 0;
@@ -278,12 +257,12 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   // get coordinates of each amplicon
   IntervalTree amplicons;
   if (!pair_info.empty() && calculate_amplicons) {
-    amplicons = populate_amplicons(pair_info, primers);
-    std::cerr << "Amplicons detected: " << std::endl;
+    amplicons = populate_amplicons(pair_info, primers);    
     amplicons.inOrder();
     amplicons.get_max_pos();
     amplicons.amplicon_position_pop();
     std::cerr << "Maximum position " << amplicons.max_pos << std::endl;
+    if(amplicons.max_pos == 0) calculate_amplicons = false;
   } else{
     //std::cerr << "Exiting." << std::endl;
     //return -1;
@@ -343,11 +322,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     }
   }
 
-  char strand = '+';
-  uint32_t start_pos = -1;
-  uint32_t outside_amp = 0;
-  uint32_t lower_search=0;
-  uint32_t counter = 0;
 
   // Iterate through reads
   in = sam_open(bam.c_str(), "r");
@@ -378,12 +352,50 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
   // Iiterate through reads
   while (sam_read1(in, header, aln) >= 0) {
     //get the name of the read    
+    char strand = '+';
+    uint32_t start_pos = -1;
     std::string read_name = bam_get_qname(aln);
     //TESTLINES
-    //if(read_name != "A01535:8:HJ3YYDSX2:4:1147:23972:15421") continue;
-    //if(read_name != "A01535:8:HJ3YYDSX2:4:1108:10212:30326") continue;
-   
-    //std::cerr << read_name << std::endl;
+    /*if(read_name != "A01535:8:HJ3YYDSX2:4:1132:14615:29152") continue;
+    std::cerr << "isize " << aln->core.isize << std::endl;
+    std::cerr << "qlen " << aln->core.l_qseq << std::endl;
+    std::cerr << "mpos " << aln->core.mpos << std::endl;
+    std::cerr << "tid " << aln->core.tid << std::endl;
+    std::cerr << "mtid " << aln->core.mtid << std::endl;
+    std::cerr << "end pos " << bam_endpos(aln) << std::endl;
+    std::cerr << "pos " << aln->core.pos << std::endl;*/
+    /*if (aln->core.flag & BAM_FPAIRED){
+      std::cerr << "paired" << std::endl;
+    } else {
+      std::cerr << "not paired" << std::endl;
+    }
+    if (aln->core.flag & BAM_FMUNMAP){
+      std::cerr << "unmapped" << std::endl;
+    } else {
+      std::cerr << "mapped" << std::endl;
+    }
+    if ((aln->core.flag & BAM_FPROPER_PAIR) != 0){
+      std::cerr << "proper pair" << std::endl;
+    } else {
+      std::cerr << "not proper pair" << std::endl;
+    }
+    if ((aln->core.flag & BAM_FREAD1) != 0){
+      std::cerr << "read 1" << std::endl;
+    } else {
+      std::cerr << "not read 1" << std::endl;
+    }
+    if ((aln->core.flag & BAM_FDUP) != 0){
+      std::cerr << "pcr dup" << std::endl;
+    } else {
+      std::cerr << "no pcr dup" << std::endl;
+    }
+    if ((aln->core.flag & BAM_FSECONDARY) != 0){
+      std::cerr << "secondary alignment" << std::endl;
+    } else {
+      std::cerr << "no secondary alignment" << std::endl;
+    }*/
+
+    //std::cerr << read_name << " " << std::endl;
     strand = '+';  
     if (bam_is_rev(aln)) {
       start_pos = bam_endpos(aln) - 1;
@@ -406,32 +418,30 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     //get the sequence
     uint8_t *seq = bam_get_seq(aln);
     //get cigar for the read
-    uint32_t *cigar = bam_get_cigar(r); 
-    uint32_t nlength = r->core.n_cigar; 
     uint8_t *qualities = bam_get_qual(r);
     if(!calculate_amplicons){
-      amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln));
+      //TODO
+      //amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln), min_qual);
       continue;
     }
     if (!aln->core.flag & BAM_FPAIRED){
-      std::cerr << "not paired" << std::endl;
       //if the read is unpaired try to assign it to an amplicon anyways
       std::vector<uint32_t> positions;
       std::vector<std::string> bases;
       std::vector<uint32_t> qualities;
       uint32_t start_read = aln->core.pos;
       uint32_t end_read = find_sequence_end(aln);
-      parse_cigar(aln, positions, bases, qualities, start_read);
+      parse_cigar(aln, positions, bases, qualities, start_read, min_qual);
       bool found_amplicon = false;
       uint32_t amp_dist = 429496729;
       uint32_t amp_start = 0;
       amplicons.find_read_amplicon(start_read, end_read, found_amplicon, read_name, amp_start, amp_dist);   
       if(!found_amplicon){
-        amplicons.add_read_variants(positions, bases, qualities);
+        amplicons.add_read_variants(positions, bases, qualities, min_qual);
       } else{
-        amplicons.assign_read_amplicon(amp_start, positions, bases, qualities);
+        amplicons.assign_read_amplicon(amp_start, positions, bases, qualities, min_qual);
       }
-      std::cerr << read_name << std::endl;
+      //std::cerr << "not paired " << read_name << std::endl;
       continue;
     }
     auto it = read_map.find(read_name);
@@ -440,11 +450,10 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     if (it != read_map.end()) {
       bam1_t* mate = it->second;
       if (aln->core.flag & BAM_FREVERSE){
-        merge_reads(mate, aln, amplicons);
+        merge_reads(mate, aln, amplicons, min_qual);
       } else {
-        merge_reads(aln, mate, amplicons);
+        merge_reads(aln, mate, amplicons, min_qual);
       }
-      //exit(0);
       //clean the mate
       bam_destroy1(mate);
       read_map.erase(it);
@@ -452,88 +461,27 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       // Store the current read in the map
       read_map[read_name] = bam_dup1(aln);  // Duplicate the read to avoid overwriting
     }
-    continue;
-    
-    //TEST LINES
-    std::string test = bam_get_qname(aln);
-    //if(test != "covid19genome_200-29703_s15860_U_95F_8103_8244_1_141_2:0:0_1:0:0_7") continue;
-    if(start_pos < 12000 || start_pos > 14000) continue;
-    counter += 1;
-    overlapping_primers.clear();
-    if(strand == '+'){
-      if(start_pos >= 10){
-        lower_search = start_pos-10;
+  }
+  //for reads that aren't flagged as unmapped but are for some reason
+    for(auto it = read_map.begin(); it != read_map.end(); ++it){
+      std::string read_name = bam_get_qname(it->second);    
+      std::vector<uint32_t> positions;
+      std::vector<std::string> bases;
+      std::vector<uint32_t> qualities;
+      uint32_t start_read = it->second->core.pos;
+      uint32_t end_read = find_sequence_end(it->second);
+      parse_cigar(it->second, positions, bases, qualities, start_read, min_qual);
+      bool found_amplicon = false;
+      uint32_t amp_dist = 429496729;
+      uint32_t amp_start = 0;
+      amplicons.find_read_amplicon(start_read, end_read, found_amplicon, read_name, amp_start, amp_dist);   
+      if(!found_amplicon){
+        amplicons.add_read_variants(positions, bases, qualities, min_qual);
       } else{
-        lower_search = 0;
+        amplicons.assign_read_amplicon(amp_start, positions, bases, qualities, min_qual);
       }
-      for(uint32_t i=lower_search; i < start_pos+10; i++){
-        if (i > amplicons.max_pos) continue; 
-        if (primer_map_forward.find(i) != primer_map_forward.end()) {
-          overlapping_primers = primer_map_forward[i];
-        }
-        if (overlapping_primers.size() > 0) break;
-      }
-    }else{
-      if(start_pos >= 10){
-        lower_search = start_pos-10;
-      } else{
-        lower_search = 0;
-      }
-      for (uint32_t i=lower_search; i < start_pos+10; i++){
-        if (i > amplicons.max_pos) continue;
-        if (primer_map_reverse.find(i) != primer_map_reverse.end()){
-          overlapping_primers = primer_map_reverse[i];
-        }
-        if (overlapping_primers.size() > 0) break;
-      }
-    }
-    uint32_t ref_id = aln->core.tid;
-    std::string region = header->target_name[ref_id];
-        
-    //this handles the case of reads outside of an amplicon
-    if (overlapping_primers.size() == 0){
-      amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln));
-      outside_amp += 1;
-      continue;
-    }
-    for(uint32_t i=0; i < overlapping_primers.size(); i++){
-      uint32_t start = overlapping_primers[i].get_start();
-      uint32_t end = overlapping_primers[i].get_end();
-      bool cont = true;
-      for(uint32_t k =0; k < unpaired_primers.size(); k++){
-        if (unpaired_primers[k].get_start() == start && unpaired_primers[k].get_end() == end){
-          amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln));         
-          outside_amp += 1;
-          cont = false;
-          continue;
-        }
-      }
-      if(!cont){
-        continue;
-      }
-      //CHANGE can do this by index
-      for(uint32_t j=0; j < primers.size(); j++){
-        uint32_t pstart = primers[j].get_start();
-        uint32_t pend = primers[j].get_end(); 
-        if (start == pstart && end == pend){          
-          primers[j].add_cigarotype(cigar, aln->core.pos, nlength, seq, aux, bam_get_qname(aln), qualities, bam_is_rev(aln));
-        }
-      }
-    }
-    
   }
-  /*
-  std::cerr << "transforming primers" << std::endl;
-  //this is super time costly
-  for(uint32_t i=0; i < primers.size(); i++){
-    primers[i].populate_positions();
-    primers[i].transform_mutations();
-  }
-  std::cerr << "setting haplotypes" << std::endl;
-  for (uint32_t i=0; i < primers.size(); i++){
-    amplicons.set_haplotypes(primers[i]);      
-  }
-  */
+
   //TEST LINES
   if(development_mode){
     std::string amp_file = bam_out + "_all.txt";
@@ -543,24 +491,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
     amplicons.write_out_frequencies(amp_file);
   }
 
-  std::cerr << "test here " << amplicons.variants[16176].depth << std::endl;
-  std::cerr << "read map remaining " << read_map.size() << std::endl;
-  for(auto allele : amplicons.variants[16176].alleles){
-    std::cerr << allele.nuc << " " << allele.depth << std::endl;
-  }
-
   //combine amplicon counts to get total variants 
   amplicons.combine_haplotypes();
   //detect primer binding issues
   std::vector<position> variants = amplicons.variants;
 
-  std::cerr << "test here " << amplicons.variants[16176].depth << std::endl;
-  for(auto allele : amplicons.variants[16176].alleles){
-    std::cerr << allele.nuc << " " << allele.depth << std::endl;
-  }
-  //exit(0);
-
-  
   //add in primer info
   for(uint32_t i=0; i < variants.size(); i++){
     bool mutation = false;
@@ -606,7 +541,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       uint32_t total_depth = amplicons.test_flux[j].depth;
       for(auto pos : amplicons.test_flux[j].alleles){
         //remove things with crappy quality
-        if(pos.mean_qual < 20 && pos.nuc != "-"){
+        if(pos.mean_qual < min_qual && pos.nuc != "-"){
           total_depth -= pos.depth;
         }
         if(i == test_pos){
@@ -614,7 +549,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
         }
       }
 
-      if(total_depth < depth_cutoff){
+      if(total_depth < min_depth){
          continue;
       }
       if(i == test_pos){
@@ -623,7 +558,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out,
       amplicon_depths.push_back(total_depth);
       std::vector<allele> ad  = amplicons.test_flux[j].alleles;
       for(uint32_t k=0; k < ad.size(); k++){
-        if(ad[k].mean_qual < 20 && ad[k].nuc != "-") continue;
+        if(ad[k].mean_qual < min_qual && ad[k].nuc != "-") continue;
         std::string nuc = ad[k].nuc;
         uint32_t ad_depth = ad[k].depth;
         if(ad_depth == 0) continue;
