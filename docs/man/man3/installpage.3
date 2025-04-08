@@ -1,4 +1,4 @@
-.TH "installpage" 3 "Fri Feb 24 2023" "iVar" \" -*- nroff -*-
+.TH "installpage" 3 "iVar" \" -*- nroff -*-
 .ad l
 .nh
 .SH NAME
@@ -9,24 +9,24 @@ installpage \- Installation
 .SS "Dependencies"
 .PP
 .IP "\(bu" 2
-\fCHTSlib\fP
+\fRHTSlib\fP
 .IP "\(bu" 2
-\fCGCC\fP any version after v5\&.0\&. Support for c++11 standard required\&.
+\fRGCC\fP any version after v5\&.0\&. Support for c++11 standard required\&.
 .PP
 .PP
 Note:
 .IP "\(bu" 2
-It is highly recommended that \fCsamtools\fP also be installed alongside iVar\&. iVar uses the output of samtools mpileup to call variants and generate consensus sequences\&. In addition, samtools \fCsort\fP and \fCindex\fP commands are very useful to setup a pipeline using iVar\&.
+It is highly recommended that \fRsamtools\fP also be installed alongside iVar\&. iVar uses the output of samtools mpileup to call variants and generate consensus sequences\&. In addition, samtools \fRsort\fP and \fRindex\fP commands are very useful to setup a pipeline using iVar\&.
 .PP
 .SH "Installing via conda"
 .PP
-iVar is available on bioconda\&. To install conda, please use the \fCminiconda\fP package\&. After intalling conda please add the following channels,
+iVar is available on bioconda\&. To install conda, please use the \fRminiconda\fP package\&. After intalling conda please add the following channels,
 .PP
 .PP
 .nf
-conda config --add channels defaults
-conda config --add channels bioconda
-conda config --add channels conda-forge
+conda config \-\-add channels defaults
+conda config \-\-add channels bioconda
+conda config \-\-add channels conda\-forge
 .fi
 .PP
 .PP
@@ -38,7 +38,7 @@ conda install ivar
 .fi
 .PP
 .SS "Installing via homebrew"
-iVar can be installed using \fCHomebrew\fP\&.
+iVar can be installed using \fRHomebrew\fP\&.
 .PP
 .PP
 .nf
@@ -48,17 +48,17 @@ brew install brewsci/bio/ivar
 .SH "Installing on Mac"
 .PP
 .SS "Installing build tools"
-\fCXcode\fP from Apple is required to compile iVar (and other tools) from source\&. If you don't want to install the full Xcode package from the AppStore, you can install the Xcode command line tools,
+\fRXcode\fP from Apple is required to compile iVar (and other tools) from source\&. If you don't want to install the full Xcode package from the AppStore, you can install the Xcode command line tools,
 .PP
 .PP
 .nf
-xcode-select --install
+xcode\-select \-\-install
 .fi
 .PP
 .PP
-\fCGNU Autotools\fP is required to compile iVar from source\&.
+\fRGNU Autotools\fP is required to compile iVar from source\&.
 .PP
-To install Autotools using \fChomebrew\fP please use the command below,
+To install Autotools using \fRhomebrew\fP please use the command below,
 .PP
 .PP
 .nf
@@ -66,11 +66,11 @@ brew install autoconf automake libtool
 .fi
 .PP
 .SS "HTSlib installed using conda"
-HTSlib can be installed with \fCconda\fP using the command,
+HTSlib can be installed with \fRconda\fP using the command,
 .PP
 .PP
 .nf
-conda install -c bioconda htslib
+conda install \-c bioconda htslib
 .fi
 .PP
 .PP
@@ -115,12 +115,12 @@ make install
 .PP
 If HTSlib was installed using conda, please run the following commands by supplying the prefix to the bin folder of the conda binary\&.
 .PP
-The prefix to the bin folder can be found using the command \fCwhich conda\fP\&. The output of the command will be in this format - /opt/conda/bin/conda or /opt/anaconda2/bin/conda or /opt/anaconda3/bin/conda depending on whether you installed miniconda or anaconda\&. For example, if the output of the command is /opt/conda/bin/conda, the prefix to the htslib bin folder will be /opt/conda\&. This can be supplied to \&./configure --with-hts=/opt/conda\&.
+The prefix to the bin folder can be found using the command \fRwhich conda\fP\&. The output of the command will be in this format - /opt/conda/bin/conda or /opt/anaconda2/bin/conda or /opt/anaconda3/bin/conda depending on whether you installed miniconda or anaconda\&. For example, if the output of the command is /opt/conda/bin/conda, the prefix to the htslib bin folder will be /opt/conda\&. This can be supplied to \&./configure --with-hts=/opt/conda\&.
 .PP
 .PP
 .nf
 \&./autogen\&.sh
-\&./configure --with-hts=/prefix/to/bin/folder/with/HTSlib
+\&./configure \-\-with\-hts=/prefix/to/bin/folder/with/HTSlib
 make
 make install
 .fi
@@ -131,39 +131,39 @@ If HTSlib was installed in a non standard location, please run the following com
 .PP
 .nf
 \&./autogen\&.sh
-\&./configure --with-hts=/prefix/to/bin/folder/with/HTSlib
+\&./configure \-\-with\-hts=/prefix/to/bin/folder/with/HTSlib
 make
 make install
 .fi
 .PP
 .PP
-To test installation just run, \fCivar version\fP and you should get the following output,
+To test installation just run, \fRivar version\fP and you should get the following output,
 .PP
 .PP
 .nf
 iVar version 1\&.0
 
-Please raise issues and bug reports at https://github\&.com/andersen-lab/ivar/
+Please raise issues and bug reports at https://github\&.com/andersen\-lab/ivar/
 .fi
 .PP
 .SH "Installing on Linux"
 .PP
 .SS "Installing build tools"
-\fCGNU Autotools\fP is required to compile iVar from source\&.
+\fRGNU Autotools\fP is required to compile iVar from source\&.
 .PP
-To install Autotools using \fCAPT\fP please use the command below,
+To install Autotools using \fRAPT\fP please use the command below,
 .PP
 .PP
 .nf
-apt-get install autotools-dev
+apt\-get install autotools\-dev
 .fi
 .PP
 .SS "HTSlib installed using conda"
-HTSlib can be installed with \fCconda\fP using the command,
+HTSlib can be installed with \fRconda\fP using the command,
 .PP
 .PP
 .nf
-conda install -c bioconda htslib
+conda install \-c bioconda htslib
 .fi
 .PP
 .PP
@@ -208,12 +208,12 @@ make install
 .PP
 If HTSlib was installed using conda, please run the following commands by supplying the prefix to the bin folder of the conda binary\&.
 .PP
-The prefix to the bin folder can be found using the command \fCwhich conda\fP\&. The output of the command will be in this format - /opt/conda/bin/conda or /opt/anaconda2/bin/conda or /opt/anaconda3/bin/conda depending on whether you installed miniconda or anaconda\&. For example, if the output of the command is /opt/conda/bin/conda, the prefix to the htslib bin folder will be /opt/conda\&. This can be supplied to \&./configure --with-hts=/opt/conda\&.
+The prefix to the bin folder can be found using the command \fRwhich conda\fP\&. The output of the command will be in this format - /opt/conda/bin/conda or /opt/anaconda2/bin/conda or /opt/anaconda3/bin/conda depending on whether you installed miniconda or anaconda\&. For example, if the output of the command is /opt/conda/bin/conda, the prefix to the htslib bin folder will be /opt/conda\&. This can be supplied to \&./configure --with-hts=/opt/conda\&.
 .PP
 .PP
 .nf
 \&./autogen\&.sh
-\&./configure --with-hts=/prefix/to/bin/folder/with/HTSlib
+\&./configure \-\-with\-hts=/prefix/to/bin/folder/with/HTSlib
 make
 make install
 .fi
@@ -224,24 +224,24 @@ If HTSlib was installed in a non standard location, please run the following com
 .PP
 .nf
 \&./autogen\&.sh
-\&./configure --with-hts=/prefix/to/bin/folder/with/HTSlib
+\&./configure \-\-with\-hts=/prefix/to/bin/folder/with/HTSlib
 make
 make install
 .fi
 .PP
 .PP
-To test installation just run, \fCivar version\fP and you should get the following output,
+To test installation just run, \fRivar version\fP and you should get the following output,
 .PP
 .PP
 .nf
 iVar version 1\&.0
 
-Please raise issues and bug reports at https://github\&.com/andersen-lab/ivar/
+Please raise issues and bug reports at https://github\&.com/andersen\-lab/ivar/
 .fi
 .PP
 .SH "Running from Docker"
 .PP
-iVar can also be run via \fCDocker\fP\&. Pull the docker image from \fCDocker Hub\fP using the following command,
+iVar can also be run via \fRDocker\fP\&. Pull the docker image from \fRDocker Hub\fP using the following command,
 .PP
 .PP
 .nf
@@ -249,9 +249,9 @@ docker pull andersenlabapps/ivar
 .fi
 .PP
 .PP
-This docker image contains all the required dependencies to run iVar and the \fBpipelines\fP developed using iVar\&. You will have to attach a docker volume to get data into the docker container\&. Instructions to do so are in the \fCDocker docs\fP\&.
+This docker image contains all the required dependencies to run iVar and the \fBpipelines\fP developed using iVar\&. You will have to attach a docker volume to get data into the docker container\&. Instructions to do so are in the \fRDocker docs\fP\&.
 .PP
-\fCiVar on Docker Hub\fP
+\fRiVar on Docker Hub\fP
 .SH "Contact"
 .PP
 For bug reports please email gkarthik[at]scripps\&.edu or raise an issue on Github\&. 

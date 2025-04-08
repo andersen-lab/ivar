@@ -120,6 +120,7 @@ Input Options    Description
            -q    Minimum quality score threshold to count base (Default: 20)
            -t    Minimum frequency threshold(0 - 1) to call variants (Default: 0.03)
            -m    Minimum read depth to call variants (Default: 0)
+           -G    Count gaps towards depth. By default, gaps are not counted           
            -r    Reference file used for alignment. This is used to translate the nucleotide sequences and identify intra host single nucleotide variants
            -g    A GFF file in the GFF3 format can be supplied to specify coordinates of open reading frames (ORFs). In absence of GFF file, amino acid translation will not be done.
 
