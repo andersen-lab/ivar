@@ -959,10 +959,10 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
   uint32_t round_val = 4; 
 
   bool development_mode=true;
-  std::vector<float> error_rate = cluster_error(prefix, quality_threshold);
+  double error_rate = cluster_error(prefix, quality_threshold, depth_cutoff);
 
-  float lower_bound = error_rate[0]+0.001;
-  float upper_bound = error_rate[1]-0.001;
+  float lower_bound = 1-error_rate;
+  float upper_bound = error_rate;
   std::cerr << "lower " << lower_bound << " upper " << upper_bound << std::endl;
   std::vector<variant> base_variants;
   std::vector<uint32_t> deletion_positions = find_deletion_positions(prefix, depth_cutoff, lower_bound, upper_bound, round_val);

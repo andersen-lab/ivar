@@ -39,14 +39,13 @@ std::vector<std::vector<uint32_t>> determine_outlier_points(std::vector<double> 
     return(removal_points);
 }
 
-std::vector<float> cluster_error(std::string filename, double quality_threshold){
+double cluster_error(std::string filename, double quality_threshold, uint32_t depth_cutoff){
   /*
     Here we use clustering to determine the value of the noise.
   */
 
   float lower_bound = 0.50;
   float upper_bound = 0.99;
-  uint32_t depth_cutoff = 10;
   uint32_t round_val = 4;
   
   std::vector<uint32_t> deletion_positions = find_deletion_positions(filename, depth_cutoff, lower_bound, upper_bound, round_val);
@@ -77,7 +76,7 @@ std::vector<float> cluster_error(std::string filename, double quality_threshold)
     count_original += 1;
   }
 
-  uint32_t n = 2;
+  uint32_t n = 3;
   gaussian_mixture_model model = retrain_model(n, data_original, variants_original, 2, 0.00001);
   std::vector<double> means = model.means;
   
@@ -114,9 +113,5 @@ std::vector<float> cluster_error(std::string filename, double quality_threshold)
 
   //get the upper edge of the noise cluster
   auto min_it = std::min_element(cleaned_cluster.begin(), cleaned_cluster.end());
-  std::cerr << "min it " << *min_it << std::endl;
-  std::vector<float> tmp;
-  tmp.push_back(1-(*min_it));
-  tmp.push_back(*min_it);
-  return tmp;
+  return *min_it;
 }

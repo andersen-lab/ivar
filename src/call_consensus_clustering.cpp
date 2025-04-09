@@ -347,9 +347,9 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   float solution_error = 0.05;
   double quality_threshold = 20; 
 
-  std::vector<float> error_rate = cluster_error(variants_file, quality_threshold);
-  float freq_lower_bound = error_rate[0];
-  float freq_upper_bound = error_rate[1];
+  double error_rate = cluster_error(variants_file, quality_threshold, depth_cutoff);
+  float freq_lower_bound = 1-error_rate;
+  float freq_upper_bound = error_rate;
 
   //read in the cluster values
   std::vector<float> means = parse_clustering_results(clustering_file);

@@ -5,9 +5,7 @@
 #include <numeric>
 #include <unordered_map>
 #include <unordered_set>
-#include <chrono>
 #include <tuple>
-using namespace std::chrono;
 
 void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, uint32_t total_ref_pos, uint8_t min_qual){
   uint32_t total_query_pos=0;
