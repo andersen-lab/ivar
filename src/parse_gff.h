@@ -5,6 +5,7 @@
 #include <map>
 #include <regex>
 #include <sstream>
+#include <algorithm>
 
 #ifndef parse_gff
 #define parse_gff
@@ -51,6 +52,8 @@ class gff3_feature {
   int get_phase();
   std::map<std::string, std::string> get_attributes();
   std::string get_attribute(std::string key);
+  gff3_feature* get_previous();
+  gff3_feature* get_next();
 
   int set_seqid();
   int set_source();
@@ -62,6 +65,8 @@ class gff3_feature {
   int set_attributes(std::string attr);
   int64_t get_edit_position();
   std::string get_edit_sequence();
+  void set_previous(gff3_feature* prev);
+  void set_next(gff3_feature* next);
 
  private:
   std::string seqid, source, type;
@@ -70,6 +75,8 @@ class gff3_feature {
   float score;
   char strand;
   int phase;
+  gff3_feature* previous_feature;
+  gff3_feature* next_feature;
 };
 
 class gff3 {
@@ -82,6 +89,7 @@ class gff3 {
   std::vector<gff3_feature> query_features(uint64_t pos, std::string type);
   int get_count();
   bool empty();
+  void link_features();
 
  private:
   std::vector<gff3_feature> features;

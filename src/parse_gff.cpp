@@ -37,6 +37,9 @@ gff3_feature::gff3_feature(std::string line) {
     }
     ctr++;
   }
+  this->previous_feature = nullptr;
+  this->next_feature = nullptr;
+
   if (ctr < 9) std::cerr << "GFF file is not in GFF3 file format!" << std::endl;
   line_stream.clear();
 }
@@ -87,6 +90,9 @@ std::string gff3_feature::get_type() { return type; }
 
 char gff3_feature::get_strand() { return strand; }
 
+gff3_feature* gff3_feature::get_previous(){ return previous_feature; }
+gff3_feature* gff3_feature::get_next(){ return next_feature; }
+
 int64_t gff3_feature::get_edit_position() {
   int64_t edit_pos = -1;
   std::map<std::string, std::string>::iterator it;
@@ -109,6 +115,13 @@ std::string gff3_feature::get_edit_sequence() {
     }
   }
   return edit_seq;
+}
+
+void gff3_feature::set_previous(gff3_feature* prev){
+  this->previous_feature = prev;
+}
+void gff3_feature::set_next(gff3_feature* next){
+  this->next_feature = next;
 }
 
 int gff3::print() {
@@ -143,6 +156,7 @@ int gff3::read_file(std::string path) {
   }
   if(!features.empty()){
     this->is_empty = false;
+    this->link_features();
   } else {
     std::cerr << "GFF file is empty!" << std::endl;
   }
@@ -165,3 +179,37 @@ std::vector<gff3_feature> gff3::query_features(uint64_t pos, std::string type) {
 int gff3::get_count() { return features.size(); }
 
 bool gff3::empty() { return is_empty; }
+
+bool compare_gff_features(gff3_feature *a, gff3_feature *b) {
+  return a->get_start() < b->get_start();
+}
+
+void gff3::link_features() {
+  std::vector<gff3_feature>::iterator it;
+  std::vector<gff3_feature> res;
+  std::string id;
+
+  std::map<std::string, std::vector<gff3_feature*> > features_by_id;
+
+  for (it = features.begin(); it != features.end(); it++) {
+    id = it->get_attribute("ID");
+    if(!id.empty()){
+      features_by_id[id].push_back(&(*it));
+    }
+  }
+
+  for (std::map<std::string, std::vector<gff3_feature*> >::iterator it2 = features_by_id.begin(); it2 != features_by_id.end(); it2++) {
+    std::vector<gff3_feature*> &linked_features = it2-> second;
+
+    std::sort(linked_features.begin(), linked_features.end(), compare_gff_features);
+
+    for(size_t i = 0; i < linked_features.size(); i++){
+      if(i > 0)
+        linked_features[i]->set_previous(linked_features[i-1]);
+
+      if(i < linked_features.size() - 1) {
+        linked_features[i]->set_next(linked_features[i+1]);
+      }
+    }
+  }
+}

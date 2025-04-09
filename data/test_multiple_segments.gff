@@ -1,5 +1,5 @@
 ## GFF3 file format
 test	Genbank	primer_binding_site	2	290	.	+	.	ID=id-test1;Note=daft punk;Parent=geneFragmentsOfTime;
 test	Genbank	long_terminal_repeat	1	55	.	+	.	ID=id-test2;Note=random access memories;Parent=geneGetLucky;
-test	Genbank	CDS	1	30	.	+	.	ID=test1;Note=seg-1;gene=geneTroyeSivan;
-test	Genbank	CDS	203	238	.	+	.	ID=test1;Note=seg-2;gene=geneTroyeSivan;
+test	Genbank	CDS	1	26	.	+	.	ID=test1;Note=seg-1;gene=geneJason;Parent=geneJohn;
+test	Genbank	CDS	203	238	.	+	.	ID=test1;Note=seg-2;gene=geneJason;Parent=geneJohn;
