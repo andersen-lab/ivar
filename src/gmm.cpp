@@ -213,70 +213,32 @@ kmeans_model train_model(uint32_t n, arma::mat data) {
 
 //function used for production
 gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> variants, uint32_t lower_n, double var_floor){
-
+  double initial_covariance = 0.005;
   gaussian_mixture_model gmodel; 
   gmodel.n = n;
-
-  arma::mat centroids;
   arma::mat initial_means(1, n, arma::fill::zeros);
 
   arma::mat cov (1, n, arma::fill::zeros);
   std::vector<double> total_distances;
   std::vector<std::vector<double>> all_centroids;
+  
+  //run a kmeans to seed the GMM
+  kmeans_model initial_model = train_model(n, data);
  
-  for(uint32_t j=0; j < 15; j++){
-    //std::cerr << "iteration j " << j << std::endl;
-    bool status2 = arma::kmeans(centroids, data, n, arma::random_spread, 10, false);
-    if(!status2) continue;
-    double total_dist = 0;
-    std::vector<std::vector<double>> clusters(n);
-    for(auto point : data){
-      //using std::min_element to find the closest element
-      auto closest_it = std::min_element(centroids.begin(), centroids.end(),
-        [point](double a, double b) {
-            return std::abs(a - point) < std::abs(b - point);
-        });
-
-       uint32_t index = std::distance(centroids.begin(), closest_it);
-       //std::cerr << point << " " << centroids[index] << std::endl;
-       clusters[index].push_back(point);  
-       total_dist += std::abs(point-centroids[index]);
-    }  
-    std::vector<double> tmp;
-    for(auto c : centroids){
-      //std::cerr << c << " ";
-      tmp.push_back((double)c);
-    }
-    //std::cerr << "\n";
-    all_centroids.push_back(tmp);
-    //std::cerr << total_dist << std::endl;
-    total_distances.push_back(total_dist);
+  for(uint32_t c=0; c < initial_model.means.size(); c++){
+    initial_means.col(c) = (double)initial_model.means[c];
+    cov.col(c) = initial_covariance;
+    //std::cerr << initial_model.means[c] << std::endl;
   }
   
-  uint32_t i=0;
-  auto min_it = std::min_element(total_distances.begin(), total_distances.end());
-  uint32_t index = std::distance(total_distances.begin(), min_it);
-  std::vector<double> centroid_vec = all_centroids[index];
-  
-  for(uint32_t c=0; c < centroid_vec.size(); c++){
-    initial_means.col(i) = (double)centroid_vec[c];
-    std::cerr << "initial k means " << centroid_vec[c] << std::endl;
-    cov.col(i) = 0.005;
-    ++i;
-  }
-  //original had this a 0.001, then 0.8, then 0.01
   arma::gmm_diag model;
   model.reset(1, n);
   model.set_means(initial_means);
   model.set_dcovs(cov);
   bool status = model.learn(data, n, arma::eucl_dist, arma::keep_existing, 1, 10, var_floor, false);
   if(!status){
-    std::cerr << "model failed to converge" << std::endl;
-  }
-  uint32_t c = 0;
-  for(auto m : model.means){
-    std::cerr << "retrain means " << m << std::endl;
-    c++;
+    std::cerr << "GMM failed to converge" << std::endl;
+    exit(1);
   }
   std::vector<double> means;
   std::vector<double> hefts;
@@ -303,24 +265,11 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
     prob_matrix.push_back(tmp);
   }
 
-    // Compute Log-Likelihood
-    arma::rowvec log_probs = model.log_p(data);
-    double log_likelihood = arma::accu(log_probs);
-
-    // Compute number of parameters (k)
-    int d = data.n_rows; // Number of dimensions (features)
-    int k = n * (d + d * d); // Number of estimated parameters
-
-    // Compute AIC
-    double AIC = 2 * k - 2 * log_likelihood;
-
-
   gmodel.dcovs = dcovs;
   gmodel.prob_matrix = prob_matrix;
   gmodel.means = means;
   gmodel.hefts = hefts;
   gmodel.model = model;
-  gmodel.aic = AIC;
   return(gmodel);
 }
 
@@ -849,7 +798,7 @@ std::vector<uint32_t> find_deletion_positions(std::string filename, uint32_t dep
   return(deletion_positions);
 }
 
-void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions, uint32_t round_val, double quality_threshold){
+void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions, uint32_t round_val, uint8_t quality_threshold){
   /*
    * Parses the variants file produced internally by reading bam file line-by-line.
    */
@@ -952,44 +901,37 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
   } 
 }
 
-std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
+std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual){
   uint32_t n=8;
-  uint32_t depth_cutoff = 10;
-  float quality_threshold = 20;
   uint32_t round_val = 4; 
-
   bool development_mode=true;
-  double error_rate = cluster_error(prefix, quality_threshold, depth_cutoff);
-
-  float lower_bound = 1-error_rate;
-  float upper_bound = error_rate;
+  double error_rate = cluster_error(prefix, min_qual, min_depth);
+  //add these adjusters because of rounding errors
+  float lower_bound = 1-error_rate+0.0001;
+  float upper_bound = error_rate-0.0001;
   std::cerr << "lower " << lower_bound << " upper " << upper_bound << std::endl;
   std::vector<variant> base_variants;
-  std::vector<uint32_t> deletion_positions = find_deletion_positions(prefix, depth_cutoff, lower_bound, upper_bound, round_val);
+  std::vector<uint32_t> deletion_positions = find_deletion_positions(prefix, min_depth, lower_bound, upper_bound, round_val);
   
-  parse_internal_variants(prefix, base_variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, round_val, quality_threshold);
+  parse_internal_variants(prefix, base_variants, min_depth, lower_bound, upper_bound, deletion_positions, round_val, min_qual);
   
   //if ivar 1.0 is in use, calculate the frequency of the reference
   if(base_variants[0].version_1_var){
-    calculate_reference_frequency(base_variants, prefix, depth_cutoff, lower_bound, upper_bound, deletion_positions);
+    calculate_reference_frequency(base_variants, prefix, min_depth, lower_bound, upper_bound, deletion_positions);
   }
   std::string filename = prefix + ".txt";
 
   //this whole things needs to be reconfigured
   uint32_t useful_var=0;
-  std::vector<double> all_var;
   std::vector<variant> variants;
   std::vector<uint32_t> count_pos;
 
   for(uint32_t i=0; i < base_variants.size(); i++){
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].del_flag && !base_variants[i].amplicon_masked && !base_variants[i].primer_masked){
+    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && !base_variants[i].primer_masked){
       useful_var++;
       variants.push_back(base_variants[i]);
-      //all_var.push_back(base_variants[i].freq);   
-      //TESTLINES 
-      all_var.push_back(base_variants[i].gapped_freq);
       count_pos.push_back(base_variants[i].position);
-      std::cerr << base_variants[i].freq << " " << base_variants[i].position << " " << base_variants[i].nuc << " " << base_variants[i].depth << " " << base_variants[i].gapped_freq << std::endl;
+      //std::cerr << base_variants[i].freq << " " << base_variants[i].position << " " << base_variants[i].nuc << " " << base_variants[i].depth << " " << base_variants[i].gapped_freq << std::endl;
     }
   }
   std::cerr << "useful var " << useful_var << std::endl;
@@ -1005,9 +947,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
   //(rows, cols) where each columns is a sample  
   uint32_t count=0;
   for(uint32_t i = 0; i < variants.size(); i++){   
-    //check if variant should be filtered for first pass model
-    //double tmp = static_cast<double>(variants[i].freq);
-    //TESTLINES
     double tmp = static_cast<double>(variants[i].gapped_freq);
     data.col(count) = tmp;
     count += 1;
@@ -1063,9 +1002,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
       std::cerr << "\n";
       tmp_mads.push_back(mad);
       float ratio = (float)useful_var / (float) n; //originally data.size()
-      /*for(auto d : data){
-        std::cerr << d << std::endl;
-      }*/
       std::cerr << "mean " << mean << " mad " << mad << " cluster size " << data.size() << " ratio " << ratio << std::endl;
       if(data.size() > 5){
         if(mad <= 0.10){
@@ -1146,9 +1082,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix){
   //look at all variants despite other parameters
   base_variants.clear();
   variants.clear();
-  parse_internal_variants(prefix, base_variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, round_val, quality_threshold);
+  parse_internal_variants(prefix, base_variants, min_depth, lower_bound, upper_bound, deletion_positions, round_val, min_qual);
   if(base_variants[0].version_1_var){
-    calculate_reference_frequency(base_variants, prefix, depth_cutoff, lower_bound, upper_bound, deletion_positions);
+    calculate_reference_frequency(base_variants, prefix, min_depth, lower_bound, upper_bound, deletion_positions);
   }
   if(!variants[0].version_1_var){ 
     calculate_gapped_frequency(base_variants, upper_bound, lower_bound);
