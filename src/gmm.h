@@ -50,8 +50,8 @@ struct variant {
 
 };
 void split(const std::string &s, char delim, std::vector<std::string> &elems);
-std::vector<variant> gmm_model(std::string prefix, std::string output_prefix);
-void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions, uint32_t round_val, double quality_threshold);
+std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual);
+void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions, uint32_t round_val, uint8_t quality_threshold);
 std::vector<uint32_t> find_deletion_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, uint32_t round_val);
 std::vector<uint32_t> find_low_quality_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, float quality_threshold, uint32_t round_val);
 std::vector<std::vector<double>> solve_possible_solutions(std::vector<float> tmp_means, double error);
