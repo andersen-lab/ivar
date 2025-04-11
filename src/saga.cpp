@@ -191,6 +191,9 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
 
   amplicons.find_read_amplicon(start_forward, end_reverse, found_amplicon, bam_get_qname(read1), amp_start, amp_dist);   
   if(!found_amplicon){
+    if(start_forward < 23063 && end_reverse > 23063){
+    std::cerr << start_forward << " " << end_reverse << " " << bam_get_qname(read1) << " " << bam_get_qname(read2) << std::endl;
+    }
     amplicons.add_read_variants(final_positions, final_bases, final_qualities, min_qual);
   } else {
     amplicons.assign_read_amplicon(amp_start, final_positions, final_bases, final_qualities, min_qual);
@@ -402,6 +405,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       start_pos = aln->core.pos;
     }
     //TEST LINES
+    if(start_pos < 22063 || start_pos > 24063) continue;
     //if(start_pos < 15176 || start_pos > 17176) continue;
     bam1_t *r = aln;
     //get the md tag
@@ -519,7 +523,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   std::vector<uint32_t> flagged_positions; 
   std::vector<float> std_deviations;
   std::vector<std::string> pos_nuc;
-  uint32_t test_pos = 0;
+  uint32_t test_pos = 23064;
   //detect fluctuating variants across amplicons
   for(uint32_t i=0; i < amplicons.max_pos; i++){
     amplicons.test_flux.clear();

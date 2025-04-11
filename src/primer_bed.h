@@ -20,14 +20,10 @@ class primer {
   int16_t pair_indice;
   int16_t indice;
   uint32_t read_count = 0;
-  std::vector<position> positions; //allele counts for this primer
 
  public:
-  uint32_t hardcoded_length=300; //CHANGE
   std::string get_name();
   std::string get_region();
-  std::vector<position> get_positions();
-  void set_positions(position pos);
   int get_score();
   uint32_t get_start() const;
   uint32_t get_end() const;
@@ -36,7 +32,6 @@ class primer {
   int16_t get_pair_indice();
   int16_t get_indice() const;
   uint32_t get_read_count() const;
-  void populate_positions();
   void set_start(uint32_t s);
   void set_end(uint32_t e);
   void set_strand(char s);
@@ -64,8 +59,4 @@ primer get_max_end(std::vector<primer> primers);
 std::vector<uint32_t> get_nlengths();
 std::vector<uint32_t> get_start_positions();
 std::vector<bool> get_direction();
-std::vector<std::vector<std::string>> get_qnames();
-void set_positions(position pos);
-std::vector<position> get_positions();
-void populate_positions();
 #endif

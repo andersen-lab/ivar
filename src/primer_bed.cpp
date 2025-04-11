@@ -1,16 +1,11 @@
 #include "primer_bed.h"
 #include "allele_functions.h"
 #include "ref_seq.h"
-#include <chrono>
 std::string primer::get_name() { return name; }
 
 std::string primer::get_region() { return region; }
 
 int primer::get_score() { return score; }
-
-std::vector<position> primer::get_positions() { return positions; }
-
-void primer::set_positions(position pos) { positions.push_back(pos); }
 
 uint32_t primer::get_start() const { return start; }
 
@@ -73,22 +68,6 @@ float weighted_similarity(std::string string_1, std::string string_2){
 
   // Normalize the score to be between 0 and 1
   return similarity_score / total_weight;
-}
-
-void primer::populate_positions(){
-  for(uint32_t i=0; i < this->hardcoded_length; i++){
-    position tmp;
-    tmp.alleles = populate_basic_alleles();
-    if(this->get_strand() == '+'){
-      tmp.pos = i + this->get_start();
-    } else {
-      if(this->get_end() > i){
-        break;
-      }
-      tmp.pos = this->get_end() - i;
-    }
-    positions.push_back(tmp);
-  }
 }
 
 std::vector<primer> populate_from_file(std::string path, int32_t offset = 0) {

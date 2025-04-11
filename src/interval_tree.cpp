@@ -138,8 +138,6 @@ void IntervalTree::detect_primer_issues(ITNode *root, uint32_t find_position){
 
 void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
   if (root==NULL) return;
-  //unsure why this line is wrogn, but it is
-  //if (find_position < (uint32_t)root->data->low) return;
     for(uint32_t i=0; i < root->amp_positions.size(); i++){
       if(find_position == root->amp_positions[i].pos){
         test_flux.push_back(root->amp_positions[i]);

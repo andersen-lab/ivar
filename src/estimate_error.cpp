@@ -2,6 +2,13 @@
 #include "gmm.h"
 #include "saga.h"
 
+std::vector<std::vector<double>> assign_nearest_cluster(){
+  /*
+    Given a set of means and variants assign each variant to the nearest cluster.
+  */
+  
+}
+
 std::vector<double> z_score(std::vector<double> data) {
     double mean = std::accumulate(data.begin(), data.end(), 0.0) / data.size();
     double sq_sum = std::inner_product(data.begin(), data.end(), data.begin(), 0.0);
@@ -39,7 +46,7 @@ std::vector<std::vector<uint32_t>> determine_outlier_points(std::vector<double> 
     return(removal_points);
 }
 
-double cluster_error(std::string filename, double quality_threshold, uint32_t depth_cutoff){
+double cluster_error(std::string filename, uint8_t quality_threshold, uint32_t depth_cutoff){
   /*
     Here we use clustering to determine the value of the noise.
   */
@@ -76,32 +83,42 @@ double cluster_error(std::string filename, double quality_threshold, uint32_t de
     count_original += 1;
   }
 
-  uint32_t n = 3;
-  gaussian_mixture_model model = retrain_model(n, data_original, variants_original, 2, 0.00001);
-  std::vector<double> means = model.means;
-  
-  //for each cluster this describes the points which are outliers
-  std::vector<std::vector<uint32_t>> removal_points = determine_outlier_points(frequencies, means);
-  std::vector<std::vector<double>> clusters(n);
+  //start with a small n value and if we don't find two major clusters we increase the number of clusters
+  uint32_t n = 2;
+  kmeans_model model;
 
-  for(auto var : variants_original){
-    double tmp = (double)var.gapped_freq;
-    auto it = std::min_element(means.begin(), means.end(), 
-        [tmp](double a, double b) {
-            return std::fabs(a - tmp) < std::fabs(b - tmp);
-        });
-    uint32_t index = std::distance(means.begin(), it);
-    clusters[index].push_back(var.gapped_freq);
+  while(n <= 5){
+    model = train_model(n, data_original);
+    for(auto m : model.means){
+      std::cerr << m << std::endl;
+    }
+    std::vector<double> means = model.means;
+    bool stop=true;
+    for(uint32_t i=0; i < model.clusters.size(); i++){
+      float percent = (float)model.clusters[i].size() / (float)data_original.size();
+      if(percent > 0.85) {
+        n++;
+        stop = false;
+      }
+      std::cerr << "n " << n << " percent " << percent << std::endl;
+    }
+    if(stop) break;
   }
+  //for each cluster this describes the points which are outliers
+  std::vector<std::vector<uint32_t>> removal_points = determine_outlier_points(frequencies, model.means);
+
   uint32_t j = 0;
   uint32_t largest=0;
-  for(uint32_t i=0; i < clusters.size(); i++){
-    if(clusters[i].size() > largest){
+  for(uint32_t i=0; i < model.clusters.size(); i++){
+    //std::cerr << "percent " << (float)model.clusters[i].size() / (float)data_original.size() << std::endl;
+    double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
+    //std::cerr << "mean " << mean << std::endl;
+    if(model.clusters[i].size() > largest){
       j = i;
-      largest = clusters[i].size();
+      largest = model.clusters[i].size();
     }
   }
-  std::vector<double> universal_cluster = clusters[j];
+  std::vector<double> universal_cluster = model.clusters[j];
   std::vector<uint32_t> outliers = removal_points[j];
   std::vector<double> cleaned_cluster;
   for(uint32_t i=0; i < universal_cluster.size(); i++){
@@ -113,5 +130,7 @@ double cluster_error(std::string filename, double quality_threshold, uint32_t de
 
   //get the upper edge of the noise cluster
   auto min_it = std::min_element(cleaned_cluster.begin(), cleaned_cluster.end());
-  return *min_it;
+  std::cerr << *min_it << std::endl;
+  //exit(0);
+  return(*min_it);
 }

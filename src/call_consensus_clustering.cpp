@@ -209,9 +209,6 @@ std::vector<std::vector<float>> find_solutions(std::vector<float> means, float e
   std::sort(results.begin(), results.end());
   results.erase(std::unique(results.begin(), results.end()), results.end());
 
-  auto max_iter = std::max_element(means.begin(), means.end());
-  auto min_iter = std::min_element(means.begin(), means.end());
-
   std::vector<std::vector<float>> final_results;
   //constrain that the solutions must add to 1
   for(uint32_t i=0; i < results.size(); i++){
@@ -341,13 +338,11 @@ std::vector<float> parse_clustering_results(std::string clustering_file){
   }  
   return(numbers);
 }
-void cluster_consensus(std::vector<variant> variants, std::string clustering_file, std::string variants_file, double default_threshold){ 
-  float depth_cutoff = 10; 
+void cluster_consensus(std::vector<variant> variants, std::string clustering_file, std::string variants_file, double default_threshold, uint32_t min_depth, uint8_t min_qual){ 
   double error = 0.10; 
-  float solution_error = 0.05;
-  double quality_threshold = 20; 
+  float solution_error = 0.10;
 
-  double error_rate = cluster_error(variants_file, quality_threshold, depth_cutoff);
+  double error_rate = cluster_error(variants_file, min_qual, min_depth);
   float freq_lower_bound = 1-error_rate;
   float freq_upper_bound = error_rate;
 
@@ -504,7 +499,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     //TESTLINES
     if(variants[i].nuc.find('+') != std::string::npos) continue;
     //TESTLINES
-    if(variants[i].position == 13572){
+    if(variants[i].position == 22029){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " del pos " << variants[i].pos_del_flag << " depth flag " << variants[i].depth_flag << std::endl;
@@ -628,7 +623,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     auto it = std::find(solution.begin(), solution.end(), tmp_mean);
     if(it == solution.end()) continue;
     file << ">"+clustering_file+"_cluster_"+ std::to_string(means[i]) << "\n";
-    std::cerr << all_sequences[i][13571] << std::endl;
     file << all_sequences[i] << "\n";
   }
   file.close(); 
