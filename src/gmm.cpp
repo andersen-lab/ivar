@@ -96,21 +96,6 @@ double calculate_median(std::vector<double> &data) {
     }
 }
 
-void calculate_gapped_frequency(std::vector<variant> &variants, double universal_cluster, double noise_cluster){
-  for(uint32_t i=0; i < variants.size(); i++){
-      double total_depth = 0;
-      for(uint32_t j=0; j < variants.size(); j++){
-        if(variants[i].position == variants[j].position){
-          total_depth += variants[j].depth;
-        }
-      }
-      variants[i].gapped_freq = variants[i].depth / total_depth;
-      if(variants[i].gapped_freq > universal_cluster || variants[i].gapped_freq < noise_cluster){
-        variants[i].gap_outside_freq_range = true;
-      }
-  }
-}
-
 uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
     std::unordered_map<uint32_t, uint32_t> frequency_map;
     uint32_t max_count = 0;
@@ -263,55 +248,6 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
   gmodel.means = means;
   gmodel.hefts = hefts;
   gmodel.model = model;
-  return(gmodel);
-}
-
-gaussian_mixture_model retrain_model_seeded(uint32_t n, arma::mat data, std::vector<variant> variants, uint32_t lower_n, std::vector<double> centroids){
-  gaussian_mixture_model gmodel; 
-  gmodel.n = n;
-
-  arma::mat initial_means(1, n, arma::fill::zeros);
-  arma::mat cov (1, n, arma::fill::zeros);
-
-  for(uint32_t i=0; i < centroids.size(); i++){
-    initial_means.col(i) = centroids[i];
-    cov.col(i) = 0.0001;
-  } 
-
-  double var_floor = 0.0001;
-  arma::gmm_diag model;
-  model.reset(1, n);
-  model.set_means(initial_means);
-  model.set_dcovs(cov);
-
-  bool status = model.learn(data, n, arma::eucl_dist, arma::keep_existing, 1, 10, var_floor, false);
-  if(!status){
-    std::cerr << "model failed to converge" << std::endl;
-  }
-
-  std::vector<std::vector<double>> prob_matrix;
-  std::vector<double> tmp;
-  for(uint32_t i=0; i < n; i++){
-    arma::rowvec set_likelihood = model.log_p(data, i);
-    tmp.clear();
-    for(uint32_t j=0; j < data.n_cols; j++){
-      tmp.push_back((double)set_likelihood[j]);
-    }
-    prob_matrix.push_back(tmp);
-  }
-
-  std::vector<double> means;
-  for(uint32_t i=0; i < model.means.size(); i++){
-    double m = (double)model.means[i];
-    std::cerr << m << " " << model.hefts[i] << std::endl;
-    double factor = std::pow(10.0, 2);
-    double rounded = std::round(m * factor) / factor;
-    means.push_back(rounded);
-  }
-  gmodel.prob_matrix = prob_matrix;
-  gmodel.means = means;
-  gmodel.model = model;
-
   return(gmodel);
 }
 
@@ -1012,23 +948,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     retrained = retrain_model(optimal_n, data, variants, lower_n, 0.001);
     assign_clusters(variants, retrained, lower_n);
   }
-  std::vector<double> centroids;
-  std::vector<std::vector<double>> c_clusters(optimal_n);
-  for(auto var : variants){
-    int cluster = var.cluster_assigned;
-    //TEST LINES
-    c_clusters[cluster].push_back(var.gapped_freq);
-  }
-  for(auto data : c_clusters){
-    double mean = calculate_mean(data);
-    centroids.push_back(mean);
-  }
-  //retrained = retrain_model_seeded(optimal_n, data, variants, lower_n, centroids);
-  //assign_clusters(variants, retrained, lower_n);
+
+  //calculate cluster means
+  //TODO this can be put in function
   std::vector<std::vector<double>> clusters(optimal_n);
   for(auto var : variants){
     int cluster = var.cluster_assigned;
-    //TEST LINES
     clusters[cluster].push_back(var.gapped_freq);
   }
   std::vector<double> final_means; 
@@ -1062,12 +987,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   if(base_variants[0].version_1_var){
     calculate_reference_frequency(base_variants, prefix, min_depth, lower_bound, upper_bound);
   }
-  if(!variants[0].version_1_var){ 
-    calculate_gapped_frequency(base_variants, upper_bound, lower_bound);
-  }
-  
+ 
   for(uint32_t i=0; i < base_variants.size(); i++){
-    if(!base_variants[i].gap_outside_freq_range){
+    if(!base_variants[i].outside_freq_range){
       useful_var += 1;
       variants.push_back(base_variants[i]);
     }

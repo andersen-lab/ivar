@@ -44,19 +44,15 @@ struct variant {
   bool primer_masked=false; //mutation in primer binding region of overlapped amplicon
   bool depth_flag=false; //depth is below the threshold                  
   bool low_prob_flag=false;
-  bool del_flag=false;
-  bool pos_del_flag=false;
   bool qual_flag=false;
   bool outside_freq_range=false; //outside of useful frequency range for model                 
-  bool gap_outside_freq_range=false;
   bool cluster_outlier=false; //is an outlier for the cluster assigned
   std::vector<double> probabilities;
 
 };
 void split(const std::string &s, char delim, std::vector<std::string> &elems);
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual);
-void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions, uint32_t round_val, uint8_t quality_threshold);
-std::vector<uint32_t> find_deletion_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, uint32_t round_val);
+void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, uint32_t round_val, uint8_t quality_threshold);
 std::vector<uint32_t> find_low_quality_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, float quality_threshold, uint32_t round_val);
 std::vector<std::vector<double>> solve_possible_solutions(std::vector<float> tmp_means, double error);
 uint32_t smallest_value_index(std::vector<double> values);
@@ -65,6 +61,6 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
 gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> variants, uint32_t lower_n, double var_floor);
 void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, uint32_t lower_n);
 double calculate_mean(const std::vector<double>& data);
-void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions);
+void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound);
 kmeans_model train_model(uint32_t n, arma::mat data);
 #endif
