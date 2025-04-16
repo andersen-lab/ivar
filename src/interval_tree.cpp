@@ -110,6 +110,17 @@ void IntervalTree::amplicon_position_pop(ITNode *root){
   amplicon_position_pop(root->right); 
 }
 
+void IntervalTree::detect_position_amplicons(ITNode *root, uint32_t find_position, uint32_t &counter, std::vector<uint32_t> &overlaps){
+  if (root==NULL) return;
+  //if (find_position < (uint32_t)root->data->low) return;
+  if(((uint32_t)root->data->low < find_position) && (find_position < (uint32_t)root->data->high)){
+    overlaps.push_back(counter);
+  }
+  counter += 1;
+  detect_position_amplicons(root->right, find_position, counter, overlaps);
+}
+
+
 void IntervalTree::detect_amplicon_overlaps(ITNode *root, uint32_t find_position){
   if (root==NULL) return;
   if (find_position < (uint32_t)root->data->low) return;

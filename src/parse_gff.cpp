@@ -37,18 +37,18 @@ gff3_feature::gff3_feature(std::string line) {
     }
     ctr++;
   }
-  if (ctr < 9) std::cout << "GFF file is not in GFF3 file format!" << std::endl;
+  if (ctr < 9) std::cerr << "GFF file is not in GFF3 file format!" << std::endl;
   line_stream.clear();
 }
 
 int gff3_feature::print() {
-  std::cout << seqid << "\t" << source << "\t" << type << "\t" << start << "\t"
+  std::cerr << seqid << "\t" << source << "\t" << type << "\t" << start << "\t"
             << end << "\t" << score << "\t" << strand << "\t" << phase << "\t";
   std::map<std::string, std::string>::iterator it;
   for (it = attributes.begin(); it != attributes.end(); it++) {
-    std::cout << it->first << ": " << it->second << "; ";
+    std::cerr << it->first << ": " << it->second << "; ";
   }
-  std::cout << std::endl;
+  std::cerr << std::endl;
   return 0;
 }
 
@@ -84,6 +84,8 @@ uint64_t gff3_feature::get_end() { return end; }
 int gff3_feature::get_phase() { return phase; }
 
 std::string gff3_feature::get_type() { return type; }
+
+char gff3_feature::get_strand() { return strand; }
 
 int64_t gff3_feature::get_edit_position() {
   int64_t edit_pos = -1;
@@ -129,16 +131,22 @@ gff3::gff3(std::string path) {
 int gff3::read_file(std::string path) {
   std::ifstream fin = std::ifstream(path);
   if (!fin) {
-    std::cout << "GFF file does not exist at " << path << std::endl;
+    std::cerr << "GFF file does not exist at " << path << std::endl;
     return -1;
   }
   std::string line;
   while (std::getline(fin, line)) {
     if (line[0] == '#')  // Avoid comments in GFF file
       continue;
-    features.push_back(gff3_feature(line));
+    if(!line.empty())
+      features.push_back(gff3_feature(line));
   }
-  this->is_empty = false;
+  if(!features.empty()){
+    this->is_empty = false;
+  } else {
+    std::cerr << "GFF file is empty!" << std::endl;
+  }
+
   return 0;
 }
 

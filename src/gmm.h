@@ -32,6 +32,10 @@ struct variant {
   int cluster_assigned = -1;
   bool version_1_var=false;  
   float std_dev;
+  //number corresponding the the amplicons covering this position
+  std::vector<uint32_t> amplicon_numbers;
+  //frequencies of this variants on each amplicon
+  std::vector<double> freq_numbers;
 
   //for these true means flagged as problematic
   bool vague_assignment=false; //cannot be distinguished between two groups

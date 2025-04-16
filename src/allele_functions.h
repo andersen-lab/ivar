@@ -32,6 +32,7 @@ class position {
     void update_alleles(std::string nt, uint32_t count, uint32_t qual);
     bool flux;
     bool in_primer=false;
+    std::string amplicon_numbers="0";
 };
 
 int check_position_exists(uint32_t p, std::vector<position> positions);

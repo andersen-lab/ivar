@@ -798,6 +798,29 @@ std::vector<uint32_t> find_deletion_positions(std::string filename, uint32_t dep
   return(deletion_positions);
 }
 
+std::vector<double> split_csv_double(const std::string& input) {
+    std::vector<double> result;
+    std::stringstream ss(input);
+    std::string token;
+    
+    while (std::getline(ss, token, ',')) {
+      result.push_back(std::stod(token));
+    }
+    return result;
+}
+
+
+std::vector<uint32_t> split_csv(const std::string& input) {
+    std::vector<uint32_t> result;
+    std::stringstream ss(input);
+    std::string token;
+    
+    while (std::getline(ss, token, ',')) {
+      result.push_back(std::stoi(token));
+    }
+    return result;
+}
+
 void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions, uint32_t round_val, uint8_t quality_threshold){
   /*
    * Parses the variants file produced internally by reading bam file line-by-line.
@@ -819,6 +842,8 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     std::string flag = "";
     std::string amp_flag = "";
     std::string primer_flag = "";
+    std::vector<uint32_t> amplicon_numbers;
+    std::vector<double> freq_numbers;
     split(line, '\t', row_values);
     pos = std::stoi(row_values[1]);
     bool del_pos = std::find(deletion_positions.begin(), deletion_positions.end(), pos) != deletion_positions.end();
@@ -836,6 +861,8 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       amp_flag = row_values[22];
       primer_flag = row_values[23];
       std_dev = std::stof(row_values[24]);
+      amplicon_numbers = split_csv(row_values[26]);
+      freq_numbers = split_csv_double(row_values[25]);
       version_1_var = false;
     } else {
       gapped_freq = 0.0;
@@ -853,6 +880,8 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     tmp.qual = qual;
     tmp.gapped_freq = gapped_freq;
     tmp.std_dev = std_dev;
+    tmp.amplicon_numbers = amplicon_numbers;
+    tmp.freq_numbers = freq_numbers;
     tmp.version_1_var = version_1_var;
     if (flag == "TRUE"){
       tmp.amplicon_flux = true;
@@ -1091,9 +1120,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   
   for(uint32_t i=0; i < base_variants.size(); i++){
-    if(base_variants[i].del_flag){
-      continue;
-    }
     if(!base_variants[i].outside_freq_range && !base_variants[i].pos_del_flag){
       useful_var += 1;
       variants.push_back(base_variants[i]);
@@ -1130,7 +1156,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     prob_matrix.push_back(tmp);
   }
   retrained.prob_matrix = prob_matrix;
-  //this throws and error with ungapped freq
   assign_clusters(variants, retrained, lower_n);
   //determine_low_prob_positions(variants);
 

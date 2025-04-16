@@ -5,13 +5,13 @@
 
 int main() {
   int num_tests = 8;
-  allele a1 = {"A", 40, 0, 30, 0, 0, 0, false};
-  allele a2 = {"T", 40, 10, 30, 0, 0, 0, false};
-  allele a3 = {"G", 40, 10, 10, 0, 0, 0, false};
-  allele a4 = {"+T", 30, 10, 10, 0, 0, 0, false};
-  allele a5 = {"+AG", 30, 10, 10, 0, 0, 0, false};
-  allele a6 = {"+AC", 30, 4, 10, 0, 0, 0, false};
-  allele a7 = {"+WT", 30, 2, 10, 0, 0, 0, false};
+  allele a1 = {"A", 40, 0, 30, 0, 0, 0};
+  allele a2 = {"T", 40, 10, 30, 0, 0, 0};
+  allele a3 = {"G", 40, 10, 10, 0, 0, 0};
+  allele a4 = {"+T", 30, 10, 10, 0, 0, 0};
+  allele a5 = {"+AG", 30, 10, 10, 0, 0, 0};
+  allele a6 = {"+AC", 30, 4, 10, 0, 0, 0};
+  allele a7 = {"+WT", 30, 2, 10, 0, 0, 0};
   int success = 0;
   allele arr[] = {a1, a2, a3, a4, a5};
   ret_t s;

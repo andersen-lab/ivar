@@ -1,5 +1,7 @@
-\label{installpage_md_docs_INSTALLATION}%
-\Hypertarget{installpage_md_docs_INSTALLATION}%
+\chapter{Installation}
+\hypertarget{installpage}{}\label{installpage}\index{Installation@{Installation}}
+\label{installpage_md_docs_2_i_n_s_t_a_l_l_a_t_i_o_n}%
+\Hypertarget{installpage_md_docs_2_i_n_s_t_a_l_l_a_t_i_o_n}%
 
 
 \doxysubsection*{Dependencies}
@@ -13,14 +15,14 @@
 Note\+:
 \begin{DoxyItemize}
 \item It is highly recommended that \href{https://github.com/samtools/samtools}{\texttt{ samtools}} also be installed alongside i\+Var. i\+Var uses the output of samtools mpileup to call variants and generate consensus sequences. In addition, samtools {\ttfamily sort} and {\ttfamily index} commands are very useful to setup a pipeline using i\+Var.
-\end{DoxyItemize}\hypertarget{installpage_autotoc_md0}{}\doxysection{Installing via conda}\label{installpage_autotoc_md0}
+\end{DoxyItemize}\hypertarget{installpage_autotoc_md0}{}\doxysection{\texorpdfstring{Installing via conda}{Installing via conda}}\label{installpage_autotoc_md0}
 i\+Var is available on bioconda. To install conda, please use the \href{https://conda.io/miniconda.html}{\texttt{ miniconda}} package. After intalling conda please add the following channels,
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{conda config -\/-\/add channels defaults}
-\DoxyCodeLine{conda config -\/-\/add channels bioconda}
-\DoxyCodeLine{conda config -\/-\/add channels conda-\/forge}
+\DoxyCodeLine{conda\ config\ -\/-\/add\ channels\ defaults}
+\DoxyCodeLine{conda\ config\ -\/-\/add\ channels\ bioconda}
+\DoxyCodeLine{conda\ config\ -\/-\/add\ channels\ conda-\/forge}
 
 \end{DoxyCode}
 
@@ -29,24 +31,24 @@ To install i\+Var,
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{conda install ivar}
+\DoxyCodeLine{conda\ install\ ivar}
 
 \end{DoxyCode}
-\hypertarget{installpage_autotoc_md1}{}\doxysubsection{Installing via homebrew}\label{installpage_autotoc_md1}
+\hypertarget{installpage_autotoc_md1}{}\doxysubsection{\texorpdfstring{Installing via homebrew}{Installing via homebrew}}\label{installpage_autotoc_md1}
 i\+Var can be installed using \href{https://brew.sh/}{\texttt{ Homebrew}}.
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{brew install brewsci/bio/ivar}
+\DoxyCodeLine{brew\ install\ brewsci/bio/ivar}
 
 \end{DoxyCode}
-\hypertarget{installpage_autotoc_md2}{}\doxysection{Installing on Mac}\label{installpage_autotoc_md2}
-\hypertarget{installpage_autotoc_md3}{}\doxysubsection{Installing build tools}\label{installpage_autotoc_md3}
+\hypertarget{installpage_autotoc_md2}{}\doxysection{\texorpdfstring{Installing on Mac}{Installing on Mac}}\label{installpage_autotoc_md2}
+\hypertarget{installpage_autotoc_md3}{}\doxysubsection{\texorpdfstring{Installing build tools}{Installing build tools}}\label{installpage_autotoc_md3}
 \href{https://developer.apple.com/xcode/}{\texttt{ Xcode}} from Apple is required to compile i\+Var (and other tools) from source. If you don\textquotesingle{}t want to install the full Xcode package from the App\+Store, you can install the Xcode command line tools,
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{xcode-\/select -\/-\/install}
+\DoxyCodeLine{xcode-\/select\ -\/-\/install}
 
 \end{DoxyCode}
 
@@ -57,15 +59,15 @@ To install Autotools using \href{https://brew.sh/}{\texttt{ homebrew}} please us
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{brew install autoconf automake libtool}
+\DoxyCodeLine{brew\ install\ autoconf\ automake\ libtool}
 
 \end{DoxyCode}
-\hypertarget{installpage_autotoc_md4}{}\doxysubsection{HTSlib installed using conda}\label{installpage_autotoc_md4}
+\hypertarget{installpage_autotoc_md4}{}\doxysubsection{\texorpdfstring{HTSlib installed using conda}{HTSlib installed using conda}}\label{installpage_autotoc_md4}
 HTSlib can be installed with \href{https://conda.io/docs/}{\texttt{ conda}} using the command,
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{conda install -\/c bioconda htslib}
+\DoxyCodeLine{conda\ install\ -\/c\ bioconda\ htslib}
 
 \end{DoxyCode}
 
@@ -74,31 +76,31 @@ The conda binary is by default installed at /opt/. You can check the installatio
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{which conda}
+\DoxyCodeLine{which\ conda}
 
 \end{DoxyCode}
 
 
 The output of the command will be in this format -\/ /opt/conda/bin/conda or /opt/anaconda2/bin/conda or /opt/anaconda3/bin/conda depending on whether you installed miniconda or anaconda.
 
-If the output is for example, /opt/conda/bin/conda, then you can add the path to the lib folder to \$\+LD\+\_\+\+LIBRARY\+\_\+\+PATH using the command below. You can add this to your $\sim$/.bash\+\_\+profile or $\sim$/.bashrc to avoid rerunning the command everytime a new bash session starts.
+If the output is for example, /opt/conda/bin/conda, then you can add the path to the lib folder to \$\+LD\+\_\+\+LIBRARY\+\_\+\+PATH using the command below. You can add this to your \texorpdfstring{$\sim$}{\string~}/.bash\+\_\+profile or \texorpdfstring{$\sim$}{\string~}/.bashrc to avoid rerunning the command everytime a new bash session starts.
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{export LD\_LIBRARY\_PATH=\$LD\_LIBRARY\_PATH:/opt/conda/lib}
+\DoxyCodeLine{export\ LD\_LIBRARY\_PATH=\$LD\_LIBRARY\_PATH:/opt/conda/lib}
 
 \end{DoxyCode}
-\hypertarget{installpage_autotoc_md5}{}\doxysubsection{HTSlib installed from source}\label{installpage_autotoc_md5}
+\hypertarget{installpage_autotoc_md5}{}\doxysubsection{\texorpdfstring{HTSlib installed from source}{HTSlib installed from source}}\label{installpage_autotoc_md5}
 Installation instructions and downloads for HTSlib can be found at \href{http://www.htslib.org/download/}{\texttt{ http\+://www.\+htslib.\+org/download/}}.
 
 If HTSlib is installed in a non standard location, please add the following to your .bash\+\_\+profile so that i\+Var can find HTSlib dynamic libraries during runtime.
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{export LD\_LIBRARY\_PATH=\$LD\_LIBRARY\_PATH:/path/to/hts/lib/folder}
+\DoxyCodeLine{export\ LD\_LIBRARY\_PATH=\$LD\_LIBRARY\_PATH:/path/to/hts/lib/folder}
 
 \end{DoxyCode}
-\hypertarget{installpage_autotoc_md6}{}\doxysubsection{Installing i\+Var}\label{installpage_autotoc_md6}
+\hypertarget{installpage_autotoc_md6}{}\doxysubsection{\texorpdfstring{Installing i\+Var}{Installing i\+Var}}\label{installpage_autotoc_md6}
 To install i\+Var, run the following commands.
 
 
@@ -106,7 +108,7 @@ To install i\+Var, run the following commands.
 \DoxyCodeLine{./autogen.sh}
 \DoxyCodeLine{./configure}
 \DoxyCodeLine{make}
-\DoxyCodeLine{make install}
+\DoxyCodeLine{make\ install}
 
 \end{DoxyCode}
 
@@ -118,9 +120,9 @@ The prefix to the bin folder can be found using the command {\ttfamily which con
 
 \begin{DoxyCode}{0}
 \DoxyCodeLine{./autogen.sh}
-\DoxyCodeLine{./configure -\/-\/with-\/hts=/prefix/to/bin/folder/with/HTSlib}
+\DoxyCodeLine{./configure\ -\/-\/with-\/hts=/prefix/to/bin/folder/with/HTSlib}
 \DoxyCodeLine{make}
-\DoxyCodeLine{make install}
+\DoxyCodeLine{make\ install}
 
 \end{DoxyCode}
 
@@ -130,9 +132,9 @@ If HTSlib was installed in a non standard location, please run the following com
 
 \begin{DoxyCode}{0}
 \DoxyCodeLine{./autogen.sh}
-\DoxyCodeLine{./configure -\/-\/with-\/hts=/prefix/to/bin/folder/with/HTSlib}
+\DoxyCodeLine{./configure\ -\/-\/with-\/hts=/prefix/to/bin/folder/with/HTSlib}
 \DoxyCodeLine{make}
-\DoxyCodeLine{make install}
+\DoxyCodeLine{make\ install}
 
 \end{DoxyCode}
 
@@ -141,28 +143,28 @@ To test installation just run, {\ttfamily ivar version} and you should get the f
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{iVar version 1.0}
+\DoxyCodeLine{iVar\ version\ 1.0}
 \DoxyCodeLine{}
-\DoxyCodeLine{Please raise issues and bug reports at https://github.com/andersen-\/lab/ivar/}
+\DoxyCodeLine{Please\ raise\ issues\ and\ bug\ reports\ at\ https://github.com/andersen-\/lab/ivar/}
 
 \end{DoxyCode}
-\hypertarget{installpage_autotoc_md7}{}\doxysection{Installing on Linux}\label{installpage_autotoc_md7}
-\hypertarget{installpage_autotoc_md8}{}\doxysubsection{Installing build tools}\label{installpage_autotoc_md8}
+\hypertarget{installpage_autotoc_md7}{}\doxysection{\texorpdfstring{Installing on Linux}{Installing on Linux}}\label{installpage_autotoc_md7}
+\hypertarget{installpage_autotoc_md8}{}\doxysubsection{\texorpdfstring{Installing build tools}{Installing build tools}}\label{installpage_autotoc_md8}
 \href{https://www.gnu.org/software/automake/manual/html_node/Autotools-Introduction.html\#Autotools-Introduction}{\texttt{ GNU Autotools}} is required to compile i\+Var from source.
 
 To install Autotools using \href{https://help.ubuntu.com/lts/serverguide/apt.html}{\texttt{ APT}} please use the command below,
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{apt-\/get install autotools-\/dev}
+\DoxyCodeLine{apt-\/get\ install\ autotools-\/dev}
 
 \end{DoxyCode}
-\hypertarget{installpage_autotoc_md9}{}\doxysubsection{HTSlib installed using conda}\label{installpage_autotoc_md9}
+\hypertarget{installpage_autotoc_md9}{}\doxysubsection{\texorpdfstring{HTSlib installed using conda}{HTSlib installed using conda}}\label{installpage_autotoc_md9}
 HTSlib can be installed with \href{https://conda.io/docs/}{\texttt{ conda}} using the command,
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{conda install -\/c bioconda htslib}
+\DoxyCodeLine{conda\ install\ -\/c\ bioconda\ htslib}
 
 \end{DoxyCode}
 
@@ -171,31 +173,31 @@ The conda binary is by default installed at /opt/. You can check the installatio
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{which conda}
+\DoxyCodeLine{which\ conda}
 
 \end{DoxyCode}
 
 
 The output of the command will be in this format -\/ /opt/conda/bin/conda or /opt/anaconda2/bin/conda or /opt/anaconda3/bin/conda depending on whether you installed miniconda or anaconda.
 
-If the output is for example, /opt/conda/bin/conda, then you can add the path to the lib folder to \$\+LD\+\_\+\+LIBRARY\+\_\+\+PATH using the command below. You can add this to your $\sim$/.bash\+\_\+profile or $\sim$/.bashrc to avoid rerunning the command everytime a new bash session starts.
+If the output is for example, /opt/conda/bin/conda, then you can add the path to the lib folder to \$\+LD\+\_\+\+LIBRARY\+\_\+\+PATH using the command below. You can add this to your \texorpdfstring{$\sim$}{\string~}/.bash\+\_\+profile or \texorpdfstring{$\sim$}{\string~}/.bashrc to avoid rerunning the command everytime a new bash session starts.
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{export LD\_LIBRARY\_PATH=\$LD\_LIBRARY\_PATH:/opt/conda/lib}
+\DoxyCodeLine{export\ LD\_LIBRARY\_PATH=\$LD\_LIBRARY\_PATH:/opt/conda/lib}
 
 \end{DoxyCode}
-\hypertarget{installpage_autotoc_md10}{}\doxysubsection{HTSlib installed from source}\label{installpage_autotoc_md10}
+\hypertarget{installpage_autotoc_md10}{}\doxysubsection{\texorpdfstring{HTSlib installed from source}{HTSlib installed from source}}\label{installpage_autotoc_md10}
 Installation instructions and downloads for HTSlib can be found at \href{http://www.htslib.org/download/}{\texttt{ http\+://www.\+htslib.\+org/download/}}.
 
 If HTSlib is installed in a non standard location, please add the following to your .bash\+\_\+profile so that i\+Var can find HTSlib dynamic libraries during runtime.
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{export LD\_LIBRARY\_PATH=\$LD\_LIBRARY\_PATH:/path/to/hts/lib/folder}
+\DoxyCodeLine{export\ LD\_LIBRARY\_PATH=\$LD\_LIBRARY\_PATH:/path/to/hts/lib/folder}
 
 \end{DoxyCode}
-\hypertarget{installpage_autotoc_md11}{}\doxysubsection{Installing i\+Var}\label{installpage_autotoc_md11}
+\hypertarget{installpage_autotoc_md11}{}\doxysubsection{\texorpdfstring{Installing i\+Var}{Installing i\+Var}}\label{installpage_autotoc_md11}
 To install i\+Var, run the following commands.
 
 
@@ -203,7 +205,7 @@ To install i\+Var, run the following commands.
 \DoxyCodeLine{./autogen.sh}
 \DoxyCodeLine{./configure}
 \DoxyCodeLine{make}
-\DoxyCodeLine{make install}
+\DoxyCodeLine{make\ install}
 
 \end{DoxyCode}
 
@@ -215,9 +217,9 @@ The prefix to the bin folder can be found using the command {\ttfamily which con
 
 \begin{DoxyCode}{0}
 \DoxyCodeLine{./autogen.sh}
-\DoxyCodeLine{./configure -\/-\/with-\/hts=/prefix/to/bin/folder/with/HTSlib}
+\DoxyCodeLine{./configure\ -\/-\/with-\/hts=/prefix/to/bin/folder/with/HTSlib}
 \DoxyCodeLine{make}
-\DoxyCodeLine{make install}
+\DoxyCodeLine{make\ install}
 
 \end{DoxyCode}
 
@@ -227,9 +229,9 @@ If HTSlib was installed in a non standard location, please run the following com
 
 \begin{DoxyCode}{0}
 \DoxyCodeLine{./autogen.sh}
-\DoxyCodeLine{./configure -\/-\/with-\/hts=/prefix/to/bin/folder/with/HTSlib}
+\DoxyCodeLine{./configure\ -\/-\/with-\/hts=/prefix/to/bin/folder/with/HTSlib}
 \DoxyCodeLine{make}
-\DoxyCodeLine{make install}
+\DoxyCodeLine{make\ install}
 
 \end{DoxyCode}
 
@@ -238,22 +240,22 @@ To test installation just run, {\ttfamily ivar version} and you should get the f
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{iVar version 1.0}
+\DoxyCodeLine{iVar\ version\ 1.0}
 \DoxyCodeLine{}
-\DoxyCodeLine{Please raise issues and bug reports at https://github.com/andersen-\/lab/ivar/}
+\DoxyCodeLine{Please\ raise\ issues\ and\ bug\ reports\ at\ https://github.com/andersen-\/lab/ivar/}
 
 \end{DoxyCode}
-\hypertarget{installpage_autotoc_md12}{}\doxysection{Running from Docker}\label{installpage_autotoc_md12}
+\hypertarget{installpage_autotoc_md12}{}\doxysection{\texorpdfstring{Running from Docker}{Running from Docker}}\label{installpage_autotoc_md12}
 i\+Var can also be run via \href{https://www.docker.com/}{\texttt{ Docker}}. Pull the docker image from \href{https://hub.docker.com/}{\texttt{ Docker Hub}} using the following command,
 
 
 \begin{DoxyCode}{0}
-\DoxyCodeLine{docker pull andersenlabapps/ivar}
+\DoxyCodeLine{docker\ pull\ andersenlabapps/ivar}
 
 \end{DoxyCode}
 
 
-This docker image contains all the required dependencies to run i\+Var and the \mbox{\hyperlink{cookbookpage}{pipelines}} developed using i\+Var. You will have to attach a docker volume to get data into the docker container. Instructions to do so are in the \href{https://docs.docker.com/storage/volumes/}{\texttt{ Docker docs}}.
+This docker image contains all the required dependencies to run i\+Var and the \doxysectlink{cookbookpage}{pipelines}{0} developed using i\+Var. You will have to attach a docker volume to get data into the docker container. Instructions to do so are in the \href{https://docs.docker.com/storage/volumes/}{\texttt{ Docker docs}}.
 
-\href{https://hub.docker.com/r/andersenlabapps/ivar/}{\texttt{ i\+Var on Docker Hub}}\hypertarget{installpage_autotoc_md13}{}\doxysection{Contact}\label{installpage_autotoc_md13}
+\href{https://hub.docker.com/r/andersenlabapps/ivar/}{\texttt{ i\+Var on Docker Hub}}\hypertarget{installpage_autotoc_md13}{}\doxysection{\texorpdfstring{Contact}{Contact}}\label{installpage_autotoc_md13}
 For bug reports please email gkarthik\mbox{[}at\mbox{]}scripps.\+edu or raise an issue on Github. 

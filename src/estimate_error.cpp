@@ -2,13 +2,6 @@
 #include "gmm.h"
 #include "saga.h"
 
-std::vector<std::vector<double>> assign_nearest_cluster(){
-  /*
-    Given a set of means and variants assign each variant to the nearest cluster.
-  */
-  
-}
-
 std::vector<double> z_score(std::vector<double> data) {
     double mean = std::accumulate(data.begin(), data.end(), 0.0) / data.size();
     double sq_sum = std::inner_product(data.begin(), data.end(), data.begin(), 0.0);
@@ -89,9 +82,6 @@ double cluster_error(std::string filename, uint8_t quality_threshold, uint32_t d
 
   while(n <= 5){
     model = train_model(n, data_original);
-    for(auto m : model.means){
-      std::cerr << m << std::endl;
-    }
     std::vector<double> means = model.means;
     bool stop=true;
     for(uint32_t i=0; i < model.clusters.size(); i++){
@@ -100,7 +90,7 @@ double cluster_error(std::string filename, uint8_t quality_threshold, uint32_t d
         n++;
         stop = false;
       }
-      std::cerr << "n " << n << " percent " << percent << std::endl;
+      //std::cerr << "n " << n << " percent " << percent << std::endl;
     }
     if(stop) break;
   }
@@ -111,8 +101,10 @@ double cluster_error(std::string filename, uint8_t quality_threshold, uint32_t d
   uint32_t largest=0;
   for(uint32_t i=0; i < model.clusters.size(); i++){
     //std::cerr << "percent " << (float)model.clusters[i].size() / (float)data_original.size() << std::endl;
-    double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
+    //double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
     //std::cerr << "mean " << mean << std::endl;
+    //double stdev = calculate_standard_deviation(model.clusters[i]);
+    //std::cerr << stdev << std::endl;
     if(model.clusters[i].size() > largest){
       j = i;
       largest = model.clusters[i].size();
@@ -128,6 +120,7 @@ double cluster_error(std::string filename, uint8_t quality_threshold, uint32_t d
     }
   }
 
+  
   //get the upper edge of the noise cluster
   auto min_it = std::min_element(cleaned_cluster.begin(), cleaned_cluster.end());
   std::cerr << *min_it << std::endl;

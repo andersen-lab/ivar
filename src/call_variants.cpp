@@ -32,7 +32,7 @@ double *get_frequency_depth(
 int call_variants_from_plup(std::istream &cin, std::string out_file,
                             uint8_t min_qual, double min_threshold,
                             uint32_t min_depth, std::string ref_path,
-                            std::string gff_path) {
+                            std::string gff_path, bool gapped_depth) {
   std::string line, cell, bases, qualities, region;
   ref_antd refantd(ref_path, gff_path);
   std::ostringstream out_str;
@@ -108,7 +108,13 @@ int call_variants_from_plup(std::istream &cin, std::string out_file,
     // Get ungapped depth
     pdepth = 0;
     for (std::vector<allele>::iterator it = ad.begin(); it != ad.end(); ++it) {
-      if (it->nuc[0] == '*' || it->nuc[0] == '+' || it->nuc[0] == '-') continue;
+      // if ((gapped_depth && (it->nuc[0] == '+' || it->nuc[0] == '-')) || (!gapped_depth && (it->nuc[0] == '+' || it->nuc[0] == '*' || it->nuc[0] == '-'))) continue;
+      // Split into two if statements for readability.
+      if (gapped_depth) {
+        if (it->nuc[0] == '+' || it->nuc[0] == '-') continue; // Count gaps ('*') towards depth
+      } else {
+        if (it->nuc[0] == '+' || it->nuc[0] == '*' || it->nuc[0] == '-') continue;
+      }
       pdepth += it->depth;
     }
     if (pdepth < min_depth) {  // Check for minimum depth

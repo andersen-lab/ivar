@@ -1,4 +1,4 @@
-.TH "cookbookpage" 3 "Fri Feb 24 2023" "iVar" \" -*- nroff -*-
+.TH "cookbookpage" 3 "iVar" \" -*- nroff -*-
 .ad l
 .nh
 .SH NAME
@@ -6,9 +6,9 @@ cookbookpage \- Cookbook
 .PP
 
 .PP
-Two pipelines to call iSNVs from known and unknown reference sequences have been written in \fCsnakemake\fP\&.
+Two pipelines to call iSNVs from known and unknown reference sequences have been written in \fRsnakemake\fP\&.
 .PP
-The two pipelines are distributed along with iVar and are present in the\fCpipeline/\fP and \fCpipeline_field/\fP fodlers respectively\&.
+The two pipelines are distributed along with iVar and are present in the\fRpipeline/\fP and \fRpipeline_field/\fP fodlers respectively\&.
 .PP
 For both pipelines, there are four parameters that will have to be set in beginning of the Snakefile\&.
 .PP
@@ -16,7 +16,7 @@ For both pipelines, there are four parameters that will have to be set in beginn
 .nf
 in_dir = "<input fastq files>"
 out_dir = "<output directory>"
-bed = "<bed-file-with-primer-positions>"
+bed = "<bed\-file\-with\-primer\-positions>"
 ref="<path to reference fasta>"
 .fi
 .PP
@@ -24,35 +24,35 @@ ref="<path to reference fasta>"
 .PP
 .SS "Call iSNVs from samples with known reference sequence"
 .PP
-\fCLink to Jupyter Notebook\fP
+\fRLink to Jupyter Notebook\fP
 .PP
-\fCLink to pipeline\fP
+\fRLink to pipeline\fP
 .PP
 .SS "Dependencies:"
 .PP
 .IP "\(bu" 2
-\fCiVar\fP
+\fRiVar\fP
 .IP "\(bu" 2
-\fCsamtools\fP
+\fRsamtools\fP
 .IP "\(bu" 2
-\fCbwa\fP
+\fRbwa\fP
 .IP "\(bu" 2
-\fCbedtools\fP
+\fRbedtools\fP
 .PP
 .PP
 .SS "Call iSNVs from samples with unknown reference sequence"
 .PP
-\fCLink to pipeline\fP
+\fRLink to pipeline\fP
 .PP
 .SS "Dependencies:"
 .PP
 .IP "\(bu" 2
-\fCiVar\fP
+\fRiVar\fP
 .IP "\(bu" 2
-\fCsamtools\fP
+\fRsamtools\fP
 .IP "\(bu" 2
-\fCbwa\fP
+\fRbwa\fP
 .IP "\(bu" 2
-\fCbedtools\fP 
+\fRbedtools\fP 
 .PP
 

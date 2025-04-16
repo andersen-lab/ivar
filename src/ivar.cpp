@@ -20,7 +20,7 @@
 #include "call_consensus_clustering.h"
 #include "saga.h"
 
-const std::string VERSION = "1.4.2";
+const std::string VERSION = "1.4.4";
 
 struct args_t {
   std::string bam;               // -i
@@ -49,6 +49,7 @@ struct args_t {
   bool keep_for_reanalysis;      // -k
   //contam params
   std::string variants;          // -s
+  bool gapped_depth;             // -G
 } g_args;
 
 void print_usage() {
@@ -148,6 +149,7 @@ void print_variants_usage() {
          "           -t    Minimum frequency threshold(0 - 1) to call variants "
          "(Default: 0.03)\n"
          "           -m    Minimum read depth to call variants (Default: 0)\n"
+         "           -G    Count gaps towards depth. By default, gaps are not counted\n"
          "           -r    Reference file used for alignment. This is used to "
          "translate the nucleotide sequences and identify intra host single "
          "nucleotide variants\n"
@@ -279,7 +281,7 @@ void print_version_info() {
 }
 
 static const char *trim_opt_str = "i:b:f:x:p:m:q:s:ekh?";
-static const char *variants_opt_str = "p:t:q:m:r:g:h?";
+static const char *variants_opt_str = "p:t:q:m:r:g:Gh?";
 static const char *consensus_opt_str = "i:p:q:t:c:m:n:kh?";
 static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
@@ -490,6 +492,7 @@ int main(int argc, char *argv[]) {
     g_args.min_depth = 0;
     g_args.ref = "";
     g_args.gff = "";
+    g_args.gapped_depth = false;
     opt = getopt(argc, argv, variants_opt_str);
     while (opt != -1) {
       switch (opt) {
@@ -510,6 +513,9 @@ int main(int argc, char *argv[]) {
           break;
         case 'g':
           g_args.gff = optarg;
+          break;
+        case 'G':
+          g_args.gapped_depth = true;
           break;
         case 'h':
         case '?':
@@ -551,7 +557,7 @@ int main(int argc, char *argv[]) {
     }
     res = call_variants_from_plup(std::cin, g_args.prefix, g_args.min_qual,
                                   g_args.min_threshold, g_args.min_depth,
-                                  g_args.ref, g_args.gff);
+                                  g_args.ref, g_args.gff, g_args.gapped_depth);
   }
   // ivar consensus
   else if (cmd.compare("consensus") == 0) {
