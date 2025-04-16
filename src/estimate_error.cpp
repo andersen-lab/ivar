@@ -48,11 +48,10 @@ double cluster_error(std::string filename, uint8_t quality_threshold, uint32_t d
   float upper_bound = 0.99;
   uint32_t round_val = 4;
   
-  std::vector<uint32_t> deletion_positions = find_deletion_positions(filename, depth_cutoff, lower_bound, upper_bound, round_val);
   std::vector<variant> base_variants;
-  parse_internal_variants(filename, base_variants, depth_cutoff, lower_bound, upper_bound, deletion_positions, round_val, quality_threshold);
+  parse_internal_variants(filename, base_variants, depth_cutoff, lower_bound, upper_bound, round_val, quality_threshold);
   if(base_variants[0].version_1_var){
-    calculate_reference_frequency(base_variants, filename, depth_cutoff, lower_bound, upper_bound, deletion_positions);
+    calculate_reference_frequency(base_variants, filename, depth_cutoff, lower_bound, upper_bound);
   }
 
   std::vector<variant> variants_original;
@@ -61,7 +60,7 @@ double cluster_error(std::string filename, uint8_t quality_threshold, uint32_t d
   std::vector<double> frequencies;
    for(uint32_t i=0; i < base_variants.size(); i++){
     if(base_variants[i].position > max_pos) max_pos = base_variants[i].position;
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].del_flag && !base_variants[i].amplicon_masked && !base_variants[i].primer_masked){      
+    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && !base_variants[i].primer_masked){      
       useful_count_original++;
       variants_original.push_back(base_variants[i]);
       frequencies.push_back(base_variants[i].freq);

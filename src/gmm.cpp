@@ -8,7 +8,7 @@
 #include <limits>
 #include <unordered_map>
 
-void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions){
+void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound){
   //also account for things NOT in the variants file
   uint32_t max_pos = 0;
   for(auto var : variants){
@@ -71,11 +71,6 @@ void calculate_reference_frequency(std::vector<variant> &variants, std::string f
     } else {
       tmp.qual_flag = false;
     }
-    tmp.del_flag = false; 
-    bool del_pos = std::find(deletion_positions.begin(), deletion_positions.end(), pos) != deletion_positions.end();
-    if(del_pos) {
-      tmp.pos_del_flag = true;
-    }
     variants.push_back(tmp); 
     count += 1;
   } 
@@ -103,7 +98,6 @@ double calculate_median(std::vector<double> &data) {
 
 void calculate_gapped_frequency(std::vector<variant> &variants, double universal_cluster, double noise_cluster){
   for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].pos_del_flag){
       double total_depth = 0;
       for(uint32_t j=0; j < variants.size(); j++){
         if(variants[i].position == variants[j].position){
@@ -114,7 +108,6 @@ void calculate_gapped_frequency(std::vector<variant> &variants, double universal
       if(variants[i].gapped_freq > universal_cluster || variants[i].gapped_freq < noise_cluster){
         variants[i].gap_outside_freq_range = true;
       }
-    }
   }
 }
 
@@ -765,39 +758,6 @@ void split(const std::string &s, char delim, std::vector<std::string> &elems){
     }
 }
 
-std::vector<uint32_t> find_deletion_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, uint32_t round_val){
-
-  std::vector<uint32_t> deletion_positions;
-  std::ifstream infile(filename);
-  std::string line;
-  uint32_t count = 0;
-  float freq = 0;
-  uint32_t depth = 0;
-  uint32_t pos = 0;
-  while (std::getline(infile, line)) {
-    if(count == 0) {
-      count++;
-      continue;
-    }
-    std::vector<std::string> row_values;
-    split(line, '\t', row_values);
-
-    depth = std::stoi(row_values[7]);
-    pos = std::stoi(row_values[1]);
-    freq = std::stof(row_values[10]);
-    float multiplier = pow(10, round_val);
-    freq = round(freq * multiplier) / multiplier;
-    std::string nuc = row_values[3];
-    count++;
-    if(1/freq * depth < depth_cutoff || freq < lower_bound) continue;
-    if (is_substring(nuc, "+") || is_substring(nuc, "-")) {
-      deletion_positions.push_back(pos);
-    }
-    count++;
-  }
-  return(deletion_positions);
-}
-
 std::vector<double> split_csv_double(const std::string& input) {
     std::vector<double> result;
     std::stringstream ss(input);
@@ -821,7 +781,7 @@ std::vector<uint32_t> split_csv(const std::string& input) {
     return result;
 }
 
-void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, std::vector<uint32_t> deletion_positions, uint32_t round_val, uint8_t quality_threshold){
+void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, uint32_t round_val, uint8_t quality_threshold){
   /*
    * Parses the variants file produced internally by reading bam file line-by-line.
    */
@@ -834,7 +794,8 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       count += 1;
       continue;
     }
-     std::vector<std::string> row_values;
+    
+    std::vector<std::string> row_values;
     //split the line by delimiter
     uint32_t pos = 0, depth = 0;
     float freq = 0, gapped_freq=0, qual=0, std_dev=0;
@@ -846,7 +807,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     std::vector<double> freq_numbers;
     split(line, '\t', row_values);
     pos = std::stoi(row_values[1]);
-    bool del_pos = std::find(deletion_positions.begin(), deletion_positions.end(), pos) != deletion_positions.end();
     depth = std::stoi(row_values[7]);
     freq = std::stof(row_values[10]);
   
@@ -917,14 +877,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     } else {
       tmp.qual_flag = false;
     }
-    if(del_pos && (row_values[3].find("-") != std::string::npos || row_values[3].find('+') != std::string::npos)){
-      tmp.del_flag = true;
-    } else {
-      tmp.del_flag = false;
-    } 
-    if(del_pos) {
-      tmp.pos_del_flag = true;
-    }
     variants.push_back(tmp); 
     count += 1;
   } 
@@ -940,13 +892,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   float upper_bound = error_rate-0.0001;
   std::cerr << "lower " << lower_bound << " upper " << upper_bound << std::endl;
   std::vector<variant> base_variants;
-  std::vector<uint32_t> deletion_positions = find_deletion_positions(prefix, min_depth, lower_bound, upper_bound, round_val);
   
-  parse_internal_variants(prefix, base_variants, min_depth, lower_bound, upper_bound, deletion_positions, round_val, min_qual);
+  parse_internal_variants(prefix, base_variants, min_depth, lower_bound, upper_bound, round_val, min_qual);
   
   //if ivar 1.0 is in use, calculate the frequency of the reference
   if(base_variants[0].version_1_var){
-    calculate_reference_frequency(base_variants, prefix, min_depth, lower_bound, upper_bound, deletion_positions);
+    calculate_reference_frequency(base_variants, prefix, min_depth, lower_bound, upper_bound);
   }
   std::string filename = prefix + ".txt";
 
@@ -1025,10 +976,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         std::cerr << "empty cluster" << std::endl;
         continue;
       }
-      for(auto d : data){
-        std::cerr << d << " ";
-      }
-      std::cerr << "\n";
       tmp_mads.push_back(mad);
       float ratio = (float)useful_var / (float) n; //originally data.size()
       std::cerr << "mean " << mean << " mad " << mad << " cluster size " << data.size() << " ratio " << ratio << std::endl;
@@ -1076,8 +1023,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     double mean = calculate_mean(data);
     centroids.push_back(mean);
   }
-  retrained = retrain_model_seeded(optimal_n, data, variants, lower_n, centroids);
-  assign_clusters(variants, retrained, lower_n);
+  //retrained = retrain_model_seeded(optimal_n, data, variants, lower_n, centroids);
+  //assign_clusters(variants, retrained, lower_n);
   std::vector<std::vector<double>> clusters(optimal_n);
   for(auto var : variants){
     int cluster = var.cluster_assigned;
@@ -1111,19 +1058,16 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //look at all variants despite other parameters
   base_variants.clear();
   variants.clear();
-  parse_internal_variants(prefix, base_variants, min_depth, lower_bound, upper_bound, deletion_positions, round_val, min_qual);
+  parse_internal_variants(prefix, base_variants, min_depth, lower_bound, upper_bound, round_val, min_qual);
   if(base_variants[0].version_1_var){
-    calculate_reference_frequency(base_variants, prefix, min_depth, lower_bound, upper_bound, deletion_positions);
+    calculate_reference_frequency(base_variants, prefix, min_depth, lower_bound, upper_bound);
   }
   if(!variants[0].version_1_var){ 
     calculate_gapped_frequency(base_variants, upper_bound, lower_bound);
   }
   
   for(uint32_t i=0; i < base_variants.size(); i++){
-    if(!base_variants[i].outside_freq_range && !base_variants[i].pos_del_flag){
-      useful_var += 1;
-      variants.push_back(base_variants[i]);
-    } else if(base_variants[i].pos_del_flag && !base_variants[i].gap_outside_freq_range){
+    if(!base_variants[i].gap_outside_freq_range){
       useful_var += 1;
       variants.push_back(base_variants[i]);
     }
@@ -1134,12 +1078,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   for(uint32_t i = 0; i < variants.size(); i++){   
     double tmp;
     //check if variant should be filtered for first pass model
-    if(!variants[i].pos_del_flag || variants[i].version_1_var){
-      //tmp = static_cast<double>(variants[i].freq); //transform
-      //TESTLINES
+    if(variants[i].version_1_var){
       tmp = static_cast<double>(variants[i].gapped_freq); 
-    } else {
-      tmp = static_cast<double>(variants[i].gapped_freq); //transform
     }
     final_data.col(count) = tmp;
     count += 1;
@@ -1161,9 +1101,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   //lets add back in the 100% variants
   for(uint32_t i=0; i < base_variants.size(); i++){
-    if(base_variants[i].outside_freq_range && !base_variants[i].pos_del_flag){
-      variants.push_back(base_variants[i]);
-    } else if(base_variants[i].pos_del_flag && base_variants[i].gap_outside_freq_range){
+    if(base_variants[i].outside_freq_range){
       variants.push_back(base_variants[i]);
     }
   }
@@ -1174,7 +1112,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     for(uint32_t i=0; i < variants.size(); i++){
       file << std::to_string(variants[i].position) << "\t"; 
       file << variants[i].nuc << "\t";
-      if(!variants[i].pos_del_flag || variants[i].version_1_var){
+      if(variants[i].version_1_var){
         file << std::to_string(variants[i].freq) << "\t";
       } else{
         file << std::to_string(variants[i].gapped_freq) << "\t";

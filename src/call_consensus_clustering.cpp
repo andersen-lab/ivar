@@ -57,13 +57,13 @@ double find_neighboring_cluster(double freq, uint32_t cluster_assigned, std::vec
 
 void rewrite_position_masking(std::vector<variant> variants){
   /*
-    Given a position that was originally flagged as experiencing fluctuation, determine if the fluctuation would affect the consensus.
+    Given a position that was originally flagged as experiencing fluctuation, determine if the fluctuation would affect the consensus. 
   */
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].amplicon_flux && variants[i].freq_numbers.size() > 1){
       std::cerr << variants[i].position << std::endl;
-      for(uint32_t j=0; j < variants[i].freq_numbers.size(); j++){
-        std::cerr << variants[i].freq_numbers[j] << " ";
+      for(uint32_t j=0; j < variants[i].freq_numbers.size(); j++){    
+        std::cerr << variants[i].freq_numbers[j] << std::endl;
       }
       std::cerr << "\n";
     } 
@@ -577,8 +577,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     all_consensus_seqs.push_back(tmp);
   }
 
-  rewrite_position_masking(variants);
-  exit(0);
+  //rewrite_position_masking(variants);
 
   std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, solution, inverse_groups, means, freq_lower_bound, freq_upper_bound);
   modify_variant_masking(amplicons_to_mask, variants);
@@ -594,7 +593,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     if(variants[i].position == 10652){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " " << variants[i].gapped_freq << std::endl;
-      std::cerr << "vague assignment " << variants[i].vague_assignment << " del pos " << variants[i].pos_del_flag << " depth flag " << variants[i].depth_flag << std::endl;
+      std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
       std::cerr << "amplicon masked " << variants[i].amplicon_masked << " amp flux pos " << variants[i].amplicon_flux << std::endl;        
       for(auto m : variants[i].amplicon_numbers){
         std::cerr << m << std::endl;
@@ -660,8 +659,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
      if(variants[i].freq <= freq_lower_bound) continue;
      //handle all the cases where you never assigned anything
     if(variants[i].cluster_assigned == -1){
-      if(variants[i].pos_del_flag && variants[i].gapped_freq < freq_upper_bound) continue;
-      if(!variants[i].pos_del_flag && variants[i].freq < freq_upper_bound) continue;
+      if(variants[i].gapped_freq < freq_upper_bound) continue;
       if(print) std::cerr << "not assigned anything" << std::endl;
       //ADD IN ADDING TO ALL CLUSTERS
       for(uint32_t j=0; j < all_consensus_seqs.size(); j++){
