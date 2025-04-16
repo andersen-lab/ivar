@@ -877,11 +877,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   gaussian_mixture_model retrained;
 
   //TESTLINES
-  std::vector<std::vector<double>> mads;
-  std::vector<std::vector<double>> percents;
   while(counter <= n){
-    std::vector<double> tmp_mads;
-    std::vector<double> tmp_percent_far;
     if(((float)useful_var / (float)counter) < 1){
       if(counter > 2){
         optimal_n = counter - 1;
@@ -912,7 +908,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         std::cerr << "empty cluster" << std::endl;
         continue;
       }
-      tmp_mads.push_back(mad);
       float ratio = (float)useful_var / (float) n; //originally data.size()
       std::cerr << "mean " << mean << " mad " << mad << " cluster size " << data.size() << " ratio " << ratio << std::endl;
       if(data.size() > 5){
@@ -937,8 +932,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       break;
     }
     counter++;     
-    mads.push_back(tmp_mads);
-    percents.push_back(tmp_percent_far);
   }
   std::cerr << "optimal n " << optimal_n << std::endl;
   if(optimal_n != retrained.means.size()){
