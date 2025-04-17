@@ -1,0 +1,491 @@
+#include "solve_clustering.h"
+#include "saga.h"
+#include <ostream>
+#include <iostream>
+#include <vector>
+#include <sstream>
+#include <string>
+#include <algorithm>
+#include <numeric>
+
+void modify_variant_masking(std::vector<uint32_t> amplicons_to_mask, std::vector<variant> &variants){
+  for(uint32_t i=0; i < variants.size(); i++){
+    std::vector<uint32_t> tmp = variants[i].amplicon_numbers;
+    bool found = false;
+    for(uint32_t j=0; j < tmp.size(); j++){
+      auto it = std::find(amplicons_to_mask.begin(), amplicons_to_mask.end(), tmp[j]);
+      if(it != amplicons_to_mask.end()){
+        found = true;
+        variants[i].amplicon_masked = true;
+        break;
+      }
+    }
+    if(!found) {
+      variants[i].amplicon_masked = false;
+    }
+  }
+}
+
+bool test_cluster_deviation(double nearest_cluster, double variant_cluster, double std_dev){
+  bool fluctuation = false;
+  //CLEANUP THIS CAN BE CALCULATED ONCE PER ALL CLUSTERS
+  //determine if the assigned and nearest cluster can be resolved based on variant fluctuation
+  std::vector<double> tmp = {nearest_cluster, variant_cluster};
+  double cluster_dev = calculate_standard_deviation(tmp);
+  if((double)std_dev > cluster_dev){
+    fluctuation = true;
+  }
+  return(fluctuation);
+}
+
+double find_neighboring_cluster(double freq, uint32_t cluster_assigned, std::vector<double> means){
+  //find closest cluster by mean value
+  double min_dist = 1;
+  uint32_t index = 0;
+  for(uint32_t i=0; i < means.size(); i++){
+    if(i == cluster_assigned) continue;
+    double dist = std::abs(means[i]-freq);
+    if(dist < min_dist){
+      min_dist = dist;
+      index = i;
+    }
+  }
+  return(means[index]);
+}
+
+void rewrite_position_masking(std::vector<variant> variants){
+  /*
+    Given a position that was originally flagged as experiencing fluctuation, determine if the fluctuation would affect the consensus. 
+  */
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].amplicon_flux && variants[i].freq_numbers.size() > 1){
+      std::cerr << variants[i].position << std::endl;
+      for(uint32_t j=0; j < variants[i].freq_numbers.size(); j++){    
+        std::cerr << variants[i].freq_numbers[j] << std::endl;
+      }
+      std::cerr << "\n";
+    } 
+  }
+}
+
+std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, std::vector<double>solution, std::vector<std::vector<uint32_t>> inverse_groups, std::vector<double> means){
+  //stores the numbers of every amplicon where we believe experiences fluctuation that imapcts consensus
+  std::vector<uint32_t> amplicons_to_mask;
+
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].amplicon_flux && !variants[i].outside_freq_range){
+      //find all clusters not part of the same assignment
+      std::vector<double> other_population_clusters;
+      for(uint32_t j=0; j < inverse_groups.size(); j++){
+        //check to make sure you're lookin at a group that's part of the solution
+        auto mit = std::find(solution.begin(), solution.end(), means[j]);
+        if(mit == solution.end()) continue;
+        auto it = std::find(inverse_groups[j].begin(), inverse_groups[j].end(), variants[i].cluster_assigned);      
+        //assigned cluster is not apart of the population
+        if(it == inverse_groups[j].end())
+        for(auto ig : inverse_groups[j]){
+          //CLEAN UP this will push redundant things back
+          other_population_clusters.push_back(means[ig]);
+        }
+      }
+
+      //find the second closest cluster index
+      double closest_mean = find_neighboring_cluster((double)variants[i].gapped_freq, variants[i].cluster_assigned, other_population_clusters);
+      //check if the cluster is within the standard dev of the variant
+      bool fluctuating = test_cluster_deviation(closest_mean, means[variants[i].cluster_assigned], variants[i].std_dev);       
+      if(fluctuating){
+        for(auto v : variants[i].amplicon_numbers){
+          if(std::find(amplicons_to_mask.begin(), amplicons_to_mask.end(), v) == amplicons_to_mask.end()){
+            amplicons_to_mask.push_back(v);
+            std::cerr << "pos " << variants[i].position << " freq " << variants[i].gapped_freq << " " << closest_mean << " assigned mean " << means[variants[i].cluster_assigned] << std::endl;
+            for(auto x : variants[i].freq_numbers){
+              std::cerr << x << " ";
+            }
+            std::cerr << "\n" << std::endl;
+            for(auto x : variants[i].amplicon_numbers){
+              std::cerr << x << " ";
+            }
+            std::cerr << "\n" << std::endl;
+          }
+        }
+      }
+    }
+  }
+  return(amplicons_to_mask);
+}
+
+double find_nearest_distance(const std::vector<double> all_sums, double value) {
+    double min_distance = std::numeric_limits<double>::max();
+    for (auto num : all_sums) {
+        double distance = std::abs(num - value);
+        if (distance < min_distance) {
+            min_distance = distance;
+        }
+    }
+    return min_distance;
+}
+
+bool account_peaks(std::vector<double> possible_solution, std::vector<double> means, double total, double error){
+  bool valid = true;
+  std::vector<double> current;
+  std::vector<std::vector<double>> results;
+  find_combinations(possible_solution, 0, current, results, 0);
+ 
+  std::vector<double> all_sums; 
+  for(auto result : results){
+    double sum = std::accumulate(result.begin(), result.end(), 0.0f);
+    all_sums.push_back(sum);
+  }
+
+  //check if all means can be accounted for
+  for(auto mean : means){
+    double dist = find_nearest_distance(all_sums, mean);
+    if(dist > error){
+      valid = false;
+      break;
+    }
+  }
+  return(valid);
+}
+
+bool within_error_range(std::vector<double> values, double target, double error){
+  //test if the sum of the vector equals the target value within some error
+  double sum = std::accumulate(values.begin(), values.end(), 0.0f);
+  if(sum < target+error && sum > target-error){
+    return(true);  
+  } else{
+    return(false);
+  }
+}
+
+std::vector<std::vector<double>> find_subsets_with_error(std::vector<double> means, double target, double error){
+  //first we find all the possible combinations
+  std::vector<double> current;
+  std::vector<std::vector<double>> results;
+  find_combinations(means, 0, current, results, 0);
+
+  std::vector<std::vector<double>> valid_combinations;  
+  for(uint32_t i=0; i < results.size(); i++){
+    bool in_range = within_error_range(results[i], target, error);
+    if(in_range){
+      valid_combinations.push_back(results[i]);
+    }
+  }
+  return(valid_combinations);
+}
+
+std::vector<std::vector<double>> frequency_pair_finder(std::vector<variant> variants, std::vector<double> means){ 
+  std::vector<std::vector<double>> pairs;
+  std::vector<uint32_t> track_positions;
+
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(!variants[i].depth_flag && !variants[i].qual_flag && !variants[i].outside_freq_range && variants[i].cluster_assigned != -1){
+      auto it = std::find(track_positions.begin(), track_positions.end(), variants[i].position);
+      //found
+      if(it != track_positions.end()){
+        size_t index = std::distance(track_positions.begin(), it);
+        pairs[index].push_back(means[variants[i].cluster_assigned]);
+      } else{
+        std::vector<double> tmp = {means[variants[i].cluster_assigned]};
+        pairs.push_back(tmp);
+        track_positions.push_back(variants[i].position);
+      }
+    }    
+  } 
+
+  return(pairs);
+}
+
+bool cluster_gravity_analysis(std::vector<std::vector<double>> solutions){
+  //in the event of multiple solutions, check that the largest cluster is the same
+  std::vector<double> max_values;
+  for(auto solution : solutions){
+    double max = *std::max_element(solution.begin(), solution.end());
+    max_values.push_back(max);
+  }
+  bool all_same = std::all_of(max_values.begin() + 1, max_values.end(), [&](double x) { return x == max_values[0]; });  
+  return(all_same);
+}
+
+bool account_for_clusters(std::vector<double> means, std::vector<std::vector<double>> results, double error){
+  bool keep = false;
+  std::vector<double> accounted_means;
+
+  for(uint32_t i=0; i < results.size(); i++){
+    double total = std::accumulate(results[i].begin(), results[i].end(), 0.0f);
+    //determine if this is close to a cluster
+    for(uint32_t j=0; j < means.size(); j++){
+      double diff = std::abs(total-means[j]);
+      if(diff < error){
+        accounted_means.push_back(means[j]);
+      }
+    }
+  }
+  
+  for(auto val : accounted_means){
+    auto it = std::find(means.begin(), means.end(), val);
+    if (it != means.end()){
+      uint32_t index = std::distance(means.begin(), it);
+      means.erase(means.begin() + index);
+    }
+  }  
+  if(means.size() == 0){
+    keep = true;
+  } else{
+    keep = false;
+  }
+  return(keep);
+}
+
+void find_combinations(std::vector<double> means, uint32_t index, std::vector<double> &current, std::vector<std::vector<double>> &results, double error){
+  if (!current.empty()){
+    results.push_back(current);
+  }
+  for (uint32_t i = index; i < means.size(); ++i) {
+    if(means[i] < error) continue;
+    current.push_back(means[i]);
+    find_combinations(means, i+1, current, results, error);
+    current.pop_back();
+  }
+}
+
+std::vector<std::vector<double>> find_solutions(std::vector<double> means, double error){
+  std::vector<double> current;
+  std::vector<std::vector<double>> results;
+  find_combinations(means, 0, current, results, 0);
+  
+  std::sort(results.begin(), results.end());
+  results.erase(std::unique(results.begin(), results.end()), results.end());
+
+  std::vector<std::vector<double>> final_results;
+  //constrain that the solutions must add to 1
+  for(uint32_t i=0; i < results.size(); i++){
+    bool keep = within_error_range(results[i], 1, error);
+    if(keep){
+      final_results.push_back(results[i]);
+    }
+  }
+  return(final_results);  
+}
+
+std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<double> solution, std::vector<double> means, std::vector<double> &unresolved, double error){
+ 
+  std::vector<std::vector<uint32_t>> cluster_indexes(means.size());
+  std::vector<double> current;
+  std::vector<std::vector<double>> results;
+  std::vector<double> totals;
+
+  find_combinations(solution, 0, current, results, error);
+  for(uint32_t i=0; i < results.size(); i++){
+    double sum = std::accumulate(results[i].begin(), results[i].end(), 0.0f); 
+    totals.push_back(sum);
+  }
+
+  //given a solution and the means, map each cluster to the cluster it contains
+  for(uint32_t i=0; i < means.size(); i++){
+    double target = means[i];
+    auto it = std::find(solution.begin(), solution.end(), target);
+
+    //the mean is part of the solution
+    if(it != solution.end()){
+        cluster_indexes[i].push_back(i);
+        std::vector<double> distances(totals.size());
+        std::transform(totals.begin(), totals.end(), distances.begin(), [target](double num) { return std::abs(target - num); }); 
+        uint32_t count = 0;
+        //this checks the distances from the mean to all other possible peaks
+        for(uint32_t d=0; d < distances.size(); d++){
+          if(distances[d] < 0.03 && distances[d] != 0){ 
+            count += 1;
+          }
+        }
+        if(count > 1) unresolved.push_back(target);
+       
+    } else {
+      //the problem with this is that it looks at the min but not if two overlapping peaks occur
+      auto it = std::min_element(totals.begin(), totals.end(), [target](double a, double b) {return std::abs(a - target) < std::abs(b - target);});
+      
+      std::vector<double> distances(totals.size());
+      std::transform(totals.begin(), totals.end(), distances.begin(), [target](double num) { return std::abs(target - num); }); 
+      uint32_t count = 0;
+      for(uint32_t d=0; d < distances.size(); d++){
+        if(distances[d] < 0.03) count += 1;
+      }
+      uint32_t index = std::distance(totals.begin(), it);
+      for(auto x : results[index]){
+        auto it2 = std::find(std::begin(means), std::end(means), x);
+        uint32_t index2 = std::distance(std::begin(means), it2);
+        cluster_indexes[i].push_back(index2);
+      }
+      if(count > 1) unresolved.push_back(means[i]);
+    }
+  }
+  /*for(uint32_t i=0; i < cluster_indexes.size(); i++){
+    for(uint32_t j=0; j < cluster_indexes[i].size(); j++){
+      std::cerr << cluster_indexes[i][j] << " ";
+    }
+    std::cerr << "\n";
+  }*/
+  //for(auto u : unresolved) std::cerr << u << std::endl;
+  return(cluster_indexes);
+}
+
+std::vector<std::vector<double>> deduplicate_solutions(std::vector<std::vector<double>> vectors){
+  std::vector<std::vector<double>> solutions;
+  for(uint32_t i=0; i < vectors.size(); i++){
+    if(i == 0){
+      solutions.push_back(vectors[i]);
+      continue;
+    }
+    bool add = true;
+    for(uint32_t j=0; j < solutions.size(); j++){
+      bool same = std::equal(solutions[j].begin(), solutions[j].end(), vectors[i].begin());
+      if(same && (solutions[j].size() == vectors[i].size())){
+        add = false;
+        break;
+      }
+    }
+    if(add){
+      solutions.push_back(vectors[i]);
+    }
+  }
+  return(solutions);
+}
+
+void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model){ 
+  std::cerr << "solving clusters" << std::endl;
+  double error = 0.10;
+  double solution_error = 0.10;
+
+  //read in the cluster values
+  std::vector<double> means = model.means;
+  for(auto m : means){
+    std::cerr << "consensus means " << m << std::endl;
+  }
+  //find position wise frequency pairs
+  std::vector<std::vector<double>> pairs = frequency_pair_finder(variants, means);
+  std::vector<std::vector<double>> solutions = find_solutions(means, error);
+
+  //find peaks that can't be a subset of other peaks
+  std::vector<double> non_subset_means;
+  for(uint32_t i=0; i < means.size(); i++){
+    std::vector<std::vector<double>> tmp = find_subsets_with_error(means, means[i], solution_error);
+    if(tmp.size() <= 1 && means[i] > error){
+      non_subset_means.push_back(means[i]);
+    }
+  }
+  for(auto m : non_subset_means) std::cerr << "non subset " << m << std::endl;
+  std::cerr << "solutions size " << solutions.size() << std::endl;
+  //reduce solution space to things that contain the non subset peaks
+  std::vector<std::vector<double>> realistic_solutions;
+  for(uint32_t i=0; i < solutions.size(); i++){
+      std::vector<double> tmp = solutions[i];
+      bool found = std::all_of(non_subset_means.begin(), non_subset_means.end(), [&tmp](double value) {return std::find(tmp.begin(), tmp.end(), value) != tmp.end();});
+     if(found){
+        realistic_solutions.push_back(solutions[i]);
+     }
+  }
+  std::cerr << "realistic solutions size " << realistic_solutions.size() << std::endl;
+  //check each solution that every possible peak is accounted for
+  std::vector<std::vector<double>> solution_sets;
+  for(uint32_t i=0; i < realistic_solutions.size(); i++){
+    for(auto r : realistic_solutions[i]){
+      std::cerr << r << " ";
+    }
+    std::cerr << "\n";
+    bool keep = account_peaks(realistic_solutions[i], means, 1, solution_error);
+    if(keep){
+      solution_sets.push_back(realistic_solutions[i]);
+    }
+  }
+  for(auto sol : solution_sets){
+    std::cerr << "\nsolution" << std::endl;
+    for(auto s : sol){
+      std::cerr << s << " ";
+    }
+  }
+  std::cerr << "\n" << std::endl;
+  std::vector<double> solution;
+  bool traditional_majority= false; //if we can't find a solution call a traditional majority consensus
+  if(solution_sets.size() == 0){
+    std::cerr << "no solution found" << std::endl;
+    traditional_majority = true;
+  } else if(solution_sets.size() > 1){
+    std::cerr << "too many solutions" << std::endl;
+    traditional_majority = true;
+  } else{
+    solution = solution_sets[0];
+  }
+
+  for(auto x : solution){
+    std::cerr << x << std::endl;
+  }
+  std::vector<double> unresolved;
+  std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
+  std::vector<std::vector<uint32_t>> inverse_groups(means.size());
+  for(uint32_t i=0; i < cluster_groups.size(); i++){
+    for(uint32_t j=0; j < cluster_groups[i].size(); j++){
+      inverse_groups[cluster_groups[i][j]].push_back(i);
+    }
+  }
+  //TESTLINES MEAN CODE
+  std::string solution_string = "[";
+  for(uint32_t i=0; i < solution.size(); i++){
+    if(i != 0){
+      solution_string += ",";
+    }
+    std::string tmp = std::to_string(solution[i]);
+    solution_string += tmp;
+  }
+
+  /*solution_string += "]";
+  std::string solution_filename = clustering_file + "_solution.txt";
+  std::ofstream file_sol(solution_filename);
+  file_sol << "means\n";
+  file_sol << solution_string << "\n";
+  file_sol.close();*/
+
+  double largest = *std::max_element(solution.begin(), solution.end());
+  //define the clusters which contain the majority population
+  std::vector<std::vector<double>> possible_clusters;
+  std::vector<double> current;
+  find_combinations(solution, 0, current, possible_clusters, 0);
+  std::vector<double> expected_clusters;
+  for(uint32_t i=0; i < possible_clusters.size(); i++){
+    bool keep = false;
+    for(uint32_t j=0; j < possible_clusters[i].size(); j++){
+      if(possible_clusters[i][j] == largest){
+        keep = true;
+        break;
+      }
+    }
+    if(keep){
+      double sum = std::accumulate(possible_clusters[i].begin(), possible_clusters[i].end(), 0.0f);
+      expected_clusters.push_back(sum);
+    }
+  }
+  //a list of cluster assignments that we assign to consensus
+  std::vector<int> major_indexes;
+  //index of the "100%" cluster
+  for(uint32_t j=0; j < means.size(); j++){
+    double tmp = means[j];
+    auto closest = *std::min_element(expected_clusters.begin(), expected_clusters.end(), [tmp](double a, double b) {
+      return std::abs(a - tmp) < std::abs(b - tmp);
+    });
+    double diff = std::abs(closest - tmp);
+    auto it = std::find(solution.begin(), solution.end(), tmp);
+    if((diff < error && it == solution.end()) || tmp == largest){
+      std::cerr << "major index " << means[j] << " " << j << std::endl;
+      major_indexes.push_back((int)j);
+    }
+  }
+
+  //rewrite_position_masking(variants);
+
+  std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, solution, inverse_groups, means);
+  modify_variant_masking(amplicons_to_mask, variants);
+  for(auto x : amplicons_to_mask){
+    std::cerr << "mask " << x << std::endl;
+  }
+  exit(0);
+
+}

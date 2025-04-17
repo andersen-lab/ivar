@@ -22,6 +22,7 @@ add_executable(ivar
         estimate_error.cpp
         gmm.cpp
         call_consensus_clustering.cpp
+        solve_clustering.cpp
         ${armadillo_src}
 )
 

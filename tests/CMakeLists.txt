@@ -59,7 +59,7 @@ add_executable(check_primer_bed
 )
 
 add_executable(check_clustering_consensus
-        test_clustering_consensus.cpp ../src/gmm.cpp ../src/call_consensus_clustering.cpp ../src/estimate_error.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp
+        test_clustering_consensus.cpp ../src/gmm.cpp ../src/call_consensus_clustering.cpp ../src/estimate_error.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp
 )
 
 add_executable(check_getmasked

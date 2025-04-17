@@ -36,7 +36,8 @@ struct variant {
   std::vector<uint32_t> amplicon_numbers;
   //frequencies of this variants on each amplicon
   std::vector<double> freq_numbers;
-
+  //the consensus sequence this variant is assigned to
+  uint32_t consensus_number;
   //for these true means flagged as problematic
   bool vague_assignment=false; //cannot be distinguished between two groups
   bool amplicon_flux=false; //fluctuation frequency across amplicons
@@ -58,9 +59,10 @@ std::vector<std::vector<double>> solve_possible_solutions(std::vector<float> tmp
 uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
 void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, std::vector<double> means, uint32_t lower_n);
-gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> variants, uint32_t lower_n, double var_floor);
+gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double var_floor);
 void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, uint32_t lower_n);
 double calculate_mean(const std::vector<double>& data);
 void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound);
 kmeans_model train_model(uint32_t n, arma::mat data);
+void probability_amplicon_frequencies(gaussian_mixture_model retrained, std::vector<variant> base_variants, uint32_t n);
 #endif
