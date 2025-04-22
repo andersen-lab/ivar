@@ -773,7 +773,17 @@ std::vector<uint32_t> split_csv(const std::string& input) {
     return result;
 }
 
-void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, uint32_t round_val, uint8_t quality_threshold){
+void set_freq_range_flags(std::vector<variant> &variants, float lower_bound, float upper_bound){
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].gapped_freq <= lower_bound || variants[i].gapped_freq >= upper_bound){
+      variants[i].outside_freq_range = true;
+    } else {
+      variants[i].outside_freq_range = false;
+    }
+  }
+}
+
+void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold){
   /*
    * Parses the variants file produced internally by reading bam file line-by-line.
    */
@@ -858,12 +868,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     } else {
       tmp.depth_flag = false;
     }
-    //TEST LINES 
-    if (gapped_freq <= lower_bound || gapped_freq >= upper_bound){
-      tmp.outside_freq_range = true;
-    } else {
-      tmp.outside_freq_range = false;
-    }
     if((double)qual < quality_threshold){
       tmp.qual_flag = true;
     } else {
@@ -878,20 +882,21 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t n=8;
   uint32_t round_val = 4; 
   bool development_mode=true;
-  double error_rate = cluster_error(prefix, min_qual, min_depth);
+
+  std::vector<variant> base_variants;
+  parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
+  double error_rate = cluster_error(base_variants, min_qual, min_depth);
   //add these adjusters because of rounding errors
   float lower_bound = 1-error_rate+0.0001;
   float upper_bound = error_rate-0.0001;
+  set_freq_range_flags(base_variants, lower_bound, upper_bound);
   std::cerr << "lower " << lower_bound << " upper " << upper_bound << std::endl;
-  std::vector<variant> base_variants;
   
-  parse_internal_variants(prefix, base_variants, min_depth, lower_bound, upper_bound, round_val, min_qual);
   
   //if ivar 1.0 is in use, calculate the frequency of the reference
   if(base_variants[0].version_1_var){
     calculate_reference_frequency(base_variants, prefix, min_depth, lower_bound, upper_bound);
   }
-  std::string filename = prefix + ".txt";
 
   //this whole things needs to be reconfigured
   uint32_t useful_var=0;

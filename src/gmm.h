@@ -58,8 +58,7 @@ struct variant {
 };
 void split(const std::string &s, char delim, std::vector<std::string> &elems);
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means);
-void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, uint32_t round_val, uint8_t quality_threshold);
-std::vector<uint32_t> find_low_quality_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, float quality_threshold, uint32_t round_val);
+void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold);
 std::vector<std::vector<double>> solve_possible_solutions(std::vector<float> tmp_means, double error);
 uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
@@ -71,4 +70,5 @@ void calculate_reference_frequency(std::vector<variant> &variants, std::string f
 kmeans_model train_model(uint32_t n, arma::mat data);
 void probability_amplicon_frequencies(gaussian_mixture_model retrained, std::vector<variant> base_variants, uint32_t n);
 void calculate_cluster_deviations(gaussian_mixture_model &model);
+void set_freq_range_flags(std::vector<variant> &variants, float lower_bound, float upper_bound);
 #endif

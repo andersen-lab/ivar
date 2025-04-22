@@ -39,20 +39,17 @@ std::vector<std::vector<uint32_t>> determine_outlier_points(std::vector<double> 
     return(removal_points);
 }
 
-double cluster_error(std::string filename, uint8_t quality_threshold, uint32_t depth_cutoff){
+double cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold, uint32_t depth_cutoff){
   /*
     Here we use clustering to determine the value of the noise.
   */
-
   float lower_bound = 0.50;
   float upper_bound = 0.99;
-  uint32_t round_val = 4;
+  set_freq_range_flags(base_variants, lower_bound, upper_bound);
   
-  std::vector<variant> base_variants;
-  parse_internal_variants(filename, base_variants, depth_cutoff, lower_bound, upper_bound, round_val, quality_threshold);
-  if(base_variants[0].version_1_var){
+  /*if(base_variants[0].version_1_var){
     calculate_reference_frequency(base_variants, filename, depth_cutoff, lower_bound, upper_bound);
-  }
+  }*/
 
   std::vector<variant> variants_original;
   uint32_t useful_count_original = 0;

@@ -111,10 +111,10 @@ std::vector<float> parse_clustering_results(std::string clustering_file){
   }  
   return(numbers);
 }
-void cluster_consensus(std::vector<variant> variants, std::string clustering_file, std::string variants_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means){ 
+void cluster_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means){ 
   std::cerr << "calling consensus" << std::endl;
   double max_mean=0;
-  double error_rate = cluster_error(variants_file, min_qual, min_depth);
+  double error_rate = cluster_error(variants, min_qual, min_depth);
   float freq_lower_bound = 1-error_rate-0.001;
   float freq_upper_bound = error_rate+0.001;
 
