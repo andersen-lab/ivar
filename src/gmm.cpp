@@ -1,5 +1,6 @@
 #include "./include/armadillo"
 #include "gmm.h"
+#include "saga.h"
 #include "call_consensus_clustering.h"
 #include "solve_clustering.h"
 #include "estimate_error.h"
@@ -9,10 +10,22 @@
 #include <limits>
 #include <unordered_map>
 
+void calculate_cluster_deviations(gaussian_mixture_model &model){
+  //here we calculate the standard deviation of each cluster
+  std::vector<double> std_devs;
+  for(uint32_t i=0; i < model.clusters.size(); i++){
+    double std_dev = calculate_standard_deviation(model.clusters[i]);
+    std_devs.push_back(std_dev);
+  }
+  model.cluster_std_devs = std_devs;
+}
+
 std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> variants){
   std::vector<std::vector<double>> clusters(n);
   for(uint32_t i=0; i < variants.size(); i++){
-    clusters[variants[i].cluster_assigned].push_back(variants[i].gapped_freq);
+    if(variants[i].cluster_assigned != -1){
+      clusters[variants[i].cluster_assigned].push_back(variants[i].gapped_freq);
+    }
   }
   return(clusters);
 }
@@ -289,6 +302,8 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
   gmodel.model = model;
   assign_clusters(variants, gmodel, lower_n);
 
+  std::vector<std::vector<double>> clusters = form_clusters(n, variants);
+  gmodel.clusters = clusters;
   return(gmodel);
 }
 
@@ -859,7 +874,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
   } 
 }
 
-std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual){
+std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means){
   uint32_t n=8;
   uint32_t round_val = 4; 
   bool development_mode=true;
@@ -907,8 +922,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     data.col(count) = tmp;
     count += 1;
   }
-  std::vector<double> means;
-  std::vector<double> hefts;
   std::vector<uint32_t> exclude_cluster_indices;
   
   uint32_t counter = 2;
@@ -971,7 +984,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     retrained.prob_matrix.clear();
     retrained = retrain_model(optimal_n, data, variants, lower_n, 0.001);
   }
-
+  means = retrained.means;
   //calculate cluster means
   //TODO this can be put in function
   std::ofstream file;
@@ -1059,6 +1072,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     file.close();
   }
 
-  solve_clusters(variants, retrained);
+  solve_clusters(variants, retrained, error_rate, solution);
   return(variants);
 }

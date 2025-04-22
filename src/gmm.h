@@ -20,6 +20,8 @@ struct gaussian_mixture_model {
   std::vector<double> dcovs;
   double aic;
   arma::gmm_diag model;
+  std::vector<std::vector<double>> clusters;
+  std::vector<double> cluster_std_devs;
 };
 
 struct variant {
@@ -37,7 +39,10 @@ struct variant {
   //frequencies of this variants on each amplicon
   std::vector<double> freq_numbers;
   //the consensus sequence this variant is assigned to
-  uint32_t consensus_number;
+  std::vector<uint32_t> consensus_numbers;
+  //if this cluster is fully resolveable or not
+  bool resolved=true;
+
   //for these true means flagged as problematic
   bool vague_assignment=false; //cannot be distinguished between two groups
   bool amplicon_flux=false; //fluctuation frequency across amplicons
@@ -52,7 +57,7 @@ struct variant {
 
 };
 void split(const std::string &s, char delim, std::vector<std::string> &elems);
-std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual);
+std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means);
 void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, float lower_bound, float upper_bound, uint32_t round_val, uint8_t quality_threshold);
 std::vector<uint32_t> find_low_quality_positions(std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound, float quality_threshold, uint32_t round_val);
 std::vector<std::vector<double>> solve_possible_solutions(std::vector<float> tmp_means, double error);
@@ -65,4 +70,5 @@ double calculate_mean(const std::vector<double>& data);
 void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound);
 kmeans_model train_model(uint32_t n, arma::mat data);
 void probability_amplicon_frequencies(gaussian_mixture_model retrained, std::vector<variant> base_variants, uint32_t n);
+void calculate_cluster_deviations(gaussian_mixture_model &model);
 #endif

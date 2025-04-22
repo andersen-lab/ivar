@@ -111,12 +111,8 @@ std::vector<float> parse_clustering_results(std::string clustering_file){
   }  
   return(numbers);
 }
-void cluster_consensus(std::vector<variant> variants, std::string clustering_file, std::string variants_file, double default_threshold, uint32_t min_depth, uint8_t min_qual){ 
-
-  std::vector<double> solution;
-  std::vector<std::vector<double>> inverse_groups;
-  std::vector<double> unresolved;
-  std::vector<double> means;
+void cluster_consensus(std::vector<variant> variants, std::string clustering_file, std::string variants_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means){ 
+  std::cerr << "calling consensus" << std::endl;
   double max_mean=0;
   double error_rate = cluster_error(variants_file, min_qual, min_depth);
   float freq_lower_bound = 1-error_rate-0.001;
@@ -130,8 +126,9 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     }
   }
   bool print = false;
+  //initialize sequences for all possible populations
   std::vector<std::vector<std::string>> all_consensus_seqs;
-  for(uint32_t i=0; i < means.size(); i++){
+  for(uint32_t i=0; i < solution.size(); i++){
     std::vector<std::string> tmp(max_position, "N");
     all_consensus_seqs.push_back(tmp);
   }
@@ -152,14 +149,8 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     } else{
         print = false;
     }
-    //if the mean for this cluster is unresolved we skip it
-    auto it = std::find(unresolved.begin(), unresolved.end(), means[variants[i].cluster_assigned]);     
-    if(it != unresolved.end()){ 
-      if(print){
-        std::cerr << "unresolved " << means[variants[i].cluster_assigned] << std::endl;
-      }
-      continue;
-    }
+    //TODO handle the unresolved code portion
+
     //if this amplicon is experiencing fluctuation across amplicons, call ambiguity
     if(variants[i].amplicon_masked && variants[i].freq < freq_upper_bound){
       if(print){
@@ -187,7 +178,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
        continue;
      }
      uint32_t position = variants[i].position;
-     if(variants[i].low_prob_flag && means[variants[i].cluster_assigned] != freq_upper_bound && variants[i].freq < max_mean){
+     if(variants[i].low_prob_flag && variants[i].freq < max_mean){
         if(print){
             std::cerr << "c" << std::endl;
             for(auto p : variants[i].probabilities){
@@ -197,7 +188,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
         }
        continue;
      }
-     if(variants[i].vague_assignment && variants[i].freq < freq_upper_bound && variants[i].freq < max_mean && std::abs(variants[i].freq - means[variants[i].cluster_assigned]) > 0.10){      
+     if(variants[i].vague_assignment && variants[i].freq < freq_upper_bound && variants[i].freq < max_mean){      
        if(print){
           std::cerr << "d" << std::endl;
           for(auto a : variants[i].probabilities){
@@ -219,17 +210,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       continue;
     }
 
-    for(uint32_t j=0; j < inverse_groups.size(); j++){
-      //check to make sure you're lookin at a group that's part of the solution
-      auto mit = std::find(solution.begin(), solution.end(), means[j]);
-      if(mit == solution.end()) continue;
-      //assign the point to all applicable groups
-      auto it = std::find(inverse_groups[j].begin(), inverse_groups[j].end(), variants[i].cluster_assigned);      
-      if(it != inverse_groups[j].end()){
-        if(print) std::cerr << "in inverse " << j << std::endl;
-        all_consensus_seqs[j][position-1] = variants[i].nuc;
-      }
-    }
+    //TODO INVERSE CODE
   }
   std::vector<std::string> all_sequences;
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){

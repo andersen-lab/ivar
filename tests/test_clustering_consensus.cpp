@@ -17,27 +17,38 @@ int main() {
   uint32_t round_val = 4; 
   uint32_t min_depth = 10;
   uint8_t min_qual = 20;
-  float lower_bound = 0.03;
-  float upper_bound = 0.97;
-  std::string var_filename = "../data/version_bump_tests/test_variants.txt";
-    
+  //std::string var_filename = "../data/version_bump_tests/test_variants.txt";
+  std::string var_filename = "../data/version_bump_tests/file_0_var.txt";
+   
   std::vector<variant> base_variants; 
-  uint32_t n = 4;
+  std::vector<variant> variants; 
+  uint32_t n = 2;
 
+  //estimation of error
+  double error_rate = cluster_error(var_filename, min_qual, min_depth);
+  float lower_bound = 1-error_rate+0.0001;
+  float upper_bound = error_rate-0.0001;
   //parse our test variants file
+  uint32_t count = 0;
   parse_internal_variants(var_filename, base_variants, min_depth, lower_bound, upper_bound, round_val, min_qual);
-
+  for(uint32_t i=0; i < base_variants.size(); i++){
+    if(!base_variants[i].outside_freq_range && !base_variants[i].depth_flag){
+      variants.push_back(base_variants[i]);
+      count++;
+    }
+  }
+  
   //initialize armadillo dataset and populate with frequency data
-  arma::mat data(1, base_variants.size(), arma::fill::zeros);
+  arma::mat data(1, count, arma::fill::zeros);
 
   //(rows, cols) where each columns is a sample
-  for(uint32_t i = 0; i < base_variants.size(); i++){
-    double tmp = static_cast<double>(base_variants[i].gapped_freq);
+  for(uint32_t i = 0; i < variants.size(); i++){
+    double tmp = static_cast<double>(variants[i].gapped_freq);
     data.col(i) = tmp;
   }
-
-  gaussian_mixture_model retrained = retrain_model(n, data, base_variants, 2, 0.001);
-  solve_clusters(base_variants, retrained);
+  std::vector<double> solution;   
+  gaussian_mixture_model retrained = retrain_model(n, data, variants, 2, 0.001);
+  solve_clusters(variants, retrained, (double)lower_bound, solution);
   exit(0);
   for(auto m : retrained.means){
     std::cerr << m << std::endl;

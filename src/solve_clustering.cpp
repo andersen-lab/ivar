@@ -53,17 +53,39 @@ double find_neighboring_cluster(double freq, uint32_t cluster_assigned, std::vec
   return(means[index]);
 }
 
-void rewrite_position_masking(std::vector<variant> variants){
-  /*
-    Given a position that was originally flagged as experiencing fluctuation, determine if the fluctuation would affect the consensus. 
-  */
+void rewrite_position_masking(std::vector<variant> &variants, gaussian_mixture_model model, uint32_t n){
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].amplicon_flux && variants[i].freq_numbers.size() > 1){
-      std::cerr << variants[i].position << std::endl;
-      for(uint32_t j=0; j < variants[i].freq_numbers.size(); j++){    
-        std::cerr << variants[i].freq_numbers[j] << std::endl;
+      //populate a new armadillo dataset with more frequencies
+      arma::mat final_data(1, variants[i].freq_numbers.size(), arma::fill::zeros);
+      for(uint32_t j = 0; j < variants[i].freq_numbers.size(); j++){
+        final_data.col(j) = static_cast<double>(variants[i].freq_numbers[j]);
       }
-      std::cerr << "\n";
+      //recalculate the prob matrix based on the new dataset
+      std::vector<std::vector<double>> prob_matrix;
+      std::vector<double> tmp;
+      for(uint32_t j=0; j < n; j++){
+        arma::rowvec set_likelihood = model.model.log_p(final_data, j);
+        tmp.clear();
+        for(uint32_t k=0; k < final_data.n_cols; k++){
+          tmp.push_back((double)set_likelihood[k]);
+         }
+        prob_matrix.push_back(tmp);
+      }
+      std::vector<std::vector<double>> inverse = transpose_vector(prob_matrix);
+      bool mask = false;
+      for(uint32_t j=0; j < variants[i].freq_numbers.size(); j++){    
+        auto max_it = std::max_element(inverse[j].begin(), inverse[j].end());
+        uint32_t index = std::distance(inverse[j].begin(), max_it);
+        
+        auto it = std::find(variants[i].consensus_numbers.begin(), variants[i].consensus_numbers.end(), index);
+        if(it == variants[i].consensus_numbers.end()){
+          mask = true;
+          break;
+        }
+      }
+      variants[i].amplicon_flux = mask;
+      variants[i].amplicon_masked = mask;
     } 
   }
 }
@@ -97,15 +119,15 @@ std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, st
         for(auto v : variants[i].amplicon_numbers){
           if(std::find(amplicons_to_mask.begin(), amplicons_to_mask.end(), v) == amplicons_to_mask.end()){
             amplicons_to_mask.push_back(v);
-            std::cerr << "pos " << variants[i].position << " freq " << variants[i].gapped_freq << " " << closest_mean << " assigned mean " << means[variants[i].cluster_assigned] << std::endl;
-            for(auto x : variants[i].freq_numbers){
+            //std::cerr << "pos " << variants[i].position << " freq " << variants[i].gapped_freq << " " << closest_mean << " assigned mean " << means[variants[i].cluster_assigned] << std::endl;
+            /*for(auto x : variants[i].freq_numbers){
               std::cerr << x << " ";
             }
             std::cerr << "\n" << std::endl;
             for(auto x : variants[i].amplicon_numbers){
               std::cerr << x << " ";
             }
-            std::cerr << "\n" << std::endl;
+            std::cerr << "\n" << std::endl;*/
           }
         }
       }
@@ -166,6 +188,7 @@ std::vector<std::vector<double>> find_subsets_with_error(std::vector<double> mea
 
   std::vector<std::vector<double>> valid_combinations;  
   for(uint32_t i=0; i < results.size(); i++){
+    
     bool in_range = within_error_range(results[i], target, error);
     if(in_range){
       valid_combinations.push_back(results[i]);
@@ -251,7 +274,8 @@ void find_combinations(std::vector<double> means, uint32_t index, std::vector<do
 
 std::vector<std::vector<double>> find_solutions(std::vector<double> means, double error){
   std::vector<double> current;
-  std::vector<std::vector<double>> results;
+  std::vector<std::vector<double>> results;    
+
   find_combinations(means, 0, current, results, 0);
   
   std::sort(results.begin(), results.end());
@@ -351,30 +375,63 @@ std::vector<std::vector<double>> deduplicate_solutions(std::vector<std::vector<d
   return(solutions);
 }
 
-void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model){ 
+std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, double estimated_error){
+  std::vector<double> means = model.means;
+  std::vector<double> std_devs = model.cluster_std_devs;
+  std::vector<uint32_t> noise_indices;
+  for(uint32_t i=0; i < means.size(); i++){
+    //if the estimated error is within one standard deviation of the cluster mean
+    //and the standard deviation is relatively small - noise peaks tend to have smalelr stdevs
+    if(((means[i] - (std_devs[i])) <= estimated_error) && std_devs[i] < 0.05){
+      noise_indices.push_back(i);
+    }
+  }
+  return(noise_indices);
+}
+
+void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model, double estimated_error, std::vector<double> &solution){ 
   std::cerr << "solving clusters" << std::endl;
   double error = 0.10;
   double solution_error = 0.10;
-
+  calculate_cluster_deviations(model);
+  for(auto x : model.cluster_std_devs){
+    std::cerr << x << std::endl;
+  }
   //read in the cluster values
   std::vector<double> means = model.means;
   for(auto m : means){
     std::cerr << "consensus means " << m << std::endl;
   }
+    
+  std::cerr << "estimated error " << estimated_error << std::endl;
+
+  //determine if any clusters are possible noise
+  std::vector<uint32_t> noise_indices = noise_cluster_calculator(model, estimated_error);
+
+
+  //filter peaks from means by index
+  std::vector<double> filtered_means;
+  std::vector<double> std_devs;
+  for(uint32_t i=0; i < means.size(); i++){
+    auto it = std::find(noise_indices.begin(), noise_indices.end(), i);
+    if(it == noise_indices.end()){
+      filtered_means.push_back(means[i]);
+      std_devs.push_back(model.cluster_std_devs[i]);
+    }
+  }
+  
   //find position wise frequency pairs
   std::vector<std::vector<double>> pairs = frequency_pair_finder(variants, means);
-  std::vector<std::vector<double>> solutions = find_solutions(means, error);
+  std::vector<std::vector<double>> solutions = find_solutions(filtered_means, error);
 
   //find peaks that can't be a subset of other peaks
   std::vector<double> non_subset_means;
-  for(uint32_t i=0; i < means.size(); i++){
-    std::vector<std::vector<double>> tmp = find_subsets_with_error(means, means[i], solution_error);
-    if(tmp.size() <= 1 && means[i] > error){
-      non_subset_means.push_back(means[i]);
+  for(uint32_t i=0; i < filtered_means.size(); i++){
+    std::vector<std::vector<double>> tmp = find_subsets_with_error(filtered_means, filtered_means[i], std_devs[i]);
+    if(tmp.size() <= 1){
+      non_subset_means.push_back(filtered_means[i]);
     }
   }
-  for(auto m : non_subset_means) std::cerr << "non subset " << m << std::endl;
-  std::cerr << "solutions size " << solutions.size() << std::endl;
   //reduce solution space to things that contain the non subset peaks
   std::vector<std::vector<double>> realistic_solutions;
   for(uint32_t i=0; i < solutions.size(); i++){
@@ -384,7 +441,7 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
         realistic_solutions.push_back(solutions[i]);
      }
   }
-  std::cerr << "realistic solutions size " << realistic_solutions.size() << std::endl;
+  //std::cerr << "realistic solutions size " << realistic_solutions.size() << std::endl;
   //check each solution that every possible peak is accounted for
   std::vector<std::vector<double>> solution_sets;
   for(uint32_t i=0; i < realistic_solutions.size(); i++){
@@ -392,7 +449,7 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
       std::cerr << r << " ";
     }
     std::cerr << "\n";
-    bool keep = account_peaks(realistic_solutions[i], means, 1, solution_error);
+    bool keep = account_peaks(realistic_solutions[i], filtered_means, 1, solution_error);
     if(keep){
       solution_sets.push_back(realistic_solutions[i]);
     }
@@ -404,7 +461,6 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
     }
   }
   std::cerr << "\n" << std::endl;
-  std::vector<double> solution;
   bool traditional_majority= false; //if we can't find a solution call a traditional majority consensus
   if(solution_sets.size() == 0){
     std::cerr << "no solution found" << std::endl;
@@ -421,6 +477,7 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   }
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
+  
   std::vector<std::vector<uint32_t>> inverse_groups(means.size());
   for(uint32_t i=0; i < cluster_groups.size(); i++){
     for(uint32_t j=0; j < cluster_groups[i].size(); j++){
@@ -479,13 +536,32 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
     }
   }
 
-  //rewrite_position_masking(variants);
+  //check if the variant corresponds to an unresolved cluster
+  for(uint32_t i=0; i < variants.size(); i++){
+    auto it = std::find(unresolved.begin(), unresolved.end(), means[variants[i].cluster_assigned]);
+    if(it != unresolved.end()){
+      variants[i].resolved = false;
+    }
+  }
 
+  //assign the number of the consensus genome
+  for(uint32_t i=0; i < variants.size(); i++){
+    for(uint32_t j=0; j < inverse_groups.size(); j++){
+      //check to make sure you're lookin at a group that's part of the solution
+      auto mit = std::find(solution.begin(), solution.end(), means[j]);
+      if(mit == solution.end()) continue;
+    
+      //assign the point to all applicable groups
+      auto it = std::find(inverse_groups[j].begin(), inverse_groups[j].end(), variants[i].cluster_assigned);
+      if(it != inverse_groups[j].end()){
+        variants[i].consensus_numbers.push_back(j);
+      }
+    }           
+  }
+  //here we assess if positions should be masked based on clustering
+  rewrite_position_masking(variants, model, means.size());  
+
+  //here we adjuts amplicon masking based on clustering
   std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, solution, inverse_groups, means);
   modify_variant_masking(amplicons_to_mask, variants);
-  for(auto x : amplicons_to_mask){
-    std::cerr << "mask " << x << std::endl;
-  }
-  exit(0);
-
 }

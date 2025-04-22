@@ -122,7 +122,5 @@ double cluster_error(std::string filename, uint8_t quality_threshold, uint32_t d
   
   //get the upper edge of the noise cluster
   auto min_it = std::min_element(cleaned_cluster.begin(), cleaned_cluster.end());
-  std::cerr << *min_it << std::endl;
-  //exit(0);
   return(*min_it);
 }

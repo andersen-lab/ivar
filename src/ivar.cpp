@@ -356,8 +356,10 @@ int main(int argc, char *argv[]) {
       opt = getopt(argc, argv, contam_opt_str);
     }
     if (!g_args.variants.empty() && !g_args.prefix.empty()) {
-      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual);
-      cluster_consensus(variants, g_args.prefix, g_args.variants, g_args.min_threshold, g_args.min_depth, g_args.min_qual);
+      std::vector<double> solution;
+      std::vector<double> means;
+      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means);
+      cluster_consensus(variants, g_args.prefix, g_args.variants, g_args.min_threshold, g_args.min_depth, g_args.min_qual, solution, means);
     }
     res = 0; 
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
