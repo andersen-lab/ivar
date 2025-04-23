@@ -114,10 +114,11 @@ std::vector<float> parse_clustering_results(std::string clustering_file){
 void cluster_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means){ 
   std::cerr << "calling consensus" << std::endl;
   double max_mean=0;
+  set_freq_range_flags(variants, 0, 1);
   double error_rate = cluster_error(variants, min_qual, min_depth);
   float freq_lower_bound = 1-error_rate-0.001;
   float freq_upper_bound = error_rate+0.001;
-
+  set_freq_range_flags(variants, freq_lower_bound, freq_upper_bound);
   //find the largest position in the variants file
   uint32_t max_position = 0;
   for(auto x : variants){
@@ -128,27 +129,32 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   bool print = false;
   //initialize sequences for all possible populations
   std::vector<std::vector<std::string>> all_consensus_seqs;
-  for(uint32_t i=0; i < solution.size(); i++){
+  for(uint32_t i=0; i < means.size(); i++){
     std::vector<std::string> tmp(max_position, "N");
     all_consensus_seqs.push_back(tmp);
   }
-
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
     if(variants[i].nuc.find('+') != std::string::npos) continue;
     //TESTLINES
-    if(variants[i].position == 10652){
+    if(variants[i].position == 210){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
       std::cerr << "amplicon masked " << variants[i].amplicon_masked << " amp flux pos " << variants[i].amplicon_flux << std::endl;        
-      for(auto m : variants[i].amplicon_numbers){
-        std::cerr << m << std::endl;
-      }
-    } else{
-        print = false;
+    }else{
+      print = false;
     }
+    float freq = variants[i].gapped_freq;
+    float qual = variants[i].qual;
+    uint32_t depth = variants[i].depth;    
+    //depth, quality, and low frequency bypass
+    if(freq < freq_lower_bound || qual < (float)min_qual || depth < min_depth){
+      if(print) std::cerr << "min qual, freq, or depth issue " << qual << " " << freq << " " << depth << " flb " << freq_lower_bound << " mq " << (float)min_qual << " md " << min_depth << std::endl;
+      continue;
+    }
+
     //TODO handle the unresolved code portion
 
     //if this amplicon is experiencing fluctuation across amplicons, call ambiguity
@@ -165,18 +171,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       }
       continue;
     } 
-    if(variants[i].depth_flag){
-      if(print){
-        std::cerr << "a " << variants[i].depth_flag << std::endl;
-      }
-      continue;
-     } 
-     if(variants[i].qual < 20 && variants[i].nuc != "-"){
-        if(print){
-          std::cerr << "b" << std::endl;
-       }
-       continue;
-     }
      uint32_t position = variants[i].position;
      if(variants[i].low_prob_flag && variants[i].freq < max_mean){
         if(print){
@@ -198,19 +192,19 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
        }
        continue;
      }
-     if(variants[i].freq <= freq_lower_bound) continue;
-     //handle all the cases where you never assigned anything
-    if(variants[i].cluster_assigned == -1){
+     //handle all the cases where you never assigned anything, assign to all if it's over the upper bound
+     if(variants[i].cluster_assigned == -1){
       if(variants[i].gapped_freq < freq_upper_bound) continue;
       if(print) std::cerr << "not assigned anything" << std::endl;
-      //ADD IN ADDING TO ALL CLUSTERS
       for(uint32_t j=0; j < all_consensus_seqs.size(); j++){
         all_consensus_seqs[j][position-1] = variants[i].nuc;
       }
       continue;
     }
-
     //TODO INVERSE CODE
+    for(uint32_t j=0; j < variants[i].consensus_numbers.size(); j++){
+      all_consensus_seqs[variants[i].consensus_numbers[j]][position-1] = variants[i].nuc;
+    }
   }
   std::vector<std::string> all_sequences;
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
@@ -222,10 +216,12 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   //write the consensus string to file
   std::string consensus_filename = clustering_file + ".fa";
   std::ofstream file(consensus_filename);
-  for(uint32_t i=0; i < all_sequences.size(); i++){
-    float tmp_mean = means[i];
+  for(uint32_t i=0; i < all_sequences.size(); i++){ 
+    double tmp_mean = means[i];
     auto it = std::find(solution.begin(), solution.end(), tmp_mean);
-    if(it == solution.end()) continue;
+    if(it == solution.end()){ 
+      continue;
+    }
     file << ">"+clustering_file+"_cluster_"+ std::to_string(means[i]) << "\n";
     file << all_sequences[i] << "\n";
   }

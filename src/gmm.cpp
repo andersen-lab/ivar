@@ -1076,7 +1076,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     }
     file.close();
   }
-
   solve_clusters(variants, retrained, error_rate, solution);
   return(variants);
 }

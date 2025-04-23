@@ -531,7 +531,6 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
     double diff = std::abs(closest - tmp);
     auto it = std::find(solution.begin(), solution.end(), tmp);
     if((diff < error && it == solution.end()) || tmp == largest){
-      std::cerr << "major index " << means[j] << " " << j << std::endl;
       major_indexes.push_back((int)j);
     }
   }

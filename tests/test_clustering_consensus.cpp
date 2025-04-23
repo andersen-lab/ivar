@@ -19,12 +19,13 @@ int main() {
   uint32_t round_val = 4; 
   uint32_t min_depth = 10;
   uint8_t min_qual = 20;
-  //std::string var_filename = "../data/version_bump_tests/test_variants.txt";
-  std::string var_filename = "../data/version_bump_tests/file_0_var.txt";
+  double default_threshold = 0.5;
+  std::string var_filename = "../data/version_bump_tests/test_variants.txt";
+  //std::string var_filename = "../data/version_bump_tests/file_0_var.txt";
    
   std::vector<variant> base_variants; 
   std::vector<variant> variants; 
-  uint32_t n = 2;
+  uint32_t n = 4;
 
   //estimation of error
   parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual);
@@ -51,10 +52,14 @@ int main() {
   }
   std::vector<double> solution;   
   gaussian_mixture_model retrained = retrain_model(n, data, variants, 2, 0.001);
+  //push back the ones we removed earlier
+  for(uint32_t i=0; i < base_variants.size(); i++){
+    if(base_variants[i].outside_freq_range || base_variants[i].depth_flag){
+      variants.push_back(base_variants[i]);   
+    }
+  }
   solve_clusters(variants, retrained, (double)lower_bound, solution);
-
-  //cluster_consensus(variants, prefix, , double default_t    hreshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means)
-  
+  cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means); 
   exit(0);
   probability_amplicon_frequencies(retrained, base_variants, n);
   
