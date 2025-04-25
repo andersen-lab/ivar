@@ -67,7 +67,7 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
 void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, uint32_t lower_n);
 double calculate_mean(const std::vector<double>& data);
 void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound);
-kmeans_model train_model(uint32_t n, arma::mat data);
+kmeans_model train_model(uint32_t n, arma::mat data, bool error);
 void probability_amplicon_frequencies(gaussian_mixture_model retrained, std::vector<variant> base_variants, uint32_t n);
 void calculate_cluster_deviations(gaussian_mixture_model &model);
 void set_freq_range_flags(std::vector<variant> &variants, float lower_bound, float upper_bound);

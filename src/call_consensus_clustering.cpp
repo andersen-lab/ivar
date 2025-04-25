@@ -126,6 +126,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       max_position = x.position;
     }
   }
+  std::cerr << "max positionm " << max_position << std::endl;
   bool print = false;
   //initialize sequences for all possible populations
   std::vector<std::vector<std::string>> all_consensus_seqs;
@@ -133,6 +134,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     std::vector<std::string> tmp(max_position, "N");
     all_consensus_seqs.push_back(tmp);
   }
+  
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES

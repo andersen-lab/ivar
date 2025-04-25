@@ -77,22 +77,23 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
   kmeans_model model;
 
   while(n <= 5){
-    model = train_model(n, data_original);
+    model = train_model(n, data_original, true);
     std::vector<double> means = model.means;
-    bool stop=true;
+    bool stop=false;
     for(uint32_t i=0; i < model.clusters.size(); i++){
+      double stdev = calculate_standard_deviation(model.clusters[i]);
       float percent = (float)model.clusters[i].size() / (float)data_original.size();
-      if(percent > 0.85) {
-        n++;
-        stop = false;
-      }
-      //std::cerr << "n " << n << " percent " << percent << std::endl;
+      double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
+      if(stdev < 0.01) stop = true;
+      //std::cerr << "n " << n << " percent " << percent << " mean " << mean << " stdev " << stdev << std::endl;
     }
+    //std::cerr << "\n";
     if(stop) break;
+    else n++;
   }
   //for each cluster this describes the points which are outliers
   std::vector<std::vector<uint32_t>> removal_points = determine_outlier_points(frequencies, model.means);
-
+  
   uint32_t j = 0;
   uint32_t largest=0;
   for(uint32_t i=0; i < model.clusters.size(); i++){

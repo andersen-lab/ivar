@@ -191,13 +191,19 @@ void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmod
 
 }
 
-kmeans_model train_model(uint32_t n, arma::mat data) {
+kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
+  /*
+    Train a KMeans model to seed other analyses.
+    error : bool
+      Indicates if this kmeans is being used to detected error levels.
+  */
   arma::mat centroids;
   arma::mat initial_means(1, n, arma::fill::zeros);
   kmeans_model model;
 
   std::vector<std::vector<double>> all_centroids;
-   std::vector<double> total_distances; 
+  std::vector<double> total_distances; 
+  std::vector<double> std_devs;
   for(uint32_t j=0; j < 15; j++){
     //std::cerr << "iteration j " << j << std::endl;
     bool status2 = arma::kmeans(centroids, data, n, arma::random_spread, 10, false);
@@ -215,14 +221,25 @@ kmeans_model train_model(uint32_t n, arma::mat data) {
     }  
     std::vector<double> tmp;
     for(auto c : centroids){
+      //std::cerr << c << " ";
       tmp.push_back((double)c);
     }
+
+    double stddev = calculate_standard_deviation(tmp);
+    std_devs.push_back(stddev);
+    //std::cerr << "\n";
+    //std::cerr << "total dist " << total_dist << " std dev " << stddev << std::endl;
     all_centroids.push_back(tmp);
     total_distances.push_back(total_dist);
   }
-  
-  auto min_it = std::min_element(total_distances.begin(), total_distances.end());
-  uint32_t index = std::distance(total_distances.begin(), min_it);
+  uint32_t index;
+  if(!error){
+    auto min_it = std::min_element(total_distances.begin(), total_distances.end());
+    index = std::distance(total_distances.begin(), min_it);
+  } else {
+    auto max_it = std::max_element(std_devs.begin(), std_devs.end());
+    index = std::distance(std_devs.begin(), max_it);
+  }
   std::vector<double> centroid_vec = all_centroids[index];
 
   //assign points to cluster
@@ -254,7 +271,7 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
   std::vector<std::vector<double>> all_centroids;
   
   //run a kmeans to seed the GMM
-  kmeans_model initial_model = train_model(n, data);
+  kmeans_model initial_model = train_model(n, data, false);
  
   for(uint32_t c=0; c < initial_model.means.size(); c++){
     initial_means.col(c) = (double)initial_model.means[c];
@@ -989,8 +1006,11 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     retrained.prob_matrix.clear();
     retrained = retrain_model(optimal_n, data, variants, lower_n, 0.001);
   }
-  means = retrained.means;
-  //calculate cluster means
+  for(auto cluster : retrained.clusters){
+    double mean = calculate_mean(cluster);
+    means.push_back(mean);
+  }
+  retrained.means = means;
   //TODO this can be put in function
   std::ofstream file;
   if(development_mode){
