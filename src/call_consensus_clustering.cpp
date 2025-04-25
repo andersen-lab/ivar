@@ -116,8 +116,8 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   double max_mean=0;
   set_freq_range_flags(variants, 0, 1);
   double error_rate = cluster_error(variants, min_qual, min_depth);
-  float freq_lower_bound = 1-error_rate-0.001;
-  float freq_upper_bound = error_rate+0.001;
+  float freq_lower_bound = 1-error_rate+0.001;
+  float freq_upper_bound = error_rate-0.001;
   set_freq_range_flags(variants, freq_lower_bound, freq_upper_bound);
   //find the largest position in the variants file
   uint32_t max_position = 0;
@@ -126,7 +126,8 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       max_position = x.position;
     }
   }
-  std::cerr << "max positionm " << max_position << std::endl;
+  std::cerr << "lower " << freq_lower_bound << " upper " << freq_upper_bound << std::endl;
+  std::cerr << "max position " << max_position << std::endl;
   bool print = false;
   //initialize sequences for all possible populations
   std::vector<std::vector<std::string>> all_consensus_seqs;
@@ -140,7 +141,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     //TESTLINES
     if(variants[i].nuc.find('+') != std::string::npos) continue;
     //TESTLINES
-    if(variants[i].position == 210){
+    if(variants[i].position == 638){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
