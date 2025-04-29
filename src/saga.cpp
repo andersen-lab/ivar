@@ -353,8 +353,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     } else {
       start_pos = aln->core.pos;
     }
-    //TESTLINES
-    //if(start_pos > 2119) continue;
     bam1_t *r = aln;
     //get the md tag
     uint8_t *aux = bam_aux_get(aln, "MD");
@@ -473,7 +471,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   std::vector<float> std_deviations;
   std::vector<std::string> pos_nuc;
   std::vector<std::string> freq_strings;
-  uint32_t test_pos = 1055;
+  uint32_t test_pos = 8007;
   //detect fluctuating variants across amplicons
   for(uint32_t i=0; i < amplicons.max_pos; i++){
     amplicons.test_flux.clear();

@@ -93,9 +93,9 @@ void rewrite_position_masking(std::vector<variant> &variants, gaussian_mixture_m
 std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, std::vector<double>solution, std::vector<std::vector<uint32_t>> inverse_groups, std::vector<double> means){
   //stores the numbers of every amplicon where we believe experiences fluctuation that imapcts consensus
   std::vector<uint32_t> amplicons_to_mask;
-
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].amplicon_flux && !variants[i].outside_freq_range){
+      std::cerr << variants[i].position << std::endl;
       //find all clusters not part of the same assignment
       std::vector<double> other_population_clusters;
       for(uint32_t j=0; j < inverse_groups.size(); j++){
@@ -399,9 +399,6 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   }
   //read in the cluster values
   std::vector<double> means = model.means;
-  for(auto m : means){
-    std::cerr << "consensus means " << m << std::endl;
-  }
     
   std::cerr << "estimated error " << estimated_error << std::endl;
 
@@ -558,9 +555,10 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
     }           
   }
   //here we assess if positions should be masked based on clustering
-  rewrite_position_masking(variants, model, means.size());  
+  //rewrite_position_masking(variants, model, means.size());  
 
   //here we adjuts amplicon masking based on clustering
+  //TESTLINES
   std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, solution, inverse_groups, means);
   modify_variant_masking(amplicons_to_mask, variants);
 }

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <fstream>
 #include "../src/include/armadillo"
 #include "htslib/sam.h"
 #include "../src/gmm.h"
@@ -9,23 +10,51 @@
 #include "../src/solve_clustering.h"
 #include "../src/interval_tree.h"
 
-int main() {
-  std::string prefix = "/tmp/consensus";
+void read_consensus(std::vector<std::pair<std::string, std::string>> &sequences, std::string filename){
+  std::ifstream file(filename);
+  std::string sequence;
+  std::string name;
+  std::string tmp;
+  //read the sequence line in 
+  while (std::getline(file, tmp)) {
+    if (tmp.find(">") != std::string::npos){
+      if(sequence.size() > 0){
+        std::transform(sequence.begin(), sequence.end(), sequence.begin(),[](unsigned char c) { return std::toupper(c); });
+        sequences.emplace_back(name, sequence);
+      }
+      name = tmp;
+      sequence.clear();
+      continue;
+    }
+    sequence += tmp;
+  }
+  if(sequence.size() > 0){
+    sequences.emplace_back(name, sequence);
+  }  
+}
 
-  //test var
-  int num_tests = 2;
-  int success = 2;
+int main() {
+  /*
+  Here we do integration tests on simulated data.
+  */
+  std::string prefix = "/tmp/consensus";
+  int num_tests = 1;
+  int success = 0;
  
   uint32_t round_val = 4; 
   uint32_t min_depth = 10;
   uint8_t min_qual = 20;
   double default_threshold = 0.5;
-  std::string var_filename = "../data/version_bump_tests/test_variants.txt";
-  //std::string var_filename = "../data/version_bump_tests/file_0_var.txt";
-   
+
+  //TESTCASE 1 - simulated 80/20 data one mutation difference
+  //std::string var_filename = "../data/version_bump_tests/alpha_200_alpha_1.2_800_var.txt";
+  std::string var_filename = "../data/version_bump_tests/test_variants_small.tsv";
+  std::string consensus_filename = "../data/version_bump_tests/test_consensus.fa";
+  //std::string consensus_filename = "../data/version_bump_tests/alpha_200_alpha_1.2_800_consensus.aligned.fa";
+ 
   std::vector<variant> base_variants; 
   std::vector<variant> variants; 
-  uint32_t n = 4;
+  uint32_t n = 2;
 
   //estimation of error
   parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual);
@@ -41,7 +70,6 @@ int main() {
       count++;
     }
   }
-  
   //initialize armadillo dataset and populate with frequency data
   arma::mat data(1, count, arma::fill::zeros);
 
@@ -60,8 +88,34 @@ int main() {
   }
   solve_clusters(variants, retrained, (double)lower_bound, solution);
   cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means); 
-  exit(0);
-  probability_amplicon_frequencies(retrained, base_variants, n);
+
+  std::vector<pair<std::string, std::string>> gt_sequences;
+  read_consensus(gt_sequences, consensus_filename);
+  std::string exp_sequence;
+  std::vector<pair<std::string, std::string>> exp_sequences;
+  read_consensus(exp_sequences, prefix+".fa");
+  bool correct = true;
+  for (auto itgt = gt_sequences.begin(), itexp = exp_sequences.begin(); itgt != gt_sequences.end() && itexp != exp_sequences.end(); ++itgt, ++itexp) {
+    std::cerr << "ground truth " << itgt->second << " " << itgt->second.size() << std::endl;
+    std::cerr << "exp " << itexp->second << " " << itexp->second.size() << std::endl;
+    for(uint32_t i=0; i < 29903; i++){
+      //if(i < 50 || i >= 29827) continue;
+      char a = itgt->second[i];
+      char b = itexp->second[i];
+      if(a != b){
+        correct = false;
+        std::cerr << "gt sequence " << a << " exp " << b << " pos " << i+1 << std::endl;
+        break;
+      }
+    }
+  }
+  if(correct) success++;
+
+  //TESTCASE 2 - manually curated variants file with insertion, deletion, primer binding over-efficiency, primer binding under-efficiency, primer binding inversion case
+  var_filename = "";
+
+  //std::string var_filename = "../data/version_bump_tests/test_variants.txt";
+  //var_filename = "../data/version_bump_tests/file_0_var.txt";
   
   return (num_tests == success) ? 0 : -1;
 }

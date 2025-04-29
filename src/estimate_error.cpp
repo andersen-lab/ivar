@@ -57,7 +57,7 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
   std::vector<double> frequencies;
    for(uint32_t i=0; i < base_variants.size(); i++){
     if(base_variants[i].position > max_pos) max_pos = base_variants[i].position;
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && !base_variants[i].primer_masked){      
+    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && !base_variants[i].primer_masked){          
       useful_count_original++;
       variants_original.push_back(base_variants[i]);
       frequencies.push_back(base_variants[i].freq);
@@ -79,15 +79,16 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
   while(n <= 5){
     model = train_model(n, data_original, true);
     std::vector<double> means = model.means;
+    //index of largest mean
+    uint32_t index = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
     bool stop=false;
     for(uint32_t i=0; i < model.clusters.size(); i++){
       double stdev = calculate_standard_deviation(model.clusters[i]);
       float percent = (float)model.clusters[i].size() / (float)data_original.size();
       double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
-      if(stdev < 0.01) stop = true;
+      if(stdev < 0.01 && i == index) stop = true;
       //std::cerr << "n " << n << " percent " << percent << " mean " << mean << " stdev " << stdev << std::endl;
     }
-    //std::cerr << "\n";
     if(stop) break;
     else n++;
   }
