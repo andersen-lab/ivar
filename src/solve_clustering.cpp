@@ -43,7 +43,7 @@ bool test_cluster_deviation(double nearest_cluster, double variant_cluster, doub
   //determine if the assigned and nearest cluster can be resolved based on variant fluctuation
   std::vector<double> tmp = {nearest_cluster, variant_cluster};
   double cluster_dev = calculate_standard_deviation(tmp);
-  if((double)std_dev > cluster_dev){
+  if(std_dev > cluster_dev){
     fluctuation = true;
   }
   return(fluctuation);
@@ -122,7 +122,7 @@ std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, st
       }
 
       //find the second closest cluster index
-      double closest_mean = find_neighboring_cluster((double)variants[i].gapped_freq, variants[i].cluster_assigned, other_population_clusters);
+      double closest_mean = find_neighboring_cluster(variants[i].gapped_freq, variants[i].cluster_assigned, other_population_clusters);
       //check if the cluster is within the standard dev of the variant
       bool fluctuating = test_cluster_deviation(closest_mean, means[variants[i].cluster_assigned], variants[i].std_dev);       
       if(fluctuating){
@@ -404,9 +404,6 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   double error = 0.10;
   double solution_error = 0.10;
   calculate_cluster_deviations(model);
-  for(auto x : model.cluster_std_devs){
-    std::cerr << x << std::endl;
-  }
   //read in the cluster values
   std::vector<double> means = model.means;
     
@@ -414,7 +411,6 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
 
   //determine if any clusters are possible noise
   std::vector<uint32_t> noise_indices = noise_cluster_calculator(model, estimated_error);
-
 
   //filter peaks from means by index
   std::vector<double> filtered_means;

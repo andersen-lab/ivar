@@ -9,7 +9,6 @@
 #include "../src/estimate_error.h"
 #include "../src/solve_clustering.h"
 #include "../src/interval_tree.h"
-
 void read_consensus(std::vector<std::pair<std::string, std::string>> &sequences, std::string filename){
   std::ifstream file(filename);
   std::string sequence;
@@ -59,8 +58,9 @@ int main() {
   //estimation of error
   parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual);
   double error_rate = cluster_error(base_variants, min_qual, min_depth);
-  float lower_bound = 1-error_rate+0.0001;
-  float upper_bound = error_rate-0.0001;
+  double lower_bound = 1-error_rate+0.0001;
+  double upper_bound = error_rate-0.0001;
+  std::cerr << "in test " << lower_bound << " " << upper_bound << std::endl;
   //parse our test variants file
   uint32_t count = 0;
   set_freq_range_flags(base_variants, lower_bound, upper_bound);
@@ -86,7 +86,7 @@ int main() {
       variants.push_back(base_variants[i]);   
     }
   }
-  solve_clusters(variants, retrained, (double)lower_bound, solution);
+  solve_clusters(variants, retrained, lower_bound, solution);
   cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means); 
 
   std::vector<pair<std::string, std::string>> gt_sequences;
@@ -98,13 +98,11 @@ int main() {
   for (auto itgt = gt_sequences.begin(), itexp = exp_sequences.begin(); itgt != gt_sequences.end() && itexp != exp_sequences.end(); ++itgt, ++itexp) {
     std::cerr << "ground truth " << itgt->second << " " << itgt->second.size() << std::endl;
     std::cerr << "exp " << itexp->second << " " << itexp->second.size() << std::endl;
-    for(uint32_t i=0; i < 29903; i++){
-      //if(i < 50 || i >= 29827) continue;
+    for(uint32_t i=0; i < itexp->second.size(); i++){
       char a = itgt->second[i];
       char b = itexp->second[i];
       if(a != b){
         correct = false;
-        std::cerr << "gt sequence " << a << " exp " << b << " pos " << i+1 << std::endl;
         break;
       }
     }

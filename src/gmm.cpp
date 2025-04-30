@@ -16,7 +16,7 @@ std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> 
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].cluster_assigned != -1){
       clusters[variants[i].cluster_assigned].push_back(variants[i].gapped_freq);
-    }
+    }   
   }
   return(clusters);
 }
@@ -114,13 +114,10 @@ uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
 }
 
 double calculate_mad(const std::vector<double>& data, double mean){
-    //Calculate the sum of absolute deviations
     double absDevSum = 0.0;
     for (double value : data) {
         absDevSum += std::abs(value - mean);
     }
-
-    // Calculate and return the MAD
     return absDevSum / data.size();
 }
 
@@ -132,16 +129,19 @@ void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmod
     j++;
   }
   uint32_t index = smallest_value_index(gmodel.means);
-  assign_variants_simple(variants, gmodel.prob_matrix, index, lower_n);
-
+  //handle everything but insertions
+  assign_variants_simple(variants, gmodel.prob_matrix, index, lower_n, false);
+  //handle insertions
+  assign_variants_simple(variants, gmodel.prob_matrix, index, lower_n, true);
 }
 
 kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
-  /*
-    Train a KMeans model to seed other analyses.
-    error : bool
-      Indicates if this kmeans is being used to detected error levels.
-  */
+  /**
+   * @brief Train a KMeans model to seed other analyses.
+   * @params n An integer indicating the number of model components.
+   * @param error A booleans value that indicates if this kmeans is being used to detected error levels.
+   * @return kmeans_model A kmeans_modle object storing centroids and clusters.
+   */
   arma::mat centroids;
   arma::mat initial_means(1, n, arma::fill::zeros);
   kmeans_model model;
@@ -217,7 +217,7 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
   
   //run a kmeans to seed the GMM
   kmeans_model initial_model = train_model(n, data, false);
- 
+
   for(uint32_t c=0; c < initial_model.means.size(); c++){
     initial_means.col(c) = (double)initial_model.means[c];
     cov.col(c) = initial_covariance;
@@ -256,7 +256,6 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
     }
     prob_matrix.push_back(tmp);
   }
-
   gmodel.dcovs = dcovs;
   gmodel.prob_matrix = prob_matrix;
   gmodel.means = means;
@@ -266,6 +265,15 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
 
   std::vector<std::vector<double>> clusters = form_clusters(n, variants);
   gmodel.clusters = clusters;
+  for(auto x : model.means){
+    std::cerr << "mean " << x << std::endl;
+  }
+  for(auto x : clusters){
+    for (auto y : x ){
+      std::cerr << y << " ";
+    }
+    std::cerr << "\n";
+  }
   return(gmodel);
 }
 
@@ -459,30 +467,50 @@ std::vector<uint32_t> compare_cluster_assignment(std::vector<std::vector<double>
   return(flagged_idx);
 }
 
-std::vector<uint32_t> calculate_joint_probabilities(std::vector<std::vector<double>> prob_matrix, std::vector<std::vector<uint32_t>> permutations){
-  /*
-   * Calcualte the best assignments maximizing the probability. Prob matrix is (n_clusters, n_variants)
-   */
-  std::vector<double> scores; //score for every permuation of assignment
 
-  //on the permutation level                            
-  for(uint32_t i=0; i < permutations.size(); i++){   
-    double score = 0; 
-    for(uint32_t j = 0; j < permutations[i].size(); j++){
-      //num of variants in position must match permutation
-      if(permutations[i].size() != prob_matrix.size()){ 
-        score = -1000000;
-        continue;
-      }
-      score += prob_matrix[j][permutations[i][j]];
-    }
-    scores.push_back(score);
+
+/**
+ * @brief Selects the permutation of assignments that maximizes the joint probability.
+ *
+ * This function evaluates a set of possible assignments (permutations) and computes the
+ * total joint probability score for each, using the provided probability matrix.
+ * It returns the permutation that yields the highest score.
+ *
+ * @param prob_matrix A 2D vector of probabilities, sized [n_variants][n_clusters].
+ * @param permutations A vector of permutations to evaluate, each representing a possible assignment.
+ *                     Each permutation must have a size equal to the number of clusters.
+ * @return The permutation (as a vector of cluster indices) with the highest joint probability.
+ */
+std::vector<uint32_t> calculate_joint_probabilities(const std::vector<std::vector<double>> prob_matrix, const std::vector<std::vector<uint32_t>> permutations) {
+  if (permutations.empty() || prob_matrix.empty()) {
+    return {};
   }
-  uint32_t max_idx = std::distance(scores.begin(), std::max_element(scores.begin(), scores.end()));
-  return(permutations[max_idx]);
+  size_t n_clusters = prob_matrix.size();
+  double best_score = -std::numeric_limits<double>::infinity(); 
+  size_t best_index = 0;
+  for (size_t i = 0; i < permutations.size(); ++i) {
+    const auto& perm = permutations[i];
+    if (perm.size() != n_clusters) {
+        continue;
+    }
+    double score = 0.0;
+    for (size_t j = 0; j < n_clusters; ++j) {
+      // Guard against invalid index in permutation
+      if (perm[j] >= prob_matrix[j].size()) {
+        score = -std::numeric_limits<double>::infinity();
+        break;
+      }
+      score += prob_matrix[j][perm[j]];
+    }
+    if (score > best_score) {
+      best_score = score;
+      best_index = i;
+    }
+  }
+  return permutations[best_index];
 }
 
-void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n) {
+/*void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n, bool insertions) {
   uint32_t n = prob_matrix.size();
   std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
   std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices;
@@ -512,9 +540,75 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
 
     for (uint32_t variant_idx : pos_to_variant_indices[pos]) {
       auto& var = variants[variant_idx];
-      if (var.nuc.find('+') != std::string::npos || var.depth_flag)
-        continue;
+      if(!insertions){
+        if (var.nuc.find('+') != std::string::npos || var.depth_flag)
+          continue;
+      } else {
+        if (var.nuc.find('+') == std::string::npos || var.depth_flag)
+          continue;
+      }
+      pos_idxs.push_back(variant_idx);
+      std::vector<double> prob_column;
+      prob_column.reserve(n);
+      for (uint32_t row = 0; row < n; ++row)
+        prob_column.push_back(prob_matrix[row][variant_idx]);
 
+      tmp_prob.push_back(std::move(prob_column));
+    }
+
+    if (pos_idxs.empty())
+      continue;
+    std::vector<uint32_t> assigned = calculate_joint_probabilities(tmp_prob, possible_permutations);
+    if (assigned.empty()){
+      continue;
+    }
+    std::vector<uint32_t> assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
+    std::cerr << "assignment flagged " << assignment_flagged.size() << std::endl;
+    for (uint32_t i = 0; i < pos_idxs.size(); ++i) {
+      uint32_t v_idx = pos_idxs[i];
+      std::cerr << pos << " " << pos_idxs[i] << std::endl;
+      if (std::find(assignment_flagged.begin(), assignment_flagged.end(), i) != assignment_flagged.end()) {
+        std::cerr << "assigned here " << assigned[i] << std::endl;
+        variants[v_idx].vague_assignment = true;
+        variants[v_idx].cluster_assigned = assigned[i];
+      }
+    }
+  }
+}*/
+void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n, bool insertions) {
+  uint32_t n = prob_matrix.size();
+  std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
+  std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices;
+
+  // Map positions to variant indices and nucleotides
+  for (uint32_t i = 0; i < variants.size(); ++i) {
+    uint32_t pos = variants[i].position;
+    all_nts[pos].push_back(variants[i].nuc);
+    pos_to_variant_indices[pos].push_back(i);
+  }
+
+  std::vector<uint32_t> unique_pos;
+  for (const auto& kv : all_nts)
+    unique_pos.push_back(kv.first);
+
+  // Generate all permutations up to lower_n
+  std::vector<std::vector<uint32_t>> possible_permutations;
+  for (uint32_t i = 1; i <= lower_n; ++i)
+    perm_generator(n, i, possible_permutations);
+
+  noise_resampler(n, index, possible_permutations, 6);
+
+  // Assignment by position
+  for (uint32_t pos : unique_pos) {
+    std::vector<uint32_t> pos_idxs;
+    std::vector<std::vector<double>> tmp_prob;
+
+    for (uint32_t variant_idx : pos_to_variant_indices[pos]) {
+      auto& var = variants[variant_idx];
+      if ((var.nuc.find('+') != std::string::npos && !insertions)|| var.depth_flag)
+        continue;
+      else if ((var.nuc.find('+') == std::string::npos && insertions)|| var.depth_flag)
+        continue;
       pos_idxs.push_back(variant_idx);
       std::vector<double> prob_column;
       prob_column.reserve(n);
@@ -598,7 +692,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       count += 1;
       continue;
     }
-    
+    double compare_quality = static_cast<double>(quality_threshold);
     std::vector<std::string> row_values;
     //split the line by delimiter
     uint32_t pos = 0, depth = 0;
@@ -616,15 +710,15 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
   
     double multiplier = pow(10, round_val);
     freq = round(freq * multiplier) / multiplier;
-    qual = std::stof(row_values[9]);
+    qual = std::stod(row_values[9]);
 
     if(row_values.size() > 20){
-      gapped_freq = std::stof(row_values[20]);
+      gapped_freq = std::stod(row_values[20]);
       gapped_freq = round(gapped_freq * multiplier) / multiplier;
       flag = row_values[21];
       amp_flag = row_values[22];
       primer_flag = row_values[23];
-      std_dev = std::stof(row_values[24]);
+      std_dev = std::stod(row_values[24]);
       amplicon_numbers = split_csv(row_values[26]);
       freq_numbers = split_csv_double(row_values[25]);
       version_1_var = false;
@@ -671,7 +765,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     } else {
       tmp.depth_flag = false;
     }
-    if((double)qual < quality_threshold){
+    if(qual < compare_quality){
       tmp.qual_flag = true;
     } else {
       tmp.qual_flag = false;
@@ -859,28 +953,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     }
   }
 
-  if(development_mode){
-    std::string cluster_output = output_prefix + "_cluster_data.txt";
-    file.open(cluster_output, std::ios::trunc);
-    file << "POS\tALLELE\tFREQ\tCLUSTER\tLIKELIHOOD\n";
-    for(uint32_t i=0; i < variants.size(); i++){
-      file << std::to_string(variants[i].position) << "\t"; 
-      file << variants[i].nuc << "\t";
-      if(variants[i].version_1_var){
-        file << std::to_string(variants[i].freq) << "\t";
-      } else{
-        file << std::to_string(variants[i].gapped_freq) << "\t";
-      }
-      file << std::to_string(variants[i].cluster_assigned) << "\t";
-      if(variants[i].cluster_assigned != -1){
-        double tmp = variants[i].probabilities[variants[i].cluster_assigned];
-        file << std::to_string(tmp) << "\n"; 
-      } else {
-        file << "None\n";
-      }
-    }
-    file.close();
-  }
   solve_clusters(variants, retrained, error_rate, solution);
   return(variants);
 }

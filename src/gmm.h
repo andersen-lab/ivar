@@ -49,8 +49,7 @@ struct variant {
   bool amplicon_masked=false; //masked due to another variant experiencing flu
   bool primer_masked=false; //mutation in primer binding region of overlapped amplicon
   bool depth_flag=false; //depth is below the threshold                  
-  bool low_prob_flag=false;
-  bool qual_flag=false;
+  bool qual_flag=false; //quality is below threshold
   bool outside_freq_range=false; //outside of useful frequency range for model                 
   bool cluster_outlier=false; //is an outlier for the cluster assigned
   std::vector<double> probabilities;
@@ -61,7 +60,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold);
 uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
-void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n);
+void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n, bool insertions);
 gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double var_floor);
 void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, uint32_t lower_n);
 double calculate_mean(const std::vector<double>& data);

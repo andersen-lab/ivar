@@ -43,8 +43,8 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
   /*
     Here we use clustering to determine the value of the noise.
   */
-  float lower_bound = 0.50;
-  float upper_bound = 0.99;
+  double lower_bound = 0.50;
+  double upper_bound = 0.99;
   set_freq_range_flags(base_variants, lower_bound, upper_bound);
   
   /*if(base_variants[0].version_1_var){
@@ -84,7 +84,6 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
     bool stop=false;
     for(uint32_t i=0; i < model.clusters.size(); i++){
       double stdev = calculate_standard_deviation(model.clusters[i]);
-      //float percent = (float)model.clusters[i].size() / (float)data_original.size();
       //double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
       if(stdev < 0.01 && i == index) stop = true;
       //std::cerr << "n " << n << " percent " << percent << " mean " << mean << " stdev " << stdev << std::endl;
