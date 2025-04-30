@@ -128,22 +128,21 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   }
   std::cerr << "lower " << freq_lower_bound << " upper " << freq_upper_bound << std::endl;
   bool print = false;
-  uint32_t adjust_i = 0; //to help us track how many insertions we've seen
-  uint32_t last_adjustment = 0;
   //initialize sequences for all possible populations
   std::vector<std::vector<std::string>> all_consensus_seqs;
   for(uint32_t i=0; i < means.size(); i++){
     std::vector<std::string> tmp(max_position, "N");
     all_consensus_seqs.push_back(tmp);
   }
-
+  std::vector<uint32_t> adjust_i(all_consensus_seqs.size(), 0); //to help us track how many insertions we've seen
+  std::vector<uint32_t> last_adjustment(all_consensus_seqs.size(), 0);
   //order varaints by position
   std::sort(variants.begin(), variants.end(), [](const variant& a, const variant& b) {return a.position < b.position;}); 
   
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 5){
+    if(variants[i].position == 20){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -206,14 +205,14 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
         if(variants[i].nuc.find('+') != std::string::npos){
           std::string nuc = variants[i].nuc;
           nuc.erase(std::remove(nuc.begin(), nuc.end(), '+'), nuc.end());
-          ++adjust_i;
-          last_adjustment = variants[i].position;
+          adjust_i[j] += 1;
+          last_adjustment[j] = variants[i].position;
           all_consensus_seqs[j].push_back("N"); //add an extra character
-          all_consensus_seqs[j][position-1+adjust_i] = nuc;
-        } else if (variants[i].position == last_adjustment){
-          all_consensus_seqs[j][position-1+adjust_i-1] = variants[i].nuc;         
+          all_consensus_seqs[j][position-1+adjust_i[j]] = nuc;
+        } else if (variants[i].position == last_adjustment[j]){
+          all_consensus_seqs[j][position-1+adjust_i[j]-1] = variants[i].nuc;         
         } else {
-          all_consensus_seqs[j][position-1+adjust_i] = variants[i].nuc;
+          all_consensus_seqs[j][position-1+adjust_i[j]] = variants[i].nuc;
         }
       }
       continue;
@@ -222,16 +221,15 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     for(uint32_t j=0; j < variants[i].consensus_numbers.size(); j++){
         if(variants[i].nuc.find('+') != std::string::npos){
           std::string nuc = variants[i].nuc;
-          ++adjust_i;
-          last_adjustment = variants[i].position;
+          adjust_i[variants[i].consensus_numbers[j]] += 1;
+          last_adjustment[variants[i].consensus_numbers[j]] = variants[i].position;
           all_consensus_seqs[variants[i].consensus_numbers[j]].push_back("N"); //add an extra character
           nuc.erase(std::remove(nuc.begin(), nuc.end(), '+'), nuc.end());
-          all_consensus_seqs[variants[i].consensus_numbers[j]][position-1+adjust_i] = nuc;
-          std::cerr << "position " << position-1+adjust_i << " " << adjust_i << std::endl;
-        } else if (variants[i].position == last_adjustment){
-          all_consensus_seqs[variants[i].consensus_numbers[j]][position-1+adjust_i-1] = variants[i].nuc;         
+          all_consensus_seqs[variants[i].consensus_numbers[j]][position-1+adjust_i[variants[i].consensus_numbers[j]]] = nuc;
+        } else if (variants[i].position == last_adjustment[variants[i].consensus_numbers[j]]){
+          all_consensus_seqs[variants[i].consensus_numbers[j]][position-1+adjust_i[variants[i].consensus_numbers[j]]] = variants[i].nuc;         
         } else {
-          all_consensus_seqs[variants[i].consensus_numbers[j]][position-1+adjust_i] = variants[i].nuc;
+          all_consensus_seqs[variants[i].consensus_numbers[j]][position-1+adjust_i[variants[i].consensus_numbers[j]]] = variants[i].nuc;
         }
     }
   }
@@ -245,7 +243,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   //write the consensus string to file
   std::string consensus_filename = clustering_file + ".fa";
   std::ofstream file(consensus_filename);
-
 
   std::vector<uint32_t> indices(all_sequences.size());
   for (uint32_t i = 0; i < indices.size(); ++i) {
