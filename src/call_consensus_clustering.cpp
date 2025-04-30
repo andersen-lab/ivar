@@ -73,44 +73,6 @@ bool within_error_range(std::vector<float> values, float target, float error){
   }
 }
 
-std::vector<float> parse_string_to_vector(const std::string& str) {
-    std::vector<float> result;
-    std::stringstream ss(str);
-    char ch; // Used to read and discard non-numeric characters, including the decimal point
-    float num;
-
-    // Read characters one by one
-    while (ss >> ch) {
-        // Check if the character is a digit, a minus sign, or a decimal point
-        if ((ch >= '0' && ch <= '9') || ch == '-' || ch == '.') {
-            // Put back the character into the stream to correctly read the number
-            ss.putback(ch);
-            ss >> num; // Read the number as float
-            result.push_back(num); // Add the number to the vector
-        }
-    }
-
-    return result;
-}
-
-std::vector<float> parse_clustering_results(std::string clustering_file){
-  std::ifstream infile(clustering_file + ".txt");
-  std::string line;
-  uint32_t count = 0;
-  std::vector<float> numbers;
-  while (std::getline(infile, line)) {
-    if(count == 0) {
-      count += 1;
-      continue;
-    }
-    std::vector<std::string> row_values;
-    split(line, '\t', row_values);
-    std::string means = row_values[0];
-    numbers = parse_string_to_vector(means);
-    count += 1;
-  }  
-  return(numbers);
-}
 void cluster_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means){ 
   std::cerr << "calling consensus" << std::endl;
   double max_mean=0;
