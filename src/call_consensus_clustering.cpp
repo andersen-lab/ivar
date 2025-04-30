@@ -134,15 +134,19 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     std::vector<std::string> tmp(max_position, "N");
     all_consensus_seqs.push_back(tmp);
   }
+
+  //these are to help track where insertions occur and how large they are
   std::vector<uint32_t> adjust_i(all_consensus_seqs.size(), 0); //to help us track how many insertions we've seen
   std::vector<uint32_t> last_adjustment(all_consensus_seqs.size(), 0);
+  std::vector<uint32_t> last_size(all_consensus_seqs.size(), 0);
+
   //order varaints by position
   std::sort(variants.begin(), variants.end(), [](const variant& a, const variant& b) {return a.position < b.position;}); 
   
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 20){
+    if(variants[i].position == 22){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -201,40 +205,52 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       if(variants[i].gapped_freq < freq_upper_bound) continue;
       if(print) std::cerr << "not assigned anything" << std::endl;
       for(uint32_t j=0; j < all_consensus_seqs.size(); j++){
+        uint32_t adjusted_pos = position-1+adjust_i[j];
         //TODO multiple insertions are not yet handled
         if(variants[i].nuc.find('+') != std::string::npos){
           std::string nuc = variants[i].nuc;
+          uint32_t i_len = nuc.size()-1;
+          last_size[j] = i_len;
           nuc.erase(std::remove(nuc.begin(), nuc.end(), '+'), nuc.end());
-          adjust_i[j] += 1;
+          adjust_i[j] += i_len;
+          uint32_t adjusted_pos = position-1+adjust_i[j];
           last_adjustment[j] = variants[i].position;
-          all_consensus_seqs[j].push_back("N"); //add an extra character
-          all_consensus_seqs[j][position-1+adjust_i[j]] = nuc;
+          all_consensus_seqs[j].insert(all_consensus_seqs[j].end(), i_len, "N"); //expand length of consensus
+          all_consensus_seqs[j][adjusted_pos] = nuc;
         } else if (variants[i].position == last_adjustment[j]){
-          all_consensus_seqs[j][position-1+adjust_i[j]-1] = variants[i].nuc;         
+          all_consensus_seqs[j][adjusted_pos-last_size[j]] = variants[i].nuc;         
         } else {
-          all_consensus_seqs[j][position-1+adjust_i[j]] = variants[i].nuc;
+          all_consensus_seqs[j][adjusted_pos] = variants[i].nuc;
         }
       }
       continue;
     }
     //TODO INVERSE CODE
     for(uint32_t j=0; j < variants[i].consensus_numbers.size(); j++){
+        uint32_t k = variants[i].consensus_numbers[j];
         if(variants[i].nuc.find('+') != std::string::npos){
           std::string nuc = variants[i].nuc;
-          adjust_i[variants[i].consensus_numbers[j]] += 1;
-          last_adjustment[variants[i].consensus_numbers[j]] = variants[i].position;
-          all_consensus_seqs[variants[i].consensus_numbers[j]].push_back("N"); //add an extra character
+          uint32_t i_len = nuc.size()-1;
+          last_size[k] = i_len;
+          adjust_i[k] += i_len;
+          last_adjustment[k] = variants[i].position;
+          all_consensus_seqs[k].insert(all_consensus_seqs[k].end(), i_len, "N"); //expand length of consensus
           nuc.erase(std::remove(nuc.begin(), nuc.end(), '+'), nuc.end());
-          all_consensus_seqs[variants[i].consensus_numbers[j]][position-1+adjust_i[variants[i].consensus_numbers[j]]] = nuc;
-        } else if (variants[i].position == last_adjustment[variants[i].consensus_numbers[j]]){
-          all_consensus_seqs[variants[i].consensus_numbers[j]][position-1+adjust_i[variants[i].consensus_numbers[j]]] = variants[i].nuc;         
+          std::cerr << "HERE " << nuc << std::endl;
+          all_consensus_seqs[k][position-1+adjust_i[k]] = nuc;
+        } else if (variants[i].position == last_adjustment[k]){
+          all_consensus_seqs[k][position-1+adjust_i[k]-last_adjustment[k]] = variants[i].nuc;         
         } else {
-          all_consensus_seqs[variants[i].consensus_numbers[j]][position-1+adjust_i[variants[i].consensus_numbers[j]]] = variants[i].nuc;
+          all_consensus_seqs[k][position-1+adjust_i[k]] = variants[i].nuc;
         }
     }
   }
   std::vector<std::string> all_sequences;
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
+    for(auto x : all_consensus_seqs[i]){
+      std::cerr << x << " ";
+    }
+    std::cerr << "\n";
     std::string tmp = std::accumulate(all_consensus_seqs[i].begin(), all_consensus_seqs[i].end(), std::string(""));
     tmp.erase(std::remove(tmp.begin(), tmp.end(), '-'), tmp.end());
     all_sequences.push_back(tmp);

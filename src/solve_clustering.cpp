@@ -8,6 +8,16 @@
 #include <algorithm>
 #include <numeric>
 
+void calculate_cluster_deviations(gaussian_mixture_model &model){
+  //here we calculate the standard deviation of each cluster
+  std::vector<double> std_devs;
+  for(uint32_t i=0; i < model.clusters.size(); i++){
+    double std_dev = calculate_standard_deviation(model.clusters[i]);
+    std_devs.push_back(std_dev);
+  }
+  model.cluster_std_devs = std_devs;
+}
+
 void modify_variant_masking(std::vector<uint32_t> amplicons_to_mask, std::vector<variant> &variants){
   for(uint32_t i=0; i < variants.size(); i++){
     std::vector<uint32_t> tmp = variants[i].amplicon_numbers;
@@ -22,6 +32,7 @@ void modify_variant_masking(std::vector<uint32_t> amplicons_to_mask, std::vector
     }
     if(!found) {
       variants[i].amplicon_masked = false;
+      variants[i].amplicon_flux = false;
     }
   }
 }
@@ -95,7 +106,6 @@ std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, st
   std::vector<uint32_t> amplicons_to_mask;
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].amplicon_flux && !variants[i].outside_freq_range){
-      std::cerr << variants[i].position << std::endl;
       //find all clusters not part of the same assignment
       std::vector<double> other_population_clusters;
       for(uint32_t j=0; j < inverse_groups.size(); j++){

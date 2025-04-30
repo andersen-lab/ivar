@@ -84,8 +84,8 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
     bool stop=false;
     for(uint32_t i=0; i < model.clusters.size(); i++){
       double stdev = calculate_standard_deviation(model.clusters[i]);
-      float percent = (float)model.clusters[i].size() / (float)data_original.size();
-      double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
+      //float percent = (float)model.clusters[i].size() / (float)data_original.size();
+      //double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
       if(stdev < 0.01 && i == index) stop = true;
       //std::cerr << "n " << n << " percent " << percent << " mean " << mean << " stdev " << stdev << std::endl;
     }
@@ -98,11 +98,6 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
   uint32_t j = 0;
   uint32_t largest=0;
   for(uint32_t i=0; i < model.clusters.size(); i++){
-    //std::cerr << "percent " << (float)model.clusters[i].size() / (float)data_original.size() << std::endl;
-    //double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
-    //std::cerr << "mean " << mean << std::endl;
-    //double stdev = calculate_standard_deviation(model.clusters[i]);
-    //std::cerr << stdev << std::endl;
     if(model.clusters[i].size() > largest){
       j = i;
       largest = model.clusters[i].size();

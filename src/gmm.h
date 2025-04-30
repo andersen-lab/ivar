@@ -28,12 +28,12 @@ struct variant {
   uint32_t position;
   std::string nuc;
   uint32_t depth;
-  float qual;
-  float freq;
-  float gapped_freq = 0;
+  double qual;
+  double freq;
+  double gapped_freq = 0;
   int cluster_assigned = -1;
   bool version_1_var=false;  
-  float std_dev;
+  double std_dev;
   //number corresponding the the amplicons covering this position
   std::vector<uint32_t> amplicon_numbers;
   //frequencies of this variants on each amplicon
@@ -59,16 +59,13 @@ struct variant {
 void split(const std::string &s, char delim, std::vector<std::string> &elems);
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means);
 void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold);
-std::vector<std::vector<double>> solve_possible_solutions(std::vector<float> tmp_means, double error);
 uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
-void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, std::vector<double> means, uint32_t lower_n);
+void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n);
 gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double var_floor);
 void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, uint32_t lower_n);
 double calculate_mean(const std::vector<double>& data);
-void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, float lower_bound, float upper_bound);
+void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, double lower_bound, double upper_bound);
 kmeans_model train_model(uint32_t n, arma::mat data, bool error);
-void probability_amplicon_frequencies(gaussian_mixture_model retrained, std::vector<variant> base_variants, uint32_t n);
-void calculate_cluster_deviations(gaussian_mixture_model &model);
-void set_freq_range_flags(std::vector<variant> &variants, float lower_bound, float upper_bound);
+void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound);
 #endif
