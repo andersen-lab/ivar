@@ -14,6 +14,7 @@ std::vector<allele> populate_basic_alleles(){
         allele tmp;
         tmp.depth = 0;
         tmp.nuc = nts[i];
+        tmp.mean_qual = 0;
         ad.push_back(tmp);
     }
     return(ad);
