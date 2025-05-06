@@ -75,7 +75,7 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
   //start with a small n value and if we don't find two major clusters we increase the number of clusters
   uint32_t n = 2;
   kmeans_model model;
-
+  uint32_t chosen_peak = 0;
   while(n <= 5){
     model = train_model(n, data_original, true);
     std::vector<double> means = model.means;
@@ -85,25 +85,19 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
     for(uint32_t i=0; i < model.clusters.size(); i++){
       double stdev = calculate_standard_deviation(model.clusters[i]);
       //double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
-      if(stdev < 0.01 && i == index) stop = true;
-      //std::cerr << "n " << n << " percent " << percent << " mean " << mean << " stdev " << stdev << std::endl;
+      if(stdev < 0.01 && i == index) {
+        stop = true;
+        chosen_peak = i;
+      }
+      //std::cerr << "n " << n << " mean " << mean << " stdev " << stdev << std::endl;
     }
     if(stop) break;
     else n++;
   }
   //for each cluster this describes the points which are outliers
   std::vector<std::vector<uint32_t>> removal_points = determine_outlier_points(frequencies, model.means);
-  
-  uint32_t j = 0;
-  uint32_t largest=0;
-  for(uint32_t i=0; i < model.clusters.size(); i++){
-    if(model.clusters[i].size() > largest){
-      j = i;
-      largest = model.clusters[i].size();
-    }
-  }
-  std::vector<double> universal_cluster = model.clusters[j];
-  std::vector<uint32_t> outliers = removal_points[j];
+  std::vector<double> universal_cluster = model.clusters[chosen_peak];
+  std::vector<uint32_t> outliers = removal_points[chosen_peak];
   std::vector<double> cleaned_cluster;
   for(uint32_t i=0; i < universal_cluster.size(); i++){
     auto it = std::find(outliers.begin(), outliers.end(), i);
