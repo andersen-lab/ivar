@@ -457,13 +457,6 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
       solution_sets.push_back(realistic_solutions[i]);
     }
   }
-  for(auto sol : solution_sets){
-    std::cerr << "\nsolution" << std::endl;
-    for(auto s : sol){
-      std::cerr << s << " ";
-    }
-  }
-  std::cerr << "\n" << std::endl;
   bool traditional_majority= false; //if we can't find a solution call a traditional majority consensus
   if(solution_sets.size() == 0){
     std::cerr << "no solution found" << std::endl;
@@ -475,9 +468,6 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
     solution = solution_sets[0];
   }
 
-  for(auto x : solution){
-    std::cerr << x << std::endl;
-  }
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
   

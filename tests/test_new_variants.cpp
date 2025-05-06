@@ -16,7 +16,8 @@
 int main() {
   std::string prefix = "/tmp/var";
   std::string prefix_2 = "/tmp/var_2";
-  int num_tests = 3;
+  std::string prefix_3 = "/tmp/var_3";
+  int num_tests = 4;
   int success = 0;
 
   int32_t primer_offset = 0; 
@@ -102,6 +103,24 @@ int main() {
     }
   }
   if(amp_flags_correct) success++;  
+
+  //TEST 3 - Pass the same file without the pair file or bed file.
+  bool no_amp_info = true;
+  int result_3 = preprocess_reads(bam_filename, "", prefix_3, "", "", primer_offset, min_depth, min_qual);
+  std::vector<variant> new_variants_3;
+  parse_internal_variants(prefix_3 + ".txt", new_variants_3, min_depth, round_val, min_qual);
+  std::cerr << "new variants 3 " << new_variants_3.size() << std::endl;
+  for(uint32_t i = 0; i < new_variants_3.size(); i++){
+    uint32_t position = new_variants_3[i].position;
+    std::string nuc = new_variants_3[i].nuc;
+    for(uint32_t j = 0; j < new_variants.size(); j++){
+      if(position == new_variants[j].position && nuc == new_variants[j].nuc){
+        if(new_variants_3[i].depth != new_variants[j].depth) no_amp_info = false;
+        break;
+      } 
+    }
+  }
+  if(no_amp_info) success++;  
   std::cerr << "success " << success << " num tests " << num_tests << std::endl; 
   return (num_tests == success) ? 0 : -1;
 }

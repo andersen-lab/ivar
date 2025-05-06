@@ -53,17 +53,6 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
   }  
 }
 
-std::vector<uint8_t> get_aux(const bam1_t* aln){
-  uint8_t *aux = bam_aux_get(aln, "MD");
-  std::vector<uint8_t> aux_reformat;
-  uint32_t i = 0;
-  do{
-    aux_reformat.push_back(aux[i]);
-    i++;
-  } while(aux[i] != '\0');
-  return aux_reformat; 
-}
-
 uint32_t find_sequence_end(const bam1_t* read){
   uint32_t start = read->core.pos;
   uint32_t *cigar = bam_get_cigar(read); 
@@ -82,12 +71,10 @@ uint32_t find_sequence_end(const bam1_t* read){
 void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplicons, uint8_t min_qual){
   //pass the forward first then reverse 
   //also assumes that the forward read starts more "left" than  the reverse
-  //std::cerr << "merging reads"<< std::endl;  
   uint32_t start_reverse = read2->core.pos; 
   uint32_t start_forward = read1->core.pos;
   uint32_t end_reverse = find_sequence_end(read2);
 
-  //std::cerr << start_forward << "," << end_reverse << std::endl;
   
   //record the positions and their bases
   std::vector<uint32_t> positions1;
@@ -238,34 +225,22 @@ float calculate_standard_deviation_weighted(std::vector<float> values, std::vect
 
 //first main function call
 int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std::string cmd, std::string pair_info, int32_t primer_offset, uint32_t min_depth, uint8_t min_qual){
-  bool calculate_amplicons = true; 
   bool development_mode = true;
   int retval = 0;
   std::vector<primer> primers;
   if (!bed.empty()) {
     primers = populate_from_file(bed, primer_offset);
-    if (primers.size() == 0) {
-      calculate_amplicons = false;
-      //std::cerr << "Exiting." << std::endl;
-      //return -1;
-    }
   }
   std::string gff_path = "";
-
-  //int max_primer_len = get_bigger_primer(primers);
-  // get coordinates of each amplicon
   IntervalTree amplicons;
-  if (!pair_info.empty() && calculate_amplicons) {
+  if (!pair_info.empty() && primers.size() != 0) {
     amplicons = populate_amplicons(pair_info, primers);    
     amplicons.inOrder();
     amplicons.get_max_pos();
     amplicons.amplicon_position_pop();
     std::cerr << "Maximum position " << amplicons.max_pos << std::endl;
-    if(amplicons.max_pos == 0) calculate_amplicons = false;
   } else{
-    //std::cerr << "Exiting." << std::endl;
-    //return -1;
-    calculate_amplicons = false;
+    std::cerr << "Amplicon specific measurements will not be calculated." << std::endl;
   }
 
   // Read in input file
@@ -302,19 +277,10 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   //uint32_t unmapped_counter = 0;
   //uint32_t amplicon_flag_ctr = 0;
   std::vector<primer>::iterator cit;
-  std::vector<primer> overlapping_primers;
   std::vector<bam1_t *> alns;
    
-  std::vector<primer> unpaired_primers;
-  for(uint32_t i=0; i < primers.size(); i++){
-    bool paired = amplicons.unpaired_primers(primers[i]);
-    if(!paired){
-      unpaired_primers.push_back(primers[i]);
-    }
-  }
 
-
-  // Iterate through reads
+  //iterate through reads
   in = sam_open(bam.c_str(), "r");
   header = sam_hdr_read(in);
   add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
@@ -343,35 +309,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   // Iiterate through reads
   while (sam_read1(in, header, aln) >= 0) {
     //get the name of the read    
-    char strand = '+';
-    uint32_t start_pos = -1;
     std::string read_name = bam_get_qname(aln);
-    strand = '+';  
-    if (bam_is_rev(aln)) {
-      start_pos = bam_endpos(aln) - 1;
-      strand = '-';
-    } else {
-      start_pos = aln->core.pos;
-    }
-    bam1_t *r = aln;
-    //get the md tag
-    uint8_t *aux = bam_aux_get(aln, "MD");
-    uint32_t k=0;
-    do{
-      k++;
-    } while(aux[k] != '\0');
-    if(k <= 1){
-      return(0);
-    }
-    //get the sequence
-    uint8_t *seq = bam_get_seq(aln);
-    //get cigar for the read
-    uint8_t *qualities = bam_get_qual(r);
-    if(!calculate_amplicons){
-      //TODO
-      //amplicons.add_read_variants(cigar, aln->core.pos, nlength, seq, aux, qualities, bam_get_qname(aln), min_qual);
-      continue;
-    }
     if (!(aln->core.flag & BAM_FPAIRED) || !(aln->core.flag & BAM_FPROPER_PAIR)){
       //if the read is unpaired try to assign it to an amplicon anyways
       std::vector<uint32_t> positions;
@@ -384,7 +322,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       uint32_t amp_dist = 429496729;
       uint32_t amp_start = 0;
       amplicons.find_read_amplicon(start_read, end_read, found_amplicon, read_name, amp_start, amp_dist);   
-      //std::cerr << bam_get_qname(aln) << std::endl;
       if(!found_amplicon){
         amplicons.add_read_variants(positions, bases, qualities, min_qual);
       } else{
@@ -422,7 +359,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       bool found_amplicon = false;
       uint32_t amp_dist = 429496729;
       uint32_t amp_start = 0;
-      //std::cerr << read_name << std::endl;
       amplicons.find_read_amplicon(start_read, end_read, found_amplicon, read_name, amp_start, amp_dist); 
       if(!found_amplicon){
         amplicons.add_read_variants(positions, bases, qualities, min_qual);
@@ -471,7 +407,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   std::vector<float> std_deviations;
   std::vector<std::string> pos_nuc;
   std::vector<std::string> freq_strings;
-  uint32_t test_pos = 8007;
+  uint32_t test_pos = 0;
   //detect fluctuating variants across amplicons
   for(uint32_t i=0; i < amplicons.max_pos; i++){
     amplicons.test_flux.clear();
@@ -625,7 +561,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       file << "NA\t"; //ref qual   
       file << std::to_string(variants[i].alleles[j].depth) << "\t"; //alt dp
       file << "NA\t"; //alt rv
-      file << std::to_string((float)variants[i].alleles[j].mean_qual / (float)variants[i].alleles[j].depth) << "\t"; //alt qual
+      file << std::to_string((double)variants[i].alleles[j].mean_qual / (double)variants[i].alleles[j].depth) << "\t"; //alt qual
       file << std::to_string(freq) << "\t"; //alt freq
       file << std::to_string(variants[i].depth) << "\t"; //total dp
       file << "NA\t"; //pval

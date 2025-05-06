@@ -28,6 +28,7 @@ struct variant {
   uint32_t position;
   std::string nuc;
   uint32_t depth;
+  uint32_t total_depth;
   double qual;
   double freq;
   double gapped_freq = 0;
@@ -64,7 +65,7 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
 gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double var_floor);
 void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, uint32_t lower_n);
 double calculate_mean(const std::vector<double>& data);
-void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, double lower_bound, double upper_bound);
 kmeans_model train_model(uint32_t n, arma::mat data, bool error);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound);
+void calculate_reference_frequency(std::vector<variant> &variants, std::string ref_path);
 #endif

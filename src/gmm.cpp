@@ -13,7 +13,6 @@
 #include <unordered_map>
 
 void calculate_reference_frequency(std::vector<variant> &variants, std::string ref_path){
-  std::cerr << "here" << std::endl;
   //ref_antd refantd(ref_path, ""); 
   //ref = refantd.get_base(pos, region);
   for(uint32_t i=0; i < variants.size(); i++){
@@ -30,7 +29,6 @@ std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> 
   return(clusters);
 }
 
-// Function to calculate the mean of a vector
 double calculate_mean(const std::vector<double>& data) {
     if (data.empty()) {
         return 0.0f;
@@ -43,7 +41,6 @@ uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
     std::unordered_map<uint32_t, uint32_t> frequency_map;
     uint32_t max_count = 0;
 
-    // Count frequency of each number
     for (const auto& num : nums) {
         frequency_map[num]++;
         if (frequency_map[num] > max_count) {
@@ -76,13 +73,13 @@ void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmod
   assign_variants_simple(variants, gmodel.prob_matrix, index, lower_n, true);
 }
 
+/**
+* @brief Train a KMeans model to seed other analyses.
+* @params n An integer indicating the number of model components.
+* @param error A booleans value that indicates if this kmeans is being used to detected error levels.
+* @return kmeans_model A kmeans_modle object storing centroids and clusters.
+*/
 kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
-  /**
-   * @brief Train a KMeans model to seed other analyses.
-   * @params n An integer indicating the number of model components.
-   * @param error A booleans value that indicates if this kmeans is being used to detected error levels.
-   * @return kmeans_model A kmeans_modle object storing centroids and clusters.
-   */
   arma::mat centroids;
   arma::mat initial_means(1, n, arma::fill::zeros);
   kmeans_model model;
@@ -91,7 +88,6 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
   std::vector<double> total_distances; 
   std::vector<double> std_devs;
   for(uint32_t j=0; j < 15; j++){
-    //std::cerr << "iteration j " << j << std::endl;
     bool status2 = arma::kmeans(centroids, data, n, arma::random_spread, 10, false);
     if(!status2) continue;
     double total_dist = 0;
@@ -101,22 +97,14 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
         [point](double a, double b) {
             return std::abs(a - point) < std::abs(b - point);
         });
-       uint32_t index = std::distance(centroids.begin(), closest_it);
-       
+       uint32_t index = std::distance(centroids.begin(), closest_it);      
        total_dist += std::abs(point-centroids[index]);
     }  
-    std::vector<double> tmp;
-    for(auto c : centroids){
-      //std::cerr << c << " ";
-      tmp.push_back((double)c);
-    }
-
+    std::vector<double> tmp = arma::conv_to<std::vector<double>>::from(centroids);
     double stddev = calculate_standard_deviation(tmp);
-    std_devs.push_back(stddev);
-    //std::cerr << "\n";
-    //std::cerr << "total dist " << total_dist << " std dev " << stddev << std::endl;
-    all_centroids.push_back(tmp);
-    total_distances.push_back(total_dist);
+    std_devs.emplace_back(stddev);
+    all_centroids.emplace_back(std::move(tmp));
+    total_distances.emplace_back(total_dist);
   }
   uint32_t index;
   if(!error){
@@ -206,15 +194,6 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
 
   std::vector<std::vector<double>> clusters = form_clusters(n, variants);
   gmodel.clusters = clusters;
-  for(auto x : model.means){
-    std::cerr << "mean " << x << std::endl;
-  }
-  for(auto x : clusters){
-    for (auto y : x ){
-      std::cerr << y << " ";
-    }
-    std::cerr << "\n";
-  }
   return(gmodel);
 }
 
@@ -291,15 +270,12 @@ std::vector<std::vector<double>> remove_unexplainable_solutions(std::vector<std:
         continue;
       }
       for(auto theoretical_peak : possible_peaks){
-        //std::cerr << "theoretical peak " << theoretical_peak << " mean " << mean << std::endl;
         if(std::abs(theoretical_peak - mean) < error){
-          //std::cerr << "this " << theoretical_peak << " " << mean << std::endl; 
           useful = true;
           break;
         }  
       }
       if(!useful){
-        //std::cerr << mean << std::endl;
         keep_solution = false;
         break;          
       }
@@ -866,7 +842,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       variants.push_back(base_variants[i]);
     }
   }
-
   solve_clusters(variants, retrained, error_rate, solution);
   return(variants);
 }

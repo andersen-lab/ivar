@@ -1,6 +1,4 @@
 #include "interval_tree.h"
-#include <chrono> 
-using namespace std::chrono;
 
 // Constructor for initializing an Interval Tree
 IntervalTree::IntervalTree() { _root = NULL; }

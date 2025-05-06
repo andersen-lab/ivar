@@ -55,7 +55,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       max_position = x.position;
     }
   }
-  std::cerr << "lower " << freq_lower_bound << " upper " << freq_upper_bound << std::endl;
   bool print = false;
   //initialize sequences for all possible populations
   std::vector<std::vector<std::string>> all_consensus_seqs;
@@ -66,12 +65,11 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
 
   //order varaints by position
   std::sort(variants.begin(), variants.end(), [](const variant& a, const variant& b) {return a.position < b.position;}); 
-  //for helping track insertions
   std::vector<uint32_t> last_adjustment(all_consensus_seqs.size(), 0); 
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 23){
+    if(variants[i].position == 0){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -161,10 +159,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   }
   std::vector<std::string> all_sequences;
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
-    for(auto x : all_consensus_seqs[i]){
-      std::cerr << x << " ";
-    }
-    std::cerr << "\n";
     std::string tmp = std::accumulate(all_consensus_seqs[i].begin(), all_consensus_seqs[i].end(), std::string(""));
     tmp.erase(std::remove(tmp.begin(), tmp.end(), '-'), tmp.end());
     all_sequences.push_back(tmp);
