@@ -15,7 +15,8 @@
 
 int main() {
   std::string prefix = "/tmp/var";
-  int num_tests = 2;
+  std::string prefix_2 = "/tmp/var_2";
+  int num_tests = 3;
   int success = 0;
 
   int32_t primer_offset = 0; 
@@ -87,8 +88,20 @@ int main() {
   if(expected) success++;
 
   //TEST 2 - Amplicon flagging correct or incorrect.
-   
-
+  std::string bam_filename_2 = "../data/version_bump_tests/vbump_amplicon.sorted.bam";
+  int result_2 = preprocess_reads(bam_filename_2, bed_file, prefix_2, "", pair_info, primer_offset, min_depth, min_qual);
+  std::vector<variant> new_variants_2;
+  parse_internal_variants(prefix_2 + ".txt", new_variants_2, min_depth, round_val, min_qual);
+  bool amp_flags_correct = true;
+  for(auto var : new_variants_2){
+    if(var.position == 670 && !var.amplicon_flux){
+      amp_flags_correct = false;
+    }
+    if(!var.amplicon_masked){
+      amp_flags_correct = false;
+    }
+  }
+  if(amp_flags_correct) success++;  
   std::cerr << "success " << success << " num tests " << num_tests << std::endl; 
   return (num_tests == success) ? 0 : -1;
 }
