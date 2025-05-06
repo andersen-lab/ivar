@@ -4,12 +4,21 @@
 #include "call_consensus_clustering.h"
 #include "solve_clustering.h"
 #include "estimate_error.h"
+#include "ref_seq.h"
 #include <fstream>
 #include <set>
 #include <cmath>
 #include <algorithm>
 #include <limits>
 #include <unordered_map>
+
+void calculate_reference_frequency(std::vector<variant> &variants, std::string ref_path){
+  std::cerr << "here" << std::endl;
+  //ref_antd refantd(ref_path, ""); 
+  //ref = refantd.get_base(pos, region);
+  for(uint32_t i=0; i < variants.size(); i++){
+  }
+}
 
 std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> variants){
   std::vector<std::vector<double>> clusters(n);
@@ -19,74 +28,6 @@ std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> 
     }   
   }
   return(clusters);
-}
-
-void calculate_reference_frequency(std::vector<variant> &variants, std::string filename, uint32_t depth_cutoff, double lower_bound, double upper_bound){
-  //also account for things NOT in the variants file
-  uint32_t max_pos = 0;
-  for(auto var : variants){
-    if(var.position > max_pos) max_pos = var.position;
-  }
-  
-  //if we use ivar 1.0 calculate the ref and add in it's freq
-  std::vector<uint32_t> unique_pos;
-  std::ifstream infile(filename);
-  std::string line;
-  uint32_t count = 0;
-
-  while (std::getline(infile, line)) {
-    if(count == 0) {
-      count += 1;
-      continue;
-    }
-    std::vector<std::string> row_values;
-    split(line, '\t', row_values);
-
-    uint32_t pos = 0, ref_depth = 0, total_depth;
-    double freq = 0, qual=0;
-    std::string nuc = "";
-    pos = std::stoi(row_values[1]);
-    auto it = std::find(unique_pos.begin(), unique_pos.end(), pos);
-    if(it != unique_pos.end()){
-      continue;
-    }
-    unique_pos.push_back(pos);
-    nuc = row_values[2];
-    ref_depth = std::stoi(row_values[4]);
-    qual = std::stof(row_values[6]);
-    total_depth = std::stoi(row_values[11]);
-
-    freq = (double)ref_depth / (double)total_depth;
-
-    variant tmp;
-    tmp.position = pos;
-    tmp.nuc = nuc;
-    tmp.depth = ref_depth;
-    tmp.freq = freq;
-    tmp.qual = qual;
-   
-    tmp.amplicon_flux = false;
-    tmp.amplicon_masked = false;
-    tmp.primer_masked = false;
-    tmp.version_1_var = true;
-    if(1/freq * ref_depth < depth_cutoff){
-      tmp.depth_flag = true;
-    } else {
-      tmp.depth_flag = false;
-    } 
-    if (freq <= lower_bound || freq >= upper_bound){
-      tmp.outside_freq_range = true;
-    } else {
-      tmp.outside_freq_range = false;
-    }
-    if(qual < 20){
-      tmp.qual_flag = true;
-    } else {
-      tmp.qual_flag = false;
-    }
-    variants.push_back(tmp); 
-    count += 1;
-  } 
 }
 
 // Function to calculate the mean of a vector
@@ -679,99 +620,80 @@ void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, do
   }
 }
 
+/**
+ * @brief Parses an internally formatted variant file and populates a vector of variant objects.
+ *
+ * This function reads a tab-delimited file line-by-line (skipping the header),
+ * extracts relevant variant information, and fills a vector of `variant` structs.
+ * It supports both version 1 and newer variant file formats with additional metadata.
+ *
+ * @param filename           Path to the tab-delimited variant file.
+ * @param variants           Reference to a vector where parsed variant entries will be stored.
+ * @param depth_cutoff       Minimum depth threshold (currently unused in this function).
+ * @param round_val          Number of decimal places to round frequencies to.
+ * @param quality_threshold  Minimum quality score threshold (currently unused in this function).
+ *
+ * @note The function assumes a specific column structure in the input file.
+ *       It handles both older (≤20 columns) and newer (>20 columns) variant formats.
+ *       Insertions and deletions may be represented with special notations in the input.
+ *
+ * @warning Malformed or incomplete lines (with <12 columns) are silently skipped.
+ *
+ * @see variant
+ */
 void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold){
-  /*
-   * Parses the variants file produced internally by reading bam file line-by-line.
-   */
   std::ifstream infile(filename);
   std::string line;
   uint32_t count = 0;
+  double multiplier = pow(10, round_val);
+  double compare_quality = static_cast<double>(quality_threshold);
+
+  auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "1";};
 
   while (std::getline(infile, line)) {
-    if(count == 0) {
-      count += 1;
-      continue;
-    }
-    double compare_quality = static_cast<double>(quality_threshold);
+    if(count++ == 0) continue;
     std::vector<std::string> row_values;
-    //split the line by delimiter
-    uint32_t pos = 0, depth = 0;
-    double freq = 0, gapped_freq=0, qual=0, std_dev=0;
-    bool version_1_var = false;
-    std::string flag = "";
-    std::string amp_flag = "";
-    std::string primer_flag = "";
-    std::vector<uint32_t> amplicon_numbers;
-    std::vector<double> freq_numbers;
     split(line, '\t', row_values);
-    pos = std::stoi(row_values[1]);
-    depth = std::stoi(row_values[7]);
-    freq = std::stof(row_values[10]);
-  
-    double multiplier = pow(10, round_val);
-    freq = round(freq * multiplier) / multiplier;
-    qual = std::stod(row_values[9]);
+
+    variant tmp;
+    tmp.position = std::stoi(row_values[1]);
+    tmp.nuc = row_values[3];
+    tmp.depth = std::stoi(row_values[7]);
+    tmp.total_depth = std::stoi(row_values[11]);
+    tmp.freq = std::round(std::stof(row_values[10]) * multiplier) / multiplier;
+    tmp.qual = std::stod(row_values[9]);
 
     if(row_values.size() > 20){
-      gapped_freq = std::stod(row_values[20]);
-      gapped_freq = round(gapped_freq * multiplier) / multiplier;
-      flag = row_values[21];
-      amp_flag = row_values[22];
-      primer_flag = row_values[23];
-      std_dev = std::stod(row_values[24]);
-      amplicon_numbers = split_csv(row_values[26]);
-      freq_numbers = split_csv_double(row_values[25]);
-      version_1_var = false;
+      tmp.gapped_freq = round(std::stod(row_values[20]) * multiplier) / multiplier;
+      tmp.amplicon_flux = to_bool(row_values[21]);
+      tmp.amplicon_masked = to_bool(row_values[22]);
+      tmp.primer_masked = to_bool(row_values[23]);
+      tmp.std_dev = std::stod(row_values[24]);
+      tmp.amplicon_numbers = split_csv(row_values[26]);
+      tmp.freq_numbers = split_csv_double(row_values[25]);
+      tmp.version_1_var = false;
     } else {
-      gapped_freq = 0.0;
-      flag = "FALSE";
-      amp_flag = "FALSE";
-      primer_flag = "FALSE";
-      std_dev = 0;
-      version_1_var = true;
-    }
-    variant tmp;
-    tmp.position = pos;
-    tmp.nuc = row_values[3];
-    tmp.depth = depth;
-    tmp.freq = freq;
-    tmp.qual = qual;
-    tmp.gapped_freq = gapped_freq;
-    tmp.std_dev = std_dev;
-    tmp.amplicon_numbers = amplicon_numbers;
-    tmp.freq_numbers = freq_numbers;
-    tmp.version_1_var = version_1_var;
-
-    if (flag == "TRUE"){
-      tmp.amplicon_flux = true;
-    } else {
+      tmp.gapped_freq = 0.0;
       tmp.amplicon_flux = false;
-    }
-    if (amp_flag == "TRUE"){
-      tmp.amplicon_masked = true;
-    } else {
       tmp.amplicon_masked = false;
+      tmp.primer_masked = false;
+      tmp.std_dev = 0;
+      tmp.version_1_var = true;
     }
-    if (primer_flag == "TRUE"){
-        tmp.primer_masked = false;
-    } else {
-        tmp.primer_masked = false;
-    }
-    if(!version_1_var && (1/gapped_freq * depth < depth_cutoff)){
+
+    if(!tmp.version_1_var && tmp.total_depth < depth_cutoff){
       tmp.depth_flag = true;
-    //TESTLINES this was originally freq
-    } else if(version_1_var && (1/gapped_freq * depth < depth_cutoff)){
+    } else if(tmp.version_1_var && tmp.depth < depth_cutoff){
       tmp.depth_flag = true;
     } else {
       tmp.depth_flag = false;
     }
-    if(qual < compare_quality){
+    if(tmp.qual < compare_quality){
       tmp.qual_flag = true;
     } else {
       tmp.qual_flag = false;
     }
-    variants.push_back(tmp); 
-    count += 1;
+    variants.push_back(std::move(tmp)); 
   } 
 }
 
@@ -788,11 +710,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   set_freq_range_flags(base_variants, lower_bound, upper_bound);
   std::cerr << "gmm model lower " << lower_bound << " upper " << upper_bound << std::endl;
    
-  //if ivar 1.0 is in use, calculate the frequency of the reference
-  if(base_variants[0].version_1_var){
-    calculate_reference_frequency(base_variants, prefix, min_depth, lower_bound, upper_bound);
-  }
-
   //this whole things needs to be reconfigured
   uint32_t useful_var=0;
   std::vector<variant> variants;
@@ -918,9 +835,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   //look at all variants despite other parameters
   variants.clear();
-  if(base_variants[0].version_1_var){
-    calculate_reference_frequency(base_variants, prefix, min_depth, lower_bound, upper_bound);
-  } 
   for(uint32_t i=0; i < base_variants.size(); i++){
     if(!base_variants[i].outside_freq_range){
       useful_var += 1;
