@@ -33,14 +33,17 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
         counter++;
       }
     } else if(op == 1){
+      std::string tmp = "+";       
+      double qual_avg = 0; 
+      //collect all nucs in insertions
       for(uint32_t j=total_query_pos; j < total_query_pos+len; j++){
         char nuc = seq_nt16_str[bam_seqi(seq_field1, j)];
-        std::string tmp = "+" + std::string(1, nuc);
-        positions.push_back(total_ref_pos+counter);
-        bases.push_back(tmp);
-        qualities.push_back((uint32_t)qual[j]);
-        counter++;
+        tmp +=  std::string(1, nuc);
+        qual_avg += qual[j];
       }
+      positions.push_back(total_ref_pos-1);
+      bases.push_back(tmp);
+      qualities.push_back((uint32_t)qual_avg/(tmp.size()-1));
     }
  
     //consumes ref
@@ -323,6 +326,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       uint32_t amp_start = 0;
       amplicons.find_read_amplicon(start_read, end_read, found_amplicon, read_name, amp_start, amp_dist);   
       if(!found_amplicon){
+        std::cerr << "amplicon not found" << std::endl;
         amplicons.add_read_variants(positions, bases, qualities, min_qual);
       } else{
         amplicons.assign_read_amplicon(amp_start, positions, bases, qualities, min_qual);
