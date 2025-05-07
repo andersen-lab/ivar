@@ -280,7 +280,7 @@ void print_version_info() {
                "https://github.com/andersen-lab/ivar/\n\n";
 }
 
-static const char *trim_opt_str = "i:b:f:x:p:m:q:s:ekh?";
+static const char *trim_opt_str = "i:b:f:x:p:m:q:s:r:ekh?";
 static const char *variants_opt_str = "p:t:q:m:r:g:Gh?";
 static const char *consensus_opt_str = "i:p:q:t:c:m:n:kh?";
 static const char *removereads_opt_str = "i:p:t:b:h?";
@@ -396,6 +396,7 @@ int main(int argc, char *argv[]) {
           break;
         case 'r':
           g_args.ref = optarg;
+          break;
         case 'h':
         case '?':
           print_trim_usage();
