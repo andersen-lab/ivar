@@ -8,7 +8,7 @@
 #include <unordered_set>
 #include <tuple>
 
-void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, uint32_t total_ref_pos, uint8_t min_qual){
+void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, uint32_t total_ref_pos, uint8_t min_qual, ref_antd &refantd, std::string ref_name){
   uint32_t total_query_pos=0;
   const uint8_t* seq_field1 = bam_get_seq(read1);
   uint32_t *cigar1 = bam_get_cigar(read1);
@@ -28,12 +28,14 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
         counter++;
       }
     } else if(op == 2){    
+      std::string tmp = "-";
+      positions.push_back(total_ref_pos+counter);
       for(uint32_t j=0; j < len; j++){
-        positions.push_back(total_ref_pos+counter);
-        bases.push_back("-");
-        qualities.push_back((uint32_t)min_qual);
+        tmp += refantd.get_base(total_ref_pos+counter, ref_name);
         counter++;
       }
+      bases.push_back(tmp);
+      qualities.push_back((uint32_t)min_qual);
     } else if(op == 1){
       std::string tmp = "+";       
       double qual_avg = 0; 
@@ -73,14 +75,14 @@ uint32_t find_sequence_end(const bam1_t* read){
   return start;
 }
 
-void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplicons, uint8_t min_qual){
+void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplicons, uint8_t min_qual, ref_antd &refantd, std::string ref_name){
+
   //pass the forward first then reverse 
   //also assumes that the forward read starts more "left" than  the reverse
   uint32_t start_reverse = read2->core.pos; 
   uint32_t start_forward = read1->core.pos;
   uint32_t end_reverse = find_sequence_end(read2);
 
-  
   //record the positions and their bases
   std::vector<uint32_t> positions1;
   std::vector<std::string> bases1;
@@ -91,13 +93,12 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
   std::vector<uint32_t> qualities2;
   
   //start of read, 
-  parse_cigar(read1, positions1, bases1, qualities1, start_forward, min_qual);
-  parse_cigar(read2, positions2, bases2, qualities2, start_reverse, min_qual);  
+  parse_cigar(read1, positions1, bases1, qualities1, start_forward, min_qual, refantd, ref_name);
+  parse_cigar(read2, positions2, bases2, qualities2, start_reverse, min_qual, refantd, ref_name);  
 
   //find all unique positions we need to cover
   std::unordered_set<uint32_t> unique_elements(positions1.begin(), positions1.end());
   unique_elements.insert(positions2.begin(), positions2.end());
-
   std::vector<uint32_t> final_positions;
   std::vector<uint32_t> final_qualities;
   std::vector<std::string> final_bases;
@@ -181,7 +182,6 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
   bool found_amplicon = false;
   uint32_t amp_dist = 429496729;
   uint32_t amp_start = 0;
-  //std::cerr << bam_get_qname(read1) << std::endl;
   amplicons.find_read_amplicon(start_forward, end_reverse, found_amplicon, bam_get_qname(read1), amp_start, amp_dist);   
   if(!found_amplicon){
     amplicons.add_read_variants(final_positions, final_bases, final_qualities, min_qual);
@@ -314,7 +314,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
 
   in = sam_open(bam.c_str(), "r");
   header = sam_hdr_read(in);
-  add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
   aln = bam_init1();
   amplicons.populate_variants(last_position);
 
@@ -333,13 +332,12 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       std::vector<uint32_t> qualities;
       uint32_t start_read = aln->core.pos;
       uint32_t end_read = find_sequence_end(aln);
-      parse_cigar(aln, positions, bases, qualities, start_read, min_qual);
+      parse_cigar(aln, positions, bases, qualities, start_read, min_qual, refantd, ref_name);
       bool found_amplicon = false;
       uint32_t amp_dist = 429496729;
       uint32_t amp_start = 0;
       amplicons.find_read_amplicon(start_read, end_read, found_amplicon, read_name, amp_start, amp_dist);   
       if(!found_amplicon){
-        std::cerr << "amplicon not found" << std::endl;
         amplicons.add_read_variants(positions, bases, qualities, min_qual);
       } else{
         amplicons.assign_read_amplicon(amp_start, positions, bases, qualities, min_qual);
@@ -352,9 +350,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     if (it != read_map.end()) {
       bam1_t* mate = it->second;
       if (aln->core.flag & BAM_FREVERSE){
-        merge_reads(mate, aln, amplicons, min_qual);
+        merge_reads(mate, aln, amplicons, min_qual, refantd, ref_name);
       } else {
-        merge_reads(aln, mate, amplicons, min_qual);
+        merge_reads(aln, mate, amplicons, min_qual, refantd, ref_name);
       }
       //clean the mate
       bam_destroy1(mate);
@@ -372,7 +370,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       std::vector<uint32_t> qualities;
       uint32_t start_read = it->second->core.pos;
       uint32_t end_read = find_sequence_end(it->second);
-      parse_cigar(it->second, positions, bases, qualities, start_read, min_qual);
+      parse_cigar(it->second, positions, bases, qualities, start_read, min_qual, refantd, ref_name);
       bool found_amplicon = false;
       uint32_t amp_dist = 429496729;
       uint32_t amp_start = 0;
@@ -558,8 +556,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     //find the depth of the deletion to calculate upgapped depth
     float del_depth = 0;
     char ref = refantd.get_base(variants[i].pos, ref_name);
-    std::cerr << "ref " << ref << " name " << ref_name  << std::endl;
-    exit(0);
+    
     for(uint32_t j=0; j < variants[i].alleles.size(); j++){
       if(variants[i].alleles[j].nuc == "-"){
         del_depth += (float)variants[i].alleles[j].depth;
@@ -574,7 +571,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       }
       file << "NA\t"; //region
       file << std::to_string(variants[i].pos) << "\t";
-      file << "NA\t"; //ref
+      file << ref << "\t"; //ref
       std::string test_string = variants[i].alleles[j].nuc;
       file << variants[i].alleles[j].nuc << "\t";
       file << "NA\t"; //ref dp
