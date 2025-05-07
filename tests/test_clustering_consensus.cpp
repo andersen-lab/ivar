@@ -5,6 +5,8 @@
 #include "htslib/sam.h"
 #include "../src/gmm.h"
 #include "../src/saga.h"
+#include "../src/ref_seq.h"
+#include "../src/parse_gff.h"
 #include "../src/call_consensus_clustering.h"
 #include "../src/estimate_error.h"
 #include "../src/solve_clustering.h"

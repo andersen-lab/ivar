@@ -34,7 +34,7 @@ int main() {
   std::string path = "../data/version_bump_tests/vbump_reads.mpileup";
 
   //call variants in the new way
-  int result = preprocess_reads(bam_filename, bed_file, prefix, "", pair_info, primer_offset, min_depth, min_qual, "");
+  int result = preprocess_reads(bam_filename, bed_file, prefix, "", pair_info, primer_offset, min_depth, min_qual, reference_file);
   std::vector<variant> new_variants;
   parse_internal_variants(prefix + ".txt", new_variants, min_depth, round_val, min_qual);
   //call variants in the old way
@@ -90,7 +90,7 @@ int main() {
 
   //TEST 2 - Amplicon flagging correct or incorrect.
   std::string bam_filename_2 = "../data/version_bump_tests/vbump_amplicon.sorted.bam";
-  int result_2 = preprocess_reads(bam_filename_2, bed_file, prefix_2, "", pair_info, primer_offset, min_depth, min_qual, "");
+  int result_2 = preprocess_reads(bam_filename_2, bed_file, prefix_2, "", pair_info, primer_offset, min_depth, min_qual, reference_file);
   std::vector<variant> new_variants_2;
   parse_internal_variants(prefix_2 + ".txt", new_variants_2, min_depth, round_val, min_qual);
   bool amp_flags_correct = true;
@@ -106,7 +106,7 @@ int main() {
 
   //TEST 3 - Pass the same file without the pair file or bed file.
   bool no_amp_info = true;
-  int result_3 = preprocess_reads(bam_filename, "", prefix_3, "", "", primer_offset, min_depth, min_qual, "");
+  int result_3 = preprocess_reads(bam_filename, "", prefix_3, "", "", primer_offset, min_depth, min_qual, reference_file);
   std::vector<variant> new_variants_3;
   parse_internal_variants(prefix_3 + ".txt", new_variants_3, min_depth, round_val, min_qual);
   for(uint32_t i = 0; i < new_variants_3.size(); i++){

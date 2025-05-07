@@ -1,4 +1,6 @@
 #include "saga.h"
+#include "ref_seq.h"
+#include "parse_gff.h"
 #include <fstream>
 #include <cmath>
 #include <numeric>
@@ -228,6 +230,13 @@ float calculate_standard_deviation_weighted(std::vector<float> values, std::vect
 
 //first main function call
 int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std::string cmd, std::string pair_info, int32_t primer_offset, uint32_t min_depth, uint8_t min_qual, std::string ref_file){
+  if(ref_file.empty()){
+    std::cerr << "Please provide reference." << std::endl;
+    exit(1);
+  }
+  //load the reference
+  ref_antd refantd(ref_file, "");
+  
   bool development_mode = true;
   int retval = 0;
   std::vector<primer> primers;
@@ -267,7 +276,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     std::cerr << "Unable to read header from input file." << std::endl;
     return -1;
   }
-  add_pg_line_to_header(&header, const_cast<char *>(cmd.c_str()));
   // Initiate the alignment record
   bam1_t *aln = bam_init1();
   //int ctr = 0;
@@ -290,12 +298,16 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   aln = bam_init1();
 
   uint32_t last_position=0;
+  int tid=0;
   while (sam_read1(in, header, aln) >= 0) {
     uint32_t end_pos = aln->core.pos + bam_cigar2rlen(aln->core.n_cigar, bam_get_cigar(aln));
     if (end_pos > last_position) {
       last_position = end_pos;
+      //get the region
+      tid = aln->core.tid;
     }
   }
+  const std::string ref_name = (std::string)header->target_name[tid];
   bam_destroy1(aln);
   bam_hdr_destroy(header);
   sam_close(in);
@@ -313,6 +325,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   while (sam_read1(in, header, aln) >= 0) {
     //get the name of the read    
     std::string read_name = bam_get_qname(aln);
+
     if (!(aln->core.flag & BAM_FPAIRED) || !(aln->core.flag & BAM_FPROPER_PAIR)){
       //if the read is unpaired try to assign it to an amplicon anyways
       std::vector<uint32_t> positions;
@@ -541,8 +554,12 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   //file << "POS\tALLELE\tDEPTH\tFREQ\tGAPPED_FREQ\tAVG_QUAL\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\n";
   file << "REGION\tPOS\tREF\tALT\tREF_DP\tREF_RV\tREF_QUAL\tALT_DP\tALT_RV\tALT_QUAL\tALT_FREQ\tTOTAL_DP\tPVAL\tPASS\tGFF_FEATURE\tREF_CODON\tREF_AA\tALT_CODON\tALT_AA\tPOS_AA\tGAPPED_FREQ\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\tSTD_DEV\tAMP_FREQ\tAMP_NUMBERS\n";
   for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].depth == 0) continue;
     //find the depth of the deletion to calculate upgapped depth
     float del_depth = 0;
+    char ref = refantd.get_base(variants[i].pos, ref_name);
+    std::cerr << "ref " << ref << " name " << ref_name  << std::endl;
+    exit(0);
     for(uint32_t j=0; j < variants[i].alleles.size(); j++){
       if(variants[i].alleles[j].nuc == "-"){
         del_depth += (float)variants[i].alleles[j].depth;
