@@ -372,6 +372,7 @@ int main(int argc, char *argv[]) {
     g_args.primer_offset = 0;
     g_args.min_depth = 10;
     g_args.min_qual = 20;
+    g_args.ref = "";
     opt = getopt(argc, argv, trim_opt_str);
     while (opt != -1) {
       switch (opt) {
@@ -393,6 +394,8 @@ int main(int argc, char *argv[]) {
         case 'm':
           g_args.min_length = std::stoi(optarg);
           break;
+        case 'r':
+          g_args.ref = optarg;
         case 'h':
         case '?':
           print_trim_usage();
@@ -412,13 +415,7 @@ int main(int argc, char *argv[]) {
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
     res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
                                cl_cmd.str(),
-                               g_args.primer_pair_file, g_args.primer_offset, g_args.min_depth, g_args.min_qual);
-    //std::vector<uint32_t> populations_iterate;
-    //for(uint32_t i= 2; i < 6; i++){
-    //  populations_iterate.push_back(i);
-    //}
-    //res = gmm_model(g_args.prefix, populations_iterate, g_args.prefix);
-    //res = cluster_consensus(
+                               g_args.primer_pair_file, g_args.primer_offset, g_args.min_depth, g_args.min_qual, g_args.ref);
   }
 
   // ivar trim

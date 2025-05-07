@@ -227,7 +227,7 @@ float calculate_standard_deviation_weighted(std::vector<float> values, std::vect
 }
 
 //first main function call
-int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std::string cmd, std::string pair_info, int32_t primer_offset, uint32_t min_depth, uint8_t min_qual){
+int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std::string cmd, std::string pair_info, int32_t primer_offset, uint32_t min_depth, uint8_t min_qual, std::string ref_file){
   bool development_mode = true;
   int retval = 0;
   std::vector<primer> primers;
