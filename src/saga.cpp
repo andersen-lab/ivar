@@ -8,6 +8,20 @@
 #include <unordered_set>
 #include <tuple>
 
+std::vector<allele> find_deletions_next(std::vector<position> variants, uint32_t pos){
+  std::vector<allele> deletions;
+  for(auto var : variants){
+    if(var.pos-1 == pos){
+      for(uint32_t j=0; j < var.alleles.size(); j++){
+        if (var.alleles[j].nuc.find("-") != std::string::npos && var.alleles[j].depth > 0){
+          deletions.push_back(var.alleles[j]);
+        }    
+      }
+    }
+  }
+  return(deletions);
+}
+
 void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, uint32_t total_ref_pos, uint8_t min_qual, ref_antd &refantd, std::string ref_name){
   uint32_t total_query_pos=0;
   const uint8_t* seq_field1 = bam_get_seq(read1);
@@ -31,7 +45,7 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
       std::string tmp = "-";
       positions.push_back(total_ref_pos+counter);
       for(uint32_t j=0; j < len; j++){
-        tmp += refantd.get_base(total_ref_pos+counter, ref_name);
+        tmp += refantd.get_base(total_ref_pos+counter, ref_name);        
         counter++;
       }
       bases.push_back(tmp);
@@ -556,30 +570,58 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     //find the depth of the deletion to calculate upgapped depth
     float del_depth = 0;
     char ref = refantd.get_base(variants[i].pos, ref_name);
-    
+    uint32_t pos = variants[i].pos; 
+
+    //deletions need to be shifted one position back
+    std::vector<allele> del_alleles = find_deletions_next(variants, pos);    
+
+    //remove the deletion depth as needed
     for(uint32_t j=0; j < variants[i].alleles.size(); j++){
       if(variants[i].alleles[j].nuc == "-"){
         del_depth += (float)variants[i].alleles[j].depth;
         break;  
       }
     }
-    for(uint32_t j=0; j < variants[i].alleles.size(); j++){
-      float freq = (float)variants[i].alleles[j].depth / ((float)variants[i].depth-del_depth);
-      float gapped_freq = (float)variants[i].alleles[j].depth / (float)variants[i].depth;
-      if((float)variants[i].alleles[j].depth == 0){
+
+    std::vector<allele> alleles = variants[i].alleles;
+    //remove any current deletions
+    std::vector<uint32_t> remove_indices;
+    for(uint32_t j=0; j < alleles.size(); j++){
+      if (alleles[j].nuc.find("-") != std::string::npos){
+        remove_indices.push_back(j);
+      } 
+    }
+    for(uint32_t idx : remove_indices) {
+      if(idx >= 0 && idx < alleles.size()) {
+        alleles.erase(alleles.begin() + idx);
+      }
+    }   
+
+    //add in our bonus deletions
+    if(del_alleles.size() > 0){
+      alleles.insert(alleles.end(), del_alleles.begin(), del_alleles.end());
+    }
+
+    for(uint32_t j=0; j < alleles.size(); j++){
+      float freq = (float)alleles[j].depth / ((float)variants[i].depth-del_depth);
+      float gapped_freq = (float)alleles[j].depth / (float)variants[i].depth;
+      if((float)alleles[j].depth == 0){
         continue;
       }
-      file << "NA\t"; //region
-      file << std::to_string(variants[i].pos) << "\t";
+      file << ref_name <<"\t"; //region
+      if (alleles[j].nuc.find("-") == std::string::npos) {
+        file << std::to_string(variants[i].pos) << "\t";
+      } else {
+        file << std::to_string(variants[i].pos) << "\t";
+      }
       file << ref << "\t"; //ref
-      std::string test_string = variants[i].alleles[j].nuc;
-      file << variants[i].alleles[j].nuc << "\t";
+      file << alleles[j].nuc << "\t";
       file << "NA\t"; //ref dp
       file << "NA\t"; //ref rv
       file << "NA\t"; //ref qual   
-      file << std::to_string(variants[i].alleles[j].depth) << "\t"; //alt dp
+      file << std::to_string(alleles[j].depth) << "\t"; //alt dp
       file << "NA\t"; //alt rv
-      file << std::to_string((double)variants[i].alleles[j].mean_qual / (double)variants[i].alleles[j].depth) << "\t"; //alt qual
+      file << std::to_string((double)alleles[j].mean_qual / (double)alleles[j].depth) << "\t"; //alt qual
       file << std::to_string(freq) << "\t"; //alt freq
       file << std::to_string(variants[i].depth) << "\t"; //total dp
       file << "NA\t"; //pval
@@ -610,7 +652,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       } else {
         file << "FALSE\t";
       }
-      std::string tmp = std::to_string(variants[i].pos) + variants[i].alleles[j].nuc;
+      std::string tmp = std::to_string(variants[i].pos) + alleles[j].nuc;
       std::vector<std::string>::iterator sit = find(pos_nuc.begin(), pos_nuc.end(), tmp);
       if(sit != pos_nuc.end()){
         uint32_t index = std::distance(pos_nuc.begin(), sit);

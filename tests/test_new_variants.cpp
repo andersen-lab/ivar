@@ -37,6 +37,7 @@ int main() {
   int result = preprocess_reads(bam_filename, bed_file, prefix, "", pair_info, primer_offset, min_depth, min_qual, reference_file);
   std::vector<variant> new_variants;
   parse_internal_variants(prefix + ".txt", new_variants, min_depth, round_val, min_qual);
+
   //call variants in the old way
   std::ifstream mplp(path);
   call_variants_from_plup(mplp, prefix, min_qual, min_threshold, min_depth, reference_file, "", true);
@@ -81,6 +82,7 @@ int main() {
       }
     } else {
       if(total_depth != 8){
+        std::cerr << position << " " << new_variants[i].nuc << std::endl;
         expected = false;
         break;
       }
@@ -103,7 +105,6 @@ int main() {
     }
   }
   if(amp_flags_correct) success++;  
-
   //TEST 3 - Pass the same file without the pair file or bed file.
   bool no_amp_info = true;
   int result_3 = preprocess_reads(bam_filename, "", prefix_3, "", "", primer_offset, min_depth, min_qual, reference_file);
