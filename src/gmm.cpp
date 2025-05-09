@@ -12,13 +12,6 @@
 #include <limits>
 #include <unordered_map>
 
-void calculate_reference_frequency(std::vector<variant> &variants, std::string ref_path){
-  //ref_antd refantd(ref_path, ""); 
-  //ref = refantd.get_base(pos, region);
-  for(uint32_t i=0; i < variants.size(); i++){
-  }
-}
-
 std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> variants){
   std::vector<std::vector<double>> clusters(n);
   for(uint32_t i=0; i < variants.size(); i++){
@@ -427,71 +420,6 @@ std::vector<uint32_t> calculate_joint_probabilities(const std::vector<std::vecto
   return permutations[best_index];
 }
 
-/*void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n, bool insertions) {
-  uint32_t n = prob_matrix.size();
-  std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
-  std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices;
-
-  // Map positions to variant indices and nucleotides
-  for (uint32_t i = 0; i < variants.size(); ++i) {
-    uint32_t pos = variants[i].position;
-    all_nts[pos].push_back(variants[i].nuc);
-    pos_to_variant_indices[pos].push_back(i);
-  }
-
-  std::vector<uint32_t> unique_pos;
-  for (const auto& kv : all_nts)
-    unique_pos.push_back(kv.first);
-
-  // Generate all permutations up to lower_n
-  std::vector<std::vector<uint32_t>> possible_permutations;
-  for (uint32_t i = 1; i <= lower_n; ++i)
-    perm_generator(n, i, possible_permutations);
-
-  noise_resampler(n, index, possible_permutations, 6);
-
-  // Assignment by position
-  for (uint32_t pos : unique_pos) {
-    std::vector<uint32_t> pos_idxs;
-    std::vector<std::vector<double>> tmp_prob;
-
-    for (uint32_t variant_idx : pos_to_variant_indices[pos]) {
-      auto& var = variants[variant_idx];
-      if(!insertions){
-        if (var.nuc.find('+') != std::string::npos || var.depth_flag)
-          continue;
-      } else {
-        if (var.nuc.find('+') == std::string::npos || var.depth_flag)
-          continue;
-      }
-      pos_idxs.push_back(variant_idx);
-      std::vector<double> prob_column;
-      prob_column.reserve(n);
-      for (uint32_t row = 0; row < n; ++row)
-        prob_column.push_back(prob_matrix[row][variant_idx]);
-
-      tmp_prob.push_back(std::move(prob_column));
-    }
-
-    if (pos_idxs.empty())
-      continue;
-    std::vector<uint32_t> assigned = calculate_joint_probabilities(tmp_prob, possible_permutations);
-    if (assigned.empty()){
-      continue;
-    }
-    std::vector<uint32_t> assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
-    std::cerr << "assignment flagged " << assignment_flagged.size() << std::endl;
-    for (uint32_t i = 0; i < pos_idxs.size(); ++i) {
-      uint32_t v_idx = pos_idxs[i];
-      std::cerr << pos << " " << pos_idxs[i] << std::endl;
-      if (std::find(assignment_flagged.begin(), assignment_flagged.end(), i) != assignment_flagged.end()) {
-        std::cerr << "assigned here " << assigned[i] << std::endl;
-        variants[v_idx].vague_assignment = true;
-        variants[v_idx].cluster_assigned = assigned[i];
-      }
-    }
-  }
-}*/
 void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n, bool insertions) {
   uint32_t n = prob_matrix.size();
   std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
@@ -554,7 +482,7 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
   }
 }
 
-void split(const std::string &s, char delim, std::vector<std::string> &elems){
+void split(std::string &s, char delim, std::vector<std::string> &elems){
     std::stringstream ss;
     ss.str(s);
     std::string item;
@@ -596,6 +524,57 @@ void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, do
   }
 }
 
+
+void create_ref_variant(std::vector<std::string> row_values, std::vector<variant> &variants, uint32_t depth_cutoff, double compare_quality, double multiplier){
+  variant tmp;
+  tmp.position = std::stoi(row_values[1]); 
+  tmp.nuc = row_values[2];
+  tmp.depth = std::stoi(row_values[4]);
+  tmp.total_depth = std::stoi(row_values[11]);
+
+  //we have no alleles matching the ref
+  if(tmp.depth == 0){
+    return;
+  }
+  //TODO this doesn't calcualte the gapped depth for the reference allele 
+  float freq = (float)tmp.depth / (float)tmp.total_depth;
+  tmp.freq = std::round(freq * multiplier) / multiplier;
+  tmp.qual = std::stod(row_values[6]);
+  auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "1";};
+  if(row_values.size() > 20){
+    tmp.gapped_freq = tmp.freq; //TODO unsure if this is right
+    tmp.amplicon_flux = to_bool(row_values[21]);
+    tmp.amplicon_masked = to_bool(row_values[22]);
+    tmp.primer_masked = to_bool(row_values[23]);
+    tmp.std_dev = std::stod(row_values[24]);
+    tmp.amplicon_numbers = split_csv(row_values[26]);
+    tmp.freq_numbers = split_csv_double(row_values[25]);
+    tmp.version_1_var = false;
+  } else {
+    tmp.gapped_freq = 0.0;
+    tmp.amplicon_flux = false;
+    tmp.amplicon_masked = false;
+    tmp.primer_masked = false;
+    tmp.std_dev = 0;
+    tmp.version_1_var = true;
+  }
+
+  if(!tmp.version_1_var && tmp.total_depth < depth_cutoff){
+    tmp.depth_flag = true;
+  } else if(tmp.version_1_var && tmp.depth < depth_cutoff){
+    tmp.depth_flag = true;
+  } else {
+    tmp.depth_flag = false;
+  }
+  if(tmp.qual < compare_quality){
+    tmp.qual_flag = true;
+  } else {
+    tmp.qual_flag = false;
+  }
+  variants.push_back(std::move(tmp)); 
+}
+
+
 /**
  * @brief Parses an internally formatted variant file and populates a vector of variant objects.
  *
@@ -617,7 +596,7 @@ void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, do
  *
  * @see variant
  */
-void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold){
+void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold, std::string reference_file){
   std::ifstream infile(filename);
   std::string line;
   uint32_t count = 0;
@@ -625,6 +604,8 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
   double compare_quality = static_cast<double>(quality_threshold);
 
   auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "1";};
+  //track which ref alleles we've already added
+  std::vector<uint32_t> ref_pos_used;
 
   while (std::getline(infile, line)) {
     if(count++ == 0) continue;
@@ -638,6 +619,13 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     tmp.total_depth = std::stoi(row_values[11]);
     tmp.freq = std::round(std::stof(row_values[10]) * multiplier) / multiplier;
     tmp.qual = std::stod(row_values[9]);
+
+    auto it = std::find(ref_pos_used.begin(), ref_pos_used.end(), tmp.position);
+    //ref not yet accounted for
+    if (it == ref_pos_used.end()){
+      create_ref_variant(row_values, variants, depth_cutoff, compare_quality, multiplier);
+      ref_pos_used.push_back(tmp.position);
+    }
 
     if(row_values.size() > 20){
       tmp.gapped_freq = round(std::stod(row_values[20]) * multiplier) / multiplier;
@@ -673,13 +661,17 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
   } 
 }
 
-std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means){
+std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::string ref){
+  if(ref.empty()){
+    std::cerr << "Please provide a reference sequence." << std::endl;
+    exit(1);
+  }
   uint32_t n=8;
   uint32_t round_val = 4; 
   bool development_mode=true;
 
   std::vector<variant> base_variants;
-  parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
+  parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, ref);
   double error_rate = cluster_error(base_variants, min_qual, min_depth);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
@@ -692,7 +684,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<uint32_t> count_pos;
 
   for(uint32_t i=0; i < base_variants.size(); i++){
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && !base_variants[i].primer_masked){
+    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked){
       useful_var++;
       variants.push_back(base_variants[i]);
       count_pos.push_back(base_variants[i].position);

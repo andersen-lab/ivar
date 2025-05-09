@@ -2,6 +2,7 @@
 #include "call_consensus_clustering.h"
 #include "gmm.h"
 #include "saga.h"
+#include "ref_seq.h"
 #include <ostream>
 #include <iostream>
 #include <vector>
@@ -40,8 +41,11 @@ void call_majority_consensus(std::vector<variant> variants, uint32_t max_positio
   file.close(); 
 }
 
-void cluster_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means){ 
+void cluster_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means, std::string ref){ 
   std::cerr << "calling consensus" << std::endl;
+  //parse reference sequence
+  ref_antd refantd(ref, "");
+
   double max_mean=0;
   set_freq_range_flags(variants, 0, 1);
   double error_rate = cluster_error(variants, min_qual, min_depth);

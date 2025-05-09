@@ -287,7 +287,7 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
-static const char *contam_opt_str = "p:s:t:h?";
+static const char *contam_opt_str = "p:s:t:r:h?";
 
 std::string get_filename_without_extension(std::string f, std::string ext) {
   if (ext.length() > f.length())  // If extension longer than filename
@@ -335,6 +335,7 @@ int main(int argc, char *argv[]) {
     g_args.min_threshold = 0;
     g_args.min_depth = 10;
     g_args.min_qual = 20;
+    g_args.ref = "";
     opt = getopt(argc, argv, contam_opt_str);
     while (opt != -1) {
       switch (opt) {
@@ -347,6 +348,9 @@ int main(int argc, char *argv[]) {
         case 't':
           g_args.min_threshold = atof(optarg);
           break;
+        case 'r':
+          g_args.ref = optarg;
+          break;
         case 'h':
         case '?':
           print_trim_usage();
@@ -358,8 +362,8 @@ int main(int argc, char *argv[]) {
     if (!g_args.variants.empty() && !g_args.prefix.empty()) {
       std::vector<double> solution;
       std::vector<double> means;
-      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means);
-      cluster_consensus(variants, g_args.prefix, g_args.min_threshold, g_args.min_depth, g_args.min_qual, solution, means);
+      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.ref);
+      cluster_consensus(variants, g_args.prefix, g_args.min_threshold, g_args.min_depth, g_args.min_qual, solution, means, g_args.ref);
     }
     res = 0; 
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");

@@ -40,23 +40,26 @@ int main() {
   int success = 0;
  
   uint32_t round_val = 4; 
-  uint32_t min_depth = 10;
+  uint32_t min_depth = 5;
   uint8_t min_qual = 20;
   double default_threshold = 0.5;
 
   //TEST 1 - manually currated data
-  std::string var_filename = "../data/version_bump_tests/test_variants_small.tsv";
+  std::string var_filename = "../data/version_bump_tests/vbump_consensus_var.txt";
   std::string consensus_filename = "../data/version_bump_tests/test_consensus.fa";
- 
+  std::string reference_file = "../data/version_bump_tests/MN908947.3_sequence.fasta";
   std::vector<variant> base_variants; 
   std::vector<variant> variants; 
   uint32_t n = 2;
 
   //estimation of error
-  parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual);
+  parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual, reference_file);
+  std::cerr << "base var size " << base_variants.size() << std::endl;
   double error_rate = cluster_error(base_variants, min_qual, min_depth);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
+  std::cerr << "error rate " << error_rate << std::endl;
+  std::cerr << lower_bound << " " << upper_bound << std::endl;
   //parse our test variants file
   uint32_t count = 0;
   set_freq_range_flags(base_variants, lower_bound, upper_bound);
@@ -73,15 +76,21 @@ int main() {
     double tmp = static_cast<double>(variants[i].gapped_freq);
     data.col(i) = tmp;
   }
-  std::vector<double> solution;   
+  std::vector<double> solution;
+  std::cerr << "here" << std::endl;   
+  std::cerr << variants.size() << std::endl;
   gaussian_mixture_model retrained = retrain_model(n, data, variants, 2, 0.001);
+  std::cerr << "trained model" << std::endl;
   for(uint32_t i=0; i < base_variants.size(); i++){
     if(base_variants[i].outside_freq_range || base_variants[i].depth_flag){
       variants.push_back(base_variants[i]);   
     }
   }
   solve_clusters(variants, retrained, lower_bound, solution);
-  cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means); 
+  std::cerr << "solved clusters" << std::endl;
+  cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, reference_file); 
+  exit(0);
+
 
   std::vector<pair<std::string, std::string>> gt_sequences;
   read_consensus(gt_sequences, consensus_filename);

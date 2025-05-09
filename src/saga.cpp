@@ -8,6 +8,27 @@
 #include <unordered_set>
 #include <tuple>
 
+uint32_t calculate_reference_depth(position var, char ref){
+  uint32_t depth = 0;
+  for(auto allele : var.alleles){
+    if(allele.nuc[0] == ref){
+      depth = allele.depth;
+      break;
+    }
+  }
+  return(depth);
+}
+uint32_t calculate_reference_qual(position var, char ref){
+  uint32_t qual= 0;
+  for(auto allele : var.alleles){
+    if(allele.nuc[0] == ref){
+      qual = allele.mean_qual;
+      break;
+    }
+  }
+  return(qual);
+}
+
 std::vector<allele> find_deletions_next(std::vector<position> variants, uint32_t pos){
   std::vector<allele> deletions;
   for(auto var : variants){
@@ -90,7 +111,6 @@ uint32_t find_sequence_end(const bam1_t* read){
 }
 
 void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplicons, uint8_t min_qual, ref_antd &refantd, std::string ref_name){
-
   //pass the forward first then reverse 
   //also assumes that the forward read starts more "left" than  the reverse
   uint32_t start_reverse = read2->core.pos; 
@@ -436,7 +456,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   std::vector<float> std_deviations;
   std::vector<std::string> pos_nuc;
   std::vector<std::string> freq_strings;
-  uint32_t test_pos = 0;
+  uint32_t test_pos = 1000;
   //detect fluctuating variants across amplicons
   for(uint32_t i=0; i < amplicons.max_pos; i++){
     amplicons.test_flux.clear();
@@ -568,8 +588,15 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].depth == 0) continue;
     //find the depth of the deletion to calculate upgapped depth
-    float del_depth = 0;
+    double del_depth = 0;
     char ref = refantd.get_base(variants[i].pos, ref_name);
+    //calculate the reference depth
+    uint32_t ref_depth = calculate_reference_depth(variants[i], ref);
+    double ref_qual = 0;
+    if(ref_depth > 0){
+      uint32_t  ref_qual_avg = calculate_reference_qual(variants[i], ref);
+      ref_qual = (double)ref_qual_avg / (double)ref_depth;
+    }
     uint32_t pos = variants[i].pos; 
 
     //deletions need to be shifted one position back
@@ -578,7 +605,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     //remove the deletion depth as needed
     for(uint32_t j=0; j < variants[i].alleles.size(); j++){
       if(variants[i].alleles[j].nuc == "-"){
-        del_depth += (float)variants[i].alleles[j].depth;
+        del_depth += (double)variants[i].alleles[j].depth;
         break;  
       }
     }
@@ -603,11 +630,14 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     }
 
     for(uint32_t j=0; j < alleles.size(); j++){
-      float freq = (float)alleles[j].depth / ((float)variants[i].depth-del_depth);
-      float gapped_freq = (float)alleles[j].depth / (float)variants[i].depth;
-      if((float)alleles[j].depth == 0){
+      if(alleles[j].depth == 0){
         continue;
       }
+      if(alleles[j].nuc[0] == ref){
+        continue;
+      }
+      double freq = (double)alleles[j].depth / ((double)variants[i].depth-del_depth);
+      double gapped_freq = (double)alleles[j].depth / (double)variants[i].depth;
       file << ref_name <<"\t"; //region
       if (alleles[j].nuc.find("-") == std::string::npos) {
         file << std::to_string(variants[i].pos) << "\t";
@@ -616,9 +646,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       }
       file << ref << "\t"; //ref
       file << alleles[j].nuc << "\t";
-      file << "NA\t"; //ref dp
+      file << std::to_string(ref_depth) << "\t"; //ref dp
       file << "NA\t"; //ref rv
-      file << "NA\t"; //ref qual   
+      file << std::to_string(ref_qual) << "\t"; //ref qual   
       file << std::to_string(alleles[j].depth) << "\t"; //alt dp
       file << "NA\t"; //alt rv
       file << std::to_string((double)alleles[j].mean_qual / (double)alleles[j].depth) << "\t"; //alt qual
