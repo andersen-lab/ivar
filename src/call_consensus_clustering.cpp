@@ -42,6 +42,10 @@ void call_majority_consensus(std::vector<variant> variants, uint32_t max_positio
 }
 
 void cluster_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means, std::string ref){ 
+  //TODO call majority
+  if(variants.size() == 0){
+    std::cerr << "haven't solved this yet" << std::endl;
+  }
   std::cerr << "calling consensus" << std::endl;
   //parse reference sequence
   ref_antd refantd(ref, "");

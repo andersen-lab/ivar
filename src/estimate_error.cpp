@@ -43,15 +43,12 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
   double lower_bound = 0.50;
   double upper_bound = 0.99;
   set_freq_range_flags(base_variants, lower_bound, upper_bound);
-  std::cerr << base_variants.size() << std::endl; 
   std::vector<variant> variants_original;
   uint32_t useful_count_original = 0;
   uint32_t max_pos = 0;
   std::vector<double> frequencies;
    for(uint32_t i=0; i < base_variants.size(); i++){
     if(base_variants[i].position > max_pos) max_pos = base_variants[i].position;
-    std::cerr << base_variants[i].freq << " " << base_variants[i].position << std::endl;
-    std::cerr << base_variants[i].amplicon_flux << " " << base_variants[i].depth_flag << " " << base_variants[i].outside_freq_range << " " << base_variants[i].qual_flag << " " << base_variants[i].amplicon_masked << std::endl;
     if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked){          
       useful_count_original++;
       variants_original.push_back(base_variants[i]);

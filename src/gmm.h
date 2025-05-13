@@ -29,6 +29,7 @@ struct variant {
   std::string nuc;
   uint32_t depth;
   uint32_t total_depth;
+  uint32_t gapped_depth;
   double qual;
   double freq;
   double gapped_freq = 0;
@@ -47,7 +48,7 @@ struct variant {
   //for these true means flagged as problematic
   bool vague_assignment=false; //cannot be distinguished between two groups
   bool amplicon_flux=false; //fluctuation frequency across amplicons
-  bool amplicon_masked=false; //masked due to another variant experiencing flu
+  bool amplicon_masked=false; //masked due to another variant experiencing flux
   bool primer_masked=false; //mutation in primer binding region of overlapped amplicon
   bool depth_flag=false; //depth is below the threshold                  
   bool qual_flag=false; //quality is below threshold

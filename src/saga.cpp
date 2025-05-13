@@ -8,6 +8,23 @@
 #include <unordered_set>
 #include <tuple>
 
+std::string join_uint32_vector(const std::vector<uint32_t>& vec) {
+    std::ostringstream oss;
+    for (size_t i = 0; i < vec.size(); ++i) {
+        if (i > 0) oss << ",";
+        oss << vec[i];
+    }
+    return oss.str();
+}
+std::string join_double_vector(const std::vector<double>& vec) {
+    std::ostringstream oss;
+    for (size_t i = 0; i < vec.size(); ++i) {
+        if (i > 0) oss << ",";
+        oss << vec[i];
+    }
+    return oss.str();
+}
+
 uint32_t calculate_reference_depth(position var, char ref){
   uint32_t depth = 0;
   for(auto allele : var.alleles){
@@ -424,9 +441,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     file_amp.close();
     amplicons.write_out_frequencies(amp_file);
   }
-
   //combine amplicon counts to get total variants 
-  amplicons.combine_haplotypes();
+  uint32_t counter = 1;
+  amplicons.combine_haplotypes(counter);
   //detect primer binding issues
   std::vector<position> variants = amplicons.variants;
 
@@ -455,7 +472,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   std::vector<uint32_t> flagged_positions; 
   std::vector<float> std_deviations;
   std::vector<std::string> pos_nuc;
-  std::vector<std::string> freq_strings;
   uint32_t test_pos = 1000;
   //detect fluctuating variants across amplicons
   for(uint32_t i=0; i < amplicons.max_pos; i++){
@@ -531,16 +547,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
         std::string tmp = std::to_string(i) + it->first;
         pos_nuc.push_back(tmp);
         std_deviations.push_back(sd);
-        //save the amplicon specific frequencies
-        std::ostringstream oss;
-        for (uint32_t k = 0; k < it->second.size(); ++k) {
-          oss << it->second[k];
-          if (k != it->second.size() - 1) {
-            oss << ",";
-          }
-        }
-        freq_strings.push_back(oss.str());
-        //break;
       }
     }
   }
@@ -560,31 +566,10 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     generate_range(amplicons.overlaps[i][0], amplicons.overlaps[i][1], amplicon_level_error);    
   } 
 
-
-  //assign positions to amplicons
-  //first find the biggest pos covered by variants
-  uint32_t max_pos = variants.size();
-  for(uint32_t i=0; i < max_pos; i++){   
-      std::vector<uint32_t> overlaps;
-      uint32_t counter = 1;
-      amplicons.detect_position_amplicons(i, counter, overlaps);
-      std::stringstream ss;
-      for (uint32_t j = 0; j < overlaps.size(); ++j) {
-        ss << overlaps[j];
-        if (j < overlaps.size() - 1) {
-          ss << ",";
-        }
-      }
-      if(ss.str() != ""){
-        variants[i].amplicon_numbers = ss.str();
-      }
-  }
-
   //write variants to a file
   ofstream file;
   file.open(bam_out + ".txt", ios::trunc);
-  //file << "POS\tALLELE\tDEPTH\tFREQ\tGAPPED_FREQ\tAVG_QUAL\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\n";
-  file << "REGION\tPOS\tREF\tALT\tREF_DP\tREF_RV\tREF_QUAL\tALT_DP\tALT_RV\tALT_QUAL\tALT_FREQ\tTOTAL_DP\tPVAL\tPASS\tGFF_FEATURE\tREF_CODON\tREF_AA\tALT_CODON\tALT_AA\tPOS_AA\tGAPPED_FREQ\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\tSTD_DEV\tAMP_FREQ\tAMP_NUMBERS\n";
+  file << "REGION\tPOS\tREF\tALT\tREF_DP\tREF_RV\tREF_QUAL\tALT_DP\tALT_RV\tALT_QUAL\tALT_FREQ\tTOTAL_DP\tPVAL\tPASS\tGFF_FEATURE\tREF_CODON\tREF_AA\tALT_CODON\tALT_AA\tPOS_AA\tGAPPED_FREQ\tGAPPED_DEPTH\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\tSTD_DEV\tAMP_FREQ\tAMP_NUMBERS\n";
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].depth == 0) continue;
     //find the depth of the deletion to calculate upgapped depth
@@ -653,7 +638,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       file << "NA\t"; //alt rv
       file << std::to_string((double)alleles[j].mean_qual / (double)alleles[j].depth) << "\t"; //alt qual
       file << std::to_string(freq) << "\t"; //alt freq
-      file << std::to_string(variants[i].depth) << "\t"; //total dp
+      file << std::to_string(variants[i].depth-del_depth) << "\t"; //total dp
       file << "NA\t"; //pval
       file << "NA\t"; //pass
       file << "NA\t"; //gff feature
@@ -663,6 +648,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       file << "NA\t"; //alt aa
       file << "NA\t"; //pos aa
       file << std::to_string(gapped_freq) << "\t";
+      file << std::to_string(variants[i].depth) << "\t";
       std::vector<uint32_t>::iterator it; 
       it = find(flagged_positions.begin(), flagged_positions.end(), variants[i].pos);
       if (it != flagged_positions.end()){
@@ -687,12 +673,12 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       if(sit != pos_nuc.end()){
         uint32_t index = std::distance(pos_nuc.begin(), sit);
         file << std::to_string(std_deviations[index]) << "\t";
-        file << freq_strings[index] << "\t"; 
       } else {
         file << "0\t";
-        file << "0\t";
       }
-      file << variants[i].amplicon_numbers;
+      std::vector<double> freqs = variants[i].amplicon_frequencies[alleles[j].nuc];
+      file << join_double_vector(freqs) << "\t";     
+      file << join_uint32_vector(variants[i].amplicon_numbers);
       file << "\n";
     } 
   } 

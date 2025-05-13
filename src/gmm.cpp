@@ -524,6 +524,53 @@ void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, do
   }
 }
 
+void create_ref_variant_indel(std::vector<std::string> row_values, std::vector<variant> &variants, uint32_t depth_cutoff, double compare_quality, double multiplier){
+  std::string deletion = row_values[3];
+  for(uint32_t i=1; i < deletion.size(); i++){
+    variant tmp;
+    tmp.position = std::stoi(row_values[1]) + i; 
+    tmp.nuc = deletion[i];
+    tmp.depth = std::stoi(row_values[7]);
+    tmp.total_depth = std::stoi(row_values[11]);
+
+    float freq = 1-((float)tmp.depth / (float)tmp.total_depth);
+    tmp.freq = std::round(freq * multiplier) / multiplier;
+    tmp.qual = std::stod(row_values[6]);
+    auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "1";};
+    if(row_values.size() > 20){
+      tmp.gapped_freq = tmp.freq; //TODO unsure if this is right
+      tmp.gapped_depth = std::stoi(row_values[21]);
+      tmp.gapped_depth = (float)tmp.depth / (float)tmp.gapped_depth;
+      tmp.amplicon_flux = to_bool(row_values[22]);
+      tmp.amplicon_masked = to_bool(row_values[23]);
+      tmp.primer_masked = to_bool(row_values[24]);
+      tmp.std_dev = std::stod(row_values[25]);
+      tmp.amplicon_numbers = split_csv(row_values[27]);
+      tmp.freq_numbers = split_csv_double(row_values[26]);
+      tmp.version_1_var = false;
+    } else {
+      tmp.gapped_freq = 0.0;
+      tmp.amplicon_flux = false;
+      tmp.amplicon_masked = false;
+      tmp.primer_masked = false;
+      tmp.std_dev = 0;
+      tmp.version_1_var = true;
+    }
+    if(!tmp.version_1_var && tmp.total_depth < depth_cutoff){
+      tmp.depth_flag = true;
+    } else if(tmp.version_1_var && tmp.depth < depth_cutoff){
+      tmp.depth_flag = true;
+    } else {
+      tmp.depth_flag = false;
+    }
+    if(tmp.qual < compare_quality){
+      tmp.qual_flag = true;
+    }   else {
+      tmp.qual_flag = false;
+    }
+    variants.push_back(std::move(tmp)); 
+  }
+}
 
 void create_ref_variant(std::vector<std::string> row_values, std::vector<variant> &variants, uint32_t depth_cutoff, double compare_quality, double multiplier){
   variant tmp;
@@ -531,24 +578,25 @@ void create_ref_variant(std::vector<std::string> row_values, std::vector<variant
   tmp.nuc = row_values[2];
   tmp.depth = std::stoi(row_values[4]);
   tmp.total_depth = std::stoi(row_values[11]);
-
   //we have no alleles matching the ref
   if(tmp.depth == 0){
     return;
   }
-  //TODO this doesn't calcualte the gapped depth for the reference allele 
+  //TODO this doesn't calculate the gapped depth for the reference allele 
   float freq = (float)tmp.depth / (float)tmp.total_depth;
   tmp.freq = std::round(freq * multiplier) / multiplier;
   tmp.qual = std::stod(row_values[6]);
   auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "1";};
   if(row_values.size() > 20){
     tmp.gapped_freq = tmp.freq; //TODO unsure if this is right
-    tmp.amplicon_flux = to_bool(row_values[21]);
-    tmp.amplicon_masked = to_bool(row_values[22]);
-    tmp.primer_masked = to_bool(row_values[23]);
-    tmp.std_dev = std::stod(row_values[24]);
-    tmp.amplicon_numbers = split_csv(row_values[26]);
-    tmp.freq_numbers = split_csv_double(row_values[25]);
+    tmp.gapped_depth = std::stoi(row_values[21]);
+    tmp.gapped_depth = (float)tmp.depth / (float)tmp.gapped_depth;
+    tmp.amplicon_flux = to_bool(row_values[22]);
+    tmp.amplicon_masked = to_bool(row_values[23]);
+    tmp.primer_masked = to_bool(row_values[24]);
+    tmp.std_dev = std::stod(row_values[25]);
+    tmp.amplicon_numbers = split_csv(row_values[27]);
+    tmp.freq_numbers = split_csv_double(row_values[26]);
     tmp.version_1_var = false;
   } else {
     tmp.gapped_freq = 0.0;
@@ -615,26 +663,37 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     variant tmp;
     tmp.position = std::stoi(row_values[1]);
     tmp.nuc = row_values[3];
+    bool is_ins = std::find(tmp.nuc.begin(), tmp.nuc.end(), '+') != tmp.nuc.end();
+    bool is_del = std::find(tmp.nuc.begin(), tmp.nuc.end(), '-') != tmp.nuc.end();
+    if(is_ins || is_del) {
+      tmp.position = tmp.position + 1;
+    }
+
+    auto it = std::find(ref_pos_used.begin(), ref_pos_used.end(), tmp.position);
+    //TODO
+    if (it == ref_pos_used.end() && !is_ins && !is_del){
+      //this is neither an insertion or deletion
+      create_ref_variant(row_values, variants, depth_cutoff, compare_quality, multiplier);
+      ref_pos_used.push_back(tmp.position);
+    } else if (it == ref_pos_used.end() && !is_ins){
+      //handle deletions
+      create_ref_variant_indel(row_values, variants, depth_cutoff, compare_quality, multiplier);
+      ref_pos_used.push_back(tmp.position);
+    }
     tmp.depth = std::stoi(row_values[7]);
     tmp.total_depth = std::stoi(row_values[11]);
     tmp.freq = std::round(std::stof(row_values[10]) * multiplier) / multiplier;
     tmp.qual = std::stod(row_values[9]);
 
-    auto it = std::find(ref_pos_used.begin(), ref_pos_used.end(), tmp.position);
-    //ref not yet accounted for
-    if (it == ref_pos_used.end()){
-      create_ref_variant(row_values, variants, depth_cutoff, compare_quality, multiplier);
-      ref_pos_used.push_back(tmp.position);
-    }
-
     if(row_values.size() > 20){
       tmp.gapped_freq = round(std::stod(row_values[20]) * multiplier) / multiplier;
-      tmp.amplicon_flux = to_bool(row_values[21]);
-      tmp.amplicon_masked = to_bool(row_values[22]);
-      tmp.primer_masked = to_bool(row_values[23]);
-      tmp.std_dev = std::stod(row_values[24]);
-      tmp.amplicon_numbers = split_csv(row_values[26]);
-      tmp.freq_numbers = split_csv_double(row_values[25]);
+      tmp.gapped_depth = std::stoi(row_values[21]);
+      tmp.amplicon_flux = to_bool(row_values[22]);
+      tmp.amplicon_masked = to_bool(row_values[23]);
+      tmp.primer_masked = to_bool(row_values[24]);
+      tmp.std_dev = std::stod(row_values[25]);
+      tmp.amplicon_numbers = split_csv(row_values[27]);
+      tmp.freq_numbers = split_csv_double(row_values[26]);
       tmp.version_1_var = false;
     } else {
       tmp.gapped_freq = 0.0;
@@ -693,8 +752,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   std::cerr << "useful var " << useful_var << std::endl;
 
-  //no clusterable variants return
-  if(useful_var == 0){
+  if(useful_var < 2){
     variants.clear();
     return(variants);
   }
