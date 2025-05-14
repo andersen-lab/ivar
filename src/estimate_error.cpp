@@ -76,12 +76,12 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
     bool stop=false;
     for(uint32_t i=0; i < model.clusters.size(); i++){
       double stdev = calculate_standard_deviation(model.clusters[i]);
-      double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
+      //double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
       if(stdev < 0.01 && i == index) {
         stop = true;
         chosen_peak = i;
       }
-      std::cerr << "n " << n << " mean " << mean << " stdev " << stdev << std::endl;
+      //std::cerr << "n " << n << " mean " << mean << " stdev " << stdev << std::endl;
     }
     if(stop) break;
     else n++;

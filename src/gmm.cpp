@@ -611,7 +611,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     tmp.nuc = row_values[3];
     bool is_ins = std::find(tmp.nuc.begin(), tmp.nuc.end(), '+') != tmp.nuc.end();
     bool is_del = std::find(tmp.nuc.begin(), tmp.nuc.end(), '-') != tmp.nuc.end();
-    if(is_ins || is_del) {
+    if(is_del) {
       tmp.position = tmp.position + 1;
     }
     //seperate deletions into individual reference based variants

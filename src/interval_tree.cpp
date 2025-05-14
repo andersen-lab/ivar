@@ -1,5 +1,5 @@
 #include "interval_tree.h"
-
+#include <unordered_map>
 // Constructor for initializing an Interval Tree
 IntervalTree::IntervalTree() { _root = NULL; }
 std::vector<allele> add_allele_vectors(std::vector<allele> new_alleles, std::vector<allele> return_alleles){
@@ -52,7 +52,7 @@ void IntervalTree::write_out_frequencies(ITNode *root, std::string filename){
   write_out_frequencies(root->right, filename);
 }
 
-void IntervalTree::combine_haplotypes(ITNode *root){
+void IntervalTree::combine_haplotypes(ITNode *root, uint32_t &counter){
   if (root==NULL) return;
   for(uint32_t i=0; i < root->amp_positions.size(); i++){
     if(root->amp_positions[i].depth == 0){
@@ -61,8 +61,17 @@ void IntervalTree::combine_haplotypes(ITNode *root){
     variants[root->amp_positions[i].pos].depth += root->amp_positions[i].depth;
     std::vector<allele> new_alleles = add_allele_vectors(root->amp_positions[i].alleles, variants[root->amp_positions[i].pos].alleles);
     variants[root->amp_positions[i].pos].alleles = new_alleles;
+    variants[root->amp_positions[i].pos].amplicon_numbers.push_back(counter);
+    for(uint32_t j=0; j < root->amp_positions[i].alleles.size(); j++){
+      if (variants[root->amp_positions[i].pos].amplicon_frequencies.find(root->amp_positions[i].alleles[j].nuc) != variants[root->amp_positions[i].pos].amplicon_frequencies.end()) {
+        variants[root->amp_positions[i].pos].amplicon_frequencies[root->amp_positions[i].alleles[j].nuc].push_back((double)root->amp_positions[i].alleles[j].depth / (double)root->amp_positions[i].depth);
+      } else{
+        variants[root->amp_positions[i].pos].amplicon_frequencies[root->amp_positions[i].alleles[j].nuc] = {(double)root->amp_positions[i].alleles[j].depth / (double)root->amp_positions[i].depth};
+      }
+    }
   }
-  combine_haplotypes(root->right);
+  counter += 1;
+  combine_haplotypes(root->right, counter);
 }
 
 void IntervalTree::assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual){
@@ -110,25 +119,12 @@ void IntervalTree::amplicon_position_pop(ITNode *root){
 
 void IntervalTree::detect_position_amplicons(ITNode *root, uint32_t find_position, uint32_t &counter, std::vector<uint32_t> &overlaps){
   if (root==NULL) return;
-  //if (find_position < (uint32_t)root->data->low) return;
   if(((uint32_t)root->data->low < find_position) && (find_position < (uint32_t)root->data->high)){
+    std::cerr << root->data->low << " " << find_position << " " << root->data->high << std::endl;
     overlaps.push_back(counter);
   }
   counter += 1;
   detect_position_amplicons(root->right, find_position, counter, overlaps);
-}
-
-
-void IntervalTree::detect_amplicon_overlaps(ITNode *root, uint32_t find_position){
-  if (root==NULL) return;
-  if (find_position < (uint32_t)root->data->low) return;
-  if(((uint32_t)root->data->low < find_position) && (find_position < (uint32_t)root->data->high)){
-    std::vector<uint32_t> tmp;
-    tmp.push_back((uint32_t)root->data->low);
-    tmp.push_back((uint32_t)root->data->high);
-    overlaps.push_back(tmp);
-  }
-  detect_amplicon_overlaps(root->right, find_position);
 }
 
 void IntervalTree::detect_primer_issues(ITNode *root, uint32_t find_position){

@@ -11,6 +11,11 @@
 #include <algorithm>
 #include <numeric>
 
+std::string trim_leading_ambiguities(std::string sequence, uint32_t min_position){
+  std::string result = sequence.substr(min_position-1); 
+  return(result);
+}
+
 void call_majority_consensus(std::vector<variant> variants, uint32_t max_position, std::string clustering_file, double default_threshold){
   //if we can't find a solution simply take the majority variant per position
   std::vector<std::string> nucs;
@@ -46,6 +51,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   if(variants.size() == 0){
     std::cerr << "haven't solved this yet" << std::endl;
   }
+
   std::cerr << "calling consensus" << std::endl;
   //parse reference sequence
   ref_antd refantd(ref, "");
@@ -58,9 +64,13 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   set_freq_range_flags(variants, freq_lower_bound, freq_upper_bound);
   //find the largest position in the variants file
   uint32_t max_position = 0;
+  uint32_t min_position = 4294967295U;;
   for(auto x : variants){
     if(x.position > max_position){
       max_position = x.position;
+    }
+    if(x.position < min_position && x.total_depth > 0){
+        min_position = x.position;
     }
   }
   bool print = false;
@@ -70,14 +80,14 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     std::vector<std::string> tmp(max_position, "N");
     all_consensus_seqs.push_back(tmp);
   }
-
+  
   //order varaints by position
   std::sort(variants.begin(), variants.end(), [](const variant& a, const variant& b) {return a.position < b.position;}); 
   std::vector<uint32_t> last_adjustment(all_consensus_seqs.size(), 0); 
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 0){
+    if(variants[i].position == 1554){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -103,6 +113,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       }
       continue;
     }
+
     //this variant position experiences fluctuation across amplicons
     if(variants[i].amplicon_flux){
       if(print){
@@ -198,8 +209,9 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     if(it == solution.end()){ 
       continue;
     }
+    std::string trimmed_sequence = trim_leading_ambiguities(sorted_strings[i], min_position);
     file << ">"+clustering_file+"_cluster_"+ std::to_string(tmp_mean) << "\n";
-    file << sorted_strings[i] << "\n";
+    file << trimmed_sequence << "\n";
   }
   file.close(); 
 }

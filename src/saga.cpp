@@ -97,7 +97,7 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
         tmp +=  std::string(1, nuc);
         qual_avg += qual[j];
       }
-      positions.push_back(total_ref_pos-1);
+      positions.push_back(total_ref_pos+counter-1);
       bases.push_back(tmp);
       qualities.push_back((uint32_t)qual_avg/(tmp.size()-1));
     }
@@ -598,8 +598,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
         remove_indices.push_back(j);
       } 
     }
+    std::sort(remove_indices.rbegin(), remove_indices.rend());
     for(uint32_t idx : remove_indices) {
-      if(idx >= 0 && idx < alleles.size()) {
+      if (idx < alleles.size()) {
         alleles.erase(alleles.begin() + idx);
       }
     }   
@@ -627,15 +628,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       double freq = (double)alleles[j].depth / ((double)variants[i].depth-del_depth);
       double gapped_freq = (double)alleles[j].depth / (double)variants[i].depth;
       file << ref_name <<"\t"; //region
-      if (alleles[j].nuc.find("-") == std::string::npos) {
-        file << std::to_string(variants[i].pos) << "\t";
-      } else {
-        file << std::to_string(variants[i].pos) << "\t";
-      }
-      file << ref << "\t"; //ref
+      file << std::to_string(variants[i].pos) << "\t";
+      file << "NA"  << "\t"; //ref
       file << alleles[j].nuc << "\t";
       file << std::to_string(ref_depth) << "\t"; //ref dp
-      file << "NA\t"; //ref rv
+      file << ref << "\t"; //ref rv
       file << std::to_string(ref_qual) << "\t"; //ref qual   
       file << std::to_string(alleles[j].depth) << "\t"; //alt dp
       file << "NA\t"; //alt rv

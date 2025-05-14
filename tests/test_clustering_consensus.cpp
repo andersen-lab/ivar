@@ -63,7 +63,6 @@ int main() {
   set_freq_range_flags(base_variants, lower_bound, upper_bound);
   for(uint32_t i=0; i < base_variants.size(); i++){
     if(!base_variants[i].outside_freq_range && !base_variants[i].depth_flag && !base_variants[i].amplicon_flux && !base_variants[i].amplicon_masked){
-      std::cerr << base_variants[i].freq << std::endl;
       variants.push_back(base_variants[i]);
       count++;
     }
@@ -85,6 +84,11 @@ int main() {
   }
   solve_clusters(variants, retrained, lower_bound, solution);
   std::cerr << "solved clusters" << std::endl;
+  for(auto var : variants){
+    if(var.position == 1553){
+      std::cerr << var.nuc << std::endl;
+    }
+  }
   cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, reference_file); 
   
   std::vector<pair<std::string, std::string>> gt_sequences;
@@ -95,12 +99,10 @@ int main() {
 
   bool correct = true;
   for (auto itgt = gt_sequences.begin(), itexp = exp_sequences.begin(); itgt != gt_sequences.end() && itexp != exp_sequences.end(); ++itgt, ++itexp) {
-    //std::cerr << itexp->second << std::endl;
-    //std::cerr << itgt->second << std::endl;
     if(itexp->second.size() != itgt->second.size()) { 
       correct = false;
       std::cerr << "not same size" << std::endl;
-      continue;
+      //continue;
     }
     for(uint32_t i=0; i < itexp->second.size(); i++){
       char a = itgt->second[i];
