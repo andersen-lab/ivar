@@ -556,16 +556,19 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   } 
 
   std::cerr << "variants size " << variants.size() << std::endl;
-  amplicons.overlaps.clear();
+  std::vector<uint32_t> flagged_amplicons;
   //find amplicons that are problematic
-  for(uint32_t i=0; i < flagged_positions.size(); i++){
-    amplicons.detect_amplicon_overlaps(flagged_positions[i]);
+  for(uint32_t j=0; j < variants.size(); j++){
+    auto it = std::find(flagged_positions.begin(), flagged_positions.end(), variants[j].pos);
+    if(it != flagged_positions.end()){
+      for(auto an : variants[j].amplicon_numbers){
+        auto ait = std::find(flagged_amplicons.begin(), flagged_amplicons.end(), an);
+        if(ait == flagged_amplicons.end()){
+          flagged_amplicons.push_back(an);
+        }
+      }
+    }
   }
-  std::vector<uint32_t> amplicon_level_error;
-  for(uint32_t i=0; i < amplicons.overlaps.size(); i++){
-    generate_range(amplicons.overlaps[i][0], amplicons.overlaps[i][1], amplicon_level_error);    
-  } 
-
   //write variants to a file
   ofstream file;
   file.open(bam_out + ".txt", ios::trunc);
@@ -587,14 +590,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     //deletions need to be shifted one position back
     std::vector<allele> del_alleles = find_deletions_next(variants, pos);    
 
-    //remove the deletion depth as needed
-    for(uint32_t j=0; j < variants[i].alleles.size(); j++){
-      if(variants[i].alleles[j].nuc == "-"){
-        del_depth += (double)variants[i].alleles[j].depth;
-        break;  
-      }
-    }
-
     std::vector<allele> alleles = variants[i].alleles;
     //remove any current deletions
     std::vector<uint32_t> remove_indices;
@@ -613,14 +608,22 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     if(del_alleles.size() > 0){
       alleles.insert(alleles.end(), del_alleles.begin(), del_alleles.end());
     }
-
+    //remove the deletion depth as needed
+    for(uint32_t j=0; j < alleles.size(); j++){
+      if(alleles[j].depth == 0) continue;
+      if(alleles[j].nuc.find("-") != std::string::npos){
+        del_depth += (double)alleles[j].depth;
+        break;  
+      }
+    }
+    //iterate all alleles and add them in
     for(uint32_t j=0; j < alleles.size(); j++){
       if(alleles[j].depth == 0){
         continue;
       }
-      if(alleles[j].nuc[0] == ref){
+      /*if(alleles[j].nuc[0] == ref){
         continue;
-      }
+      }*/
       double freq = (double)alleles[j].depth / ((double)variants[i].depth-del_depth);
       double gapped_freq = (double)alleles[j].depth / (double)variants[i].depth;
       file << ref_name <<"\t"; //region
@@ -656,12 +659,17 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       } else {
         file << "FALSE\t";
       }
-      it = find(amplicon_level_error.begin(), amplicon_level_error.end(), variants[i].pos);
-      if(it != amplicon_level_error.end()){
-        file << "TRUE\t";
-      } else {
-        file << "FALSE\t";
+      bool amp_flag = false;
+      for(auto an : variants[i].amplicon_numbers){
+        it = find(flagged_amplicons.begin(), flagged_amplicons.end(), an);
+        if(it != flagged_amplicons.end()){
+          amp_flag = true;
+          break;
+        }
       }
+      if(amp_flag) file << "TRUE\t";
+      else file << "FALSE\t";
+
       it = find(primer_binding_error.begin(), primer_binding_error.end(), variants[i].pos);
       if(it != primer_binding_error.end()){
         file << "TRUE\t";
