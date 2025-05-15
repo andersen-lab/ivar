@@ -495,7 +495,7 @@ std::vector<double> split_csv_double(const std::string& input) {
     std::vector<double> result;
     std::stringstream ss(input);
     std::string token;
-    
+     
     while (std::getline(ss, token, ',')) {
       result.push_back(std::stod(token));
     }
@@ -531,9 +531,9 @@ void deletion_variant(std::vector<std::string> row_values, std::vector<variant> 
     tmp.position = std::stoi(row_values[1]) + i; 
     tmp.nuc = '-';
     tmp.depth = std::stoi(row_values[7]);
-    tmp.total_depth = std::stoi(row_values[11]);
     double freq = std::stod(row_values[10]);
     tmp.freq = std::round(freq * multiplier) / multiplier;
+    tmp.total_depth = (uint32_t)(tmp.depth / tmp.freq) - tmp.depth;
     tmp.qual = std::stod(row_values[6]);
     auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "1";};
     if(row_values.size() > 20){
@@ -543,8 +543,12 @@ void deletion_variant(std::vector<std::string> row_values, std::vector<variant> 
       tmp.amplicon_masked = to_bool(row_values[23]);
       tmp.primer_masked = to_bool(row_values[24]);
       tmp.std_dev = std::stod(row_values[25]);
-      tmp.amplicon_numbers = split_csv(row_values[27]);
-      tmp.freq_numbers = split_csv_double(row_values[26]);
+      if(row_values[27] != "NA"){
+        tmp.amplicon_numbers = split_csv(row_values[27]);
+      }
+      if(row_values[26] != "NA"){
+        tmp.freq_numbers = split_csv_double(row_values[26]);
+      }
       tmp.version_1_var = false;
     } else {
       tmp.gapped_freq = 0.0;
@@ -609,7 +613,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     variant tmp;
     tmp.position = std::stoi(row_values[1]);
     tmp.nuc = row_values[3];
-    bool is_ins = std::find(tmp.nuc.begin(), tmp.nuc.end(), '+') != tmp.nuc.end();
     bool is_del = std::find(tmp.nuc.begin(), tmp.nuc.end(), '-') != tmp.nuc.end();
     if(is_del) {
       tmp.position = tmp.position + 1;
@@ -623,7 +626,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     tmp.total_depth = std::stoi(row_values[11]);
     tmp.freq = std::round(std::stof(row_values[10]) * multiplier) / multiplier;
     tmp.qual = std::stod(row_values[9]);
-
     if(row_values.size() > 20){
       tmp.gapped_freq = round(std::stod(row_values[20]) * multiplier) / multiplier;
       tmp.gapped_depth = std::stoi(row_values[21]);
@@ -631,8 +633,12 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       tmp.amplicon_masked = to_bool(row_values[23]);
       tmp.primer_masked = to_bool(row_values[24]);
       tmp.std_dev = std::stod(row_values[25]);
-      tmp.amplicon_numbers = split_csv(row_values[27]);
-      tmp.freq_numbers = split_csv_double(row_values[26]);
+      if(row_values[27] != "NA"){
+        tmp.amplicon_numbers = split_csv(row_values[27]);
+      }
+      if(row_values[26] != "NA"){
+        tmp.freq_numbers = split_csv_double(row_values[26]);
+      }
       tmp.version_1_var = false;
     } else {
       tmp.gapped_freq = 0.0;
@@ -642,7 +648,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       tmp.std_dev = 0;
       tmp.version_1_var = true;
     }
-
     if(tmp.total_depth < depth_cutoff){
       tmp.depth_flag = true;
     } else {
@@ -654,7 +659,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       tmp.qual_flag = false;
     }
     variants.push_back(std::move(tmp)); 
-  } 
+  }
 }
 
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::string ref){

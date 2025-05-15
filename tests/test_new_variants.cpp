@@ -75,14 +75,15 @@ int main() {
         expected = false;
         break;
       }
-    } else if(position < 182 || position >= 276 || position == 229){
+    } else if(position < 182 || position >= 276 || position == 229 || position == 207){
       if(total_depth != 7){
+        std::cerr << "total depth is incorrect " << position << " " << new_variants[i].nuc << " " << new_variants[i].total_depth <<  " gapped depth " <<  new_variants[i].gapped_depth << std::endl;
         expected = false;
         break;
       }
     } else {
       if(total_depth != 8){
-        std::cerr << position << " " << new_variants[i].nuc << std::endl;
+        std::cerr << "total depth is incorrect " << position << " " << new_variants[i].nuc << " " << new_variants[i].total_depth << std::endl;
         expected = false;
         break;
       }

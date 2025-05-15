@@ -472,7 +472,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   std::vector<uint32_t> flagged_positions; 
   std::vector<float> std_deviations;
   std::vector<std::string> pos_nuc;
-  uint32_t test_pos = 1000;
+  uint32_t test_pos = 0;
   //detect fluctuating variants across amplicons
   for(uint32_t i=0; i < amplicons.max_pos; i++){
     amplicons.test_flux.clear();
@@ -591,6 +591,14 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     std::vector<allele> del_alleles = find_deletions_next(variants, pos);    
 
     std::vector<allele> alleles = variants[i].alleles;
+    //remove the deletion depth as needed
+    for(uint32_t j=0; j < alleles.size(); j++){
+      if(alleles[j].depth == 0) continue;
+      if(alleles[j].nuc.find("-") != std::string::npos){
+        del_depth += (double)alleles[j].depth;
+        break;  
+      }
+    }
     //remove any current deletions
     std::vector<uint32_t> remove_indices;
     for(uint32_t j=0; j < alleles.size(); j++){
@@ -608,14 +616,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     //add in our bonus deletions
     if(del_alleles.size() > 0){
       alleles.insert(alleles.end(), del_alleles.begin(), del_alleles.end());
-    }
-    //remove the deletion depth as needed
-    for(uint32_t j=0; j < alleles.size(); j++){
-      if(alleles[j].depth == 0) continue;
-      if(alleles[j].nuc.find("-") != std::string::npos){
-        del_depth += (double)alleles[j].depth;
-        break;  
-      }
     }
     //iterate all alleles and add them in
     for(uint32_t j=0; j < alleles.size(); j++){
@@ -647,8 +647,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       file << "NA\t"; //alt codon
       file << "NA\t"; //alt aa
       file << "NA\t"; //pos aa
-      file << std::to_string(gapped_freq) << "\t";
-      file << std::to_string(variants[i].depth) << "\t";
+      file << std::to_string(gapped_freq) << "\t"; //gapped freq
+      file << std::to_string(variants[i].depth) << "\t"; //gapped depth
       std::vector<uint32_t>::iterator it; 
       it = find(flagged_positions.begin(), flagged_positions.end(), variants[i].pos);
       if (it != flagged_positions.end()){
@@ -682,8 +682,16 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
         file << "0\t";
       }
       std::vector<double> freqs = variants[i].amplicon_frequencies[alleles[j].nuc];
-      file << join_double_vector(freqs) << "\t";     
-      file << join_uint32_vector(variants[i].amplicon_numbers);
+      if(freqs.size() > 0){
+        file << join_double_vector(freqs) << "\t";     
+      } else {
+        file << "NA\t";
+      }
+      if(variants[i].amplicon_numbers.size() > 0){
+        file << join_uint32_vector(variants[i].amplicon_numbers);
+      } else {
+        file << "NA";
+      }
       file << "\n";
     } 
   } 
