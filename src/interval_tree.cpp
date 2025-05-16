@@ -117,30 +117,6 @@ void IntervalTree::amplicon_position_pop(ITNode *root){
   amplicon_position_pop(root->right); 
 }
 
-void IntervalTree::detect_position_amplicons(ITNode *root, uint32_t find_position, uint32_t &counter, std::vector<uint32_t> &overlaps){
-  if (root==NULL) return;
-  if(((uint32_t)root->data->low < find_position) && (find_position < (uint32_t)root->data->high)){
-    std::cerr << root->data->low << " " << find_position << " " << root->data->high << std::endl;
-    overlaps.push_back(counter);
-  }
-  counter += 1;
-  detect_position_amplicons(root->right, find_position, counter, overlaps);
-}
-
-void IntervalTree::detect_primer_issues(ITNode *root, uint32_t find_position){
-  if (root==NULL) return;
-  if (find_position < (uint32_t)root->data->low) return;
-  if(((uint32_t)root->data->low == find_position) || (find_position == (uint32_t)root->data->high)){
-    std::vector<uint32_t> tmp;
-    tmp.push_back((uint32_t)root->data->low);
-    tmp.push_back((uint32_t)root->data->high);
-    overlaps.push_back(tmp);
-    return;
-  }
-  detect_primer_issues(root->right, find_position);
-}
-
-
 void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
   if (root==NULL) return;
     for(uint32_t i=0; i < root->amp_positions.size(); i++){

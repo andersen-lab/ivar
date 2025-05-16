@@ -447,28 +447,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   //detect primer binding issues
   std::vector<position> variants = amplicons.variants;
 
-  //add in primer info
-  for(uint32_t i=0; i < variants.size(); i++){
-    bool mutation = false;
-    //establish a mutation at this position
-    for(auto al : variants[i].alleles){
-      if(((float)al.depth/(float)variants[i].depth) > 0.05){
-        mutation = true;
-      }
-    }
-    if(!mutation) continue;
-    //establish the mutation is within a primer region
-    for(uint32_t j=0; j < primers.size(); j++){
-      if(variants[i].pos >= primers[j].get_start() && variants[i].pos <= primers[j].get_end()+1){
-        if(primers[j].get_strand() == '+'){
-          //find the amplicon associated with this primer
-          amplicons.detect_primer_issues(primers[j].get_start());
-        } else {
-          amplicons.detect_primer_issues(primers[j].get_end() + 1);
-        }
-      }
-    }
-  }
   std::vector<uint32_t> flagged_positions; 
   std::vector<float> std_deviations;
   std::vector<std::string> pos_nuc;
@@ -550,11 +528,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       }
     }
   }
-  std::vector<uint32_t> primer_binding_error;
-  for(uint32_t i=0; i < amplicons.overlaps.size(); i++){
-    generate_range(amplicons.overlaps[i][0], amplicons.overlaps[i][1], primer_binding_error);    
-  } 
-
   std::cerr << "variants size " << variants.size() << std::endl;
   std::vector<uint32_t> flagged_amplicons;
   //find amplicons that are problematic
@@ -572,7 +545,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   //write variants to a file
   ofstream file;
   file.open(bam_out + ".txt", ios::trunc);
-  file << "REGION\tPOS\tREF\tALT\tREF_DP\tREF_RV\tREF_QUAL\tALT_DP\tALT_RV\tALT_QUAL\tALT_FREQ\tTOTAL_DP\tPVAL\tPASS\tGFF_FEATURE\tREF_CODON\tREF_AA\tALT_CODON\tALT_AA\tPOS_AA\tGAPPED_FREQ\tGAPPED_DEPTH\tFLAGGED_POS\tAMP_MASKED\tPRIMER_BINDING\tSTD_DEV\tAMP_FREQ\tAMP_NUMBERS\n";
+  file << "REGION\tPOS\tREF\tALT\tREF_DP\tREF_RV\tREF_QUAL\tALT_DP\tALT_RV\tALT_QUAL\tALT_FREQ\tTOTAL_DP\tPVAL\tPASS\tGFF_FEATURE\tREF_CODON\tREF_AA\tALT_CODON\tALT_AA\tPOS_AA\tGAPPED_FREQ\tGAPPED_DEPTH\tFLAGGED_POS\tAMP_MASKED\tSTD_DEV\tAMP_FREQ\tAMP_NUMBERS\n";
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].depth == 0) continue;
     //find the depth of the deletion to calculate upgapped depth
@@ -666,13 +639,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       }
       if(amp_flag) file << "TRUE\t";
       else file << "FALSE\t";
-
-      it = find(primer_binding_error.begin(), primer_binding_error.end(), variants[i].pos);
-      if(it != primer_binding_error.end()){
-        file << "TRUE\t";
-      } else {
-        file << "FALSE\t";
-      }
       std::string tmp = std::to_string(variants[i].pos) + alleles[j].nuc;
       std::vector<std::string>::iterator sit = find(pos_nuc.begin(), pos_nuc.end(), tmp);
       if(sit != pos_nuc.end()){

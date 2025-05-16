@@ -56,8 +56,6 @@ class IntervalTree {
   void combine_haplotypes(ITNode *root, uint32_t &counter);
   void write_out_frequencies(ITNode *root, std::string filename);
   void detect_abberations(ITNode *root, uint32_t pos);
-  void detect_position_amplicons(ITNode *root, uint32_t find_position, uint32_t &counter, std::vector<uint32_t> &overlaps);
-  void detect_primer_issues(ITNode *root, uint32_t pos);
   void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist);
   void assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual);
   
@@ -67,8 +65,7 @@ class IntervalTree {
   std::vector<position> test_flux; //storage for looking at pos across all amps
   std::vector<uint32_t> test_test;
   std::vector<position> variants; //all variants across every position                                 
-  uint32_t total_bases=0;
-  uint32_t total_qual=0;
+  //std::unordered_map<std::pair<uint32_t, std::string>, position, PairHash> variants;
   std::vector<uint32_t> flagged_positions; //positions where freq flux occurs MIGHT NOT NEED
   IntervalTree();  // constructor
   void insert(Interval data) { insert(_root, data); }
@@ -78,8 +75,6 @@ class IntervalTree {
   void get_max_pos() {get_max_pos(_root);}
   int unpaired_primers(primer prim) { return unpaired_primers(_root, prim);}
   void detect_abberations(uint32_t pos) {detect_abberations(_root, pos);}
-  void detect_position_amplicons(uint32_t find_position, uint32_t &counter, std::vector<uint32_t> &overlaps) {detect_position_amplicons(_root, find_position, counter, overlaps);}
-  void detect_primer_issues(uint32_t pos) {detect_primer_issues(_root, pos);}
   void combine_haplotypes(uint32_t &counter) {combine_haplotypes(_root, counter);}
   void write_out_frequencies(std::string filename){write_out_frequencies(_root, filename);}
   void populate_variants(uint32_t last_position);
