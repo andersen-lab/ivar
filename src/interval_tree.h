@@ -6,39 +6,53 @@ using namespace std;
 #ifndef interval_tree
 #define interval_tree
 
-// Structure to represent an interval
+// Interval
 class Interval{
  public:
+  int low, high;
+
   Interval(int val1, int val2)
       : low(std::min(val1, val2)), high(std::max(val1, val2)) {}  // constructor
-  int low, high;
 };
 
-// Structure to represent a node in Interval Search Tree
+// A node in IntervalTree
 class ITNode {
-  /*
-    public:
-    ITNode(Interval *values): data(value), left(nullptr), right(nullptr) {}  //
-    constructor int max;
-    // Getters - access member functions
-    Interval getData()const;
-    ITNode getLeft()const;
-    ITNode getRight()const;
-    // Setters - access member functions
-    void setLeft(ITNode *node);
-    void setRight(ITNode *node);
-  */
-  public:
+ public:
   void set_haplotypes(primer prim);
+  Interval *data; // pointer to node's interval data object
+  ITNode *left, *right; // pointer to node's left & right child node objects
+  int max;
+  int height; // height of node
+  std::vector<position> amp_positions;  //data for every position on amplicon
+
   ITNode(Interval value)
       : data(new Interval(value)),
         left(nullptr),
         right(nullptr),
-        max(value.high) {}  // constructor
-  Interval *data;           // pointer to node's interval data object
-  ITNode *left, *right;     // pointer to node's left & right child node objects
-  int max;
-  std::vector<position> amp_positions;  //data for every position on amplicon                             
+        max(value.high),
+        height(0){}
+
+  // Get method to handle null case
+  int get_node_height(ITNode* node) const {
+    return (node != nullptr) ? node->height : -1;
+  }
+
+  void update_height() {
+    height = 1 + std::max(get_node_height(left), get_node_height(right));
+  }
+
+  int get_balance() const {
+    return get_node_height(left) - get_node_height(right);
+  }
+
+  void update_max() {
+    max = data->high;
+    if (left != nullptr)
+      max = std::max(max, left->max);
+    if (right != nullptr)
+      max = std::max(max, right->max);
+  }
+
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -46,6 +60,10 @@ class ITNode {
 class IntervalTree {
  private:
   ITNode *_root;
+  ITNode *left_rotate(ITNode *x);
+  ITNode* right_rotate(ITNode *y);
+  ITNode* insert_node_balanced(ITNode *node, Interval data);
+
   void insert(ITNode *root, Interval data);
   bool envelopSearch(ITNode *root, Interval data);
   void inOrder(ITNode *root);
@@ -58,8 +76,9 @@ class IntervalTree {
   void detect_abberations(ITNode *root, uint32_t pos);
   void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist);
   void assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual);
-  
-  public:
+
+ public:
+  IntervalTree();
   uint32_t max_pos=0;
   std::vector<std::vector<uint32_t>> overlaps;
   std::vector<position> test_flux; //storage for looking at pos across all amps
@@ -67,7 +86,7 @@ class IntervalTree {
   std::vector<position> variants; //all variants across every position                                 
   //std::unordered_map<std::pair<uint32_t, std::string>, position, PairHash> variants;
   std::vector<uint32_t> flagged_positions; //positions where freq flux occurs MIGHT NOT NEED
-  IntervalTree();  // constructor
+
   void insert(Interval data) { insert(_root, data); }
   bool envelopSearch(Interval data) { return envelopSearch(_root, data); }
   void inOrder() { inOrder(_root); }
@@ -80,7 +99,7 @@ class IntervalTree {
   void populate_variants(uint32_t last_position);
   void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual);
   void find_read_amplicon(uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist) {find_read_amplicon(_root, lower, upper, found, read_name, amp_start, amp_dist);}
-void assign_read_amplicon(uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual) {assign_read_amplicon(_root, amp_start, positions, bases, qualities, min_qual);}
+  void assign_read_amplicon(uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual) {assign_read_amplicon(_root, amp_start, positions, bases, qualities, min_qual);}
   void amplicon_position_pop() {amplicon_position_pop(_root);}
 };
 
