@@ -65,8 +65,9 @@ class IntervalTree {
   ITNode* insert_node_balanced(ITNode *node, Interval data);
 
   void insert(ITNode *root, Interval data);
-  bool envelopSearch(ITNode *root, Interval data);
+  bool is_interval_contained(ITNode *root, Interval data);
   void inOrder(ITNode *root);
+  std::string pre_order_with_level(ITNode *root, int level);
   void amplicon_position_pop(ITNode *root);
   void print_amplicons(ITNode *root);
   void get_max_pos(ITNode *root);
@@ -87,9 +88,10 @@ class IntervalTree {
   //std::unordered_map<std::pair<uint32_t, std::string>, position, PairHash> variants;
   std::vector<uint32_t> flagged_positions; //positions where freq flux occurs MIGHT NOT NEED
 
-  void insert(Interval data) { insert(_root, data); }
-  bool envelopSearch(Interval data) { return envelopSearch(_root, data); }
+  void insert(Interval data) { _root = insert_node_balanced(_root, data); }
+  bool is_interval_contained(Interval data) { return is_interval_contained(_root, data); }
   void inOrder() { inOrder(_root); }
+  std::string pre_order_with_level() { return pre_order_with_level(_root, 0); }
   void print_amplicons() {print_amplicons(_root);}
   void get_max_pos() {get_max_pos(_root);}
   int unpaired_primers(primer prim) { return unpaired_primers(_root, prim);}
