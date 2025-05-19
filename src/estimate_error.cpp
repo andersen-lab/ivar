@@ -55,7 +55,7 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
       frequencies.push_back(base_variants[i].freq);
     }
   }
-  
+    
   if(variants_original.empty()) return(1);
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
   uint32_t count_original=0;

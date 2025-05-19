@@ -73,11 +73,12 @@ int main() {
     if(position ==58){
       if(total_depth != 6){
         expected = false;
+        std::cerr << "total depth is incorrect " << position << " " << new_variants[i].nuc << " " << new_variants[i].total_depth <<  " gapped depth " <<  new_variants[i].gapped_depth << std::endl;
         break;
       }
     } else if(position < 182 || position >= 276 || position == 229 || position == 207){
       if(total_depth != 7){
-        std::cerr << "total depth is incorrect " << position << " " << new_variants[i].nuc << " " << new_variants[i].total_depth <<  " gapped depth " <<  new_variants[i].gapped_depth << std::endl;
+        std::cerr << "total depth is incorrect " << position << " " << new_variants[i].nuc << " " << new_variants[i].total_depth << " gapped depth " <<  new_variants[i].gapped_depth << std::endl;
         expected = false;
         break;
       }
@@ -99,9 +100,11 @@ int main() {
   bool amp_flags_correct = true;
   for(auto var : new_variants_2){
     if(var.position == 670 && !var.amplicon_flux){
+      std::cerr << "amp incorrect flag " << var.position << std::endl;
       amp_flags_correct = false;
     }
     if(!var.amplicon_masked){
+      //std::cerr << "amp not masked " << var.position << std::endl;
       amp_flags_correct = false;
     }
   }
@@ -116,7 +119,10 @@ int main() {
     std::string nuc = new_variants_3[i].nuc;
     for(uint32_t j = 0; j < new_variants.size(); j++){
       if(position == new_variants[j].position && nuc == new_variants[j].nuc){
-        if(new_variants_3[i].depth != new_variants[j].depth) no_amp_info = false;
+        if(new_variants_3[i].depth != new_variants[j].depth) { 
+          no_amp_info = false;
+          std::cerr << "false last test" << std::endl;
+        }
         break;
       } 
     }

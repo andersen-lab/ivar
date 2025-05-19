@@ -29,6 +29,7 @@ class ITNode {
       : data(new Interval(value)),
         left(nullptr),
         right(nullptr),
+ improved_interval_tree
         max(value.high),
         height(0){}
 
@@ -52,7 +53,6 @@ class ITNode {
     if (right != nullptr)
       max = std::max(max, right->max);
   }
-
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -84,8 +84,8 @@ class IntervalTree {
   std::vector<std::vector<uint32_t>> overlaps;
   std::vector<position> test_flux; //storage for looking at pos across all amps
   std::vector<uint32_t> test_test;
-  std::vector<position> variants; //all variants across every position                                 
-  //std::unordered_map<std::pair<uint32_t, std::string>, position, PairHash> variants;
+  std::unordered_map<uint32_t, position> variants; //all variants across every position                                 
+  std::unordered_map<uint32_t, position> amp_positions;
   std::vector<uint32_t> flagged_positions; //positions where freq flux occurs MIGHT NOT NEED
 
   void insert(Interval data) { _root = insert_node_balanced(_root, data); }
