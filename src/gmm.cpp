@@ -241,10 +241,8 @@ std::vector<std::vector<double>> remove_unexplainable_solutions(std::vector<std:
   for(auto vec : solutions){
     std::vector<double> possible_peaks;
     for(auto x : vec){
-      //std::cerr << x << " ";
       possible_peaks.push_back(x);
     }
-    //std::cerr << std::endl;
     std::vector<std::vector<double>> all_combinations; 
     for (uint32_t i= 1; i <= vec.size(); i++) {
       std::vector<double> current_combination;
@@ -541,13 +539,12 @@ void deletion_variant(std::vector<std::string> row_values, std::vector<variant> 
       tmp.gapped_freq = std::round(std::stod(row_values[20]) * multiplier) / multiplier;
       tmp.amplicon_flux = to_bool(row_values[22]);
       tmp.amplicon_masked = to_bool(row_values[23]);
-      tmp.primer_masked = to_bool(row_values[24]);
-      tmp.std_dev = std::stod(row_values[25]);
-      if(row_values[27] != "NA"){
-        tmp.amplicon_numbers = split_csv(row_values[27]);
-      }
+      tmp.std_dev = std::stod(row_values[24]);
       if(row_values[26] != "NA"){
-        tmp.freq_numbers = split_csv_double(row_values[26]);
+        tmp.amplicon_numbers = split_csv(row_values[26]);
+      }
+      if(row_values[25] != "NA"){
+        tmp.freq_numbers = split_csv_double(row_values[25]);
       }
       tmp.version_1_var = false;
     } else {
@@ -631,13 +628,12 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       tmp.gapped_depth = std::stoi(row_values[21]);
       tmp.amplicon_flux = to_bool(row_values[22]);
       tmp.amplicon_masked = to_bool(row_values[23]);
-      tmp.primer_masked = to_bool(row_values[24]);
-      tmp.std_dev = std::stod(row_values[25]);
-      if(row_values[27] != "NA"){
-        tmp.amplicon_numbers = split_csv(row_values[27]);
-      }
+      tmp.std_dev = std::stod(row_values[24]);
       if(row_values[26] != "NA"){
-        tmp.freq_numbers = split_csv_double(row_values[26]);
+        tmp.amplicon_numbers = split_csv(row_values[26]);
+      }
+      if(row_values[25] != "NA"){
+        tmp.freq_numbers = split_csv_double(row_values[25]);
       }
       tmp.version_1_var = false;
     } else {
