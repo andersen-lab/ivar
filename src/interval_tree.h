@@ -38,7 +38,7 @@ class ITNode {
   Interval *data;           // pointer to node's interval data object
   ITNode *left, *right;     // pointer to node's left & right child node objects
   int max;
-  std::vector<position> amp_positions;  //data for every position on amplicon                             
+  std::unordered_map<uint32_t, position> amp_positions;   
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -64,8 +64,8 @@ class IntervalTree {
   std::vector<std::vector<uint32_t>> overlaps;
   std::vector<position> test_flux; //storage for looking at pos across all amps
   std::vector<uint32_t> test_test;
-  std::vector<position> variants; //all variants across every position                                 
-  //std::unordered_map<std::pair<uint32_t, std::string>, position, PairHash> variants;
+  std::unordered_map<uint32_t, position> variants; //all variants across every position                                 
+  std::unordered_map<uint32_t, position> amp_positions;
   std::vector<uint32_t> flagged_positions; //positions where freq flux occurs MIGHT NOT NEED
   IntervalTree();  // constructor
   void insert(Interval data) { insert(_root, data); }

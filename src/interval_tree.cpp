@@ -1,5 +1,6 @@
 #include "interval_tree.h"
 #include <unordered_map>
+
 // Constructor for initializing an Interval Tree
 IntervalTree::IntervalTree() { _root = NULL; }
 std::vector<allele> add_allele_vectors(std::vector<allele> new_alleles, std::vector<allele> return_alleles){
@@ -54,23 +55,22 @@ void IntervalTree::write_out_frequencies(ITNode *root, std::string filename){
 
 void IntervalTree::combine_haplotypes(ITNode *root, uint32_t &counter){
   if (root==NULL) return;
-  for(uint32_t i=0; i < root->amp_positions.size(); i++){
-    if(root->amp_positions[i].depth == 0){
-      continue;
-    }
-    variants[root->amp_positions[i].pos].depth += root->amp_positions[i].depth;
-    std::vector<allele> new_alleles = add_allele_vectors(root->amp_positions[i].alleles, variants[root->amp_positions[i].pos].alleles);
-    variants[root->amp_positions[i].pos].alleles = new_alleles;
-    variants[root->amp_positions[i].pos].amplicon_numbers.push_back(counter);
-    for(uint32_t j=0; j < root->amp_positions[i].alleles.size(); j++){
-      if (variants[root->amp_positions[i].pos].amplicon_frequencies.find(root->amp_positions[i].alleles[j].nuc) != variants[root->amp_positions[i].pos].amplicon_frequencies.end()) {
-        variants[root->amp_positions[i].pos].amplicon_frequencies[root->amp_positions[i].alleles[j].nuc].push_back((double)root->amp_positions[i].alleles[j].depth / (double)root->amp_positions[i].depth);
-      } else{
-        variants[root->amp_positions[i].pos].amplicon_frequencies[root->amp_positions[i].alleles[j].nuc] = {(double)root->amp_positions[i].alleles[j].depth / (double)root->amp_positions[i].depth};
-      }
+  for(auto [pos_key, amp_pos] : root->amp_positions){
+    if(amp_pos.depth == 0) continue;
+
+    //update position depth
+    position& var = variants[pos_key];
+    var.depth += amp_pos.depth;
+    //update alleles
+    var.alleles = add_allele_vectors(amp_pos.alleles, var.alleles);
+    var.amplicon_numbers.push_back(counter);
+  
+    double inv_depth = 1/amp_pos.depth; 
+    for (const auto& allele : amp_pos.alleles) {
+      var.amplicon_frequencies[allele.nuc].push_back(allele.depth * inv_depth);
     }
   }
-  counter += 1;
+  ++counter;
   combine_haplotypes(root->right, counter);
 }
 
@@ -78,13 +78,8 @@ void IntervalTree::assign_read_amplicon(ITNode *root, uint32_t amp_start, std::v
   if (root==NULL) return;
   if((uint32_t)root->data->low == amp_start){
     for(uint32_t i=0; i < positions.size(); i++){
-      for(uint32_t j=0; j < root->amp_positions.size(); j++){
-        if(positions[i] == root->amp_positions[j].pos){
-          if(qualities[i] >= (uint32_t) min_qual){
-            root->amp_positions[j].update_alleles(bases[i], 1, qualities[i]);
-          }
-        }
-      }
+      if(qualities[i] < (uint32_t) min_qual) continue; 
+      root->amp_positions[positions[i]].update_alleles(bases[i], 1, qualities[i]);
     }
   }
   assign_read_amplicon(root->right, amp_start, positions, bases, qualities, min_qual);
@@ -112,22 +107,21 @@ void IntervalTree::amplicon_position_pop(ITNode *root){
     position add_pos;
     add_pos.pos = i;
     add_pos.alleles = populate_basic_alleles();
-    root->amp_positions.push_back(add_pos);
+    root->amp_positions[i] = add_pos;
   }
   amplicon_position_pop(root->right); 
 }
 
 void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
   if (root==NULL) return;
-    for(uint32_t i=0; i < root->amp_positions.size(); i++){
-      if(find_position == root->amp_positions[i].pos){
-        test_flux.push_back(root->amp_positions[i]);
-        test_test.push_back(root->data->low);
-        break;
-      }
+  if (root->amp_positions.find(find_position) != root->amp_positions.end()) {
+    if(root->amp_positions[find_position].depth > 0){
+      position amp_pos = root->amp_positions[find_position];
+      test_flux.push_back(amp_pos);
+      test_test.push_back(root->data->low);
     }
+  } 
   detect_abberations(root->right, find_position);
-
 }
 
 void IntervalTree::add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual){
@@ -143,7 +137,7 @@ void IntervalTree::populate_variants(uint32_t last_position){
     position tmp;
     tmp.alleles = populate_basic_alleles();
     tmp.pos = i;
-    variants.push_back(tmp);
+    variants[i] = tmp;
   }
 }
 
