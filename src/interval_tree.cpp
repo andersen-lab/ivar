@@ -54,75 +54,113 @@ void IntervalTree::write_out_frequencies(ITNode *root, std::string filename){
 }
 
 void IntervalTree::combine_haplotypes(ITNode *root, uint32_t &counter){
-  if (root==NULL) return;
-  for(auto [pos_key, amp_pos] : root->amp_positions){
-    if(amp_pos.depth == 0) continue;
+  if (root == NULL) return;
+  //traverse left subtree
+  combine_haplotypes(root->left, counter);
+
+  //process current node
+  for (auto [pos_key, amp_pos] : root->amp_positions) {
+    if (amp_pos.depth == 0) continue;
 
     //update position depth
     position& var = variants[pos_key];
     var.depth += amp_pos.depth;
+
     //update alleles
     var.alleles = add_allele_vectors(amp_pos.alleles, var.alleles);
     var.amplicon_numbers.push_back(counter);
-  
-    double inv_depth = 1/amp_pos.depth; 
+
+    double inv_depth = 1.0 / amp_pos.depth;
     for (const auto& allele : amp_pos.alleles) {
       var.amplicon_frequencies[allele.nuc].push_back(allele.depth * inv_depth);
     }
   }
+
   ++counter;
+
+  //traverse right subtree
   combine_haplotypes(root->right, counter);
 }
 
-void IntervalTree::assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual){
-  if (root==NULL) return;
-  if((uint32_t)root->data->low == amp_start){
-    for(uint32_t i=0; i < positions.size(); i++){
-      if(qualities[i] < (uint32_t) min_qual) continue; 
+
+void IntervalTree::assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual) {
+  if (root == NULL) return;
+
+  if ((uint32_t)root->data->low == amp_start) {
+    for (uint32_t i = 0; i < positions.size(); i++) {
+      if (qualities[i] < (uint32_t)min_qual) continue;
       root->amp_positions[positions[i]].update_alleles(bases[i], 1, qualities[i]);
     }
+    return; //we found and processed the correct node, no need to continue
   }
-  assign_read_amplicon(root->right, amp_start, positions, bases, qualities, min_qual);
+
+  //traverse left or right depending on comparison
+  if (amp_start < (uint32_t)root->data->low) {
+    assign_read_amplicon(root->left, amp_start, positions, bases, qualities, min_qual);
+  } else {
+    assign_read_amplicon(root->right, amp_start, positions, bases, qualities, min_qual);
+  }
 }
 
-void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist){
-  //read name here is for TEST
-  if (root==NULL) return;
-  //if ((uint32_t)root->data->low > upper) return;
-  if(((uint32_t)root->data->low <= lower) && (upper <= (uint32_t)root->data->high)){
-    //describes how far the ends of this are from the start/end of the amplicon
+void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist) {
+  if (root == NULL) return;
+
+  //check if current node's interval fully contains [lower, upper]
+  if ((uint32_t)root->data->low <= lower && upper <= (uint32_t)root->data->high) {
     uint32_t dist = (lower - root->data->low) + (root->data->high - upper);
-    if(dist < amp_dist) { 
+    if (dist < amp_dist) {
       amp_dist = dist;
       amp_start = root->data->low;
     }
     found = true;
   }
-  find_read_amplicon(root->right, lower, upper, found, read_name, amp_start, amp_dist);
+
+  //traverse left if there's any chance of finding a containing interval
+  if (root->left && lower <= (uint32_t)root->left->data->high) {
+    find_read_amplicon(root->left, lower, upper, found, read_name, amp_start, amp_dist);
+  }
+
+  //traverse right if there's any chance of finding a containing interval
+  if (root->right && upper >= (uint32_t)root->right->data->low) {
+    find_read_amplicon(root->right, lower, upper, found, read_name, amp_start, amp_dist);
+  }
 }
 
-void IntervalTree::amplicon_position_pop(ITNode *root){
-  if (root==NULL) return;
-  for(uint32_t i=root->data->low; i < (uint32_t)root->data->high; i++){
+
+void IntervalTree::amplicon_position_pop(ITNode *root) {
+  if (root == NULL) return;
+
+  // Traverse left subtree
+  amplicon_position_pop(root->left);
+
+  // Populate amp_positions for current node
+  for (uint32_t i = root->data->low; i < (uint32_t)root->data->high; i++) {
     position add_pos;
     add_pos.pos = i;
     add_pos.alleles = populate_basic_alleles();
     root->amp_positions[i] = add_pos;
   }
-  amplicon_position_pop(root->right); 
+
+  // Traverse right subtree
+  amplicon_position_pop(root->right);
 }
 
-void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position){
-  if (root==NULL) return;
-  if (root->amp_positions.find(find_position) != root->amp_positions.end()) {
-    if(root->amp_positions[find_position].depth > 0){
-      position amp_pos = root->amp_positions[find_position];
-      test_flux.push_back(amp_pos);
-      test_test.push_back(root->data->low);
-    }
-  } 
+void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position) {
+  if (root == NULL) return;
+
+  //check current node for a matching position
+  auto it = root->amp_positions.find(find_position);
+  if (it != root->amp_positions.end() && it->second.depth > 0) {
+    position& amp_pos = it->second;
+    test_flux.push_back(amp_pos);
+    test_test.push_back(root->data->low); //track which amplicon/interval matched
+  }
+
+  //traverse both sides of the tree to catch all overlaps
+  detect_abberations(root->left, find_position);
   detect_abberations(root->right, find_position);
 }
+
 
 void IntervalTree::add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual){
   for(uint32_t i=0; i < positions.size(); i++){

@@ -455,7 +455,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   for(uint32_t i=0; i < amplicons.max_pos; i++){
     amplicons.test_flux.clear();
     amplicons.test_test.clear();
-    
+
     //this bit pushes all amp position vectors back to test_flux object
     amplicons.detect_abberations(i);
     if (amplicons.test_flux.size() < 2) continue;
