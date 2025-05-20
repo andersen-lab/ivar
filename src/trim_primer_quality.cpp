@@ -440,7 +440,7 @@ bool amplicon_filter(IntervalTree amplicons, bam1_t *r) {
     fragment_coords.high = bam_endpos(r);
   }
   // debugging
-  bool amplicon_flag = amplicons.envelopSearch(fragment_coords);
+  bool amplicon_flag = amplicons.is_interval_contained(fragment_coords);
   return amplicon_flag;
 }
 

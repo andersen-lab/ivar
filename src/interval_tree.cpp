@@ -153,6 +153,7 @@ int IntervalTree::unpaired_primers(ITNode *root, primer prim){
   return ret;
 }
 
+// [Deprecated] Use insert_node_balanced()
 // A utility function to insert a new Interval Search Tree Node
 // This is similar to BST Insert.  Here the low value of interval
 // is used tomaintain BST property
@@ -191,29 +192,29 @@ void IntervalTree::insert(ITNode *root, Interval data) {
 }
 
 // A utility function to check if the 1st interval envelops the second
-bool doEnvelop(Interval i1, Interval i2) {
+bool check_interval_contained(Interval i1, Interval i2) {
   if (i1.low <= i2.low && i1.high >= i2.high) return true;
   return false;
 }
 
 // The main function that searches an interval i in a given
 // Interval Tree.
-bool IntervalTree::envelopSearch(ITNode *root, Interval i) {
+bool IntervalTree::is_interval_contained(ITNode *root, Interval i) {
   // Base Case, tree is empty
   // std::cout << root->data->low << ":" << root->data->high << std::endl;
   if (root == NULL) return false;
 
   // If given interval overlaps with root
-  if (doEnvelop(*(root->data), i)) return true;
+  if (check_interval_contained(*(root->data), i)) return true;
 
   // If left child of root is present and max of left child is
   // greater than or equal to given interval, then i may
   // be enveloped by an amplicon in left subtree
   if (root->left != NULL && root->left->max >= i.high)
-    return envelopSearch(root->left, i);
+    return is_interval_contained(root->left, i);
 
   // Else interval can only be enveloped by amplicon in right subtree
-  return envelopSearch(root->right, i);
+  return is_interval_contained(root->right, i);
 }
 
 void IntervalTree::get_max_pos(ITNode *root){
@@ -231,6 +232,16 @@ void IntervalTree::inOrder(ITNode *root) {
   std::cerr << "[" << root->data->low << ", " << root->data->high << "]"
             << " max = " << root->max << endl;
   inOrder(root->right);
+}
+
+std::string IntervalTree::pre_order_with_level(ITNode *root,  int level) {
+  if (root == nullptr) return "";
+  std::string pre_order_str;
+  pre_order_str = "[" + std::to_string(root->data->low) + "," + std::to_string(root->data->high) + "]";
+  pre_order_str += "(" + std::to_string(level) + "), ";
+  pre_order_str += pre_order_with_level(root->left, level + 1);
+  pre_order_str += pre_order_with_level(root->right, level + 1);
+  return pre_order_str;
 }
 
 // A stand-alone function to create a tree containing the coordinates of each
@@ -259,48 +270,73 @@ void IntervalTree::print_amplicons(ITNode *root){
   print_amplicons(root->right);
 }
 
-/*
-// Simple access functions to retrieve node's interval data
-Interval ITNode::getData()const{
-return data;
-}
-// Simple access functions to retrieve node's left child
-ITNode ITNode::getLeft()const{
-return left;
-}
-// Simple access functions to retrieve node's right child
-ITNode ITNode::getRight()const{
-return right;
-}
-// Simple access functions to set node's left child
-void ITNode::setLeft(ITNode *node){
-left = node;
-}
-// Simple access functions to set node's right child
-void ITNode::setRight(ITNode *node){
-right = node;
+// node is right unbalanced
+ITNode* IntervalTree::left_rotate(ITNode *node) {
+  ITNode *right = node->right;
+  ITNode *right_left = right->left;
+
+  // Rotate
+  right->left = node;
+  node->right = right_left;
+
+  node->update_height();
+  right->update_height();
+  node->update_max();
+  right->update_max();
+
+  // New root of subtree
+  return right;
 }
 
-int main()
-{
-Interval ints[6] = {Interval(15, 20), Interval(30, 10), Interval(17, 19),
-Interval(5, 20), Interval(12, 15), Interval(30, 40)}; int n = sizeof(ints) /
-sizeof(ints[0]); IntervalTree tree = IntervalTree(); cout << "Hello World" <<
-endl;
-// populate interval tree
-for (int i = 0; i < n; i++)
-{
-tree.insert(ints[i]);
+// node if left unbalanced
+ITNode* IntervalTree::right_rotate(ITNode *node) {
+  ITNode *left = node->left;
+  ITNode *left_right = left->right;
+
+  // Rotate
+  left->right = node;
+  node->left = left_right;
+
+  node->update_height();
+  left->update_height();
+  node->update_max();
+  left->update_max();
+
+  // New root of subtree
+  return left;
 }
 
-tree.inOrder();
-Interval queries[4] = {Interval(15, 20), Interval(9, 30), Interval(31, 38),
-Interval(7, 22)}; int num_tests = sizeof(queries) / sizeof(queries[0]); for (int
-i = 0; i < num_tests; i++)
-{
-cout << "Does " << queries[i].low << ":" << queries[i].high << " Overlap? " <<
-tree.overlapSearch(queries[i]) << endl;
+ITNode* IntervalTree::insert_node_balanced(ITNode *node, Interval data) {
+  if (node == nullptr)
+    return new ITNode(data);
+
+  if (data.low < node->data->low)
+    node->left = insert_node_balanced(node->left, data); // Insert into left subtree
+  else
+    node->right = insert_node_balanced(node->right, data); // Insert into right subtree
+
+  node->update_height();
+  node->update_max();
+
+  int balance = node->get_balance();
+
+  if(balance > 1) { // Left unbalanced
+    if(data.low < node->left->data->low) // Node inserted in left left
+      return right_rotate(node);
+    else { // Node inserted in left right
+      node->left = left_rotate(node->left);
+      return right_rotate(node);
+    }
+  }
+
+  if(balance < -1) {
+    if(data.low >= node->right->data->low) // Node inserted in right right
+      return left_rotate(node);
+    else { // Node inserted in right left
+      node->right = right_rotate(node->right);
+      return left_rotate(node);
+    }
+  }
+
+  return node;
 }
-return 0;
-}
-*/
