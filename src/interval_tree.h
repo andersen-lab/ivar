@@ -74,8 +74,7 @@ class IntervalTree {
   void combine_haplotypes(ITNode *root, uint32_t &counter);
   void write_out_frequencies(ITNode *root, std::string filename);
   void detect_abberations(ITNode *root, uint32_t pos);
-  void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist);
-  void assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual);
+  void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, ITNode*&node, uint32_t &amp_dist);
 
  public:
   IntervalTree();
@@ -98,8 +97,8 @@ class IntervalTree {
   void write_out_frequencies(std::string filename){write_out_frequencies(_root, filename);}
   void populate_variants(uint32_t last_position);
   void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual);
-  void find_read_amplicon(uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist) {find_read_amplicon(_root, lower, upper, found, read_name, amp_start, amp_dist);}
-  void assign_read_amplicon(uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual) {assign_read_amplicon(_root, amp_start, positions, bases, qualities, min_qual);}
+  void find_read_amplicon(uint32_t lower, uint32_t upper, ITNode*&node, uint32_t &amp_dist) {find_read_amplicon(_root, lower, upper, node, amp_dist);}
+  void assign_read_amplicon(ITNode *node, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual);
   void amplicon_position_pop() {amplicon_position_pop(_root);}
 };
 

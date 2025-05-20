@@ -230,14 +230,13 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
   }
 
   //find assigned amplicon and populate position vector
-  bool found_amplicon = false;
   uint32_t amp_dist = 429496729;
-  uint32_t amp_start = 0;
-  amplicons.find_read_amplicon(start_forward, end_reverse, found_amplicon, bam_get_qname(read1), amp_start, amp_dist);   
-  if(!found_amplicon){
+  ITNode *node=NULL;
+  amplicons.find_read_amplicon(start_forward, end_reverse, node, amp_dist);
+  if(node == NULL){
     amplicons.add_read_variants(final_positions, final_bases, final_qualities, min_qual);
   } else {
-    amplicons.assign_read_amplicon(amp_start, final_positions, final_bases, final_qualities, min_qual);
+    amplicons.assign_read_amplicon(node, final_positions, final_bases, final_qualities, min_qual);
   }
 }
 
@@ -383,14 +382,13 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       uint32_t start_read = aln->core.pos;
       uint32_t end_read = find_sequence_end(aln);
       parse_cigar(aln, positions, bases, qualities, start_read, min_qual, refantd, ref_name);
-      bool found_amplicon = false;
       uint32_t amp_dist = 429496729;
-      uint32_t amp_start = 0;
-      amplicons.find_read_amplicon(start_read, end_read, found_amplicon, read_name, amp_start, amp_dist);   
-      if(!found_amplicon){
+      ITNode *node=NULL;
+      amplicons.find_read_amplicon(start_read, end_read, node, amp_dist);
+      if(node != NULL){
         amplicons.add_read_variants(positions, bases, qualities, min_qual);
       } else{
-        amplicons.assign_read_amplicon(amp_start, positions, bases, qualities, min_qual);
+        amplicons.assign_read_amplicon(node, positions, bases, qualities, min_qual);
       }
       continue;
     }
@@ -421,14 +419,13 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       uint32_t start_read = it->second->core.pos;
       uint32_t end_read = find_sequence_end(it->second);
       parse_cigar(it->second, positions, bases, qualities, start_read, min_qual, refantd, ref_name);
-      bool found_amplicon = false;
       uint32_t amp_dist = 429496729;
-      uint32_t amp_start = 0;
-      amplicons.find_read_amplicon(start_read, end_read, found_amplicon, read_name, amp_start, amp_dist); 
-      if(!found_amplicon){
+      ITNode *node=NULL;
+      amplicons.find_read_amplicon(start_read, end_read, node, amp_dist); 
+      if(node == NULL){
         amplicons.add_read_variants(positions, bases, qualities, min_qual);
       } else{
-        amplicons.assign_read_amplicon(amp_start, positions, bases, qualities, min_qual);
+        amplicons.assign_read_amplicon(node, positions, bases, qualities, min_qual);
       }
   }
 

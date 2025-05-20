@@ -83,26 +83,14 @@ void IntervalTree::combine_haplotypes(ITNode *root, uint32_t &counter){
 }
 
 
-void IntervalTree::assign_read_amplicon(ITNode *root, uint32_t amp_start, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual) {
-  if (root == NULL) return;
-
-  if ((uint32_t)root->data->low == amp_start) {
-    for (uint32_t i = 0; i < positions.size(); i++) {
-      if (qualities[i] < (uint32_t)min_qual) continue;
-      root->amp_positions[positions[i]].update_alleles(bases[i], 1, qualities[i]);
-    }
-    return; //we found and processed the correct node, no need to continue
-  }
-
-  //traverse left or right depending on comparison
-  if (amp_start < (uint32_t)root->data->low) {
-    assign_read_amplicon(root->left, amp_start, positions, bases, qualities, min_qual);
-  } else {
-    assign_read_amplicon(root->right, amp_start, positions, bases, qualities, min_qual);
+void IntervalTree::assign_read_amplicon(ITNode *node, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual) {
+  for (uint32_t i = 0; i < positions.size(); i++) {
+    if (qualities[i] < (uint32_t)min_qual) continue;
+      node->amp_positions[positions[i]].update_alleles(bases[i], 1, qualities[i]);
   }
 }
 
-void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, bool &found, std::string read_name, uint32_t &amp_start, uint32_t &amp_dist) {
+void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, ITNode* &node, uint32_t &amp_dist) {
   if (root == NULL) return;
 
   //check if current node's interval fully contains [lower, upper]
@@ -110,19 +98,18 @@ void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upp
     uint32_t dist = (lower - root->data->low) + (root->data->high - upper);
     if (dist < amp_dist) {
       amp_dist = dist;
-      amp_start = root->data->low;
+      node = root;
     }
-    found = true;
   }
 
   //traverse left if there's any chance of finding a containing interval
   if (root->left && lower <= (uint32_t)root->left->data->high) {
-    find_read_amplicon(root->left, lower, upper, found, read_name, amp_start, amp_dist);
+    find_read_amplicon(root->left, lower, upper, node, amp_dist);
   }
 
   //traverse right if there's any chance of finding a containing interval
   if (root->right && upper >= (uint32_t)root->right->data->low) {
-    find_read_amplicon(root->right, lower, upper, found, read_name, amp_start, amp_dist);
+    find_read_amplicon(root->right, lower, upper, node, amp_dist);
   }
 }
 
