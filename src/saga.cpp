@@ -1,3 +1,4 @@
+
 #include "saga.h"
 #include "ref_seq.h"
 #include "parse_gff.h"
@@ -72,6 +73,10 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
     uint32_t counter = 0;
     if(op == 0){ 
       for(uint32_t j=total_query_pos; j < total_query_pos+len; j++){
+        if(qual[j] < min_qual){
+          counter++;
+          continue;
+        }
         char nuc = seq_nt16_str[bam_seqi(seq_field1, j)];
         std::string tmp = std::string(1, nuc);
         positions.push_back(total_ref_pos+counter);
@@ -97,6 +102,7 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
         tmp +=  std::string(1, nuc);
         qual_avg += qual[j];
       }
+      if(((uint32_t)qual_avg/(tmp.size()-1)) < (uint32_t)min_qual) continue;
       positions.push_back(total_ref_pos+counter-1);
       bases.push_back(tmp);
       qualities.push_back((uint32_t)qual_avg/(tmp.size()-1));
@@ -234,9 +240,9 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
   ITNode *node=NULL;
   amplicons.find_read_amplicon(start_forward, end_reverse, node, amp_dist);
   if(node == NULL){
-    amplicons.add_read_variants(final_positions, final_bases, final_qualities, min_qual);
+    amplicons.add_read_variants(final_positions, final_bases, final_qualities);
   } else {
-    amplicons.assign_read_amplicon(node, final_positions, final_bases, final_qualities, min_qual);
+    amplicons.assign_read_amplicon(node, final_positions, final_bases, final_qualities);
   }
 }
 
@@ -386,9 +392,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       ITNode *node=NULL;
       amplicons.find_read_amplicon(start_read, end_read, node, amp_dist);
       if(node != NULL){
-        amplicons.add_read_variants(positions, bases, qualities, min_qual);
+        amplicons.add_read_variants(positions, bases, qualities);
       } else{
-        amplicons.assign_read_amplicon(node, positions, bases, qualities, min_qual);
+        amplicons.assign_read_amplicon(node, positions, bases, qualities);
       }
       continue;
     }
@@ -423,9 +429,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       ITNode *node=NULL;
       amplicons.find_read_amplicon(start_read, end_read, node, amp_dist); 
       if(node == NULL){
-        amplicons.add_read_variants(positions, bases, qualities, min_qual);
+        amplicons.add_read_variants(positions, bases, qualities);
       } else{
-        amplicons.assign_read_amplicon(node, positions, bases, qualities, min_qual);
+        amplicons.assign_read_amplicon(node, positions, bases, qualities);
       }
   }
 
@@ -443,11 +449,12 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
 
   //detect primer binding issues
   std::unordered_map<uint32_t, position> variants = amplicons.variants;
-
+   
   std::vector<uint32_t> flagged_positions; 
   std::vector<float> std_deviations;
   std::vector<std::string> pos_nuc;
   uint32_t test_pos = 0;
+
   //detect fluctuating variants across amplicons
   for(uint32_t i=0; i < amplicons.max_pos; i++){
     amplicons.test_flux.clear();

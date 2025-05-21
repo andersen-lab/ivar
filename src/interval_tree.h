@@ -96,9 +96,9 @@ class IntervalTree {
   void combine_haplotypes(uint32_t &counter) {combine_haplotypes(_root, counter);}
   void write_out_frequencies(std::string filename){write_out_frequencies(_root, filename);}
   void populate_variants(uint32_t last_position);
-  void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual);
+  void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
   void find_read_amplicon(uint32_t lower, uint32_t upper, ITNode*&node, uint32_t &amp_dist) {find_read_amplicon(_root, lower, upper, node, amp_dist);}
-  void assign_read_amplicon(ITNode *node, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual);
+  void assign_read_amplicon(ITNode *node, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
   void amplicon_position_pop() {amplicon_position_pop(_root);}
 };
 

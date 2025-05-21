@@ -83,10 +83,15 @@ void IntervalTree::combine_haplotypes(ITNode *root, uint32_t &counter){
 }
 
 
-void IntervalTree::assign_read_amplicon(ITNode *node, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual) {
+void IntervalTree::assign_read_amplicon(ITNode *node, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities) {
   for (uint32_t i = 0; i < positions.size(); i++) {
-    if (qualities[i] < (uint32_t)min_qual) continue;
-      node->amp_positions[positions[i]].update_alleles(bases[i], 1, qualities[i]);
+    if (node->amp_positions.find(positions[i]) == node->amp_positions.end()) {
+      position add_pos;
+      add_pos.pos = positions[i];
+      add_pos.alleles = populate_basic_alleles();
+      node->amp_positions[positions[i]] = add_pos;
+    }
+    node->amp_positions[positions[i]].update_alleles(bases[i], 1, qualities[i]);
   }
 }
 
@@ -119,15 +124,7 @@ void IntervalTree::amplicon_position_pop(ITNode *root) {
 
   // Traverse left subtree
   amplicon_position_pop(root->left);
-
-  // Populate amp_positions for current node
-  for (uint32_t i = root->data->low; i < (uint32_t)root->data->high; i++) {
-    position add_pos;
-    add_pos.pos = i;
-    add_pos.alleles = populate_basic_alleles();
-    root->amp_positions[i] = add_pos;
-  }
-
+  root->amp_positions.reserve(root->data->high-root->data->low);
   // Traverse right subtree
   amplicon_position_pop(root->right);
 }
@@ -149,11 +146,9 @@ void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position) {
 }
 
 
-void IntervalTree::add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities, uint8_t min_qual){
+void IntervalTree::add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities){
   for(uint32_t i=0; i < positions.size(); i++){
-    if(qualities[i] >= (uint32_t)min_qual){
-      variants[positions[i]].update_alleles(bases[i], 1, qualities[i]);  
-    }
+    variants[positions[i]].update_alleles(bases[i], 1, qualities[i]);  
   }
 }
 
