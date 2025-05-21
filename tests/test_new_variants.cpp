@@ -71,19 +71,19 @@ int main() {
     std::string nuc = new_variants[i].nuc; 
     double total_depth = (double)new_variants[i].total_depth;
     if(position ==58){
-      if(total_depth != 6){
+      if(total_depth != 7){
         expected = false;
         std::cerr << "total depth is incorrect " << position << " " << new_variants[i].nuc << " " << new_variants[i].total_depth <<  " gapped depth " <<  new_variants[i].gapped_depth << std::endl;
         break;
       }
     } else if(position < 182 || position >= 276 || position == 229 || position == 207){
-      if(total_depth != 7){
+      if(total_depth != 8){
         std::cerr << "total depth is incorrect " << position << " " << new_variants[i].nuc << " " << new_variants[i].total_depth << " gapped depth " <<  new_variants[i].gapped_depth << std::endl;
         expected = false;
         break;
       }
     } else {
-      if(total_depth != 8){
+      if(total_depth != 9){
         std::cerr << "total depth is incorrect " << position << " " << new_variants[i].nuc << " " << new_variants[i].total_depth << std::endl;
         expected = false;
         break;
