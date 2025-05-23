@@ -47,10 +47,10 @@ uint32_t calculate_reference_qual(position var, char ref){
   return(qual);
 }
 
-std::vector<allele> find_deletions_next(std::unordered_map<uint32_t, position> variants, uint32_t pos){
+std::vector<allele> find_deletions_next(std::vector<position> variants, uint32_t pos){
   std::vector<allele> deletions;
-  for(auto [pos_key, var] : variants){
-    if(pos_key-1 == pos){
+  for(auto var : variants){
+    if(var.pos-1 == pos){
       for(uint32_t j=0; j < var.alleles.size(); j++){
         if (var.alleles[j].nuc.find("-") != std::string::npos && var.alleles[j].depth > 0){
           deletions.push_back(var.alleles[j]);
@@ -239,11 +239,16 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
   uint32_t amp_dist = 429496729;
   ITNode *node=NULL;
   amplicons.find_read_amplicon(start_forward, end_reverse, node, amp_dist);
+  std::cerr << "a" << std::endl;
   if(node == NULL){
     amplicons.add_read_variants(final_positions, final_bases, final_qualities);
   } else {
+    std::cerr << "d" << std::endl;
+    std::cerr << node->data->low << " " << node->amp_positions.size() << std::endl;
     amplicons.assign_read_amplicon(node, final_positions, final_bases, final_qualities);
+    //find_position_amplicon(node, final_positions, final_bases, final_qualities, positions);
   }
+  std::cerr << "b" << std::endl;
 }
 
 void generate_range(uint32_t start, uint32_t end, std::vector<uint32_t> &result) {
@@ -305,7 +310,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     amplicons = populate_amplicons(pair_info, primers);    
     amplicons.inOrder();
     amplicons.get_max_pos();
-    amplicons.amplicon_position_pop();
     std::cerr << "Maximum position " << amplicons.max_pos << std::endl;
   } else{
     std::cerr << "Amplicon specific measurements will not be calculated." << std::endl;
@@ -345,6 +349,12 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   std::vector<primer>::iterator cit;
   std::vector<bam1_t *> alns;
    
+  //initate variants
+  std::vector<genomic_position> positions;
+  //populate blank vector
+  positions.populate();
+  //assign overlap regions
+  amplicons.calculate_overlaps(positions);  
 
   //iterate through reads
   in = sam_open(bam.c_str(), "r");
@@ -371,7 +381,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   header = sam_hdr_read(in);
   aln = bam_init1();
   amplicons.populate_variants(last_position);
-
   //hold the reads until it's mate can be found
   std::unordered_map<std::string, bam1_t*> read_map;
    
@@ -448,7 +457,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   amplicons.combine_haplotypes(counter);
 
   //detect primer binding issues
-  std::unordered_map<uint32_t, position> variants = amplicons.variants;
+  std::vector<position> variants = amplicons.variants;
    
   std::vector<uint32_t> flagged_positions; 
   std::vector<float> std_deviations;
@@ -534,8 +543,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   std::cerr << "variants size " << variants.size() << std::endl;
   std::vector<uint32_t> flagged_amplicons;
   //find amplicons that are problematic
-  for(auto [pos_key, var] : variants){
-    auto it = std::find(flagged_positions.begin(), flagged_positions.end(), pos_key);
+  for(auto var : variants){
+    auto it = std::find(flagged_positions.begin(), flagged_positions.end(), var.pos);
     if(it != flagged_positions.end()){
       for(auto an : var.amplicon_numbers){
         auto ait = std::find(flagged_amplicons.begin(), flagged_amplicons.end(), an);
@@ -549,11 +558,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   ofstream file;
   file.open(bam_out + ".txt", ios::trunc);
   file << "REGION\tPOS\tREF\tALT\tREF_DP\tREF_RV\tREF_QUAL\tALT_DP\tALT_RV\tALT_QUAL\tALT_FREQ\tTOTAL_DP\tPVAL\tPASS\tGFF_FEATURE\tREF_CODON\tREF_AA\tALT_CODON\tALT_AA\tPOS_AA\tGAPPED_FREQ\tGAPPED_DEPTH\tFLAGGED_POS\tAMP_MASKED\tSTD_DEV\tAMP_FREQ\tAMP_NUMBERS\n";
-  for(auto [pos_key, var] : variants){
+  for(auto var : variants){
     if(var.depth == 0) continue;
     //find the depth of the deletion to calculate upgapped depth
     double del_depth = 0;
-    char ref = refantd.get_base(pos_key, ref_name);
+    char ref = refantd.get_base(var.pos, ref_name);
     //calculate the reference depth
     uint32_t ref_depth = calculate_reference_depth(var, ref);
     double ref_qual = 0;
@@ -563,7 +572,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     }
 
     //deletions need to be shifted one position back
-    std::vector<allele> del_alleles = find_deletions_next(variants, pos_key);    
+    std::vector<allele> del_alleles = find_deletions_next(variants, var.pos);    
 
     std::vector<allele> alleles = var.alleles;
     //remove the deletion depth as needed
@@ -603,7 +612,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       double freq = (double)alleles[j].depth / ((double)var.depth-del_depth);
       double gapped_freq = (double)alleles[j].depth / (double)var.depth;
       file << ref_name <<"\t"; //region
-      file << std::to_string(pos_key) << "\t";
+      file << std::to_string(var.pos) << "\t";
       file << "NA"  << "\t"; //ref
       file << alleles[j].nuc << "\t";
       file << std::to_string(ref_depth) << "\t"; //ref dp
@@ -625,7 +634,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       file << std::to_string(gapped_freq) << "\t"; //gapped freq
       file << std::to_string(var.depth) << "\t"; //gapped depth
       std::vector<uint32_t>::iterator it; 
-      it = find(flagged_positions.begin(), flagged_positions.end(), pos_key);
+      it = find(flagged_positions.begin(), flagged_positions.end(), var.pos);
       if (it != flagged_positions.end()){
         file << "TRUE\t";
       } else {
@@ -641,7 +650,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       }
       if(amp_flag) file << "TRUE\t";
       else file << "FALSE\t";
-      std::string tmp = std::to_string(pos_key) + alleles[j].nuc;
+      std::string tmp = std::to_string(var.pos) + alleles[j].nuc;
       std::vector<std::string>::iterator sit = find(pos_nuc.begin(), pos_nuc.end(), tmp);
       if(sit != pos_nuc.end()){
         uint32_t index = std::distance(pos_nuc.begin(), sit);

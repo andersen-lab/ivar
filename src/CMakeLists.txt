@@ -18,6 +18,7 @@ add_executable(ivar
         parse_gff.cpp
         ref_seq.cpp
         interval_tree.cpp
+        genomic_position.cpp
         saga.cpp
         estimate_error.cpp
         gmm.cpp

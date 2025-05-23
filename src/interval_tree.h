@@ -1,5 +1,4 @@
 #include <iostream>
-
 #include "primer_bed.h"
 using namespace std;
 
@@ -23,7 +22,6 @@ class ITNode {
   ITNode *left, *right; // pointer to node's left & right child node objects
   int max;
   int height; // height of node
-  std::unordered_map<uint32_t, position> amp_positions;  //data for every position on amplicon
 
   ITNode(Interval value)
       : data(new Interval(value)),
@@ -80,9 +78,7 @@ class IntervalTree {
   IntervalTree();
   uint32_t max_pos=0;
   std::vector<std::vector<uint32_t>> overlaps;
-  std::vector<position> test_flux; //storage for looking at pos across all amps
   std::vector<uint32_t> test_test;
-  std::unordered_map<uint32_t, position> variants; //all variants across every position
   std::vector<uint32_t> flagged_positions; //positions where freq flux occurs MIGHT NOT NEED
 
   void insert(Interval data) { _root = insert_node_balanced(_root, data); }
@@ -96,9 +92,9 @@ class IntervalTree {
   void combine_haplotypes(uint32_t &counter) {combine_haplotypes(_root, counter);}
   void write_out_frequencies(std::string filename){write_out_frequencies(_root, filename);}
   void populate_variants(uint32_t last_position);
-  void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
+  //void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
   void find_read_amplicon(uint32_t lower, uint32_t upper, ITNode*&node, uint32_t &amp_dist) {find_read_amplicon(_root, lower, upper, node, amp_dist);}
-  void assign_read_amplicon(ITNode *node, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
+  //void assign_read_amplicon(ITNode *node, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
   void amplicon_position_pop() {amplicon_position_pop(_root);}
 };
 
