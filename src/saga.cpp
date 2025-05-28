@@ -263,20 +263,20 @@ double calculate_standard_deviation(std::vector<double> data) {
     return std::sqrt(sum / data.size());
 }
 
-float calculate_standard_deviation_weighted(std::vector<float> values, std::vector<uint32_t> weights) {
-    float weighted_sum = 0.0f, total_weight = 0.0f;
+double  calculate_standard_deviation_weighted(std::vector<double> values, std::vector<uint32_t> weights) {
+    double weighted_sum = 0.0, total_weight = 0.0;
 
     // Compute weighted mean
     for (size_t i = 0; i < values.size(); ++i) {
-        weighted_sum += values[i] * (float)weights[i];
-        total_weight += (float)weights[i];
+        weighted_sum += values[i] * weights[i];
+        total_weight += weights[i];
     }
-    float mean = weighted_sum / total_weight;
+    double mean = weighted_sum / total_weight;
 
     // Compute weighted variance
-    float variance = 0.0f;
+    double variance = 0.0f;
     for (size_t i = 0; i < values.size(); ++i) {
-        variance += (float)weights[i] * std::pow(values[i] - mean, 2);
+        variance += weights[i] * std::pow(values[i] - mean, 2);
     }
     variance /= total_weight;
 
@@ -441,13 +441,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   //combine amplicon counts to get total variants
   uint32_t counter = 1;
   combine_haplotypes(global_positions);
-  //calculate_amplicon_variation(global_positions);
+  std::vector<uint32_t> flagged_positions = calculate_amplicon_variation(global_positions);
+  std::cerr << flagged_positions.size() << std::endl;
   exit(0);
   std::vector<genomic_position> variants = global_positions;
 
-  std::vector<uint32_t> flagged_positions;
-  std::vector<float> std_deviations;
-  std::vector<std::string> pos_nuc;
   uint32_t test_pos = 0;
   /*
   //detect fluctuating variants across amplicons

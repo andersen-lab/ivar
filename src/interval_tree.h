@@ -69,7 +69,6 @@ class IntervalTree {
   void print_amplicons(ITNode *root);
   void get_max_pos(ITNode *root);
   int unpaired_primers(ITNode *root, primer prim);
-  //void detect_abberations(ITNode *root, uint32_t pos);
   void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, ITNode*&node, uint32_t &amp_dist);
   void calculate_overlaps(ITNode *root, std::vector<genomic_position> &positions);
 
@@ -87,14 +86,8 @@ class IntervalTree {
   void print_amplicons() {print_amplicons(_root);}
   void get_max_pos() {get_max_pos(_root);}
   int unpaired_primers(primer prim) { return unpaired_primers(_root, prim);}
-
   void calculate_overlaps(std::vector<genomic_position> &positions) {calculate_overlaps(_root, positions);}
-  //void detect_abberations(uint32_t pos) {detect_abberations(_root, pos);}
-  //void combine_haplotypes(uint32_t &counter) {combine_haplotypes(_root, counter);}
-  //void populate_variants(uint32_t last_position);
-  //void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
   void find_read_amplicon(uint32_t lower, uint32_t upper, ITNode*&node, uint32_t &amp_dist) {find_read_amplicon(_root, lower, upper, node, amp_dist);}
-  //void assign_read_amplicon(ITNode *node, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
 };
 
 int unpaired_primers(ITNode *root, primer prim);

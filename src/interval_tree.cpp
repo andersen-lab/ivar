@@ -13,53 +13,6 @@ bool node_compare(ITNode *node1, ITNode *node2){
   return(found);
 }
 
-/*void IntervalTree::combine_haplotypes(ITNode *root, uint32_t &counter){
-  if (root == NULL) return;
-  //traverse left subtree
-  combine_haplotypes(root->left, counter);
-
-  //process current node
-  for (auto amp_var : root->amp_positions) {
-    if (amp_var.depth == 0) continue;
-
-    //update position depth
-    position& var = variants[amp_var.pos];
-    var.depth += amp_var.depth;
-
-    //update alleles
-    var.alleles = add_allele_vectors(amp_var.alleles, var.alleles);
-    var.amplicon_numbers.push_back(counter);
-
-    double inv_depth = 1.0 / amp_var.depth;
-    for (const auto& allele : amp_var.alleles) {
-      var.amplicon_frequencies[allele.nuc].push_back(allele.depth * inv_depth);
-    }
-  }
-
-  ++counter;
-
-  //traverse right subtree
-  combine_haplotypes(root->right, counter);
-}
-
-void IntervalTree::assign_read_amplicon(ITNode *node, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities) {
-  uint32_t lower = node->data->low;
-  for (uint32_t i = 0; i < positions.size(); i++) {
-    if(node->amp_positions[positions[i]-lower].depth == 0){
-      std::cerr << "aa" << std::endl;
-      position add_pos;
-      add_pos.pos = positions[i];
-      add_pos.alleles = populate_basic_alleles();
-      std::cerr << "bb " << node->amp_positions.size() <<  " " << positions[i]-lower << std::endl;
-      node->amp_positions[positions[i]-lower] = add_pos;
-      std::cerr << "cc" << std::endl;
-    } else {
-      std::cerr << node->amp_positions.size() << " " << positions[i] << " " << lower << std::endl;
-      node->amp_positions[positions[i]-lower].update_alleles(bases[i], 1, qualities[i]);
-    }
-  }
-}
-*/
 void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, ITNode* &node, uint32_t &amp_dist) {
   if (root == NULL) return;
 
@@ -97,40 +50,6 @@ void IntervalTree::calculate_overlaps(ITNode *root, std::vector<genomic_position
   //traverse right subtree
   calculate_overlaps(root->right, positions);
 }
-/*
-void IntervalTree::detect_abberations(ITNode *root, uint32_t find_position) {
-  if (root == NULL) return;
-  uint32_t lower = root->data->low;
-  uint32_t upper = root->data->high;
-  if(lower <= find_position && find_position <= upper){
-    if(root->amp_positions[find_position-lower].depth > 0){
-      test_flux.push_back(root->amp_positions[find_position-lower]);
-      test_test.push_back(root->data->low); //track which amplicon/interval matched
-
-    }
-  }
-  //traverse both sides of the tree to catch all overlaps
-  detect_abberations(root->left, find_position);
-  detect_abberations(root->right, find_position);
-}
-
-
-void IntervalTree::add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities){
-  for(uint32_t i=0; i < positions.size(); i++){
-    variants[positions[i]].update_alleles(bases[i], 1, qualities[i]);
-  }
-}
-
-void IntervalTree::populate_variants(uint32_t last_position){
-  variants.reserve(last_position+1);
-  for(uint32_t i=0; i <= last_position; i++){
-    position tmp;
-    tmp.alleles = populate_basic_alleles();
-    tmp.pos = i;
-    variants[i] = tmp;
-  }
-}*/
-
 int IntervalTree::unpaired_primers(ITNode *root, primer prim){
   if (root==NULL) return 0;
   char strand = prim.get_strand();

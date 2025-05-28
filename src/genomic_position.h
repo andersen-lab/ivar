@@ -9,6 +9,7 @@ struct amplicon_info {
   ITNode* node = nullptr;
   std::vector<allele> amp_alleles;
   uint32_t amp_depth = 0;
+  uint32_t amp_depth_gapped = 0;
   void update_alleles(std::string allele, uint32_t qual);
 };
 
@@ -17,6 +18,7 @@ class genomic_position {
     std::vector<amplicon_info> amplicons;
     uint32_t pos;
     uint32_t depth=0;
+    uint32_t gapped_depth=0;
     std::vector<allele> alleles;
     std::unordered_map<std::string, std::vector<double>> amplicon_frequencies = {};
     std::vector<uint32_t> amplicon_numbers; //amplicons that cover this position
@@ -30,4 +32,5 @@ void populate_positions(std::vector<genomic_position> &positions, uint32_t max_p
 int check_position_exists(uint32_t p, std::vector<genomic_position> positions);
 void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vector<std::string> final_bases, std::vector<uint32_t> final_qualities, std::vector<genomic_position> &global_positions);
 void add_variants(std::vector<uint32_t> final_positions, std::vector<std::string> final_bases, std::vector<uint32_t> final_qualities, std::vector<genomic_position> &global_positions);
+std::vector<uint32_t> calculate_amplicon_variation(std::vector<genomic_position> &global_positions);
 #endif
