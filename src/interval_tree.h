@@ -1,5 +1,6 @@
 #include <iostream>
 #include "primer_bed.h"
+#include "genomic_position.h"
 using namespace std;
 
 #ifndef interval_tree
@@ -65,14 +66,12 @@ class IntervalTree {
   bool is_interval_contained(ITNode *root, Interval data);
   void inOrder(ITNode *root);
   std::string pre_order_with_level(ITNode *root, int level);
-  void amplicon_position_pop(ITNode *root);
   void print_amplicons(ITNode *root);
   void get_max_pos(ITNode *root);
   int unpaired_primers(ITNode *root, primer prim);
-  void combine_haplotypes(ITNode *root, uint32_t &counter);
-  void write_out_frequencies(ITNode *root, std::string filename);
-  void detect_abberations(ITNode *root, uint32_t pos);
+  //void detect_abberations(ITNode *root, uint32_t pos);
   void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, ITNode*&node, uint32_t &amp_dist);
+  void calculate_overlaps(ITNode *root, std::vector<genomic_position> &positions);
 
  public:
   IntervalTree();
@@ -88,17 +87,17 @@ class IntervalTree {
   void print_amplicons() {print_amplicons(_root);}
   void get_max_pos() {get_max_pos(_root);}
   int unpaired_primers(primer prim) { return unpaired_primers(_root, prim);}
-  void detect_abberations(uint32_t pos) {detect_abberations(_root, pos);}
-  void combine_haplotypes(uint32_t &counter) {combine_haplotypes(_root, counter);}
-  void write_out_frequencies(std::string filename){write_out_frequencies(_root, filename);}
-  void populate_variants(uint32_t last_position);
+
+  void calculate_overlaps(std::vector<genomic_position> &positions) {calculate_overlaps(_root, positions);}
+  //void detect_abberations(uint32_t pos) {detect_abberations(_root, pos);}
+  //void combine_haplotypes(uint32_t &counter) {combine_haplotypes(_root, counter);}
+  //void populate_variants(uint32_t last_position);
   //void add_read_variants(std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
   void find_read_amplicon(uint32_t lower, uint32_t upper, ITNode*&node, uint32_t &amp_dist) {find_read_amplicon(_root, lower, upper, node, amp_dist);}
   //void assign_read_amplicon(ITNode *node, std::vector<uint32_t> positions, std::vector<std::string> bases, std::vector<uint32_t> qualities);
-  void amplicon_position_pop() {amplicon_position_pop(_root);}
 };
 
 int unpaired_primers(ITNode *root, primer prim);
+bool node_compare(ITNode *node1, ITNode *node2);
 IntervalTree populate_amplicons(std::string pair_info_file, std::vector<primer> &primers);
-IntervalTree amplicon_position_pop();
 #endif

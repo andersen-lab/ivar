@@ -5,6 +5,7 @@
 #include "htslib/sam.h"
 #include "interval_tree.h"
 #include "primer_bed.h"
+#include "genomic_position.h"
 #include "trim_primer_quality.h"
 #ifndef saga
 #define saga

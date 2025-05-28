@@ -51,7 +51,7 @@ add_executable(check_variants
 )
 
 add_executable(check_variants_2
-        test_new_variants.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/gmm.cpp ../src/solve_clustering.cpp ../src/estimate_error.cpp ../src/call_variants.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
+        test_new_variants.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/gmm.cpp ../src/solve_clustering.cpp ../src/estimate_error.cpp ../src/call_variants.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp ../src/genomic_position.cpp
 )
 
 add_executable(check_common_variants
@@ -63,7 +63,7 @@ add_executable(check_primer_bed
 )
 
 add_executable(check_clustering_consensus
-        test_clustering_consensus.cpp ../src/gmm.cpp ../src/call_consensus_clustering.cpp ../src/estimate_error.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp
+        test_clustering_consensus.cpp ../src/gmm.cpp ../src/call_consensus_clustering.cpp ../src/estimate_error.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
 )
 
 add_executable(check_getmasked
@@ -94,10 +94,6 @@ add_executable(check_amplicon_search
         test_amplicon_search.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
-add_executable(check_preprocessing
-        test_preprocessing.cpp ../src/allele_functions.cpp ../src/saga.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp
-)
-
 set(ALL_TEST_EXECUTABLES check_primer_trim
         check_trim
         check_quality_trim
@@ -119,7 +115,6 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_interval_tree
         check_amplicon_search
         check_consensus_min_insert_threshold
-        check_preprocessing
 )
 
 if(HTSLIB_PREFIX)

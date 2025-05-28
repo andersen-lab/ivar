@@ -9,7 +9,7 @@
 
 std::vector<allele> populate_basic_alleles(){
     std::vector<allele> ad;
-    std::vector<std::string> nts = { "A", "C", "G", "T"};     
+    std::vector<std::string> nts = { "A", "C", "G", "T"};
     for(uint32_t i =0; i < nts.size(); i++){
         allele tmp;
         tmp.depth = 0;
