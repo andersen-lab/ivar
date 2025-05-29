@@ -76,8 +76,6 @@ class IntervalTree {
   IntervalTree();
   uint32_t max_pos=0;
   std::vector<std::vector<uint32_t>> overlaps;
-  std::vector<uint32_t> test_test;
-  std::vector<uint32_t> flagged_positions; //positions where freq flux occurs MIGHT NOT NEED
 
   void insert(Interval data) { _root = insert_node_balanced(_root, data); }
   bool is_interval_contained(Interval data) { return is_interval_contained(_root, data); }

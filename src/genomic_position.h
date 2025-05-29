@@ -21,6 +21,7 @@ class genomic_position {
     uint32_t gapped_depth=0;
     std::vector<allele> alleles;
     void update_alleles(std::string nt, uint32_t qual);
+
     bool flux=false; //position frequency may fluctuate between amplicons
     bool amp_flux=false; //position is on amplicon with flux
     bool overlap=false; //positon is covered by multiple amplicons

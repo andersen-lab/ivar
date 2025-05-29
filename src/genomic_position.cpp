@@ -17,16 +17,14 @@ void set_amplicon_flag(std::vector<ITNode*> flagged_amplicons, std::vector<genom
     for(auto amp : global_positions[i].amplicons){
       ITNode* tmp = amp.node;
       bool exists = std::find(flagged_amplicons.begin(), flagged_amplicons.end(), tmp) != flagged_amplicons.end();
-      global_positions[i].amp_flux = true;
+      if(exists){
+        global_positions[i].amp_flux = true;
+      }
     }
   }
 }
 
 void genomic_position::update_alleles(std::string nt, uint32_t qual){
-  //update overall positions depth
-  if(nt.find("+") == std::string::npos){
-    depth += 1;
-  }
   //check if in allele vector
   int exists = check_allele_exists(nt, alleles);
   //allele does not exist
@@ -63,17 +61,28 @@ void amplicon_info::update_alleles(std::string allele_val, uint32_t qual){
 }
 
 void add_variants(std::vector<uint32_t> final_positions, std::vector<std::string> final_bases, std::vector<uint32_t> final_qualities, std::vector<genomic_position> &global_positions) {
+
   for(uint32_t i=0; i < final_positions.size(); i++){
+    bool is_del = final_bases[i].find('-') != std::string::npos;
+    bool is_ins = final_bases[i].find('+') != std::string::npos;
+
     uint32_t size = global_positions.size();
-    while(size-1 < final_positions[i]){
+    while(size < final_positions[i]+1){
       genomic_position tmp;
-      tmp.pos = final_positions[i];
+      tmp.gapped_depth = 0;
+      tmp.depth = 0;
+      tmp.pos = global_positions.size();
       global_positions.push_back(tmp);
       size = global_positions.size();
     }
     uint32_t pos = final_positions[i];
     if(global_positions.size() >= pos){
       global_positions[final_positions[i]].update_alleles(final_bases[i], final_qualities[i]);
+      if(is_del && !is_ins) global_positions[final_positions[i]].gapped_depth += 1;
+      if(!is_del && !is_ins){
+        global_positions[final_positions[i]].depth += 1;
+        global_positions[final_positions[i]].gapped_depth += 1;
+      }
     }
   }
 }
@@ -83,25 +92,41 @@ void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vecto
     uint32_t pos = final_positions[i];
     //for this position, iterate the amplicons associated
     bool found = false;
+    bool is_del = final_bases[i].find('-') != std::string::npos;
+    bool is_ins = final_bases[i].find('+') != std::string::npos;
+
     for(uint32_t j=0; j < global_positions[pos].amplicons.size(); j++){
       amplicon_info &amp = global_positions[pos].amplicons[j];
       found = node_compare(node, amp.node);
       if(found){
         amp.update_alleles(final_bases[i], final_qualities[i]);
-        size_t pos = final_bases[i].find('-');
-        if (pos == std::string::npos) {
+        if (!is_del && !is_ins) {
           amp.amp_depth += 1;
+          global_positions[pos].gapped_depth += 1;
+          global_positions[pos].depth += 1;
         }
-        amp.amp_depth_gapped += 1;
+        if(!is_ins && is_del){
+          amp.amp_depth_gapped += 1;
+          global_positions[pos].gapped_depth += 1;
+        }
         break;
       }
     }
-
     if(!found){
       //declare a new associated amplicon
       amplicon_info amp;
       amp.node = node;
-      amp.amp_depth = 1;
+      amp.amp_depth = 0;
+      amp.amp_depth_gapped = 0;
+      if (!is_del && !is_ins) {
+        amp.amp_depth += 1;
+        global_positions[pos].gapped_depth += 1;
+        global_positions[pos].depth += 1;
+      }
+      if(!is_ins && is_del){
+        amp.amp_depth_gapped += 1;
+        global_positions[pos].gapped_depth += 1;
+      }
       amp.amp_alleles = populate_basic_alleles();
       amp.update_alleles(final_bases[i], final_qualities[i]);
       global_positions[pos].amplicons.push_back(amp);
@@ -184,23 +209,9 @@ void add_allele_vectors(std::vector<allele> &alleles, std::vector<allele> amp_al
   }
 }
 
-uint32_t calculate_gapped_depth(std::vector<allele> alleles){
-  uint32_t gapped_depth = 0;
-  for(auto a : alleles){
-    size_t pos = a.nuc.find('-');
-    if (pos != std::string::npos) {
-      gapped_depth += a.depth;
-    }
-  }
-  return(gapped_depth);
-}
-
 void combine_haplotypes(std::vector<genomic_position> &global_positions) {
   for(auto &position : global_positions){
     for(auto &amp : position.amplicons){
-      uint32_t gapped_depth = calculate_gapped_depth(amp.amp_alleles);
-      position.depth += amp.amp_depth - gapped_depth;
-      position.gapped_depth += amp.amp_depth;
       add_allele_vectors(position.alleles, amp.amp_alleles);
     }
   }
@@ -219,6 +230,8 @@ void populate_positions(std::vector<genomic_position> &positions, uint32_t max_p
   for(uint32_t i=0; i < max_position; i++) {
     genomic_position tmp;
     tmp.pos = i;
+    tmp.depth = 0;
+    tmp.gapped_depth = 0;
     positions.push_back(tmp);
   }
 }

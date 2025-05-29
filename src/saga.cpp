@@ -393,10 +393,10 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       uint32_t amp_dist = 429496729;
       ITNode *node=NULL;
       amplicons.find_read_amplicon(start_read, end_read, node, amp_dist);
-      if(node != NULL){
-        //amplicons.add_read_variants(positions, bases, qualities);
+      if(node == NULL){
+        add_variants(positions, bases, qualities, global_positions);
       } else{
-        //amplicons.assign_read_amplicon(node, positions, bases, qualities);
+        assign_read(node, positions, bases, qualities, global_positions);
       }
       continue;
     }
@@ -431,9 +431,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       ITNode *node=NULL;
       amplicons.find_read_amplicon(start_read, end_read, node, amp_dist);
       if(node == NULL){
-        //amplicons.add_read_variants(positions, bases, qualities);
+        add_variants(positions, bases, qualities, global_positions);
       } else{
-        //amplicons.assign_read_amplicon(node, positions, bases, qualities);
+        assign_read(node, positions, bases, qualities, global_positions);
       }
   }
 

@@ -63,7 +63,9 @@ int main() {
       if(found) break;
     }
   }
+
   if(depths_match && new_variants.size() > 0) success++;
+  else std::cerr << "depth tests failed" << std::endl;
 
   //compare new variants depths to expected
   bool expected = true;
@@ -80,6 +82,7 @@ int main() {
     } else if(position < 182 || position >= 276 || position == 229 || position == 207){
       if(total_depth != 8){
         std::cerr << "total depth is incorrect " << position << " " << new_variants[i].nuc << " " << new_variants[i].total_depth << " gapped depth " <<  new_variants[i].gapped_depth << std::endl;
+        std::cerr << "total depth should be 8" << std::endl;
         expected = false;
         break;
       }
@@ -105,11 +108,13 @@ int main() {
       amp_flags_correct = false;
     }
     if(!var.amplicon_masked){
-      //std::cerr << "amp not masked " << var.position << std::endl;
+      std::cerr << "amp not masked " << var.position << std::endl;
       amp_flags_correct = false;
     }
   }
   if(amp_flags_correct && new_variants_2.size() > 0) success++;
+  else std::cerr << "amp flag test failed" << std::endl;
+
   //TEST 3 - Pass the same file without the pair file or bed file.
   bool no_amp_info = true;
   int result_3 = preprocess_reads(bam_filename, "", prefix_3, "", "", primer_offset, min_depth, min_qual, reference_file);
@@ -122,13 +127,15 @@ int main() {
       if(position == new_variants[j].position && nuc == new_variants[j].nuc){
         if(new_variants_3[i].depth != new_variants[j].depth) {
           no_amp_info = false;
-          std::cerr << "false last test" << std::endl;
+          std::cerr << "false last test " << position << " new depth " << new_variants_3[i].depth << " " << new_variants[j].depth << std::endl;
         }
         break;
       }
     }
   }
   if(no_amp_info && new_variants_3.size()) success++;
+  else std::cerr << "amp info test failed" << std::endl;
+
   std::cerr << "success " << success << " num tests " << num_tests << std::endl;
   return (num_tests == success) ? 0 : -1;
 }
