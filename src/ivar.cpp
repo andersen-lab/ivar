@@ -365,7 +365,7 @@ int main(int argc, char *argv[]) {
       std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.ref);
       cluster_consensus(variants, g_args.prefix, g_args.min_threshold, g_args.min_depth, g_args.min_qual, solution, means, g_args.ref);
     }
-    res = 0; 
+    res = 0;
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
   }
 
@@ -421,7 +421,7 @@ int main(int argc, char *argv[]) {
     res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
                                cl_cmd.str(),
                                g_args.primer_pair_file, g_args.primer_offset, g_args.min_depth, g_args.min_qual, g_args.ref);
-  }
+    }
 
   // ivar trim
   else if (cmd.compare("trim") == 0) {

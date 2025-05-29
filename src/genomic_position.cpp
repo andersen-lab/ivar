@@ -4,6 +4,24 @@
 #include <string>
 #include <vector>
 
+std::vector<uint32_t> get_amplicon_numbers(std::vector<amplicon_info> amplicons){
+  std::vector<uint32_t> amp_numbers;
+  for(auto amp : amplicons){
+    amp_numbers.push_back((uint32_t)amp.node->data->low);
+  }
+  return(amp_numbers);
+}
+
+void set_amplicon_flag(std::vector<ITNode*> flagged_amplicons, std::vector<genomic_position> &global_positions){
+  for(uint32_t i =0; i < global_positions.size(); i++){
+    for(auto amp : global_positions[i].amplicons){
+      ITNode* tmp = amp.node;
+      bool exists = std::find(flagged_amplicons.begin(), flagged_amplicons.end(), tmp) != flagged_amplicons.end();
+      global_positions[i].amp_flux = true;
+    }
+  }
+}
+
 void genomic_position::update_alleles(std::string nt, uint32_t qual){
   //update overall positions depth
   if(nt.find("+") == std::string::npos){
@@ -114,8 +132,9 @@ std::unordered_map<std::string, std::vector<double>> collect_allele_frequencies(
   return freq_map;
 }
 
-std::vector<uint32_t>  calculate_amplicon_variation(std::vector<genomic_position> &global_positions){
-  std::vector<uint32_t> flagged_positions;
+std::vector<ITNode*>  calculate_amplicon_variation(std::vector<genomic_position> &global_positions){
+  std::vector<ITNode*> flagged_amplicons;
+
   for(uint32_t i=0; i < global_positions.size(); i++){
     if(global_positions[i].amplicons.size() > 0){
       std::vector<amplicon_info> tmp = global_positions[i].amplicons;
@@ -125,12 +144,22 @@ std::vector<uint32_t>  calculate_amplicon_variation(std::vector<genomic_position
         double std = calculate_standard_deviation_weighted(values, allele_depths[key]);
         if(std > 0.03){
           global_positions[i].flux = true;
-          bool exists = std::find(flagged_positions.begin(), flagged_positions.end(), global_positions[i].pos) != flagged_positions.end();
+          //add the standard dev to the allele value
+          for(auto a : global_positions[i].alleles){
+            if(a.nuc == key) a.stddev= std;
+          }
+
+          //add all amps to the flagged amps vec
+          for(auto amp : global_positions[i].amplicons){
+            ITNode* tmp = amp.node;
+            bool exists = std::find(flagged_amplicons.begin(), flagged_amplicons.end(), tmp) != flagged_amplicons.end();
+            if(!exists) flagged_amplicons.push_back(tmp);
+          }
         }
       }
     }
   }
-  return(flagged_positions);
+  return(flagged_amplicons);
 }
 
 void add_allele_vectors(std::vector<allele> &alleles, std::vector<allele> amp_alleles){
@@ -150,6 +179,7 @@ void add_allele_vectors(std::vector<allele> &alleles, std::vector<allele> amp_al
       tmp.nuc = amp_alleles[i].nuc;
       tmp.depth = amp_alleles[i].depth;
       tmp.mean_qual = amp_alleles[i].mean_qual;
+      alleles.push_back(tmp);
     }
   }
 }
