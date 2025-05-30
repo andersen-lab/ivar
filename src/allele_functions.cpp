@@ -33,20 +33,16 @@ void print_allele_depths(std::vector<allele> ad) {
   }
 }
 
-int check_allele_exists(std::string n, std::vector<allele> ad) {
-  for (std::vector<allele>::iterator it = ad.begin(); it != ad.end(); ++it) {
-    if (it->nuc.compare(n) == 0) {
-      return it - ad.begin();
+int check_allele_exists(std::string &n, std::vector<allele> &ad) {
+  for (size_t i = 0; i < ad.size(); ++i) {
+    if (ad[i].nuc == n) {
+      return static_cast<int>(i);
     }
   }
-  // allele does not exist
   return -1;
 }
 
 uint32_t sum_allele_depths(std::vector<allele> test){
-  /*
-   * Helped function for troubleshooting depth issues.
-   */
   uint32_t counter = 0;
   for(uint32_t i=0; i < test.size(); i++){
     counter += test[i].depth;

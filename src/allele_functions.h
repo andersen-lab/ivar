@@ -25,7 +25,7 @@ struct allele {
 };
 
 void update_alleles(std::string nt, uint32_t count, uint32_t qual);
-int check_allele_exists(std::string n, std::vector<allele> ad);
+int check_allele_exists(std::string &n, std::vector<allele> &ad);
 std::vector<allele> update_allele_depth(char ref, std::string bases,
                                         std::string qualities,
                                         uint8_t min_qual);

@@ -38,18 +38,20 @@ void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upp
 
 
 void IntervalTree::calculate_overlaps(ITNode *root, std::vector<genomic_position> &positions) {
-  if (root == NULL) return;
+  if (!root) return;
   //traverse left subtree
   calculate_overlaps(root->left, positions);
+  static const std::vector<allele> basic_alleles = populate_basic_alleles();
   for(uint32_t i=root->data->low; i < root->data->high; i++){
     amplicon_info amp;
-    amp.amp_alleles = populate_basic_alleles();
+    amp.amp_alleles = basic_alleles;
     amp.node = root;
     positions[i].amplicons.push_back(amp);
   }
   //traverse right subtree
   calculate_overlaps(root->right, positions);
 }
+
 int IntervalTree::unpaired_primers(ITNode *root, primer prim){
   if (root==NULL) return 0;
   char strand = prim.get_strand();

@@ -25,36 +25,30 @@ std::string join_double_vector(const std::vector<double>& vec) {
     return oss.str();
 }
 
-uint32_t calculate_reference_depth(genomic_position var, char ref){
-  uint32_t depth = 0;
+void calculate_reference_depth(genomic_position var, char ref, uint32_t &depth){
   for(auto allele : var.alleles){
     if(allele.nuc[0] == ref){
       depth = allele.depth;
       break;
     }
   }
-  return(depth);
 }
-uint32_t calculate_reference_qual(genomic_position var, char ref){
-  uint32_t qual= 0;
+
+void calculate_reference_qual(genomic_position var, char ref, uint32_t &qual){
   for(auto allele : var.alleles){
     if(allele.nuc[0] == ref){
       qual = allele.mean_qual;
       break;
     }
   }
-  return(qual);
 }
 
-std::vector<allele> find_deletions_next(std::vector<genomic_position> variants, uint32_t pos){
+std::vector<allele> find_deletions_next(genomic_position position){
   std::vector<allele> deletions;
-  for(auto var : variants){
-    if(var.pos-1 == pos){
-      for(uint32_t j=0; j < var.alleles.size(); j++){
-        if (var.alleles[j].nuc.find("-") != std::string::npos && var.alleles[j].depth > 0){
-          deletions.push_back(var.alleles[j]);
-        }
-      }
+  if(position.depth == position.gapped_depth) return(deletions);
+  for(uint32_t j=0; j < position.alleles.size(); j++){
+    if (position.alleles[j].nuc.find("-") != std::string::npos){
+      deletions.push_back(position.alleles[j]);
     }
   }
   return(deletions);
@@ -66,21 +60,33 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
   uint32_t *cigar1 = bam_get_cigar(read1);
   uint8_t* qual = bam_get_qual(read1);
   total_ref_pos += 1;
+  uint32_t mqual = (uint32_t) min_qual;
+
+  static const char seq_nt_lookup[16] = {
+    '=', 'A', 'C', 'M', 'G', 'R', 'S', 'V',
+    'T', 'W', 'Y', 'H', 'K', 'D', 'B', 'N'
+  };
+
+
   for (uint32_t i = 0; i < read1->core.n_cigar; i++){
     uint32_t op = bam_cigar_op(cigar1[i]);
     uint32_t len = bam_cigar_oplen(cigar1[i]);
     uint32_t counter = 0;
     if(op == 0){
       for(uint32_t j=total_query_pos; j < total_query_pos+len; j++){
-        if(qual[j] < min_qual){
+        uint32_t tqual = qual[j];
+        if(tqual < mqual){
           counter++;
           continue;
         }
-        char nuc = seq_nt16_str[bam_seqi(seq_field1, j)];
+        //char nuc = seq_nt16_str[bam_seqi(seq_field1, j)];
+        uint8_t base_code = bam_seqi(seq_field1, j);
+        char nuc = seq_nt_lookup[base_code];
+
         std::string tmp = std::string(1, nuc);
         positions.push_back(total_ref_pos+counter);
         bases.push_back(tmp);
-        qualities.push_back((uint32_t)qual[j]);
+        qualities.push_back(qual[j]);
         counter++;
       }
     } else if(op == 2){
@@ -91,17 +97,19 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
         counter++;
       }
       bases.push_back(tmp);
-      qualities.push_back((uint32_t)min_qual);
+      qualities.push_back(min_qual);
     } else if(op == 1){
       std::string tmp = "+";
       double qual_avg = 0;
       //collect all nucs in insertions
       for(uint32_t j=total_query_pos; j < total_query_pos+len; j++){
-        char nuc = seq_nt16_str[bam_seqi(seq_field1, j)];
+        //char nuc = seq_nt16_str[bam_seqi(seq_field1, j)];
+        uint8_t base_code = bam_seqi(seq_field1, j);
+        char nuc = seq_nt_lookup[base_code];
         tmp +=  std::string(1, nuc);
         qual_avg += qual[j];
       }
-      if(((uint32_t)qual_avg/(tmp.size()-1)) < (uint32_t)min_qual) continue;
+      if(((uint32_t)qual_avg/(tmp.size()-1)) < min_qual) continue;
       positions.push_back(total_ref_pos+counter-1);
       bases.push_back(tmp);
       qualities.push_back((uint32_t)qual_avg/(tmp.size()-1));
@@ -117,40 +125,26 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
   }
 }
 
-uint32_t find_sequence_end(const bam1_t* read){
-  uint32_t start = read->core.pos;
-  uint32_t *cigar = bam_get_cigar(read);
-  //find the end of the forward read
-  for (uint32_t i = 0; i < read->core.n_cigar; i++){
-    uint32_t op = bam_cigar_op(cigar[i]);
-    uint32_t len = bam_cigar_oplen(cigar[i]);
-    //consumes ref
-    if(bam_cigar_type(op) & 2){
-      start += len;
-    }
-  }
-  return start;
-}
-
 void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplicons, uint8_t min_qual, ref_antd &refantd, std::string ref_name, std::vector<genomic_position> &global_positions){
   //pass the forward first then reverse
   //also assumes that the forward read starts more "left" than  the reverse
   uint32_t start_reverse = read2->core.pos;
   uint32_t start_forward = read1->core.pos;
-  uint32_t end_reverse = find_sequence_end(read2);
-
+  uint32_t end_reverse = bam_endpos(read2);
   //record the positions and their bases
-  std::vector<uint32_t> positions1;
-  std::vector<std::string> bases1;
-  std::vector<uint32_t> qualities1;
+  std::vector<uint32_t> positions1, positions2;
+  std::vector<std::string> bases1, bases2;
+  std::vector<uint32_t> qualities1, qualities2;
 
-  std::vector<uint32_t> positions2;
-  std::vector<std::string> bases2;
-  std::vector<uint32_t> qualities2;
-
-  //start of read,
   parse_cigar(read1, positions1, bases1, qualities1, start_forward, min_qual, refantd, ref_name);
   parse_cigar(read2, positions2, bases2, qualities2, start_reverse, min_qual, refantd, ref_name);
+
+  // Index positions to avoid repeated scanning
+  std::unordered_map<uint32_t, std::vector<uint32_t>> pos1_indices, pos2_indices;
+  for (uint32_t i = 0; i < positions1.size(); ++i)
+    pos1_indices[positions1[i]].push_back(i);
+  for (uint32_t i = 0; i < positions2.size(); ++i)
+    pos2_indices[positions2[i]].push_back(i);
 
   //find all unique positions we need to cover
   std::unordered_set<uint32_t> unique_elements(positions1.begin(), positions1.end());
@@ -162,73 +156,43 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
   //for every position make sure the bases and qualities match
   //make sure insertions match
   for(auto pos : unique_elements){
-    auto first_it = std::find(positions1.begin(), positions1.end(), pos);
-    auto second_it = std::find(positions2.begin(), positions2.end(), pos);
+    auto it1 = pos1_indices.find(pos);
+    auto it2 = pos2_indices.find(pos);
 
-    //if its in the first read but not the second
-    if(first_it != positions1.end() && second_it == positions2.end()){
-      auto it = positions1.begin();
-      while ((it = std::find(it, positions1.end(), pos)) != positions1.end()) {
-        uint32_t index1 = std::distance(positions1.begin(), it);
-        final_positions.push_back(positions1[index1]);
-        final_qualities.push_back(qualities1[index1]);
-        final_bases.push_back(bases1[index1]);
-        ++it;
-      }
-    } else if(first_it == positions1.end() && second_it != positions2.end()){
-      //if its in the second read but not the first
-      auto it = positions2.begin();
-      while ((it = std::find(it, positions2.end(), pos)) != positions2.end()) {
-        uint32_t index2 = std::distance(positions2.begin(), it);
-        final_positions.push_back(positions2[index2]);
-        final_qualities.push_back(qualities2[index2]);
-        final_bases.push_back(bases2[index2]);
-        ++it;
-      }
-    } else if(first_it != positions1.end() && second_it != positions2.end()){
-      //if its in both reads
-      //check if the number of times the position occurs is the same
-      uint32_t count1 = std::count(positions1.begin(), positions1.end(), pos);
-      uint32_t count2 = std::count(positions2.begin(), positions2.end(), pos);
-      if(count1 != count2){continue;}
+    bool in1 = (it1 != pos1_indices.end());
+    bool in2 = (it2 != pos2_indices.end());
 
-      std::vector<uint32_t> tmp_pos2;
-      std::vector<std::string> tmp_base2;
-      std::vector<uint32_t> tmp_qual2;
-      //go get all the second read info
-      auto sit = positions2.begin();
-      while ((sit = std::find(sit, positions2.end(), pos)) != positions2.end()) {
-        uint32_t index2 = std::distance(positions2.begin(), sit);
-        tmp_pos2.push_back(positions2[index2]);
-        tmp_qual2.push_back(qualities2[index2]);
-        tmp_base2.push_back(bases2[index2]);
-        ++sit;
+    if (in1 && !in2) {
+      for (uint32_t idx : it1->second) {
+        final_positions.push_back(positions1[idx]);
+        final_qualities.push_back(qualities1[idx]);
+        final_bases.push_back(bases1[idx]);
       }
-      std::vector<uint32_t> tmp_pos1;
-      std::vector<std::string> tmp_base1;
-      std::vector<uint32_t> tmp_qual1;
-      //go get all the first read info
-      auto fit = positions1.begin();
-      while ((fit = std::find(fit, positions1.end(), pos)) != positions1.end()) {
-        uint32_t index1 = std::distance(positions1.begin(), fit);
-        tmp_pos1.push_back(positions1[index1]);
-        tmp_qual1.push_back(qualities1[index1]);
-        tmp_base1.push_back(bases1[index1]);
-        ++fit;
+    } else if (!in1 && in2) {
+      for (uint32_t idx : it2->second) {
+        final_positions.push_back(positions2[idx]);
+        final_qualities.push_back(qualities2[idx]);
+        final_bases.push_back(bases2[idx]);
       }
-      //now do the base and quality comparison
-      bool use= true;
-      for(uint32_t j=0; j < tmp_pos1.size(); j++){
-        if(tmp_base1[j] != tmp_base2[j]){
-          use = false;
+    } else if (in1 && in2) {
+      const auto& idxs1 = it1->second;
+      const auto& idxs2 = it2->second;
+
+      if (idxs1.size() != idxs2.size()) continue; // Skip if mismatch in count
+
+      bool match = true;
+      for (size_t j = 0; j < idxs1.size(); ++j) {
+        if (bases1[idxs1[j]] != bases2[idxs2[j]]) {
+          match = false;
           break;
         }
       }
-      if(use) {
-        for(uint32_t j=0; j < tmp_pos1.size(); j++){
-          final_positions.push_back(tmp_pos1[j]);
-          final_qualities.push_back(tmp_qual1[j]);
-          final_bases.push_back(tmp_base1[j]);
+
+      if (match) {
+        for (size_t j = 0; j < idxs1.size(); ++j) {
+          final_positions.push_back(positions1[idxs1[j]]);
+          final_qualities.push_back(qualities1[idxs1[j]]);
+          final_bases.push_back(bases1[idxs1[j]]);
         }
       }
     }
@@ -388,7 +352,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       std::vector<std::string> bases;
       std::vector<uint32_t> qualities;
       uint32_t start_read = aln->core.pos;
-      uint32_t end_read = find_sequence_end(aln);
+      uint32_t end_read = bam_endpos(aln);
       parse_cigar(aln, positions, bases, qualities, start_read, min_qual, refantd, ref_name);
       uint32_t amp_dist = 429496729;
       ITNode *node=NULL;
@@ -420,12 +384,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   }
   //for reads that aren't flagged as unmapped but are for some reason
     for(auto it = read_map.begin(); it != read_map.end(); ++it){
-      std::string read_name = bam_get_qname(it->second);
       std::vector<uint32_t> positions;
       std::vector<std::string> bases;
       std::vector<uint32_t> qualities;
       uint32_t start_read = it->second->core.pos;
-      uint32_t end_read = find_sequence_end(it->second);
+      uint32_t end_read = bam_endpos(it->second);
       parse_cigar(it->second, positions, bases, qualities, start_read, min_qual, refantd, ref_name);
       uint32_t amp_dist = 429496729;
       ITNode *node=NULL;
@@ -441,9 +404,14 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   uint32_t counter = 1;
   combine_haplotypes(global_positions);
   //TODO build in quality filters, and min depth filter
-  std::vector<ITNode*> flagged_amplicons = calculate_amplicon_variation(global_positions);
+  std::vector<ITNode*> flagged_amplicons = calculate_amplicon_variation(global_positions, min_depth, min_qual);
   set_amplicon_flag(flagged_amplicons, global_positions);
   //write variants to a file
+  std::unordered_map<std::string, std::vector<double>> allele_frequencies;
+  std::vector<allele> del_alleles;
+  std::vector<uint32_t> amplicon_numbers;
+  std::string blank = "NA\t";
+
   ofstream file;
   file.open(bam_out + ".txt", ios::trunc);
   file << "REGION\tPOS\tREF\tALT\tREF_DP\tREF_RV\tREF_QUAL\tALT_DP\tALT_RV\tALT_QUAL\tALT_FREQ\tTOTAL_DP\tPVAL\tPASS\tGFF_FEATURE\tREF_CODON\tREF_AA\tALT_CODON\tALT_AA\tPOS_AA\tGAPPED_FREQ\tGAPPED_DEPTH\tFLAGGED_POS\tAMP_MASKED\tSTD_DEV\tAMP_FREQ\tAMP_NUMBERS\n";
@@ -452,66 +420,62 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
 
     char ref = refantd.get_base(var.pos, ref_name);
     //calculate the reference depth
-    uint32_t ref_depth = calculate_reference_depth(var, ref);
-    double ref_qual = 0;
+    uint32_t ref_depth=0, ref_qual=0, ref_qual_avg=0;
+    calculate_reference_depth(var, ref, ref_depth);
     if(ref_depth > 0){
-      uint32_t  ref_qual_avg = calculate_reference_qual(var, ref);
+      calculate_reference_qual(var, ref, ref_qual_avg);
       ref_qual = (double)ref_qual_avg / (double)ref_depth;
     }
     //deletions need to be shifted one position back
-    std::vector<allele> del_alleles = find_deletions_next(global_positions, var.pos);
-    std::vector<allele> alleles = var.alleles;
+    del_alleles.clear();
+    if(var.pos+1 < global_positions.size()){
+      del_alleles = find_deletions_next(global_positions[var.pos+1]);
+    }
 
     //remove any current deletions
-    std::vector<uint32_t> remove_indices;
-    for(uint32_t j=0; j < alleles.size(); j++){
-      if (alleles[j].nuc.find("-") != std::string::npos){
-        remove_indices.push_back(j);
-      }
-    }
-    std::sort(remove_indices.rbegin(), remove_indices.rend());
-    for(uint32_t idx : remove_indices) {
-      if (idx < alleles.size()) {
-        alleles.erase(alleles.begin() + idx);
-      }
-    }
+    var.alleles.erase(
+    std::remove_if(var.alleles.begin(), var.alleles.end(), [](const allele &a) {
+      return a.nuc.find('-') != std::string::npos;
+    }),var.alleles.end());
 
     //add in our bonus deletions
     if(del_alleles.size() > 0){
-      alleles.insert(alleles.end(), del_alleles.begin(), del_alleles.end());
+      var.alleles.insert(var.alleles.end(), del_alleles.begin(), del_alleles.end());
     }
     //get amplicon specific frequencies
-    std::unordered_map<std::string, std::vector<double>> allele_frequencies = collect_allele_frequencies(var.amplicons);
+    allele_frequencies.clear();
+    collect_allele_frequencies(var.amplicons, allele_frequencies);
     //get the amplicon numbers
-    std::vector<uint32_t> amplicon_numbers = get_amplicon_numbers(var.amplicons);
+    amplicon_numbers.clear();
+    get_amplicon_numbers(var.amplicons, amplicon_numbers);
 
     //iterate all alleles and add them in
-    for(uint32_t j=0; j < alleles.size(); j++){
-      if(alleles[j].depth == 0){
+    for(uint32_t j=0; j < var.alleles.size(); j++){
+      if(var.alleles[j].depth == 0){
         continue;
       }
-      double freq = (double)alleles[j].depth / ((double)var.depth);
-      double gapped_freq = (double)alleles[j].depth / (double)var.gapped_depth;
+      double freq = (double)var.alleles[j].depth / ((double)var.depth);
+      double gapped_freq = (double)var.alleles[j].depth / (double)var.gapped_depth;
       file << ref_name <<"\t"; //region
       file << std::to_string(var.pos) << "\t";
-      file << "NA"  << "\t"; //ref
-      file << alleles[j].nuc << "\t";
+      file << blank; //ref
+      file << var.alleles[j].nuc << "\t";
       file << std::to_string(ref_depth) << "\t"; //ref dp
       file << ref << "\t"; //ref rv
       file << std::to_string(ref_qual) << "\t"; //ref qual
-      file << std::to_string(alleles[j].depth) << "\t"; //alt dp
-      file << "NA\t"; //alt rv
-      file << std::to_string((double)alleles[j].mean_qual / (double)alleles[j].depth) << "\t"; //alt qual
+      file << std::to_string(var.alleles[j].depth) << "\t"; //alt dp
+      file << blank; //alt rv
+      file << std::to_string((double)var.alleles[j].mean_qual / (double)var.alleles[j].depth) << "\t"; //alt qual
       file << std::to_string(freq) << "\t"; //alt freq
       file << std::to_string(var.depth) << "\t"; //total dp ungapped
-      file << "NA\t"; //pval
-      file << "NA\t"; //pass
-      file << "NA\t"; //gff feature
-      file << "NA\t"; //ref codon
-      file << "NA\t"; //ref aa
-      file << "NA\t"; //alt codon
-      file << "NA\t"; //alt aa
-      file << "NA\t"; //pos aa
+      file << blank; //pval
+      file << blank; //pass
+      file << blank; //gff feature
+      file << blank; //ref codon
+      file << blank; //ref aa
+      file << blank; //alt codon
+      file << blank; //alt aa
+      file << blank; //pos aa
       file << std::to_string(gapped_freq) << "\t"; //gapped freq
       file << std::to_string(var.gapped_depth) << "\t"; //gapped depth
       //handle variant level fluctuation
@@ -524,13 +488,13 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       if(var.amp_flux) file << "TRUE\t";
       else file << "FALSE\t";
       //standard deviation across amplicons
-      file << std::to_string(alleles[j].stddev) << "\t";
+      file << std::to_string(var.alleles[j].stddev) << "\t";
       //the amplicon-specific frequencies of the allele
-      std::vector<double> freqs = allele_frequencies[alleles[j].nuc];
+      std::vector<double> freqs = allele_frequencies[var.alleles[j].nuc];
       if(freqs.size() > 0){
         file << join_double_vector(freqs) << "\t";
       } else {
-        file << "NA\t";
+        file << blank;
       }
 
       //write out amplicons it's assigned to

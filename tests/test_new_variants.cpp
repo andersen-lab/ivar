@@ -136,6 +136,9 @@ int main() {
   if(no_amp_info && new_variants_3.size()) success++;
   else std::cerr << "amp info test failed" << std::endl;
 
+  //TEST 4 - Unit test for merge_reads function
+
+
   std::cerr << "success " << success << " num tests " << num_tests << std::endl;
   return (num_tests == success) ? 0 : -1;
 }

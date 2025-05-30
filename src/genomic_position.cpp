@@ -1,15 +1,14 @@
 #include "genomic_position.h"
 #include "interval_tree.h"
 #include "saga.h"
+#include <unordered_set>
 #include <string>
 #include <vector>
 
-std::vector<uint32_t> get_amplicon_numbers(std::vector<amplicon_info> amplicons){
-  std::vector<uint32_t> amp_numbers;
+void get_amplicon_numbers(std::vector<amplicon_info> amplicons, std::vector<uint32_t> &amp_numbers){
   for(auto amp : amplicons){
     amp_numbers.push_back((uint32_t)amp.node->data->low);
   }
-  return(amp_numbers);
 }
 
 void set_amplicon_flag(std::vector<ITNode*> flagged_amplicons, std::vector<genomic_position> &global_positions){
@@ -34,10 +33,10 @@ void genomic_position::update_alleles(std::string nt, uint32_t qual){
     tmp.depth = 1;
     tmp.nuc = nt;
     alleles.push_back(tmp);
-  } else {
-    alleles[exists].mean_qual += qual;
-    alleles[exists].depth += 1;
+    return;
   }
+  alleles[exists].mean_qual += qual;
+  alleles[exists].depth += 1;
 }
 
 void amplicon_info::update_alleles(std::string allele_val, uint32_t qual){
@@ -134,51 +133,50 @@ void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vecto
   }
 }
 
-std::unordered_map<std::string, std::vector<uint32_t>> collect_allele_depths(std::vector<amplicon_info> amplicons) {
-  std::unordered_map<std::string, std::vector<uint32_t>> depth_map;
-  for (auto amp : amplicons) {
-    for (auto al : amp.amp_alleles) {
-      if(al.depth == 0) continue;
-      depth_map[al.nuc].push_back(al.depth);
-    }
-  }
-  return depth_map;
-}
-
-std::unordered_map<std::string, std::vector<double>> collect_allele_frequencies(std::vector<amplicon_info> amplicons) {
-  std::unordered_map<std::string, std::vector<double>> freq_map;
+void collect_allele_frequencies(std::vector<amplicon_info> amplicons, std::unordered_map<std::string, std::vector<double>> &allele_frequencies) {
   for (auto amp : amplicons) {
     for (auto al : amp.amp_alleles) {
       if(al.depth == 0) continue;
       double freq = (double)al.depth / (double)amp.amp_depth;
-      freq_map[al.nuc].push_back(freq);
+      allele_frequencies[al.nuc].push_back(freq);
     }
   }
-  return freq_map;
 }
 
-std::vector<ITNode*>  calculate_amplicon_variation(std::vector<genomic_position> &global_positions){
+void collect_allele_stats(const std::vector<amplicon_info> &amplicons, std::unordered_map<std::string, std::vector<double>> &allele_frequencies, std::unordered_map<std::string, std::vector<uint32_t>> &depth_map, uint32_t min_depth, uint8_t min_qual){
+  for (const auto &amp : amplicons) {
+    for (const auto &al : amp.amp_alleles) {
+      if (al.depth < min_depth || al.mean_qual < min_qual) continue;
+      allele_frequencies[al.nuc].push_back(static_cast<double>(al.depth) / amp.amp_depth);
+      depth_map[al.nuc].push_back(al.depth);
+    }
+  }
+}
+std::vector<ITNode*>  calculate_amplicon_variation(std::vector<genomic_position> &global_positions, uint32_t min_depth, uint8_t min_qual){
   std::vector<ITNode*> flagged_amplicons;
-
+  std::unordered_map<std::string, std::vector<double>> allele_frequencies;
+  std::unordered_map<std::string, std::vector<uint32_t>> allele_depths;
+  std::unordered_set<ITNode*> seen_amplicons;
   for(uint32_t i=0; i < global_positions.size(); i++){
     if(global_positions[i].amplicons.size() > 0){
-      std::vector<amplicon_info> tmp = global_positions[i].amplicons;
-      std::unordered_map<std::string, std::vector<double>> allele_frequencies = collect_allele_frequencies(tmp);
-      std::unordered_map<std::string, std::vector<uint32_t>> allele_depths = collect_allele_depths(tmp);
+      allele_frequencies.clear();
+      allele_depths.clear();
+      collect_allele_stats(global_positions[i].amplicons, allele_frequencies, allele_depths, min_depth, min_qual);
       for (const auto &[key, values] : allele_frequencies) {
         double std = calculate_standard_deviation_weighted(values, allele_depths[key]);
         if(std > 0.03){
           global_positions[i].flux = true;
           //add the standard dev to the allele value
-          for(auto a : global_positions[i].alleles){
+          for(auto &a : global_positions[i].alleles){
             if(a.nuc == key) a.stddev= std;
           }
 
           //add all amps to the flagged amps vec
           for(auto amp : global_positions[i].amplicons){
             ITNode* tmp = amp.node;
-            bool exists = std::find(flagged_amplicons.begin(), flagged_amplicons.end(), tmp) != flagged_amplicons.end();
-            if(!exists) flagged_amplicons.push_back(tmp);
+            if (seen_amplicons.insert(tmp).second) {
+              flagged_amplicons.push_back(tmp);
+            }
           }
         }
       }
@@ -187,24 +185,23 @@ std::vector<ITNode*>  calculate_amplicon_variation(std::vector<genomic_position>
   return(flagged_amplicons);
 }
 
-void add_allele_vectors(std::vector<allele> &alleles, std::vector<allele> amp_alleles){
-  for(uint32_t i=0; i < amp_alleles.size(); i++){
-    bool found = false;
-    for(uint32_t j=0; j < alleles.size(); j++){
-      if(amp_alleles[i].nuc == alleles[j].nuc){
-        found = true;
-        alleles[j].depth += amp_alleles[i].depth;
-        alleles[j].mean_qual += amp_alleles[i].mean_qual;
-        break;
-      }
-    }
-    //this allele hasn't been seen in the global yet
-    if(!found){
-      allele tmp;
-      tmp.nuc = amp_alleles[i].nuc;
-      tmp.depth = amp_alleles[i].depth;
-      tmp.mean_qual = amp_alleles[i].mean_qual;
-      alleles.push_back(tmp);
+void add_allele_vectors(std::vector<allele> &alleles, const std::vector<allele> &amp_alleles){
+  //build a hash map for fast lookup of existing alleles by nucleotide
+  std::unordered_map<std::string, allele*> allele_map;
+  for (auto &al : alleles) {
+    allele_map[al.nuc] = &al;
+  }
+ //merge amplicon alleles into the map (and original vector)
+  for (const auto &amp_al : amp_alleles) {
+    auto it = allele_map.find(amp_al.nuc);
+    if (it != allele_map.end()) {
+      //update existing allele
+      it->second->depth += amp_al.depth;
+      it->second->mean_qual += amp_al.mean_qual;
+    } else {
+      //insert new allele and update map
+      alleles.push_back(amp_al);
+      allele_map[amp_al.nuc] = &alleles.back();
     }
   }
 }
