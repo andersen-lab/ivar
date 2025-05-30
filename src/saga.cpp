@@ -54,14 +54,17 @@ std::vector<allele> find_deletions_next(genomic_position position){
   return(deletions);
 }
 
-void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, uint32_t total_ref_pos, uint8_t min_qual, ref_antd &refantd, std::string ref_name){
+void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, uint32_t total_ref_pos, uint8_t min_qual, ref_antd &refantd, std::string ref_name, uint32_t read_len){
+  positions.reserve(read_len);
+  bases.reserve(read_len);
+  qualities.reserve(read_len);
+
   uint32_t total_query_pos=0;
   const uint8_t* seq_field1 = bam_get_seq(read1);
   uint32_t *cigar1 = bam_get_cigar(read1);
   uint8_t* qual = bam_get_qual(read1);
   total_ref_pos += 1;
-  uint32_t mqual = (uint32_t) min_qual;
-
+  uint32_t mqual = (uint32_t)min_qual;
   static const char seq_nt_lookup[16] = {
     '=', 'A', 'C', 'M', 'G', 'R', 'S', 'V',
     'T', 'W', 'Y', 'H', 'K', 'D', 'B', 'N'
@@ -71,48 +74,45 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
   for (uint32_t i = 0; i < read1->core.n_cigar; i++){
     uint32_t op = bam_cigar_op(cigar1[i]);
     uint32_t len = bam_cigar_oplen(cigar1[i]);
-    uint32_t counter = 0;
     if(op == 0){
-      for(uint32_t j=total_query_pos; j < total_query_pos+len; j++){
-        uint32_t tqual = qual[j];
-        if(tqual < mqual){
-          counter++;
-          continue;
-        }
-        //char nuc = seq_nt16_str[bam_seqi(seq_field1, j)];
-        uint8_t base_code = bam_seqi(seq_field1, j);
+      for(uint32_t j=0; j < len; j++){
+        uint32_t qpos = total_query_pos + j;
+        uint32_t rpos = total_ref_pos + j;
+        uint32_t tqual = static_cast<uint32_t>(qual[qpos]);
+        if(tqual < mqual) continue;
+        uint8_t base_code = bam_seqi(seq_field1, qpos);
         char nuc = seq_nt_lookup[base_code];
-
-        std::string tmp = std::string(1, nuc);
-        positions.push_back(total_ref_pos+counter);
-        bases.push_back(tmp);
-        qualities.push_back(qual[j]);
-        counter++;
+        positions.push_back(rpos);
+        bases.emplace_back(1, nuc);
+        qualities.push_back(tqual);
       }
     } else if(op == 2){
       std::string tmp = "-";
-      positions.push_back(total_ref_pos+counter);
       for(uint32_t j=0; j < len; j++){
-        tmp += refantd.get_base(total_ref_pos+counter, ref_name);
-        counter++;
+        tmp += refantd.get_base(total_ref_pos+j, ref_name);
       }
+      positions.push_back(total_ref_pos);
       bases.push_back(tmp);
-      qualities.push_back(min_qual);
+      qualities.push_back(mqual);
     } else if(op == 1){
       std::string tmp = "+";
-      double qual_avg = 0;
+      double qual_sum = 0;
       //collect all nucs in insertions
-      for(uint32_t j=total_query_pos; j < total_query_pos+len; j++){
-        //char nuc = seq_nt16_str[bam_seqi(seq_field1, j)];
-        uint8_t base_code = bam_seqi(seq_field1, j);
+      for(uint32_t j=0; j < len; j++){
+        uint32_t qpos = total_query_pos + j;
+        uint8_t base_code = bam_seqi(seq_field1, qpos);
         char nuc = seq_nt_lookup[base_code];
-        tmp +=  std::string(1, nuc);
-        qual_avg += qual[j];
+        tmp += nuc;
+        qual_sum += qual[qpos];
       }
-      if(((uint32_t)qual_avg/(tmp.size()-1)) < min_qual) continue;
-      positions.push_back(total_ref_pos+counter-1);
+      uint32_t avg_qual = static_cast<uint8_t>(qual_sum / len);
+      if(avg_qual < mqual) {
+        total_query_pos += len;
+        continue;
+      }
+      positions.push_back(total_ref_pos-1);
       bases.push_back(tmp);
-      qualities.push_back((uint32_t)qual_avg/(tmp.size()-1));
+      qualities.push_back(avg_qual);
     }
 
     //consumes ref
@@ -126,76 +126,66 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
 }
 
 void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplicons, uint8_t min_qual, ref_antd &refantd, std::string ref_name, std::vector<genomic_position> &global_positions){
-  //pass the forward first then reverse
-  //also assumes that the forward read starts more "left" than  the reverse
-  uint32_t start_reverse = read2->core.pos;
-  uint32_t start_forward = read1->core.pos;
-  uint32_t end_reverse = bam_endpos(read2);
+  const uint32_t start_forward = read1->core.pos;
+  const uint32_t start_reverse = read2->core.pos;
+  const uint32_t end_reverse = bam_endpos(read2);
+  const uint32_t read_len = end_reverse - start_forward;
+
   //record the positions and their bases
   std::vector<uint32_t> positions1, positions2;
   std::vector<std::string> bases1, bases2;
   std::vector<uint32_t> qualities1, qualities2;
 
-  parse_cigar(read1, positions1, bases1, qualities1, start_forward, min_qual, refantd, ref_name);
-  parse_cigar(read2, positions2, bases2, qualities2, start_reverse, min_qual, refantd, ref_name);
+  parse_cigar(read1, positions1, bases1, qualities1, start_forward, min_qual, refantd, ref_name, read_len);
+  parse_cigar(read2, positions2, bases2, qualities2, start_reverse, min_qual, refantd, ref_name, read_len);
 
-  // Index positions to avoid repeated scanning
-  std::unordered_map<uint32_t, std::vector<uint32_t>> pos1_indices, pos2_indices;
-  for (uint32_t i = 0; i < positions1.size(); ++i)
-    pos1_indices[positions1[i]].push_back(i);
-  for (uint32_t i = 0; i < positions2.size(); ++i)
-    pos2_indices[positions2[i]].push_back(i);
-
-  //find all unique positions we need to cover
-  std::unordered_set<uint32_t> unique_elements(positions1.begin(), positions1.end());
-  unique_elements.insert(positions2.begin(), positions2.end());
+  //reserve estimated size
+  size_t estimate_size = positions1.size() + positions2.size();
   std::vector<uint32_t> final_positions;
-  std::vector<uint32_t> final_qualities;
   std::vector<std::string> final_bases;
+  std::vector<uint32_t> final_qualities;
+  final_positions.reserve(estimate_size);
+  final_bases.reserve(estimate_size);
+  final_qualities.reserve(estimate_size);
 
-  //for every position make sure the bases and qualities match
-  //make sure insertions match
-  for(auto pos : unique_elements){
-    auto it1 = pos1_indices.find(pos);
-    auto it2 = pos2_indices.find(pos);
+  size_t i = 0, j = 0;
+  while (i < positions1.size() && j < positions2.size()) {
+    uint32_t p1 = positions1[i];
+    uint32_t p2 = positions2[j];
 
-    bool in1 = (it1 != pos1_indices.end());
-    bool in2 = (it2 != pos2_indices.end());
-
-    if (in1 && !in2) {
-      for (uint32_t idx : it1->second) {
-        final_positions.push_back(positions1[idx]);
-        final_qualities.push_back(qualities1[idx]);
-        final_bases.push_back(bases1[idx]);
-      }
-    } else if (!in1 && in2) {
-      for (uint32_t idx : it2->second) {
-        final_positions.push_back(positions2[idx]);
-        final_qualities.push_back(qualities2[idx]);
-        final_bases.push_back(bases2[idx]);
-      }
-    } else if (in1 && in2) {
-      const auto& idxs1 = it1->second;
-      const auto& idxs2 = it2->second;
-
-      if (idxs1.size() != idxs2.size()) continue; // Skip if mismatch in count
-
-      bool match = true;
-      for (size_t j = 0; j < idxs1.size(); ++j) {
-        if (bases1[idxs1[j]] != bases2[idxs2[j]]) {
-          match = false;
-          break;
+    if (p1 < p2) {
+        final_positions.push_back(p1);
+        final_bases.push_back(bases1[i]);
+        final_qualities.push_back(qualities1[i]);
+        ++i;
+    } else if (p2 < p1) {
+        final_positions.push_back(p2);
+        final_bases.push_back(bases2[j]);
+        final_qualities.push_back(qualities2[j]);
+        ++j;
+    } else {
+        // p1 == p2: compare bases
+        if (bases1[i] == bases2[j]) {
+            final_positions.push_back(p1);
+            final_bases.push_back(bases1[i]);
+            final_qualities.push_back(qualities1[i]); // or avg of two?
         }
-      }
-
-      if (match) {
-        for (size_t j = 0; j < idxs1.size(); ++j) {
-          final_positions.push_back(positions1[idxs1[j]]);
-          final_qualities.push_back(qualities1[idxs1[j]]);
-          final_bases.push_back(bases1[idxs1[j]]);
-        }
-      }
+        ++i;
+        ++j;
     }
+  }
+
+  while (i < positions1.size()) {
+      final_positions.push_back(positions1[i]);
+      final_bases.push_back(bases1[i]);
+      final_qualities.push_back(qualities1[i]);
+      ++i;
+  }
+  while (j < positions2.size()) {
+      final_positions.push_back(positions2[j]);
+      final_bases.push_back(bases2[j]);
+      final_qualities.push_back(qualities2[j]);
+      ++j;
   }
 
   //find assigned amplicon and populate position vector
@@ -353,7 +343,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       std::vector<uint32_t> qualities;
       uint32_t start_read = aln->core.pos;
       uint32_t end_read = bam_endpos(aln);
-      parse_cigar(aln, positions, bases, qualities, start_read, min_qual, refantd, ref_name);
+      uint32_t read_len = end_read-start_read;
+      parse_cigar(aln, positions, bases, qualities, start_read, min_qual, refantd, ref_name, read_len);
       uint32_t amp_dist = 429496729;
       ITNode *node=NULL;
       amplicons.find_read_amplicon(start_read, end_read, node, amp_dist);
@@ -389,7 +380,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       std::vector<uint32_t> qualities;
       uint32_t start_read = it->second->core.pos;
       uint32_t end_read = bam_endpos(it->second);
-      parse_cigar(it->second, positions, bases, qualities, start_read, min_qual, refantd, ref_name);
+
+      uint32_t read_len = end_read-start_read;
+      parse_cigar(it->second, positions, bases, qualities, start_read, min_qual, refantd, ref_name, read_len);
       uint32_t amp_dist = 429496729;
       ITNode *node=NULL;
       amplicons.find_read_amplicon(start_read, end_read, node, amp_dist);

@@ -73,7 +73,7 @@ int main() {
     uint32_t position = new_variants[i].position;
     std::string nuc = new_variants[i].nuc;
     double total_depth = (double)new_variants[i].total_depth;
-    if(position ==58){
+    if(position == 58){
       if(total_depth != 7){
         expected = false;
         std::cerr << "total depth is incorrect " << position << " " << new_variants[i].nuc << " " << new_variants[i].total_depth <<  " gapped depth " <<  new_variants[i].gapped_depth << std::endl;
