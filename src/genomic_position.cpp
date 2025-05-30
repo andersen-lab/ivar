@@ -59,29 +59,43 @@ void amplicon_info::update_alleles(std::string allele_val, uint32_t qual){
   }
 }
 
-void add_variants(std::vector<uint32_t> final_positions, std::vector<std::string> final_bases, std::vector<uint32_t> final_qualities, std::vector<genomic_position> &global_positions) {
+void add_variants(std::vector<uint32_t> &final_positions, std::vector<std::string> &final_bases, std::vector<uint32_t> &final_qualities, std::vector<genomic_position> &global_positions) {
+  if (final_positions.empty()) return;
+  // Compute the max position we need to handle
+  uint32_t max_pos = *std::max_element(final_positions.begin(), final_positions.end());
 
-  for(uint32_t i=0; i < final_positions.size(); i++){
-    bool is_del = final_bases[i].find('-') != std::string::npos;
-    bool is_ins = final_bases[i].find('+') != std::string::npos;
-
-    uint32_t size = global_positions.size();
-    while(size < final_positions[i]+1){
+  if (global_positions.size() <= max_pos) {
+    global_positions.reserve(max_pos + 1); // reserve prevents reallocations
+    while (global_positions.size() <= max_pos) {
       genomic_position tmp;
       tmp.gapped_depth = 0;
       tmp.depth = 0;
       tmp.pos = global_positions.size();
       global_positions.push_back(tmp);
-      size = global_positions.size();
     }
-    uint32_t pos = final_positions[i];
-    if(global_positions.size() >= pos){
-      global_positions[final_positions[i]].update_alleles(final_bases[i], final_qualities[i]);
-      if(is_del && !is_ins) global_positions[final_positions[i]].gapped_depth += 1;
-      if(!is_del && !is_ins){
-        global_positions[final_positions[i]].depth += 1;
-        global_positions[final_positions[i]].gapped_depth += 1;
-      }
+  }
+
+  for (size_t i = 0; i < final_positions.size(); ++i) {
+    const uint32_t pos = final_positions[i];
+    const std::string &base = final_bases[i];
+    const uint32_t qual = final_qualities[i];
+
+    bool is_del = false;
+    bool is_ins = false;
+
+    for (char c : base) {
+      if (c == '-') is_del = true;
+      else if (c == '+') is_ins = true;
+    }
+
+    auto &gpos = global_positions[pos];
+    gpos.update_alleles(base, qual);
+
+    if (is_del && !is_ins) {
+      gpos.gapped_depth += 1;
+    } else if (!is_del && !is_ins) {
+      gpos.depth += 1;
+      gpos.gapped_depth += 1;
     }
   }
 }

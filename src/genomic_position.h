@@ -33,7 +33,7 @@ void combine_haplotypes(std::vector<genomic_position> &global_positions);
 void populate_positions(std::vector<genomic_position> &positions, uint32_t max_position);
 int check_position_exists(uint32_t p, std::vector<genomic_position> positions);
 void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vector<std::string> final_bases, std::vector<uint32_t> final_qualities, std::vector<genomic_position> &global_positions);
-void add_variants(std::vector<uint32_t> final_positions, std::vector<std::string> final_bases, std::vector<uint32_t> final_qualities, std::vector<genomic_position> &global_positions);
+void add_variants(std::vector<uint32_t> &final_positions, std::vector<std::string> &final_bases, std::vector<uint32_t> &final_qualities, std::vector<genomic_position> &global_positions);
 std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> &global_positions, uint32_t min_depth, uint8_t min_qual);
 void set_amplicon_flag(std::vector<ITNode*> flagged_amplicons, std::vector<genomic_position> &global_positions);
 void collect_allele_frequencies(std::vector<amplicon_info> amplicons, std::unordered_map<std::string, std::vector<double>> &allele_frequencies);
