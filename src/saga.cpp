@@ -55,9 +55,6 @@ std::vector<allele> find_deletions_next(genomic_position position){
 }
 
 void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, uint32_t total_ref_pos, uint8_t min_qual, ref_antd &refantd, std::string ref_name, uint32_t read_len){
-  positions.reserve(read_len);
-  bases.reserve(read_len);
-  qualities.reserve(read_len);
 
   uint32_t total_query_pos=0;
   const uint8_t* seq_field1 = bam_get_seq(read1);
@@ -144,9 +141,9 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
   std::vector<uint32_t> final_positions;
   std::vector<std::string> final_bases;
   std::vector<uint32_t> final_qualities;
-  final_positions.reserve(estimate_size);
-  final_bases.reserve(estimate_size);
-  final_qualities.reserve(estimate_size);
+  //final_positions.reserve(estimate_size);
+  //final_bases.reserve(estimate_size);
+  //final_qualities.reserve(estimate_size);
 
   size_t i = 0, j = 0;
   while (i < positions1.size() && j < positions2.size()) {
@@ -335,7 +332,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   while (sam_read1(in, header, aln) >= 0) {
     //get the name of the read
     std::string read_name = bam_get_qname(aln);
-
     if (!(aln->core.flag & BAM_FPAIRED) || !(aln->core.flag & BAM_FPROPER_PAIR)){
       //if the read is unpaired try to assign it to an amplicon anyways
       std::vector<uint32_t> positions;
@@ -392,10 +388,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
         assign_read(node, positions, bases, qualities, global_positions);
       }
   }
-
   //combine amplicon counts to get total variants
-  uint32_t counter = 1;
   combine_haplotypes(global_positions);
+
   //TODO build in quality filters, and min depth filter
   std::vector<ITNode*> flagged_amplicons = calculate_amplicon_variation(global_positions, min_depth, min_qual);
   set_amplicon_flag(flagged_amplicons, global_positions);
@@ -410,7 +405,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   file << "REGION\tPOS\tREF\tALT\tREF_DP\tREF_RV\tREF_QUAL\tALT_DP\tALT_RV\tALT_QUAL\tALT_FREQ\tTOTAL_DP\tPVAL\tPASS\tGFF_FEATURE\tREF_CODON\tREF_AA\tALT_CODON\tALT_AA\tPOS_AA\tGAPPED_FREQ\tGAPPED_DEPTH\tFLAGGED_POS\tAMP_MASKED\tSTD_DEV\tAMP_FREQ\tAMP_NUMBERS\n";
   for(auto var : global_positions){
     if(var.depth == 0) continue;
-
     char ref = refantd.get_base(var.pos, ref_name);
     //calculate the reference depth
     uint32_t ref_depth=0, ref_qual=0, ref_qual_avg=0;
@@ -450,11 +444,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       double freq = (double)var.alleles[j].depth / ((double)var.depth);
       double gapped_freq = (double)var.alleles[j].depth / (double)var.gapped_depth;
       file << ref_name <<"\t"; //region
-      file << std::to_string(var.pos) << "\t";
-      file << blank; //ref
+      file << std::to_string(var.pos) << "\t"; //position
+      file << ref << "\t"; //ref
       file << var.alleles[j].nuc << "\t";
       file << std::to_string(ref_depth) << "\t"; //ref dp
-      file << ref << "\t"; //ref rv
+      file << blank; //ref rv
       file << std::to_string(ref_qual) << "\t"; //ref qual
       file << std::to_string(var.alleles[j].depth) << "\t"; //alt dp
       file << blank; //alt rv

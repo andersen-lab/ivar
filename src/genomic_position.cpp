@@ -32,6 +32,7 @@ void genomic_position::update_alleles(std::string nt, uint32_t qual){
     tmp.mean_qual = qual;
     tmp.depth = 1;
     tmp.nuc = nt;
+    tmp.stddev = 0;
     alleles.push_back(tmp);
     return;
   }
@@ -55,6 +56,7 @@ void amplicon_info::update_alleles(std::string allele_val, uint32_t qual){
     tmp.nuc = allele_val;
     tmp.mean_qual = qual;
     tmp.depth = 1;
+    tmp.stddev = 0;
     amp_alleles.push_back(tmp);
   }
 }
@@ -71,6 +73,7 @@ void add_variants(std::vector<uint32_t> &final_positions, std::vector<std::strin
       tmp.gapped_depth = 0;
       tmp.depth = 0;
       tmp.pos = global_positions.size();
+      if(tmp.pos == 241) std::cerr << "NEW " << std::endl;
       global_positions.push_back(tmp);
     }
   }
@@ -88,9 +91,8 @@ void add_variants(std::vector<uint32_t> &final_positions, std::vector<std::strin
       else if (c == '+') is_ins = true;
     }
 
-    auto &gpos = global_positions[pos];
+    genomic_position &gpos = global_positions[pos];
     gpos.update_alleles(base, qual);
-
     if (is_del && !is_ins) {
       gpos.gapped_depth += 1;
     } else if (!is_del && !is_ins) {
@@ -107,7 +109,6 @@ void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vecto
     bool found = false;
     bool is_del = final_bases[i].find('-') != std::string::npos;
     bool is_ins = final_bases[i].find('+') != std::string::npos;
-
     for(uint32_t j=0; j < global_positions[pos].amplicons.size(); j++){
       amplicon_info &amp = global_positions[pos].amplicons[j];
       found = node_compare(node, amp.node);
@@ -117,8 +118,7 @@ void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vecto
           amp.amp_depth += 1;
           global_positions[pos].gapped_depth += 1;
           global_positions[pos].depth += 1;
-        }
-        if(!is_ins && is_del){
+        } else if(!is_ins && is_del){
           amp.amp_depth_gapped += 1;
           global_positions[pos].gapped_depth += 1;
         }
@@ -135,8 +135,7 @@ void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vecto
         amp.amp_depth += 1;
         global_positions[pos].gapped_depth += 1;
         global_positions[pos].depth += 1;
-      }
-      if(!is_ins && is_del){
+      } else if(!is_ins && is_del){
         amp.amp_depth_gapped += 1;
         global_positions[pos].gapped_depth += 1;
       }
@@ -200,22 +199,21 @@ std::vector<ITNode*>  calculate_amplicon_variation(std::vector<genomic_position>
 }
 
 void add_allele_vectors(std::vector<allele> &alleles, const std::vector<allele> &amp_alleles){
-  //build a hash map for fast lookup of existing alleles by nucleotide
-  std::unordered_map<std::string, allele*> allele_map;
-  for (auto &al : alleles) {
-    allele_map[al.nuc] = &al;
-  }
- //merge amplicon alleles into the map (and original vector)
   for (const auto &amp_al : amp_alleles) {
-    auto it = allele_map.find(amp_al.nuc);
-    if (it != allele_map.end()) {
-      //update existing allele
-      it->second->depth += amp_al.depth;
-      it->second->mean_qual += amp_al.mean_qual;
-    } else {
-      //insert new allele and update map
-      alleles.push_back(amp_al);
-      allele_map[amp_al.nuc] = &alleles.back();
+    bool found = false;
+    for(auto &al : alleles){
+      if(al.nuc == amp_al.nuc){
+        found = true;
+        al.depth += amp_al.depth;
+        al.mean_qual += amp_al.mean_qual;
+      }
+    }
+    if(!found){
+      allele tmp;
+      tmp.nuc = amp_al.nuc;
+      tmp.depth = amp_al.depth;
+      tmp.mean_qual = amp_al.mean_qual;
+      alleles.push_back(tmp);
     }
   }
 }
