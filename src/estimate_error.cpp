@@ -13,25 +13,14 @@ std::vector<double> z_score(std::vector<double> data) {
     return z_scores;
 }
 
-std::vector<std::vector<uint32_t>> determine_outlier_points(std::vector<double> data, std::vector<double> means){
-    std::vector<std::vector<double>> clusters(means.size());
-    //assign points to clusters
-    for(auto tmp : data){
-      auto it = std::min_element(means.begin(), means.end(), 
-          [tmp](double a, double b) {
-              return std::fabs(a - tmp) < std::fabs(b - tmp);
-          });
-      uint32_t index = std::distance(means.begin(), it);
-      clusters[index].push_back(tmp);
-    }
-
-    std::vector<std::vector<uint32_t>> removal_points(means.size());
+std::vector<std::vector<uint32_t>> determine_outlier_points(std::vector<double> data, std::vector<std::vector<double>> clusters){
+    std::vector<std::vector<uint32_t>> removal_points(clusters.size());
     //calculate cluster specific percentiles
     for(uint32_t j=0; j < clusters.size(); j++){
       std::vector<double> z_scores = z_score(clusters[j]);
       for(uint32_t i=0; i < z_scores.size(); i++){
         double abs = std::abs(z_scores[i]);
-        if(abs >= 10){
+        if(abs >= 5){
           removal_points[j].push_back(i);
         }
       }
@@ -49,13 +38,13 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
   std::vector<double> frequencies;
    for(uint32_t i=0; i < base_variants.size(); i++){
     if(base_variants[i].position > max_pos) max_pos = base_variants[i].position;
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked){          
+    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked){
       useful_count_original++;
       variants_original.push_back(base_variants[i]);
       frequencies.push_back(base_variants[i].freq);
     }
   }
-    
+
   if(variants_original.empty()) return(1);
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
   uint32_t count_original=0;
@@ -76,21 +65,24 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
     bool stop=false;
     for(uint32_t i=0; i < model.clusters.size(); i++){
       double stdev = calculate_standard_deviation(model.clusters[i]);
-      //double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
+      double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
       if(stdev < 0.01 && i == index) {
         stop = true;
         chosen_peak = i;
       }
-      //std::cerr << "n " << n << " mean " << mean << " stdev " << stdev << std::endl;
+      std::cerr << "n " << n << " mean " << mean << " stdev " << stdev << std::endl;
     }
     if(stop) break;
     else n++;
   }
   //for each cluster this describes the points which are outliers
-  std::vector<std::vector<uint32_t>> removal_points = determine_outlier_points(frequencies, model.means);
+  std::vector<std::vector<uint32_t>> removal_points = determine_outlier_points(frequencies, model.clusters);
   std::vector<double> universal_cluster = model.clusters[chosen_peak];
   std::vector<uint32_t> outliers = removal_points[chosen_peak];
   std::vector<double> cleaned_cluster;
+  for(auto o : outliers){
+    std::cerr << "outlier " << o << " " << universal_cluster[o] << " chosen peak " << chosen_peak << std::endl;
+  }
   for(uint32_t i=0; i < universal_cluster.size(); i++){
     auto it = std::find(outliers.begin(), outliers.end(), i);
     if(it == outliers.end()){
@@ -98,9 +90,9 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
     }
   }
 
-  
+
   //get the upper edge of the noise cluster
   auto min_it = std::min_element(cleaned_cluster.begin(), cleaned_cluster.end());
-  
+
   return(*min_it);
 }
