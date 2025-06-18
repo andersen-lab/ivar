@@ -73,7 +73,6 @@ void add_variants(std::vector<uint32_t> &final_positions, std::vector<std::strin
       tmp.gapped_depth = 0;
       tmp.depth = 0;
       tmp.pos = global_positions.size();
-      if(tmp.pos == 241) std::cerr << "NEW " << std::endl;
       global_positions.push_back(tmp);
     }
   }
@@ -94,7 +93,10 @@ void add_variants(std::vector<uint32_t> &final_positions, std::vector<std::strin
     genomic_position &gpos = global_positions[pos];
     gpos.update_alleles(base, qual);
     if (is_del && !is_ins) {
-      gpos.gapped_depth += 1;
+      //update the gapped depth for all deletion positions
+      for(uint32_t k=0; k <final_bases[i].size(); k++){
+        global_positions[pos+k].gapped_depth += 1;
+      }
     } else if (!is_del && !is_ins) {
       gpos.depth += 1;
       gpos.gapped_depth += 1;
@@ -120,7 +122,9 @@ void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vecto
           global_positions[pos].depth += 1;
         } else if(!is_ins && is_del){
           amp.amp_depth_gapped += 1;
-          global_positions[pos].gapped_depth += 1;
+          for(uint32_t k=0; k <final_bases[i].size(); k++){
+            global_positions[pos+k].gapped_depth += 1;
+          }
         }
         break;
       }
@@ -137,7 +141,9 @@ void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vecto
         global_positions[pos].depth += 1;
       } else if(!is_ins && is_del){
         amp.amp_depth_gapped += 1;
-        global_positions[pos].gapped_depth += 1;
+        for(uint32_t k=0; k <final_bases[i].size(); k++){
+          global_positions[pos+k].gapped_depth += 1;
+        }
       }
       amp.amp_alleles = populate_basic_alleles();
       amp.update_alleles(final_bases[i], final_qualities[i]);
