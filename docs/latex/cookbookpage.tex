@@ -1,46 +1,53 @@
-Two pipelines to call i\+S\+N\+Vs from known and unknown reference sequences have been written in \href{https://snakemake.readthedocs.io/en/stable/}{\tt snakemake}.
+\chapter{Cookbook}
+\hypertarget{cookbookpage}{}\label{cookbookpage}\index{Cookbook@{Cookbook}}
+\label{cookbookpage_md_docs_2_c_o_o_k_b_o_o_k}%
+\Hypertarget{cookbookpage_md_docs_2_c_o_o_k_b_o_o_k}%
 
-The two pipelines are distributed along with i\+Var and are present in the\href{https://github.com/andersen-lab/ivar/tree/master/pipeline}{\tt pipeline/} and \href{https://github.com/andersen-lab/ivar/tree/master/pipeline_field}{\tt pipeline\+\_\+field/} fodlers respectively.
+
+Two pipelines to call i\+SNVs from known and unknown reference sequences have been written in \href{https://snakemake.readthedocs.io/en/stable/}{\texttt{ snakemake}}.
+
+The two pipelines are distributed along with i\+Var and are present in the\href{https://github.com/andersen-lab/ivar/tree/master/pipeline}{\texttt{ pipeline/}} and \href{https://github.com/andersen-lab/ivar/tree/master/pipeline_field}{\texttt{ pipeline\+\_\+field/}} fodlers respectively.
 
 For both pipelines, there are four parameters that will have to be set in beginning of the Snakefile.
 
 
-\begin{DoxyCode}
-in\_dir = "<input fastq files>"
-out\_dir = "<output directory>"
-bed = "<bed-file-with-primer-positions>"
-ref="<path to reference fasta>"
+\begin{DoxyCode}{0}
+\DoxyCodeLine{in\_dir\ =\ "{}<input\ fastq\ files>"{}}
+\DoxyCodeLine{out\_dir\ =\ "{}<output\ directory>"{}}
+\DoxyCodeLine{bed\ =\ "{}<bed-\/file-\/with-\/primer-\/positions>"{}}
+\DoxyCodeLine{ref="{}<path\ to\ reference\ fasta>"{}}
+
 \end{DoxyCode}
 
 
 
 
-\subsubsection*{Call i\+S\+N\+Vs from samples with known reference sequence}
+\doxysubsection*{Call i\+SNVs from samples with known reference sequence}
 
-\href{https://github.com/andersen-lab/paper_2018_primalseq-ivar/blob/master/cookbook/CookBook.ipynb}{\tt Link to Jupyter Notebook}
+\href{https://github.com/andersen-lab/paper_2018_primalseq-ivar/blob/master/cookbook/CookBook.ipynb}{\texttt{ Link to Jupyter Notebook}}
 
-\href{https://github.com/andersen-lab/ivar/tree/master/pipeline}{\tt Link to pipeline}
+\href{https://github.com/andersen-lab/ivar/tree/master/pipeline}{\texttt{ Link to pipeline}}
 
-\paragraph*{Dependencies\+:}
+\doxysubsubsection*{Dependencies\+:}
 
 
 \begin{DoxyItemize}
-\item \href{https://github.com/andersen-lab/ivar}{\tt i\+Var}
-\item \href{https://htslib.org/}{\tt samtools}
-\item \href{https://github.com/lh3/bwa}{\tt bwa}
-\item \href{https://bedtools.readthedocs.io/en/latest/}{\tt bedtools}
+\item \href{https://github.com/andersen-lab/ivar}{\texttt{ i\+Var}}
+\item \href{https://htslib.org/}{\texttt{ samtools}}
+\item \href{https://github.com/lh3/bwa}{\texttt{ bwa}}
+\item \href{https://bedtools.readthedocs.io/en/latest/}{\texttt{ bedtools}}
 \end{DoxyItemize}
 
-\subsubsection*{Call i\+S\+N\+Vs from samples with unknown reference sequence}
+\doxysubsection*{Call i\+SNVs from samples with unknown reference sequence}
 
-\href{https://github.com/andersen-lab/ivar/tree/master/pipeline_field/}{\tt Link to pipeline}
+\href{https://github.com/andersen-lab/ivar/tree/master/pipeline_field/}{\texttt{ Link to pipeline}}
 
-\paragraph*{Dependencies\+:}
+\doxysubsubsection*{Dependencies\+:}
 
 
 \begin{DoxyItemize}
-\item \href{https://github.com/andersen-lab/ivar}{\tt i\+Var}
-\item \href{https://htslib.org/}{\tt samtools}
-\item \href{https://github.com/lh3/bwa}{\tt bwa}
-\item \href{https://bedtools.readthedocs.io/en/latest/}{\tt bedtools} 
+\item \href{https://github.com/andersen-lab/ivar}{\texttt{ i\+Var}}
+\item \href{https://htslib.org/}{\texttt{ samtools}}
+\item \href{https://github.com/lh3/bwa}{\texttt{ bwa}}
+\item \href{https://bedtools.readthedocs.io/en/latest/}{\texttt{ bedtools}} 
 \end{DoxyItemize}

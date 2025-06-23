@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['cookbook',['Cookbook',['../cookbookpage.html',1,'']]]
+  ['cookbook_0',['Cookbook',['../cookbookpage.html',1,'']]]
 ];

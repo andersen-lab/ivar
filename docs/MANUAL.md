@@ -42,14 +42,14 @@ Command:
 ```
 ivar trim
 
-Usage: ivar trim -i <input.bam> -b <primers.bed> -p <prefix> [-m <min-length>] [-q <min-quality>] [-s <sliding-window-width>]
+Usage: ivar trim -i [<input.bam>] -b <primers.bed> [-p <prefix>] [-m <min-length>] [-q <min-quality>] [-s <sliding-window-width>]
 
 Input Options    Description
-           -i    (Required) Sorted bam file, with aligned reads, to trim primers and quality
+           -i    Sorted bam file, with aligned reads, to trim primers and quality. If not specified will read from standard in
            -b    (Required) BED file with primer sequences and positions
            -f    Primer pair information file containing left and right primer names for the same amplicon separated by a tab
                  If provided, reads will be filtered based on their overlap with amplicons prior to trimming
-           -m    Minimum length of read to retain after trimming (Default: 30)
+           -m    Minimum length of read to retain after trimming (Default: 50% the average length of the first 1000 reads)
            -q    Minimum quality threshold for sliding window to pass (Default: 20)
            -s    Width of sliding window (Default: 4)
            -e    Include reads with no primers. By default, reads with no primers are excluded
@@ -57,15 +57,23 @@ Input Options    Description
                  alignment length filter or primer requirements, but mark them QCFAIL
 
 Output Options   Description
-           -p    (Required) Prefix for the output BAM file
+           -p    Prefix for the output BAM file. If none is specified the output will write to standard out.
 ```
 
 Example Usage:
 ```
 ivar trim -b test_primers.bed -p test.trimmed -i test.bam -q 15 -m 50 -s 4
+samtools view -h test.bam | ivar trim -b test_primers.bed -p test.trimmed 
 ```
 
 The command above will produce a trimmed BAM file test.trimmed.bam after trimming the aligned reads in test.bam using the primer positions specified in test_primers.bed and a minimum quality threshold of **15**, minimum read length of **50** and a sliding window of **4**.
+
+Example Usage:
+```
+bwa mem -t 32 reference.fa 1.fq 2.fq | ivar trim -b test_primers.bed -x 3 -m 30 | samtools sort - | samtools mpileup -aa -A -Q 0 -d 0 - | ivar consensus -p test_consensus -m 10 -n N -t 0.5
+```
+
+The command above will allow you to go from alignment to consensus sequence in a single command using the bwa aligner.
 
 Example BED file
 
@@ -112,6 +120,7 @@ Input Options    Description
            -q    Minimum quality score threshold to count base (Default: 20)
            -t    Minimum frequency threshold(0 - 1) to call variants (Default: 0.03)
            -m    Minimum read depth to call variants (Default: 0)
+           -G    Count gaps towards depth. By default, gaps are not counted           
            -r    Reference file used for alignment. This is used to translate the nucleotide sequences and identify intra host single nucleotide variants
            -g    A GFF file in the GFF3 format can be supplied to specify coordinates of open reading frames (ORFs). In absence of GFF file, amino acid translation will not be done.
 
@@ -280,6 +289,7 @@ Note : samtools mpileup output must be piped into ivar consensus
 Input Options    Description
            -q    Minimum quality score threshold to count base (Default: 20)
            -t    Minimum frequency threshold(0 - 1) to call consensus. (Default: 0)
+           -c    Minimum insertion frequency threshold(0 - 1) to call consensus. (Default: 0.8)
                  Frequently used thresholds | Description
                  ---------------------------|------------
                                           0 | Majority or most common base

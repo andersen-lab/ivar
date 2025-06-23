@@ -1,8 +1,9 @@
 #include "../src/ref_seq.h"
 
-int check_failure(char n1, char n2, char n3, char *codon, int pos){
-  if(codon[0] != n1 || codon[1] != n2 || codon[2] != n3){
-    std::cout << "Pos: " << pos << " " << "Codon: " << n1 << n2 << n3 << " Res: " << codon << std::endl;
+int check_failure(char n1, char n2, char n3, char *codon, int pos) {
+  if (codon[0] != n1 || codon[1] != n2 || codon[2] != n3) {
+    std::cout << "Pos: " << pos << " "
+              << "Codon: " << n1 << n2 << n3 << " Res: " << codon << std::endl;
     return -1;
   }
   return 0;
@@ -36,7 +37,6 @@ int main() {
   codon = refantd.get_codon(140, "test", g.at(5));
   num_success = check_failure('C', 'T', 'A', codon, 140);
   std::cout << num_success;
-  if(num_success == 0)
-    return 0;
+  if (num_success == 0) return 0;
   return -1;
 }

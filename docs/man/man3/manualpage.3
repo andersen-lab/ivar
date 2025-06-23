@@ -1,14 +1,15 @@
-.TH "manualpage" 3 "Fri Jun 19 2020" "iVar" \" -*- nroff -*-
+.TH "manualpage" 3 "iVar" \" -*- nroff -*-
 .ad l
 .nh
 .SH NAME
 manualpage \- Manual 
+.PP
 
 .SH "Available Commands"
 .PP
-Command  Description   trim  Trim reads in aligned BAM   variants  Call variants from aligned BAM file   filtervariants  Filter variants across replicates or multiple samples aligned using the same reference   consensus  Call consensus from aligned BAM file   getmasked  Detect primer mismatches and get primer indices for the amplicon to be masked   removereads  Remove reads from trimmed BAM file   version  Show version information   trimadapter  (EXPERIMENTAL) Trim adapter sequences from reads   
+Command   Description    trim   Trim reads in aligned BAM    variants   Call variants from aligned BAM file    filtervariants   Filter variants across replicates or multiple samples aligned using the same reference    consensus   Call consensus from aligned BAM file    getmasked   Detect primer mismatches and get primer indices for the amplicon to be masked    removereads   Remove reads from trimmed BAM file    version   Show version information    trimadapter   (EXPERIMENTAL) Trim adapter sequences from reads   
 .PP
-To view detailed usage for each command type \fCivar <command>\fP Note : Commands maked (EXPERIMENTAL) are still under active development\&.
+To view detailed usage for each command type \fRivar <command>\fP Note : Commands maked (EXPERIMENTAL) are still under active development\&.
 .SH "Description of commands"
 .PP
 .SS "Trim primer sequences with iVar"
@@ -20,8 +21,8 @@ To sort and index an aligned BAM file (OPTIONAL, if index is not present iVar wi
 .PP
 .PP
 .nf
-# Input file - test\&.bam
-samtools sort -o test\&.sorted\&.bam test\&.bam && samtools index test\&.sorted\&.bam\&.
+# Input file \- test\&.bam
+samtools sort \-o test\&.sorted\&.bam test\&.bam && samtools index test\&.sorted\&.bam\&.
 .fi
 .PP
 .PP
@@ -32,18 +33,22 @@ Command:
 .nf
 ivar trim
 
-Usage: ivar trim -i <input\&.bam> -b <primers\&.bed> -p <prefix> [-m <min-length>] [-q <min-quality>] [-s <sliding-window-width>]
+Usage: ivar trim \-i [<input\&.bam>] \-b <primers\&.bed> [\-p <prefix>] [\-m <min\-length>] [\-q <min\-quality>] [\-s <sliding\-window\-width>]
 
 Input Options    Description
-           -i    (Required) Sorted bam file, with aligned reads, to trim primers and quality
-           -b    (Required) BED file with primer sequences and positions
-           -m    Minimum length of read to retain after trimming (Default: 30)
-           -q    Minimum quality threshold for sliding window to pass (Default: 20)
-           -s    Width of sliding window (Default: 4)
-           -e    Include reads with no primers\&. By default, reads with no primers are excluded
+           \-i    Sorted bam file, with aligned reads, to trim primers and quality\&. If not specified will read from standard in
+           \-b    (Required) BED file with primer sequences and positions
+           \-f    Primer pair information file containing left and right primer names for the same amplicon separated by a tab
+                 If provided, reads will be filtered based on their overlap with amplicons prior to trimming
+           \-m    Minimum length of read to retain after trimming (Default: 50% the average length of the first 1000 reads)
+           \-q    Minimum quality threshold for sliding window to pass (Default: 20)
+           \-s    Width of sliding window (Default: 4)
+           \-e    Include reads with no primers\&. By default, reads with no primers are excluded
+           \-k    Keep reads to allow for reanalysis: keep reads which would be dropped by
+                 alignment length filter or primer requirements, but mark them QCFAIL
 
 Output Options   Description
-           -p    (Required) Prefix for the output BAM file
+           \-p    Prefix for the output BAM file\&. If none is specified the output will write to standard out\&.
 
 .fi
 .PP
@@ -51,23 +56,34 @@ Output Options   Description
 Example Usage: 
 .PP
 .nf
-ivar trim -b test_primers\&.bed -p test\&.trimmed -i test\&.bam -q 15 -m 50 -s 4
+ivar trim \-b test_primers\&.bed \-p test\&.trimmed \-i test\&.bam \-q 15 \-m 50 \-s 4
+samtools view \-h test\&.bam | ivar trim \-b test_primers\&.bed \-p test\&.trimmed 
 
 .fi
 .PP
 .PP
 The command above will produce a trimmed BAM file test\&.trimmed\&.bam after trimming the aligned reads in test\&.bam using the primer positions specified in test_primers\&.bed and a minimum quality threshold of \fB15\fP, minimum read length of \fB50\fP and a sliding window of \fB4\fP\&.
 .PP
+Example Usage: 
+.PP
+.nf
+bwa mem \-t 32 reference\&.fa 1\&.fq 2\&.fq | ivar trim \-b test_primers\&.bed \-x 3 \-m 30 | samtools sort \- | samtools mpileup \-aa \-A \-Q 0 \-d 0 \- | ivar consensus \-p test_consensus \-m 10 \-n N \-t 0\&.5
+
+.fi
+.PP
+.PP
+The command above will allow you to go from alignment to consensus sequence in a single command using the bwa aligner\&.
+.PP
 Example BED file
 .PP
 .PP
 .nf
 Puerto  28  52  400_1_out_L 60  +
-Puerto  482 504 400_1_out_R 60  -
+Puerto  482 504 400_1_out_R 60  \-
 Puerto  359 381 400_2_out_L 60  +
-Puerto  796 818 400_2_out_R 60  -
+Puerto  796 818 400_2_out_R 60  \-
 Puerto  658 680 400_3_out_L*    60  +
-Puerto  1054    1076    400_3_out_R*    60  -
+Puerto  1054    1076    400_3_out_R*    60  \-
 \&.
 \&.
 \&.
@@ -75,20 +91,20 @@ Puerto  1054    1076    400_3_out_R*    60  -
 .fi
 .PP
 .SS "Call variants with iVar"
-iVar uses the output of the \fCsamtools mpileup\fP command to call variants - single nucleotide variants(SNVs) and indels\&. In order to call variants correctly, the reference file used for alignment must be passed to iVar using the \fC-r\fP flag\&. The output of \fCsamtools pileup\fP is piped into \fCivar variants\fP to generate a \&.tsv file with the variants\&. There are two parameters that can be set for variant calling using iVar - minimum quality(Default: 20) and minimum frequency(Default: 0\&.03)\&. Minimum quality is the minimum quality for a base to be counted towards the ungapped depth to canculate iSNV frequency at a given position\&. For insertions, the quality metric is discarded and the mpileup depth is used directly\&. Minimum frequency is the minimum frequency required for a SNV or indel to be reported\&.
+iVar uses the output of the \fRsamtools mpileup\fP command to call variants - single nucleotide variants(SNVs) and indels\&. In order to call variants correctly, the reference file used for alignment must be passed to iVar using the \fR-r\fP flag\&. The output of \fRsamtools pileup\fP is piped into \fRivar variants\fP to generate a \&.tsv file with the variants\&. There are two parameters that can be set for variant calling using iVar - minimum quality(Default: 20) and minimum frequency(Default: 0\&.03)\&. Minimum quality is the minimum quality for a base to be counted towards the ungapped depth to canculate iSNV frequency at a given position\&. For insertions, the quality metric is discarded and the mpileup depth is used directly\&. Minimum frequency is the minimum frequency required for a SNV or indel to be reported\&.
 .PP
 .SS "Amino acid translation of iSNVs"
 .PP
-iVar can identify codons and translate variants into amino acids using a GFF file in the \fBhttps:\fP//github\&.com/The-Sequence-Ontology/Specifications/blob/master/gff3\&.md 'GFF3' format containing the required coding regions (CDS)\&. In absence of a GFF file, iVar will not perform the translation and 'NA' will be added to the output file in place of the reference and alternate codons and amino acids\&. The GFF file in the GFF3 format can be downloaded via ftp from NCBI RefSeq/Genbank\&. They are usually the files with the extension '\&.gff\&.gz'\&. For example, the GFF file for Zaire Ebolavirus can be found \fChere\fP\&. More details on GFF3 files hosted by NCBI can be found in their ftp \fCFAQs\fP\&.
+iVar can identify codons and translate variants into amino acids using a GFF file in the \fRGFF3\fP format containing the required coding regions (CDS)\&. In absence of a GFF file, iVar will not perform the translation and 'NA' will be added to the output file in place of the reference and alternate codons and amino acids\&. The GFF file in the GFF3 format can be downloaded via ftp from NCBI RefSeq/Genbank\&. They are usually the files with the extension '\&.gff\&.gz'\&. For example, the GFF file for Zaire Ebolavirus can be found \fRhere\fP\&. More details on GFF3 files hosted by NCBI can be found in their ftp \fRFAQs\fP\&.
 .PP
 .SS "Account for RNA editing through polymerase slippage"
 .PP
-Some RNA viruses such as Ebola virus, might have polymerase slippage causing the insertion of a couple of nucleotides\&. More details can be found \fChere\fP\&. iVar can account for this editing and identify the correct open reading frames\&. The user will have to specify two additional parameters, \fBEditPosition\fP: Position at which edit occurs and \fBEditSequence\fP: The sequence tht is inserted at the given positon, in the 'attributes' column of the GFF file to account for this\&. A test example is given below,
+Some RNA viruses such as Ebola virus, might have polymerase slippage causing the insertion of a couple of nucleotides\&. More details can be found \fRhere\fP\&. iVar can account for this editing and identify the correct open reading frames\&. The user will have to specify two additional parameters, \fBEditPosition\fP: Position at which edit occurs and \fBEditSequence\fP: The sequence tht is inserted at the given positon, in the 'attributes' column of the GFF file to account for this\&. A test example is given below,
 .PP
 .PP
 .nf
-test    Genbank CDS 2   292 \&.   +   \&.   ID=id-testedit1;Note=PinkFloyd;EditPosition=100;EditSequence=A
-test    Genbank CDS 2   292 \&.   +   \&.   ID=id-testedit2;Note=AnotherBrickInTheWall;EditPosition=102;EditSequence=AA
+test    Genbank CDS 2   292 \&.   +   \&.   ID=id\-testedit1;Note=PinkFloyd;EditPosition=100;EditSequence=A
+test    Genbank CDS 2   292 \&.   +   \&.   ID=id\-testedit2;Note=AnotherBrickInTheWall;EditPosition=102;EditSequence=AA
 .fi
 .PP
 .PP
@@ -97,19 +113,20 @@ If a certain base is present in multiple CDSs, iVar will add a new row for each 
 Command: 
 .PP
 .nf
-Usage: samtools mpileup -aa -A -d 0 -B -Q 0 --reference [<reference-fasta] <input\&.bam> | ivar variants -p <prefix> [-q <min-quality>] [-t <min-frequency-threshold>] [-m <minimum depth>] [-r <reference-fasta>] [-g GFF file]
+Usage: samtools mpileup \-aa \-A \-d 0 \-B \-Q 0 \-\-reference [<reference\-fasta] <input\&.bam> | ivar variants \-p <prefix> [\-q <min\-quality>] [\-t <min\-frequency\-threshold>] [\-m <minimum depth>] [\-r <reference\-fasta>] [\-g GFF file]
 
 Note : samtools mpileup output must be piped into ivar variants
 
 Input Options    Description
-           -q    Minimum quality score threshold to count base (Default: 20)
-           -t    Minimum frequency threshold(0 - 1) to call variants (Default: 0\&.03)
-           -m    Minimum read depth to call variants (Default: 0)
-           -r    Reference file used for alignment\&. This is used to translate the nucleotide sequences and identify intra host single nucleotide variants
-           -g    A GFF file in the GFF3 format can be supplied to specify coordinates of open reading frames (ORFs)\&. In absence of GFF file, amino acid translation will not be done\&.
+           \-q    Minimum quality score threshold to count base (Default: 20)
+           \-t    Minimum frequency threshold(0 \- 1) to call variants (Default: 0\&.03)
+           \-m    Minimum read depth to call variants (Default: 0)
+           \-G    Count gaps towards depth\&. By default, gaps are not counted           
+           \-r    Reference file used for alignment\&. This is used to translate the nucleotide sequences and identify intra host single nucleotide variants
+           \-g    A GFF file in the GFF3 format can be supplied to specify coordinates of open reading frames (ORFs)\&. In absence of GFF file, amino acid translation will not be done\&.
 
 Output Options   Description
-           -p    (Required) Prefix for the output tsv variant file
+           \-p    (Required) Prefix for the output tsv variant file
 
 .fi
 .PP
@@ -117,7 +134,7 @@ Output Options   Description
 Example Usage: 
 .PP
 .nf
-samtools mpileup -aa -A -d 600000 -B -Q 0 test\&.trimmed\&.bam | ivar variants -p test -q 20 -t 0\&.03 -r test_reference\&.fa -g test\&.gff
+samtools mpileup \-aa \-A \-d 600000 \-B \-Q 0 test\&.trimmed\&.bam | ivar variants \-p test \-q 20 \-t 0\&.03 \-r test_reference\&.fa \-g test\&.gff
 
 .fi
 .PP
@@ -129,8 +146,8 @@ Example of output \&.tsv file\&.
 .PP
 .nf
 REGION  POS REF ALT REF_DP  REF_RV  REF_QUAL    ALT_DP  ALT_RV  ALT_QUAL    ALT_FREQ    TOTAL_DP    PVAL    PASS    GFF_FEATURE REF_CODON   REF_AA  ALT_CODON   ALT_AA
-test    42  G   T   0   0   0   1   0   49  1   1   1   FALSE   id-test3    AGG R   ATG M
-test    42  G   T   0   0   0   1   0   49  1   1   1   FALSE   id-test4    CAG Q   CAT H
+test    42  G   T   0   0   0   1   0   49  1   1   1   FALSE   id\-test3    AGG R   ATG M
+test    42  G   T   0   0   0   1   0   49  1   1   1   FALSE   id\-test4    CAG Q   CAT H
 test    320 A   T   1   1   35  1   1   46  0\&.5 2   0\&.666667    FALSE   NA  NA  NA  NA  NA
 test    365 A   T   0   0   0   1   1   27  1   1   1   FALSE   NA  NA  NA  NA  NA
 .fi
@@ -138,24 +155,24 @@ test    365 A   T   0   0   0   1   1   27  1   1   1   FALSE   NA  NA  NA  NA  
 .PP
 Description
 .PP
-Field  Description   REGION  Region from BAM file   POS  Position on reference sequence   REF  Reference base   ALT  Alternate Base   REF_DP  Ungapped depth of reference base   REF_RV  Ungapped depth of reference base on reverse reads   REF_QUAL  Mean quality of reference base   ALT_DP  Ungapped depth of alternate base\&.   ALT_RV  Ungapped deapth of alternate base on reverse reads   ALT_QUAL  Mean quality of alternate base   ALT_FREQ  Frequency of alternate base   TOTAL_DP  Total depth at position   PVAL  p-value of fisher's exact test   PASS  Result of p-value <= 0\&.05   GFF_FEATURE  ID of the GFF feature used for the translation   REF_CODON  Codong using the reference base   REF_AA  Amino acid translated from reference codon   ALT_CODON  Codon using the alternate base   ALT_AA  Amino acid translated from the alternate codon   
+Field   Description    REGION   Region from BAM file    POS   Position on reference sequence    REF   Reference base    ALT   Alternate Base    REF_DP   Ungapped depth of reference base    REF_RV   Ungapped depth of reference base on reverse reads    REF_QUAL   Mean quality of reference base    ALT_DP   Ungapped depth of alternate base\&.    ALT_RV   Ungapped deapth of alternate base on reverse reads    ALT_QUAL   Mean quality of alternate base    ALT_FREQ   Frequency of alternate base    TOTAL_DP   Total depth at position    PVAL   p-value of fisher's exact test    PASS   Result of p-value <= 0\&.05    GFF_FEATURE   ID of the GFF feature used for the translation    REF_CODON   Codong using the reference base    REF_AA   Amino acid translated from reference codon    ALT_CODON   Codon using the alternate base    ALT_AA   Amino acid translated from the alternate codon   
 .PP
-\fBNote\fP: Please use the -B options with \fCsamtools mpileup\fP to call variants and generate consensus\&. When a reference sequence is supplied, the quality of the reference base is reduced to 0 (ASCII: !) in the mpileup output\&. Disabling BAQ with -B seems to fix this\&. This was tested in samtools 1\&.7 and 1\&.8\&.
+\fBNote\fP: Please use the -B options with \fRsamtools mpileup\fP to call variants and generate consensus\&. When a reference sequence is supplied, the quality of the reference base is reduced to 0 (ASCII: !) in the mpileup output\&. Disabling BAQ with -B seems to fix this\&. This was tested in samtools 1\&.7 and 1\&.8\&.
 .SS "Filter variants across replicates with iVar"
-iVar can be used to get an intersection of variants(in \&.tsv files) called from any number of replicates or from different samples using the same reference sequence\&. This intersection will filter out any iSNVs that do not occur in a minimum fraction of the files supplied\&. This parameter can be changed using the \fC-t\fP flag which range from 0 to 1 (default)\&. Fields that are different across replicates(fields apart from REGION, POS, REF, ALT, REF_CODON, REF_AA, ALT_CODON, ALT_AA) will have the filename added as a suffix\&. If there are a large number of files to be filtered, the \fC-f\fP flag can be used to supply a text file with one sample/replicate variant \&.tsv file per line\&.
+iVar can be used to get an intersection of variants(in \&.tsv files) called from any number of replicates or from different samples using the same reference sequence\&. This intersection will filter out any iSNVs that do not occur in a minimum fraction of the files supplied\&. This parameter can be changed using the \fR-t\fP flag which range from 0 to 1 (default)\&. Fields that are different across replicates(fields apart from REGION, POS, REF, ALT, REF_CODON, REF_AA, ALT_CODON, ALT_AA) will have the filename added as a suffix\&. If there are a large number of files to be filtered, the \fR-f\fP flag can be used to supply a text file with one sample/replicate variant \&.tsv file per line\&.
 .PP
 Command: 
 .PP
 .nf
-Usage: ivar filtervariants -p <prefix> replicate-one\&.tsv replicate-two\&.tsv \&.\&.\&. OR ivar filtervariants -p <prefix> -f <text file with one variant file per line> 
+Usage: ivar filtervariants \-p <prefix> replicate\-one\&.tsv replicate\-two\&.tsv \&.\&.\&. OR ivar filtervariants \-p <prefix> \-f <text file with one variant file per line> 
 Input: Variant tsv files for each replicate/sample
 
 Input Options    Description
-           -t    Minimum fration of files required to contain the same variant\&. Specify value within [0,1]\&. (Default: 1)
-           -f    A text file with one variant file per line\&.
+           \-t    Minimum fration of files required to contain the same variant\&. Specify value within [0,1]\&. (Default: 1)
+           \-f    A text file with one variant file per line\&.
 
 Output Options   Description
-           -p    (Required) Prefix for the output filtered tsv file
+           \-p    (Required) Prefix for the output filtered tsv file
 
 .fi
 .PP
@@ -163,7 +180,7 @@ Output Options   Description
 Example Usage: The command below only retains those variants that are found in atleast 50% of the fiels supplied 
 .PP
 .nf
-ivar filtervariants -t 0\&.5 -p test\&.filtered test\&.1\&.tsv test\&.2\&.tsv test\&.3\&.tsv
+ivar filtervariants \-t 0\&.5 \-p test\&.filtered test\&.1\&.tsv test\&.2\&.tsv test\&.3\&.tsv
 
 .fi
 .PP
@@ -172,7 +189,7 @@ The three replicates can also be supplied using a text file as shown below
 .PP
 .PP
 .nf
-ivar filtervariants -t 0\&.5 -p test\&.filtered -f filter_files\&.txt
+ivar filtervariants \-t 0\&.5 \-p test\&.filtered \-f filter_files\&.txt
 .fi
 .PP
 .PP
@@ -193,28 +210,28 @@ Example output of filtered \&.tsv file from three files test_rep1\&.tsv and test
 .PP
 .nf
 REGION  POS REF ALT GFF_FEATURE REF_CODON   REF_AA  ALT_CODON   ALT_AA  REF_DP_test\&.1\&.tsv   REF_RV_test\&.1\&.tsv   REF_QUAL_test\&.1\&.tsv ALT_DP_test\&.1\&.tsv   ALT_RV_test\&.1\&.tsv   ALT_QUAL_test\&.1\&.tsv ALT_FREQ_test\&.1\&.tsv TOTAL_DP_test\&.1\&.tsv PVAL_test\&.1\&.tsv PASS_test\&.1\&.tsv REF_DP_test\&.2\&.tsv   REF_RV_test\&.2\&.tsv   REF_QUAL_test\&.2\&.tsv ALT_DP_test\&.2\&.tsv   ALT_RV_test\&.2\&.tsv   ALT_QUAL_test\&.2\&.tsv ALT_FREQ_test\&.2\&.tsv TOTAL_DP_test\&.2\&.tsv PVAL_test\&.2\&.tsv PASS_test\&.2\&.tsv REF_DP_test\&.3\&.tsv   REF_RV_test\&.3\&.tsv   REF_QUAL_test\&.3\&.tsv ALT_DP_test\&.3\&.tsv   ALT_RV_test\&.3\&.tsv   ALT_QUAL_test\&.3\&.tsv ALT_FREQ_test\&.3\&.tsv TOTAL_DP_test\&.3\&.tsv PVAL_test\&.3\&.tsv PASS_test\&.3\&.tsv 
-test    139 T   A   id-test3    GCT A   GCA A   1   0   32  1   0   55  0\&.5 2   0\&.666667    FALSE   1   0   32  1   0   55  0\&.5 2   0\&.666667    FALSE   NA  NA  NA  NA  NA  NA  NA  NA  NA  NA
+test    139 T   A   id\-test3    GCT A   GCA A   1   0   32  1   0   55  0\&.5 2   0\&.666667    FALSE   1   0   32  1   0   55  0\&.5 2   0\&.666667    FALSE   NA  NA  NA  NA  NA  NA  NA  NA  NA  NA
 test    320 A   T   NA  NA  NA  NA  NA  1   1   35  1   1   46  0\&.5 2   0\&.666667    FALSE   NA  NA  NA  NA  NA  NA  NA  NA  NA  NA  1   1   35  1   1   46  0\&.5 2   0\&.666667    FALSE
 test    365 A   T   NA  NA  NA  NA  NA  0   0   0   1   1   27  1   1   1   FALSE   0   0   0   1   1   27  1   1   1   FALSE   0   0   0   1   1   27  1   1   1   FALSE
-test    42  G   T   id-test4    CAG Q   CAT H   0   0   0   1   0   49  1   1   1   FALSE   0   0   0   1   0   49  1   1   1   FALSE   NA  NA  NA  NA  NA  NA  NA  NA  NA  NA
-test    42  G   T   id-testedit1    AGG R   ATG M   0   0   0   1   0   49  1   1   1   FALSE   0   0   0   1   0   49  1   1   1   FALSE   0   0   0   1   0   49  1   1   1   FALSE
-test    69  T   G   id-testedit2    TTG L   TGG W   1   0   57  1   0   53  0\&.5 2   0\&.666667    FALSE   1   0   57  1   0   53  0\&.5 2   0\&.666667    FALSE   1   0   57  1   0   53  0\&.5 2   0\&.666667    FALSE
+test    42  G   T   id\-test4    CAG Q   CAT H   0   0   0   1   0   49  1   1   1   FALSE   0   0   0   1   0   49  1   1   1   FALSE   NA  NA  NA  NA  NA  NA  NA  NA  NA  NA
+test    42  G   T   id\-testedit1    AGG R   ATG M   0   0   0   1   0   49  1   1   1   FALSE   0   0   0   1   0   49  1   1   1   FALSE   0   0   0   1   0   49  1   1   1   FALSE
+test    69  T   G   id\-testedit2    TTG L   TGG W   1   0   57  1   0   53  0\&.5 2   0\&.666667    FALSE   1   0   57  1   0   53  0\&.5 2   0\&.666667    FALSE   1   0   57  1   0   53  0\&.5 2   0\&.666667    FALSE
 .fi
 .PP
 .PP
 Description of fields
 .PP
-No  Field  Description   1  REGION  Common region across all replicate variant tsv files   2  POS  Common position across all variant tsv files   3  REF  Common reference base across all variant tsv files   4  ALT  Common alternate base across all variant tsv files   5  GFF_FEATURE  GFF feature used for the translation   6  REF_CODON  The codon using the reference base   7  REF_AA  Reference codon translated into amino acid   8  ALT_CODON  Codon using the alternate base   9  ALT_AA  Alternate codon translated into amino acid   10  REF_DP_<rep1-tsv-file-name>  Depth of reference base in replicate 1   11  REF_RV_<rep1-tsv-file-name>  Depth of reference base on reverse reads in replicate 1   12  REF_QUAL_<rep1-tsv-file-name>  Mean quality of reference base in replicate 1   13  ALT_DP_<rep1-tsv-file-name>  Depth of alternate base in replicate 1   14  ALT_RV_<rep1-tsv-file-name>  Deapth of alternate base on reverse reads in replicate 1   15  ALT_QUAL_<rep1-tsv-file-name>  Mean quality of alternate base in replicate 1   16  ALT_FREQ_<rep1-tsv-file-name>  Frequency of alternate base in replicate 1   17  TOTAL_DP_<rep1-tsv-file-name>  Total depth at position in replicate 1   18  PVAL_<rep1-tsv-file-name>  p-value of fisher's exact test in replicate 1   19  PASS_<rep1-tsv-file-name>  Result of p-value <= 0\&.05 in replicate 1   20  Continue rows 10 - 19 for every replicate provided  
+No   Field   Description    1   REGION   Common region across all replicate variant tsv files    2   POS   Common position across all variant tsv files    3   REF   Common reference base across all variant tsv files    4   ALT   Common alternate base across all variant tsv files    5   GFF_FEATURE   GFF feature used for the translation    6   REF_CODON   The codon using the reference base    7   REF_AA   Reference codon translated into amino acid    8   ALT_CODON   Codon using the alternate base    9   ALT_AA   Alternate codon translated into amino acid    10   REF_DP_<rep1-tsv-file-name>   Depth of reference base in replicate 1    11   REF_RV_<rep1-tsv-file-name>   Depth of reference base on reverse reads in replicate 1    12   REF_QUAL_<rep1-tsv-file-name>   Mean quality of reference base in replicate 1    13   ALT_DP_<rep1-tsv-file-name>   Depth of alternate base in replicate 1    14   ALT_RV_<rep1-tsv-file-name>   Deapth of alternate base on reverse reads in replicate 1    15   ALT_QUAL_<rep1-tsv-file-name>   Mean quality of alternate base in replicate 1    16   ALT_FREQ_<rep1-tsv-file-name>   Frequency of alternate base in replicate 1    17   TOTAL_DP_<rep1-tsv-file-name>   Total depth at position in replicate 1    18   PVAL_<rep1-tsv-file-name>   p-value of fisher's exact test in replicate 1    19   PASS_<rep1-tsv-file-name>   Result of p-value <= 0\&.05 in replicate 1    20   Continue rows 10 - 19 for every replicate provided   
 .SS "Generate a consensus sequences from an aligned BAM file"
-To generate a consensus sequence iVar uses the output of \fCsamtools mpileup\fP command\&. The mpileup output must be piped into \fCivar consensus\fP\&. There are five parameters that can be set - minimum quality(Default: 20), minimum frequency threshold(Default: 0), minimum depth to call a consensus(Default: 10), a flag to exclude nucleotides from regions with depth less than the minimum depth and a character to call in regions with coverage lower than the speicifed minimum depth(Default: 'N')\&. Minimum quality is the minimum quality of a base to be considered in calculations of variant frequencies at a given position\&. Minimum frequency threshold is the minimum frequency that a base must match to be called as the consensus base at a position\&. If one base is not enough to match a given frequency, then an ambigious nucleotide is called at that position\&. Minimum depth is the minimum required depth to call a consensus\&. If '-k' flag is set then these regions are not included in the consensus sequence\&. If '-k' is not set then by default, a 'N' is called in these regions\&. You can also specfy which character you want to add to the consensus to cover regions with depth less than the minimum depth\&. This can be done using -n option\&. It takes one of two values: '-' or 'N'\&.
+To generate a consensus sequence iVar uses the output of \fRsamtools mpileup\fP command\&. The mpileup output must be piped into \fRivar consensus\fP\&. There are five parameters that can be set - minimum quality(Default: 20), minimum frequency threshold(Default: 0), minimum depth to call a consensus(Default: 10), a flag to exclude nucleotides from regions with depth less than the minimum depth and a character to call in regions with coverage lower than the speicifed minimum depth(Default: 'N')\&. Minimum quality is the minimum quality of a base to be considered in calculations of variant frequencies at a given position\&. Minimum frequency threshold is the minimum frequency that a base must match to be called as the consensus base at a position\&. If one base is not enough to match a given frequency, then an ambigious nucleotide is called at that position\&. Minimum depth is the minimum required depth to call a consensus\&. If '-k' flag is set then these regions are not included in the consensus sequence\&. If '-k' is not set then by default, a 'N' is called in these regions\&. You can also specfy which character you want to add to the consensus to cover regions with depth less than the minimum depth\&. This can be done using -n option\&. It takes one of two values: '-' or 'N'\&.
 .PP
 As an example, consider a position with 6As, 3Ts and 1C\&. The table below shows the consensus nucleotide called at different frequencies\&.
 .PP
-Minimum frequency threshold  Consensus   0  A   0\&.5  A   0\&.6  A   0\&.7  W(A or T)   0\&.9  W (A or T)   1  H (A or T or C)   
+Minimum frequency threshold   Consensus    0   A    0\&.5   A    0\&.6   A    0\&.7   W(A or T)    0\&.9   W (A or T)    1   H (A or T or C)   
 .PP
 If there are two nucleotides at the same frequency, both nucleotides are used to call an ambigious base as the consensus\&. As an example, consider a position wiht 6 Ts, 2As and 2 Gs\&. The table below shows the consensus nucleotide called at different frequencies\&.
 .PP
-Minimum frequency threshold  Consensus   0  T   0\&.5  T   0\&.6  T   0\&.7  D(A or T or G)   0\&.9  D(A or T or G)   1  D(A or T or G)   
+Minimum frequency threshold   Consensus    0   T    0\&.5   T    0\&.6   T    0\&.7   D(A or T or G)    0\&.9   D(A or T or G)    1   D(A or T or G)   
 .PP
 The output of the command is a fasta file with the consensus sequence and a \&.txt file with the average quality of every base used to generate the consensus at each position\&. \fIFor insertions, the quality is set to be the minimum quality threshold since mpileup doesn't give the quality of bases in insertions\&.\fP
 .PP
@@ -224,33 +241,34 @@ Command:
 .nf
 ivar consensus
 
-Usage: samtools mpileup -aa -A -d 0 -Q 0 <input\&.bam> | ivar consensus -p <prefix> 
+Usage: samtools mpileup \-aa \-A \-d 0 \-Q 0 <input\&.bam> | ivar consensus \-p <prefix> 
 
 Note : samtools mpileup output must be piped into ivar consensus
 
 Input Options    Description
-           -q    Minimum quality score threshold to count base (Default: 20)
-           -t    Minimum frequency threshold(0 - 1) to call consensus\&. (Default: 0)
+           \-q    Minimum quality score threshold to count base (Default: 20)
+           \-t    Minimum frequency threshold(0 \- 1) to call consensus\&. (Default: 0)
+           \-c    Minimum insertion frequency threshold(0 \- 1) to call consensus\&. (Default: 0\&.8)
                  Frequently used thresholds | Description
-                 ---------------------------|------------
+                 \-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-|\-\-\-\-\-\-\-\-\-\-\-\-
                                           0 | Majority or most common base
                                         0\&.2 | Bases that make up atleast 20% of the depth at a position
                                         0\&.5 | Strict or bases that make up atleast 50% of the depth at a position
                                         0\&.9 | Strict or bases that make up atleast 90% of the depth at a position
                                           1 | Identical or bases that make up 100% of the depth at a position\&. Will have highest ambiguities
-           -m    Minimum depth to call consensus(Default: 10)
-           -k    If '-k' flag is added, regions with depth less than minimum depth will not be added to the consensus sequence\&. Using '-k' will override any option specified using -n 
-           -n    (N/-) Character to print in regions with less than minimum coverage(Default: N)
+           \-m    Minimum depth to call consensus(Default: 10)
+           \-k    If '\-k' flag is added, regions with depth less than minimum depth will not be added to the consensus sequence\&. Using '\-k' will override any option specified using \-n 
+           \-n    (N/\-) Character to print in regions with less than minimum coverage(Default: N)
 
 Output Options   Description
-           -p    (Required) Prefix for the output fasta file and quality file
+           \-p    (Required) Prefix for the output fasta file and quality file
 .fi
 .PP
 .PP
 Example Usage: 
 .PP
 .nf
-samtools mpileup -d 1000 -A -Q 0 test\&.bam | ivar consensus -p test -q 20 -t 0
+samtools mpileup \-d 1000 \-A \-Q 0 test\&.bam | ivar consensus \-p test \-q 20 \-t 0
 
 .fi
 .PP
@@ -263,15 +281,15 @@ Command:
 .PP
 .nf
 ivar getmasked
-Usage: ivar getmasked -i <input-filtered\&.tsv> -b <primers\&.bed> -f <primer_pairs\&.tsv> -p <prefix>
-Note: This step is used only for amplicon-based sequencing\&.
+Usage: ivar getmasked \-i <input\-filtered\&.tsv> \-b <primers\&.bed> \-f <primer_pairs\&.tsv> \-p <prefix>
+Note: This step is used only for amplicon\-based sequencing\&.
 
 Input Options    Description
-           -i    (Required) Input filtered variants tsv generated from 'ivar filtervariants'
-           -b    (Required) BED file with primer sequences and positions
-           -f    (Required) Primer pair information file containing left and right primer names for the same amplicon separated by a tab
+           \-i    (Required) Input filtered variants tsv generated from 'ivar filtervariants'
+           \-b    (Required) BED file with primer sequences and positions
+           \-f    (Required) Primer pair information file containing left and right primer names for the same amplicon separated by a tab
 Output Options   Description
-           -p    (Required) Prefix for the output text file
+           \-p    (Required) Prefix for the output text file
 
 .fi
 .PP
@@ -281,11 +299,11 @@ Example BED file
 .PP
 .nf
 Puerto  28  52  400_1_out_L 60  +
-Puerto  482 504 400_1_out_R 60  -
+Puerto  482 504 400_1_out_R 60  \-
 Puerto  359 381 400_2_out_L 60  +
-Puerto  796 818 400_2_out_R 60  -
+Puerto  796 818 400_2_out_R 60  \-
 Puerto  658 680 400_3_out_L*    60  +
-Puerto  1054    1076    400_3_out_R*    60  -
+Puerto  1054    1076    400_3_out_R*    60  \-
 \&.
 \&.
 \&.
@@ -310,7 +328,7 @@ Example primer pair information file
 Example Usage: 
 .PP
 .nf
-ivar getmasked -i test\&.filtered\&.tsv -b primers\&.bed -f pair_information\&.tsv -p test\&.masked\&.txt
+ivar getmasked \-i test\&.filtered\&.tsv \-b primers\&.bed \-f pair_information\&.tsv \-p test\&.masked\&.txt
 
 .fi
 .PP
@@ -325,22 +343,22 @@ Example Output:
 .fi
 .PP
 .SS "Remove reads associated with mismatched primer indices"
-This command accepts an aligned and sorted BAM file trimmed using \fCivar trim\fP and removes the reads corresponding to the supplied primer indices, which is the output of \fCivar getmasked\fP command\&. Under the hood, \fCivar trim\fP adds the zero based primer index(based on the BED file) to the BAM auxillary data for every read\&. Hence, ivar removereads will only work on BAM files that have been trimmed using \fCivar trim\fP\&.
+This command accepts an aligned and sorted BAM file trimmed using \fRivar trim\fP and removes the reads corresponding to the supplied primer indices, which is the output of \fRivar getmasked\fP command\&. Under the hood, \fRivar trim\fP adds the zero based primer index(based on the BED file) to the BAM auxillary data for every read\&. Hence, ivar removereads will only work on BAM files that have been trimmed using \fRivar trim\fP\&.
 .PP
 Command: 
 .PP
 .nf
 ivar removereads
 
-Usage: ivar removereads -i <input\&.trimmed\&.bam> -p <prefix> -t <text-file-with-primer-indices>
-Note: This step is used only for amplicon-based sequencing\&.
+Usage: ivar removereads \-i <input\&.trimmed\&.bam> \-p <prefix> \-t <text\-file\-with\-primer\-indices>
+Note: This step is used only for amplicon\-based sequencing\&.
 
 Input Options    Description
-           -i    (Required) Input BAM file  trimmed with ivar trim\&. Must be sorted and indexed, which can be done using sort_index_bam\&.sh
-           -t    (Required) Text file with primer indices separated by spaces\&. This is the output of getmasked command\&.
+           \-i    (Required) Input BAM file  trimmed with ivar trim\&. Must be sorted and indexed, which can be done using sort_index_bam\&.sh
+           \-t    (Required) Text file with primer indices separated by spaces\&. This is the output of getmasked command\&.
 
 Output Options   Description
-           -p    (Required) Prefix for the output filtered BAM file
+           \-p    (Required) Prefix for the output filtered BAM file
 
 .fi
 .PP
@@ -348,13 +366,13 @@ Output Options   Description
 Example Usage: 
 .PP
 .nf
-ivar trim -i test\&.bam -p test\&.trimmed
-ivar removereads -i test\&.trimmed\&.bam -p test\&.trimmed\&.masked\&.bam -t test\&.masked\&.txt
+ivar trim \-i test\&.bam \-p test\&.trimmed
+ivar removereads \-i test\&.trimmed\&.bam \-p test\&.trimmed\&.masked\&.bam \-t test\&.masked\&.txt
 
 .fi
 .PP
 .PP
-The \fCivar trim\fP command above trims test\&.bam and produced test\&.trimmed\&.bam with the primer indice data added\&. The \fCivar removereads\fP command produces an output file - test\&.trimmed\&.masked\&.bam after removing all the reads corresponding to primer indices - 1,2,7 and 8\&.
+The \fRivar trim\fP command above trims test\&.bam and produced test\&.trimmed\&.bam with the primer indice data added\&. The \fRivar removereads\fP command produces an output file - test\&.trimmed\&.masked\&.bam after removing all the reads corresponding to primer indices - 1,2,7 and 8\&.
 .SS "(Experimental) trimadapter"
 \fBNote: This feature is under active development and not completely validated yet\&.\fP
 .PP

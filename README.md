@@ -18,7 +18,7 @@ bioRxiv doi: [https://doi.org/10.1101/383513](https://doi.org/10.1101/383513)
 
 Manual for iVar is available [here](https://andersen-lab.github.io/ivar/html/).
 
-## Insallation
+## Installation
 
 ### Dependencies
 

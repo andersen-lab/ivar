@@ -1,16 +1,18 @@
-#include <iostream>
+#include <cstdint>
 #include <fstream>
-#include <sstream>
-#include <regex>
-#include <map>
+#include <iostream>
 #include <iterator>
+#include <map>
+#include <regex>
+#include <sstream>
 
 #ifndef parse_gff
 #define parse_gff
 
-/* 
+/*
 GFF3 file format:
-Defined at https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
+Defined at
+https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
 
 | Col        | Desc                                                          |
 | seqid      | ID of ref                                                     |
@@ -24,7 +26,7 @@ Defined at https://github.com/The-Sequence-Ontology/Specifications/blob/master/g
 | attributes | list of attributes in the format tag=value;tag-value..        |
 */
 
-/* 
+/*
 Custom GFF3 attributes for RNA editing
 
 EditPosition: Position to make insertion
@@ -35,11 +37,11 @@ EditSequence: Sequence to be inserted
 const std::string EDIT_POSITION = "EditPosition";
 const std::string EDIT_SEQUENCE = "EditSequence";
 
-class gff3_feature{
-public:
+class gff3_feature {
+ public:
   gff3_feature(std::string line);
   int print();
-  
+
   std::string get_seqid();
   std::string get_source();
   std::string get_type();
@@ -60,8 +62,8 @@ public:
   int set_attributes(std::string attr);
   int64_t get_edit_position();
   std::string get_edit_sequence();
-  
-private:
+
+ private:
   std::string seqid, source, type;
   std::map<std::string, std::string> attributes;
   uint64_t start, end;
@@ -70,8 +72,8 @@ private:
   int phase;
 };
 
-class gff3{
-public:
+class gff3 {
+ public:
   gff3();
   gff3(std::string path);
   std::vector<gff3_feature> get_features();
@@ -81,7 +83,7 @@ public:
   int get_count();
   bool empty();
 
-private:
+ private:
   std::vector<gff3_feature> features;
   // Flag to see if file has been populated
   bool is_empty;

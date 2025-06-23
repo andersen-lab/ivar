@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-18.04, ubuntu-20.04]
+        os: [ubuntu-20.04]
 
     steps:
     - uses: actions/checkout@master
@@ -57,26 +57,21 @@ jobs:
 
   build-macos:
 
-    runs-on: [ macos-latest ]
+    runs-on: [ macos-14 ]
 
     steps:
     - uses: actions/checkout@master
     - name: install GNU autotools
       run: |
-        curl -O http://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz
-        tar zxvf autoconf-2.69.tar.gz
-        cd autoconf-2.69
-        ./configure && make && sudo make install
-        brew install automake libtool
+        brew install autoconf automake libtool
     - name: download htslib
-      run: wget https://github.com/samtools/htslib/archive/1.10.2.tar.gz
+      run: wget https://github.com/samtools/htslib/releases/download/1.12/htslib-1.12.tar.bz2
     - name: untar
-      run: tar xf 1.10.2.tar.gz
+      run: tar xf htslib-1.12.tar.bz2
     - name: install htslib
       run: |
-        cd htslib-1.10.2/
-        autoheader
-        autoconf
+        cd htslib-1.12/
+        autoreconf -i
         ./configure
         make
         sudo make install

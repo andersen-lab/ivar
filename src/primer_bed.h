@@ -1,8 +1,9 @@
-#include <iostream>
-#include <vector>
-#include <sstream>
-#include <fstream>
 #include <algorithm>
+#include <cstdint>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <vector>
 
 #ifndef primer_bed
 #define primer_bed
@@ -10,14 +11,14 @@
 class primer {
  private:
   std::string region;
-  uint32_t start;		// 0 based
-  uint32_t end;			// 0 based
+  uint32_t start;  // 0 based
+  uint32_t end;    // 0 based
   std::string name;
-  int score;
+  int score = 0;
   char strand;
   int16_t pair_indice;
   int16_t indice;
-  uint32_t read_count;
+  uint32_t read_count = 0;
 
  public:
   std::string get_name();
@@ -40,17 +41,18 @@ class primer {
   void set_indice(int16_t i);
   void set_read_count(uint32_t rc);
   void add_read_count(uint32_t rc);
-  bool operator == (const primer& p) const{
+  bool operator==(const primer& p) const {
     return (indice == p.get_indice()) ? true : false;
   }
-
 };
 
 std::vector<primer> populate_from_file(std::string path, int32_t offset);
 std::vector<primer> populate_from_file(std::string path);
 std::vector<primer> get_primers(std::vector<primer> p, unsigned int pos);
 int get_primer_indice(std::vector<primer> p, std::string name);
-int populate_pair_indices(std::vector<primer> &primers, std::string path);
+int populate_pair_indices(std::vector<primer>& primers, std::string path);
+void print_primer_info(primer primers);
+void print_all_primer_info(std::vector<primer> primers);
 primer get_min_start(std::vector<primer> primers);
 primer get_max_end(std::vector<primer> primers);
 
