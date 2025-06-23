@@ -20,12 +20,12 @@ jobs:
     - name: download htslib
       run: |
         wget https://github.com/samtools/htslib/archive/1.10.2.tar.gz
-        sudo apt-get install gcc-7
+        sudo apt-get install gcc-14
     - name: untar
       run: tar xf 1.10.2.tar.gz
     - name: install htslib
       env:
-        CC: gcc-7
+        CC: gcc-14
       run: |
         cd htslib-1.10.2/
         autoheader
@@ -36,23 +36,23 @@ jobs:
         sudo ldconfig
     - name: autotools
       env:
-        CC: gcc-7
+        CC: gcc-14
       run: ./autogen.sh
     - name: configure
       env:
-        CC: gcc-7
+        CC: gcc-14
       run: ./configure
     - name: make
       env:
-        CC: gcc-7
+        CC: gcc-14
       run: make
     - name: make check
       env:
-        CC: gcc-7
+        CC: gcc-14
       run: make check
     - name: make install
       env:
-        CC: gcc-7
+        CC: gcc-14
       run: sudo make install
 
   build-macos:
