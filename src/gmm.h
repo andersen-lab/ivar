@@ -16,7 +16,7 @@ struct gaussian_mixture_model {
   uint32_t n;
   double var_floor;
   std::vector<double> means;
-  std::vector<double> hefts; 
+  std::vector<double> hefts;
   std::vector<double> dcovs;
   double aic;
   arma::gmm_diag model;
@@ -34,7 +34,7 @@ struct variant {
   double freq;
   double gapped_freq = 0;
   int cluster_assigned = -1;
-  bool version_1_var=false;  
+  bool version_1_var=false;
   double std_dev;
   //number corresponding the the amplicons covering this position
   std::vector<uint32_t> amplicon_numbers;
@@ -50,9 +50,9 @@ struct variant {
   bool amplicon_flux=false; //fluctuation frequency across amplicons
   bool amplicon_masked=false; //masked due to another variant experiencing flux
   bool primer_masked=false; //mutation in primer binding region of overlapped amplicon
-  bool depth_flag=false; //depth is below the threshold                  
+  bool depth_flag=false; //depth is below the threshold
   bool qual_flag=false; //quality is below threshold
-  bool outside_freq_range=false; //outside of useful frequency range for model                 
+  bool outside_freq_range=false; //outside of useful frequency range for model
   bool cluster_outlier=false; //is an outlier for the cluster assigned
   std::vector<double> probabilities;
 
