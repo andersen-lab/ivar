@@ -653,23 +653,20 @@ void handle_conflicting_del(std::vector<variant> &variants){
   std::vector<uint32_t> remove_index;
   for(uint32_t i=0; i < variants.size(); i++){
     //position contains a deletion
-    if(variants[i].nuc == "-"){
+    if (std::find(variants[i].nuc.begin(), variants[i].nuc.end(), '-') != variants[i].nuc.end()){
       if (std::find(remove_index.begin(), remove_index.end(), i) != remove_index.end()){
         continue;
       }
-
       for(uint32_t j=0; j < variants.size(); j++){
         if(i == j) continue;
-        if(variants[i].position == variants[j].position && variants[j].nuc == "-"){
-          if(variants[i].depth > variants[j].depth){
-            remove_index.push_back(j);
-            //std::cerr << variants[i].position << " " << variants[i].depth << std::endl;
-          } else if(variants[j].depth > variants[i].depth){
+        bool del_pos = std::find(variants[j].nuc.begin(), variants[j].nuc.end(), '-') != variants[j].nuc.end();
+        if(variants[i].position == variants[j].position && del_pos){
+          if(variants[j].depth > variants[i].depth){
             remove_index.push_back(i);
-            //std::cerr << variants[j].position << " " << variants[j].depth << std::endl;
-          } else {
+            //std::cerr << "b " << variants[i].position << " " << variants[i].depth << " " << variants[i].nuc << std::endl;
+          } else if(variants[i].depth == variants[j].depth) {
             remove_index.push_back(i);
-            //std::cerr << variants[j].position << " " << variants[j].depth << std::endl;
+            //std::cerr << "c " << variants[i].position << " " << variants[i].depth << std::endl;
           }
         }
       }
@@ -695,12 +692,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, ref);
   handle_conflicting_del(base_variants);
-  for(auto v : base_variants){
-    if(v.position == 210){
-      std::cerr << v.depth << " " << v.nuc << std::endl;
-    }
-  }
-  exit(0);
 
   double error_rate = cluster_error(base_variants, min_qual, min_depth);
   double lower_bound = 1-error_rate+0.0001;

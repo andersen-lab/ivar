@@ -69,4 +69,5 @@ double calculate_mean(const std::vector<double>& data);
 kmeans_model train_model(uint32_t n, arma::mat data, bool error);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound);
 void calculate_reference_frequency(std::vector<variant> &variants, std::string ref_path);
+void handle_conflicting_del(std::vector<variant> &variants);
 #endif
