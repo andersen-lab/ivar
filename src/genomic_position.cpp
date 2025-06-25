@@ -94,7 +94,7 @@ void add_variants(std::vector<uint32_t> &final_positions, std::vector<std::strin
     gpos.update_alleles(base, qual);
     if (is_del && !is_ins) {
       //update the gapped depth for all deletion positions
-      for(uint32_t k=0; k <final_bases[i].size(); k++){
+      for(uint32_t k=0; k <final_bases[i].size()-1; k++){
         global_positions[pos+k].gapped_depth += 1;
       }
     } else if (!is_del && !is_ins) {
@@ -122,7 +122,7 @@ void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vecto
           global_positions[pos].depth += 1;
         } else if(!is_ins && is_del){
           amp.amp_depth_gapped += 1;
-          for(uint32_t k=0; k <final_bases[i].size(); k++){
+          for(uint32_t k=0; k <final_bases[i].size()-1; k++){
             global_positions[pos+k].gapped_depth += 1;
           }
         }
@@ -141,7 +141,7 @@ void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vecto
         global_positions[pos].depth += 1;
       } else if(!is_ins && is_del){
         amp.amp_depth_gapped += 1;
-        for(uint32_t k=0; k <final_bases[i].size(); k++){
+        for(uint32_t k=0; k <final_bases[i].size()-1; k++){
           global_positions[pos+k].gapped_depth += 1;
         }
       }
@@ -162,25 +162,25 @@ void collect_allele_frequencies(std::vector<amplicon_info> amplicons, std::unord
   }
 }
 
-void collect_allele_stats(const std::vector<amplicon_info> &amplicons, std::unordered_map<std::string, std::vector<double>> &allele_frequencies, std::unordered_map<std::string, std::vector<uint32_t>> &depth_map, uint32_t min_depth, uint8_t min_qual){
+void collect_allele_stats(const std::vector<amplicon_info> &amplicons, std::unordered_map<std::string, std::vector<double>> &allele_frequencies, std::unordered_map<std::string, std::vector<uint32_t>> &depth_map, uint8_t min_qual){
   for (const auto &amp : amplicons) {
     for (const auto &al : amp.amp_alleles) {
-      if (al.depth < min_depth || al.mean_qual < min_qual) continue;
+      if (al.mean_qual < min_qual) continue;
       allele_frequencies[al.nuc].push_back(static_cast<double>(al.depth) / amp.amp_depth);
       depth_map[al.nuc].push_back(al.depth);
     }
   }
 }
-std::vector<ITNode*>  calculate_amplicon_variation(std::vector<genomic_position> &global_positions, uint32_t min_depth, uint8_t min_qual){
+std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> &global_positions, uint32_t min_depth, uint8_t min_qual){
   std::vector<ITNode*> flagged_amplicons;
   std::unordered_map<std::string, std::vector<double>> allele_frequencies;
   std::unordered_map<std::string, std::vector<uint32_t>> allele_depths;
   std::unordered_set<ITNode*> seen_amplicons;
   for(uint32_t i=0; i < global_positions.size(); i++){
-    if(global_positions[i].amplicons.size() > 0){
+    if(global_positions[i].amplicons.size() > 0 && global_positions[i].gapped_depth >= min_depth){
       allele_frequencies.clear();
       allele_depths.clear();
-      collect_allele_stats(global_positions[i].amplicons, allele_frequencies, allele_depths, min_depth, min_qual);
+      collect_allele_stats(global_positions[i].amplicons, allele_frequencies, allele_depths, min_qual);
       for (const auto &[key, values] : allele_frequencies) {
         double std = calculate_standard_deviation_weighted(values, allele_depths[key]);
         if(std > 0.03){

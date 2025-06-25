@@ -272,7 +272,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     std::cerr << ("Unable to open input file.") << std::endl;
     return -1;
   }
-
   // Get the header
   sam_hdr_t *header = sam_hdr_read(in);
   if (header == NULL) {
@@ -314,20 +313,21 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     if (end_pos > last_position) {
       last_position = end_pos;
       //get the region
-      tid = aln->core.tid;
+      if(aln->core.tid > -1){
+        tid = aln->core.tid;
+      }
     }
   }
+
   const std::string ref_name = (std::string)header->target_name[tid];
   bam_destroy1(aln);
   bam_hdr_destroy(header);
   sam_close(in);
-
   in = sam_open(bam.c_str(), "r");
   header = sam_hdr_read(in);
   aln = bam_init1();
   //hold the reads until it's mate can be found
   std::unordered_map<std::string, bam1_t*> read_map;
-
   // Iiterate through reads
   while (sam_read1(in, header, aln) >= 0) {
     //get the name of the read
@@ -390,10 +390,10 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   }
   //combine amplicon counts to get total variants
   combine_haplotypes(global_positions);
-
   //TODO build in quality filters, and min depth filter
   std::vector<ITNode*> flagged_amplicons = calculate_amplicon_variation(global_positions, min_depth, min_qual);
   set_amplicon_flag(flagged_amplicons, global_positions);
+
   //write variants to a file
   std::unordered_map<std::string, std::vector<double>> allele_frequencies;
   std::vector<allele> del_alleles;
