@@ -332,6 +332,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   while (sam_read1(in, header, aln) >= 0) {
     //get the name of the read
     std::string read_name = bam_get_qname(aln);
+
     if (!(aln->core.flag & BAM_FPAIRED) || !(aln->core.flag & BAM_FPROPER_PAIR)){
       //if the read is unpaired try to assign it to an amplicon anyways
       std::vector<uint32_t> positions;
@@ -429,6 +430,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     if(del_alleles.size() > 0){
       var.alleles.insert(var.alleles.end(), del_alleles.begin(), del_alleles.end());
     }
+
     //get amplicon specific frequencies
     allele_frequencies.clear();
     collect_allele_frequencies(var.amplicons, allele_frequencies);
@@ -441,8 +443,12 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       if(var.alleles[j].depth == 0){
         continue;
       }
-      double freq = (double)var.alleles[j].depth / ((double)var.depth);
-      double gapped_freq = (double)var.alleles[j].depth / (double)var.gapped_depth;
+      uint32_t depth = var.depth;
+      uint32_t gapped_depth = var.gapped_depth;
+      auto dit = std::find(var.alleles[j].nuc.begin(), var.alleles[j].nuc.end(), '-');
+
+      double freq = (double)var.alleles[j].depth / ((double)depth);
+      double gapped_freq = (double)var.alleles[j].depth / (double)gapped_depth;
       file << ref_name <<"\t"; //region
       file << std::to_string(var.pos) << "\t"; //position
       file << ref << "\t"; //ref
@@ -453,7 +459,11 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       file << std::to_string(var.alleles[j].depth) << "\t"; //alt dp
       file << blank; //alt rv
       file << std::to_string((double)var.alleles[j].mean_qual / (double)var.alleles[j].depth) << "\t"; //alt qual
-      file << std::to_string(freq) << "\t"; //alt freq
+      if(dit == var.alleles[j].nuc.end()){
+        file << std::to_string(freq) << "\t"; //alt freq
+      } else {
+        file << std::to_string(gapped_freq) << "\t"; //alt freq
+      }
       file << std::to_string(var.depth) << "\t"; //total dp ungapped
       file << blank; //pval
       file << blank; //pass
