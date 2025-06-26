@@ -445,6 +445,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       }
       uint32_t depth = var.depth;
       uint32_t gapped_depth = var.gapped_depth;
+
+      //check if this allele is a deletion
       auto dit = std::find(var.alleles[j].nuc.begin(), var.alleles[j].nuc.end(), '-');
 
       double freq = (double)var.alleles[j].depth / ((double)depth);
@@ -461,10 +463,13 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       file << std::to_string((double)var.alleles[j].mean_qual / (double)var.alleles[j].depth) << "\t"; //alt qual
       if(dit == var.alleles[j].nuc.end()){
         file << std::to_string(freq) << "\t"; //alt freq
+        file << std::to_string(var.depth) << "\t"; //total dp ungapped
       } else {
-        file << std::to_string(gapped_freq) << "\t"; //alt freq
+        uint32_t useful_depth = gapped_depth - var.alleles[j].depth;
+        double useful_freq = (double)var.alleles[j].depth / (double)useful_depth;
+        file << std::to_string(useful_freq) << "\t"; //alt freq
+        file << std::to_string(useful_depth) << "\t";
       }
-      file << std::to_string(var.depth) << "\t"; //total dp ungapped
       file << blank; //pval
       file << blank; //pass
       file << blank; //gff feature
