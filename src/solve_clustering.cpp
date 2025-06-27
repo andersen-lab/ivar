@@ -64,6 +64,8 @@ double find_neighboring_cluster(double freq, uint32_t cluster_assigned, std::vec
   return(means[index]);
 }
 
+
+
 void rewrite_position_masking(std::vector<variant> &variants, gaussian_mixture_model model, uint32_t n){
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].amplicon_flux && variants[i].freq_numbers.size() > 1){
@@ -101,44 +103,30 @@ void rewrite_position_masking(std::vector<variant> &variants, gaussian_mixture_m
   }
 }
 
-std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, std::vector<double>solution, std::vector<std::vector<uint32_t>> inverse_groups, std::vector<double> means){
+std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, std::vector<double> means){
   //stores the numbers of every amplicon where we believe experiences fluctuation that imapcts consensus
+  //here we define that as a position where the amplicon is fluctuating and the closest cluster is within a standard deviation
   std::vector<uint32_t> amplicons_to_mask;
+
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].amplicon_flux && !variants[i].outside_freq_range){
       //find all clusters not part of the same assignment
       std::vector<double> other_population_clusters;
-      for(uint32_t j=0; j < inverse_groups.size(); j++){
-        //check to make sure you're lookin at a group that's part of the solution
-        auto mit = std::find(solution.begin(), solution.end(), means[j]);
-        if(mit == solution.end()) continue;
-        auto it = std::find(inverse_groups[j].begin(), inverse_groups[j].end(), variants[i].cluster_assigned);
-        //assigned cluster is not apart of the population
-        if(it == inverse_groups[j].end())
-        for(auto ig : inverse_groups[j]){
-          //CLEAN UP this will push redundant things back
-          other_population_clusters.push_back(means[ig]);
-        }
+      other_population_clusters.reserve(means.size());
+      for(uint32_t j=0; j< means.size();j++){
+        auto it = std::find(variants[i].consensus_numbers.begin(), variants[i].consensus_numbers.end(), j);
+        if(it == variants[i].consensus_numbers.end()) other_population_clusters.push_back(means[j]);
       }
 
       //find the second closest cluster index
       double closest_mean = find_neighboring_cluster(variants[i].gapped_freq, variants[i].cluster_assigned, other_population_clusters);
+
       //check if the cluster is within the standard dev of the variant
       bool fluctuating = test_cluster_deviation(closest_mean, means[variants[i].cluster_assigned], variants[i].std_dev);
-      if(fluctuating){
-        for(auto v : variants[i].amplicon_numbers){
-          if(std::find(amplicons_to_mask.begin(), amplicons_to_mask.end(), v) == amplicons_to_mask.end()){
-            amplicons_to_mask.push_back(v);
-            //std::cerr << "pos " << variants[i].position << " freq " << variants[i].gapped_freq << " " << closest_mean << " assigned mean " << means[variants[i].cluster_assigned] << std::endl;
-            /*for(auto x : variants[i].freq_numbers){
-              std::cerr << x << " ";
-            }
-            std::cerr << "\n" << std::endl;
-            for(auto x : variants[i].amplicon_numbers){
-              std::cerr << x << " ";
-            }
-            std::cerr << "\n" << std::endl;*/
-          }
+      if(!fluctuating) continue;
+      for(auto v : variants[i].amplicon_numbers){
+        if(std::find(amplicons_to_mask.begin(), amplicons_to_mask.end(), v) == amplicons_to_mask.end()){
+          amplicons_to_mask.push_back(v);
         }
       }
     }
@@ -545,7 +533,6 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   //rewrite_position_masking(variants, model, means.size());
   //here we adjuts amplicon masking based on clustering
   //TESTLINES
-  std::cerr << "seg fault occuring solve clusters" << std::endl;
-  std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, solution, inverse_groups, means);
+  std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, means);
   modify_variant_masking(amplicons_to_mask, variants);
 }

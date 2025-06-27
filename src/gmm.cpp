@@ -804,7 +804,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       useful_var++;
       variants.push_back(base_variants[i]);
       count_pos.push_back(base_variants[i].position);
-      std::cerr << base_variants[i].freq << " " << base_variants[i].position << " " << base_variants[i].nuc << " " << base_variants[i].depth << " " << base_variants[i].gapped_freq << std::endl;
+      //std::cerr << base_variants[i].freq << " " << base_variants[i].position << " " << base_variants[i].nuc << " " << base_variants[i].depth << " " << base_variants[i].gapped_freq << std::endl;
     }
   }
   std::cerr << "useful var " << useful_var << std::endl;
@@ -819,11 +819,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   arma::mat data(1, useful_var, arma::fill::zeros);
 
   //(rows, cols) where each columns is a sample
-  uint32_t count=0;
   for(uint32_t i = 0; i < variants.size(); i++){
     double tmp = static_cast<double>(variants[i].gapped_freq);
-    data.col(count) = tmp;
-    count += 1;
+    data.col(i) = tmp;
   }
   std::vector<uint32_t> exclude_cluster_indices;
 
