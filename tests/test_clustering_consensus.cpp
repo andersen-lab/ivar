@@ -53,8 +53,8 @@ int main() {
   uint32_t n = 2;
 
   parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual, reference_file);
-  handle_conflicting_del(base_variants);
-  separate_deletion_positions(base_variants);
+  //handle_conflicting_del(base_variants);
+  //separate_deletion_positions(base_variants);
 
   double error_rate = cluster_error(base_variants, min_qual, min_depth);
   double lower_bound = 1-error_rate+0.0001;
@@ -67,6 +67,7 @@ int main() {
   for(uint32_t i=0; i < base_variants.size(); i++){
     if(!base_variants[i].outside_freq_range && !base_variants[i].depth_flag && !base_variants[i].amplicon_flux && !base_variants[i].amplicon_masked){
       variants.push_back(base_variants[i]);
+      std::cerr << base_variants[i].position << " " << base_variants[i].nuc << std::endl;
       count++;
     }
   }
@@ -85,7 +86,7 @@ int main() {
   solve_clusters(variants, retrained, lower_bound, solution);
   std::cerr << "solved clusters" << std::endl;
   cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, reference_file);
-
+  std::cerr << "consensus clustered" << std::endl;
   std::vector<pair<std::string, std::string>> gt_sequences;
   read_consensus(gt_sequences, consensus_filename);
   std::string exp_sequence;

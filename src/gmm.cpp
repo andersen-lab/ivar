@@ -784,8 +784,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, ref);
-  handle_conflicting_del(base_variants);
-  separate_deletion_positions(base_variants);
+  //handle_conflicting_del(base_variants);
+  //separate_deletion_positions(base_variants);
 
   double error_rate = cluster_error(base_variants, min_qual, min_depth);
   double lower_bound = 1-error_rate+0.0001;
