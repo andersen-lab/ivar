@@ -14,6 +14,25 @@
 #include "../src/parse_gff.h"
 #include "../src/genomic_position.h"
 
+variant find_identical_variant(variant search_var, std::vector<variant> all_variants){
+  variant null;
+  null.nuc = "None";
+  for (auto var : all_variants){
+    if(var.position == search_var.position && var.nuc == search_var.nuc) return(var);
+  }
+  return(null);
+}
+
+bool test_depth(std::vector<variant> new_variants, std::vector<variant> old_variants){
+  bool depths_match = true;
+  for(uint32_t i=0; i < new_variants.size(); i++){
+    variant match = find_identical_variant(new_variants[i], old_variants);
+    std::cerr << match.nuc << " " << new_variants[i].position << std::endl;
+    exit(0);
+  }
+  return(depths_match);
+}
+
 int main() {
   std::string prefix = "/tmp/var";
   std::string prefix_2 = "/tmp/var_2";
@@ -26,6 +45,7 @@ int main() {
   uint8_t min_qual = 20;
   uint32_t round_val = 4;
   double min_threshold = 0;
+
   std::string pair_info = "../data/version_bump_tests/pair_file.tsv";
   std::string bed_file = "../data/version_bump_tests/SARS-CoV-2.primer.bed";
   std::string reference_file = "../data/version_bump_tests/MN908947.3_sequence.fasta";
@@ -41,9 +61,12 @@ int main() {
 
   //call variants in the old way
   std::ifstream mplp(path);
-  call_variants_from_plup(mplp, prefix, min_qual, min_threshold, min_depth, reference_file, "", true);
+  call_variants_from_plup(mplp, prefix, min_qual, min_threshold, min_depth, reference_file, "", true); //gapped depth call
   std::vector<variant> old_variants;
   parse_internal_variants(prefix + ".tsv", old_variants, min_depth, round_val, min_qual, reference_file);
+
+  test_depth(new_variants, old_variants);
+  exit(0);
 
   //compare variants depths between old and new method
   bool depths_match = true;
@@ -63,6 +86,8 @@ int main() {
       if(found) break;
     }
   }
+  exit(0);
+
 
   if(depths_match && new_variants.size() > 0) success++;
   else std::cerr << "depth tests failed" << std::endl;

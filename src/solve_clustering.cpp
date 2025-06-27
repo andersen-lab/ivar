@@ -73,7 +73,6 @@ void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gaussi
     if(!variants[i].amplicon_flux) continue;
     arma::mat final_data = arma::conv_to<arma::rowvec>::from(variants[i].freq_numbers);
     final_data.reshape(1, model.n);
-    std::cerr << "here" << std::endl;
     tmp.clear();
     prob_matrix.clear();
     for(uint32_t j=0; j < model.n; j++){
