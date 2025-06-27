@@ -64,42 +64,42 @@ double find_neighboring_cluster(double freq, uint32_t cluster_assigned, std::vec
   return(means[index]);
 }
 
+void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gaussian_mixture_model model){
+  std::vector<std::vector<double>> prob_matrix;
+  std::vector<double> tmp;
 
-
-void rewrite_position_masking(std::vector<variant> &variants, gaussian_mixture_model model, uint32_t n){
   for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].amplicon_flux && variants[i].freq_numbers.size() > 1){
-      //populate a new armadillo dataset with more frequencies
-      arma::mat final_data(1, variants[i].freq_numbers.size(), arma::fill::zeros);
-      for(uint32_t j = 0; j < variants[i].freq_numbers.size(); j++){
-        final_data.col(j) = static_cast<double>(variants[i].freq_numbers[j]);
-      }
-      //recalculate the prob matrix based on the new dataset
-      std::vector<std::vector<double>> prob_matrix;
-      std::vector<double> tmp;
-      for(uint32_t j=0; j < n; j++){
-        arma::rowvec set_likelihood = model.model.log_p(final_data, j);
-        tmp.clear();
-        for(uint32_t k=0; k < final_data.n_cols; k++){
-          tmp.push_back((double)set_likelihood[k]);
-         }
-        prob_matrix.push_back(tmp);
-      }
-      std::vector<std::vector<double>> inverse = transpose_vector(prob_matrix);
-      bool mask = false;
-      for(uint32_t j=0; j < variants[i].freq_numbers.size(); j++){
-        auto max_it = std::max_element(inverse[j].begin(), inverse[j].end());
-        uint32_t index = std::distance(inverse[j].begin(), max_it);
-
-        auto it = std::find(variants[i].consensus_numbers.begin(), variants[i].consensus_numbers.end(), index);
-        if(it == variants[i].consensus_numbers.end()){
-          mask = true;
-          break;
-        }
-      }
-      variants[i].amplicon_flux = mask;
-      variants[i].amplicon_masked = mask;
+    if(variants[i].freq_numbers.size() < 2) continue;
+    if(!variants[i].amplicon_flux) continue;
+    arma::mat final_data = arma::conv_to<arma::rowvec>::from(variants[i].freq_numbers);
+    final_data.reshape(1, model.n);
+    std::cerr << "here" << std::endl;
+    tmp.clear();
+    prob_matrix.clear();
+    for(uint32_t j=0; j < model.n; j++){
+      arma::rowvec set_likelihood = model.model.log_p(final_data, j);
+      tmp.clear();
+      for(uint32_t k=0; k < final_data.n_cols; k++){
+        tmp.push_back((double)set_likelihood[k]);
+       }
+      prob_matrix.push_back(tmp);
     }
+    std::vector<std::vector<double>> inverse = transpose_vector(prob_matrix);
+    for(uint32_t j=0; j < variants[i].freq_numbers.size(); j++){
+      auto max_it = std::max_element(inverse[j].begin(), inverse[j].end());
+      uint32_t index = std::distance(inverse[j].begin(), max_it);
+      variants[i].freq_assignments.push_back(index);
+    }
+  }
+}
+
+void rewrite_position_masking(std::vector<variant> &variants){
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].freq_numbers.size() < 2) continue;
+    if(!variants[i].amplicon_flux) continue;
+      bool all_equal = std::all_of(variants[i].freq_assignments.begin(), variants[i].freq_assignments.end(), [&](uint32_t v) {return v == variants[i].freq_assignments[0];});
+      if(all_equal) variants[i].amplicon_flux = false;
+      else variants[i].amplicon_flux = true;
   }
 }
 
@@ -529,10 +529,9 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
       }
     }
   }
-  //here we assess if positions should be masked based on clustering
-  //rewrite_position_masking(variants, model, means.size());
-  //here we adjuts amplicon masking based on clustering
-  //TESTLINES
+  amplicon_specific_cluster_assignment(variants, model);
+  rewrite_position_masking(variants);
+
   std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, means);
   modify_variant_masking(amplicons_to_mask, variants);
 }

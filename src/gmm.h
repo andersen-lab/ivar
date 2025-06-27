@@ -40,6 +40,9 @@ struct variant {
   std::vector<uint32_t> amplicon_numbers;
   //frequencies of this variants on each amplicon
   std::vector<double> freq_numbers;
+  //per amplicon frequency assignments to clusters
+  std::vector<uint32_t> freq_assignments;
+
   //the consensus sequence this variant is assigned to
   std::vector<uint32_t> consensus_numbers;
   //if this cluster is fully resolveable or not
