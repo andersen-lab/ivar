@@ -13,7 +13,7 @@
 #include "../src/interval_tree.h"
 
 int main() {
-  int num_tests = 2;
+  int num_tests = 4;
   int success = 0;
 
   /* TEST 1 - Position level masking based on amplicon fluctuation.
@@ -24,6 +24,10 @@ int main() {
    *
    * First, we test to make sure amplicon-specific variant frequencies are \
    * assigned to the correct clusters.
+   * Second, we check the amplicon flagging.
+   *
+   * A - Position not flagged.
+   * B - Position flagged.
    */
   std::vector<variant> variants;
   gaussian_mixture_model model;
@@ -48,12 +52,36 @@ int main() {
   amplicon_specific_cluster_assignment(variants, model);
 
   variant output = variants[0];
+  //this checks for correct assignment on the amplicon level
   if(output.freq_assignments[0] == 0 && output.freq_assignments[1] == 0){
     success++;
   }
-  std::cerr << variants.size() << std::endl;
   rewrite_position_masking(variants); //change the position masking
   if(!variants[0].amplicon_flux) success++; //should not be flagged
+
+
+  variants.clear();
+  means.clear();
+  means = {0.60, 0.40};
+  mmeans = means;
+  mmeans = mmeans.t();
+  gmm_model.set_params(mmeans, covs, hefts);
+  model.model = gmm_model;
+  model.means = means;
+  tmp.freq = 0.5;
+  tmp.amplicon_flux = true;
+  tmp.freq_numbers = {0.55, 0.45};
+  variants.push_back(tmp);
+  amplicon_specific_cluster_assignment(variants, model);
+
+  output = variants[0];
+  //here they should be assigned to different clusters
+  if(output.freq_assignments[0] == 0 && output.freq_assignments[1] == 1){
+    success++;
+  }
+  if(variants[0].amplicon_flux){
+    success++;
+  }
 
   /* TEST 2 - Amplicons are masked only if they
    * (a) they contain a position flagged as experiencing fluctuation
@@ -62,6 +90,11 @@ int main() {
    * of 0.10 and it's assigned to a cluster at 0.50, however a cluster \
    * also exists at 0.45 we would flag the amplicon.
    */
+
   //std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, means);
+
+
+
+  std::cerr << "success " << success << " tests " << num_tests << std::endl;
   return (num_tests == success) ? 0 : -1;
 }
