@@ -272,11 +272,11 @@ std::vector<std::vector<double>> find_solutions(std::vector<double> means, doubl
   std::vector<std::vector<double>> results;
 
   find_combinations(means, 0, current, results, 0);
-
   std::sort(results.begin(), results.end());
   results.erase(std::unique(results.begin(), results.end()), results.end());
 
   std::vector<std::vector<double>> final_results;
+
   //constrain that the solutions must add to 1
   for(uint32_t i=0; i < results.size(); i++){
     bool keep = within_error_range(results[i], 1, error);
@@ -377,7 +377,7 @@ std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, dou
   for(uint32_t i=0; i < means.size(); i++){
     //if the estimated error is within one standard deviation of the cluster mean
     //and the standard deviation is relatively small - noise peaks tend to have smaller stdevs
-    if(((means[i] - (std_devs[i])) <= estimated_error) && std_devs[i] < 0.05 && means[i] < 0.5){
+    if((means[i]-std_devs[i] <= estimated_error) && std_devs[i] < 0.05 && means[i] < 0.5){
       noise_indices.push_back(i);
     }
   }
@@ -386,16 +386,15 @@ std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, dou
 
 void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model, double estimated_error, std::vector<double> &solution){
   std::cerr << "solving clusters" << std::endl;
-  double error = 0.10;
+  double error = 0.05;
   double solution_error = 0.10;
   calculate_cluster_deviations(model);
   //read in the cluster values
   std::vector<double> means = model.means;
-
   std::cerr << "estimated error " << estimated_error << std::endl;
 
   //determine if any clusters are possible noise
-  std::vector<uint32_t> noise_indices = noise_cluster_calculator(model, 1-estimated_error);
+  std::vector<uint32_t> noise_indices = noise_cluster_calculator(model, estimated_error);
   //filter peaks from means by index
   std::vector<double> filtered_means;
   std::vector<double> std_devs;
@@ -409,7 +408,6 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   //find position wise frequency pairs
   std::vector<std::vector<double>> pairs = frequency_pair_finder(variants, means);
   std::vector<std::vector<double>> solutions = find_solutions(filtered_means, error);
-
   //find peaks that can't be a subset of other peaks
   std::vector<double> non_subset_means;
   for(uint32_t i=0; i < filtered_means.size(); i++){

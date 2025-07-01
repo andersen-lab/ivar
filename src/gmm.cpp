@@ -914,6 +914,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   assign_all_variants(variants, base_variants, retrained);
   add_noise_variants(variants, base_variants);
-  solve_clusters(variants, retrained, error_rate, solution);
+  solve_clusters(variants, retrained, lower_bound, solution);
   return(variants);
 }
