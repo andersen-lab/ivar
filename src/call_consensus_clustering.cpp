@@ -202,14 +202,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
         }
     }
   }
-  std::cerr << "printing deletions" << std::endl;
-  for(auto con : deletions){
-    for(auto del : con){
-      std::cerr << del << " ";
-    }
-    std::cerr << "\n";
-  }
-
   std::vector<std::string> all_sequences;
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
     std::string tmp = std::accumulate(all_consensus_seqs[i].begin(), all_consensus_seqs[i].end(), std::string(""));
@@ -239,15 +231,10 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
 
   for(uint32_t i=0; i < sorted_strings.size(); i++){
     double tmp_mean = sorted_values[i];
-    std::cerr << "mean " << tmp_mean << std::endl;
     auto it = std::find(solution.begin(), solution.end(), tmp_mean);
     if(it == solution.end()){
       continue;
     }
-    for(uint32_t j=485; j < 490; j++){
-      std::cerr << j << " " << sorted_strings[i][j] << " ";
-    }
-    std::cerr << "\n";
     std::string trimmed_sequence = trim_leading_ambiguities(sorted_strings[i], min_position);
     file << ">"+clustering_file+"_cluster_"+ std::to_string(tmp_mean) << "\n";
     file << trimmed_sequence << "\n";

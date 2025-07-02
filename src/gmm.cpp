@@ -701,6 +701,28 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
   }
 }
 
+void set_deletion_flags(std::vector<variant> &variants){
+  std::vector<uint32_t> del_positions;
+
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].depth_flag) continue;
+    bool found = std::find(variants[i].nuc.begin(), variants[i].nuc.end(), '-') != variants[i].nuc.end();
+    if(found){
+      for(uint32_t j=1; j < variants[i].nuc.size()-1; j++){
+        del_positions.push_back(variants[i].position+j);
+      }
+    }
+  }
+
+  //set the include_clustering flag to false if this covers a deletion position
+  for(uint32_t i=0; i < variants.size(); i++){
+    bool found = std::find(del_positions.begin(), del_positions.end(), variants[i].position) != del_positions.end();
+    if(found) {
+      variants[i].include_clustering = false;
+    }
+  }
+}
+
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::string ref){
   if(ref.empty()){
     std::cerr << "Please provide a reference sequence." << std::endl;
@@ -712,21 +734,25 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, ref);
-
+  set_deletion_flags(base_variants);
+  /*for(auto var : base_variants){
+    if(!var.include_clustering && var.gapped_freq > 0.03 && var.gapped_freq < 0.97){
+      std::cerr << var.nuc << " " << var.position << " " << var.gapped_freq << std::endl;
+    }
+  }
+  exit(0);*/
   double error_rate = cluster_error(base_variants, min_qual, min_depth);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
   set_freq_range_flags(base_variants, lower_bound, upper_bound);
-  std::cerr << "gmm model lower " << lower_bound << " upper " << upper_bound << std::endl;
-
-
+  std::cerr << "lower bound " << lower_bound <<  " upper bound " << upper_bound << std::endl;
   //this whole things needs to be reconfigured
   uint32_t useful_var=0;
   std::vector<variant> variants;
   std::vector<uint32_t> count_pos;
 
   for(uint32_t i=0; i < base_variants.size(); i++){
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked){
+    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
       useful_var++;
       variants.push_back(base_variants[i]);
       count_pos.push_back(base_variants[i].position);
