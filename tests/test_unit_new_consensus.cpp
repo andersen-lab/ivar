@@ -13,7 +13,7 @@
 #include "../src/interval_tree.h"
 
 int main() {
-  int num_tests = 4;
+  int num_tests = 7;
   int success = 0;
 
   /* TEST 1 - Position level masking based on amplicon fluctuation.
@@ -93,7 +93,29 @@ int main() {
 
   //std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, means);
 
+  /* TEST 3 - Flag positions that are adjacent to deletion starts as not being included in clustering
+   */
+  variants.clear();
+  tmp.nuc = "-A";
+  tmp.position = 1;
 
+  variant tmp2;
+  tmp2.position = 1;
+
+  variant tmp3;
+  tmp3.position = 2;
+
+  variants.push_back(tmp);
+  variants.push_back(tmp2);
+  variants.push_back(tmp3);
+
+  set_deletion_flags(variants);
+  output = variants[0];
+  if(output.include_clustering == 1) success++;
+  output = variants[1];
+  if(output.include_clustering == 1) success++;
+  output = variants[2];
+  if(output.include_clustering == 0) success++;
 
   std::cerr << "success " << success << " tests " << num_tests << std::endl;
   return (num_tests == success) ? 0 : -1;
