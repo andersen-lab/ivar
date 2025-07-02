@@ -701,78 +701,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
   }
 }
 
-void handle_conflicting_del(std::vector<variant> &variants){
-  std::vector<uint32_t> remove_index;
-  for(uint32_t i=0; i < variants.size(); i++){
-    //position contains a deletion
-    if (std::find(variants[i].nuc.begin(), variants[i].nuc.end(), '-') != variants[i].nuc.end()){
-      if (std::find(remove_index.begin(), remove_index.end(), i) != remove_index.end()){
-        continue;
-      }
-      for(uint32_t j=0; j < variants.size(); j++){
-        if(i == j) continue;
-        bool del_pos = std::find(variants[j].nuc.begin(), variants[j].nuc.end(), '-') != variants[j].nuc.end();
-        if(variants[i].position == variants[j].position && del_pos){
-          if(variants[j].depth > variants[i].depth){
-            remove_index.push_back(i);
-            //std::cerr << "b " << variants[i].position << " " << variants[i].depth << " " << variants[i].nuc << std::endl;
-          } else if(variants[i].depth == variants[j].depth) {
-            remove_index.push_back(i);
-            //std::cerr << "c " << variants[i].position << " " << variants[i].depth << std::endl;
-          }
-        }
-      }
-    }
-  }
-  std::sort(remove_index.rbegin(), remove_index.rend());
-  for (size_t idx : remove_index) {
-    if (idx < variants.size()) {
-      variants.erase(variants.begin() + idx);
-    }
-  }
-}
-
-void separate_deletion_positions(std::vector<variant> &variants){
-  for(uint32_t i=0; i < variants.size(); i++){
-    auto it = std::find(variants[i].nuc.begin(), variants[i].nuc.end(), '-');
-    if(it != variants[i].nuc.end()){
-      std::string tmp = variants[i].nuc;
-      tmp.erase(std::remove(tmp.begin(), tmp.end(), '-'), tmp.end());
-      for(uint32_t j=0; j < tmp.size(); j++){
-        if(j ==0) variants[i].nuc = "-";
-        //search for the following positions
-        //TODO not complete
-        variant new_var;
-        new_var.nuc = "-";
-        new_var.position = variants[i].position + j;
-        new_var.depth = variants[i].depth;
-        new_var.gapped_depth = variants[i].gapped_depth;
-        new_var.gapped_freq = variants[i].gapped_freq;
-        new_var.freq = variants[i].freq;
-        new_var.qual = variants[i].qual;
-        new_var.total_depth = variants[i].total_depth;
-        new_var.cluster_assigned = variants[i].cluster_assigned;
-        new_var.version_1_var = variants[i].version_1_var;
-        new_var.std_dev = variants[i].std_dev;
-        new_var.amplicon_numbers = variants[i].amplicon_numbers;
-        new_var.freq_numbers = variants[i].freq_numbers;
-        new_var.consensus_numbers = variants[i].consensus_numbers;
-        new_var.resolved = variants[i].resolved;
-        new_var.vague_assignment = variants[i].vague_assignment;
-        new_var.amplicon_flux = variants[i].amplicon_flux;
-        new_var.amplicon_masked = variants[i].amplicon_masked;
-        new_var.primer_masked = variants[i].primer_masked;
-        new_var.depth_flag = variants[i].depth_flag;
-        new_var.qual_flag = variants[i].qual_flag;
-        new_var.outside_freq_range = variants[i].outside_freq_range;
-        new_var.cluster_outlier = variants[i].cluster_outlier;
-        new_var.probabilities = variants[i].probabilities;
-        variants.push_back(new_var);
-      }
-    }
-  }
-}
-
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::string ref){
   if(ref.empty()){
     std::cerr << "Please provide a reference sequence." << std::endl;
@@ -784,8 +712,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, ref);
-  //handle_conflicting_del(base_variants);
-  //separate_deletion_positions(base_variants);
 
   double error_rate = cluster_error(base_variants, min_qual, min_depth);
   double lower_bound = 1-error_rate+0.0001;
@@ -804,7 +730,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       useful_var++;
       variants.push_back(base_variants[i]);
       count_pos.push_back(base_variants[i].position);
-      //std::cerr << base_variants[i].freq << " " << base_variants[i].position << " " << base_variants[i].nuc << " " << base_variants[i].depth << " " << base_variants[i].gapped_freq << std::endl;
+      std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq << std::endl;
     }
   }
   std::cerr << "useful var " << useful_var << std::endl;
@@ -857,7 +783,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         std::cerr << "empty cluster" << std::endl;
         continue;
       }
-      std::cerr << "mean " << mean << " mad " << mad << " cluster size " << data.size() << std::endl;
+      std::cerr << "\nmean " << mean << " mad " << mad << " cluster size " << data.size() << "\n" << std::endl;
       for(auto d : data){
         std::cerr << d << " ";
       }

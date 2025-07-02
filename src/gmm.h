@@ -36,6 +36,7 @@ struct variant {
   int cluster_assigned = -1;
   bool version_1_var=false;
   double std_dev;
+
   //number corresponding the the amplicons covering this position
   std::vector<uint32_t> amplicon_numbers;
   //frequencies of this variants on each amplicon
@@ -57,6 +58,7 @@ struct variant {
   bool qual_flag=false; //quality is below threshold
   bool outside_freq_range=false; //outside of useful frequency range for model
   bool cluster_outlier=false; //is an outlier for the cluster assigned
+  bool include_clustering=true; //here we flag the later positions of deletions
   std::vector<double> probabilities;
 
 };
