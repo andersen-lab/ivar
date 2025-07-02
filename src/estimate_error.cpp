@@ -20,7 +20,7 @@ std::vector<std::vector<uint32_t>> determine_outlier_points(std::vector<double> 
       std::vector<double> z_scores = z_score(clusters[j]);
       for(uint32_t i=0; i < z_scores.size(); i++){
         double abs = std::abs(z_scores[i]);
-        if(abs >= 5){
+        if(abs >= 3){
           removal_points[j].push_back(i);
         }
       }
@@ -39,7 +39,7 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
 
    for(uint32_t i=0; i < base_variants.size(); i++){
     if(base_variants[i].position > max_pos) max_pos = base_variants[i].position;
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked){
+    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
       useful_count_original++;
       variants_original.push_back(base_variants[i]);
       frequencies.push_back(base_variants[i].gapped_freq);
@@ -64,15 +64,15 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
     std::vector<double> means = model.means;
     //index of largest mean
     uint32_t index = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
+    chosen_peak = index;
     bool stop=false;
     for(uint32_t i=0; i < model.clusters.size(); i++){
       double stdev = calculate_standard_deviation(model.clusters[i]);
-      //double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
+      double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
       if(stdev < 0.01 && i == index) {
         stop = true;
-        chosen_peak = i;
       }
-      //std::cerr << "n " << n << " mean " << mean << " stdev " << stdev << " " << model.clusters[i].size() << std::endl;
+      std::cerr << "n " << n << " mean " << mean << " stdev " << stdev << " " << model.clusters[i].size() << std::endl;
     }
     if(stop) break;
     else n++;
@@ -88,7 +88,6 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
       cleaned_cluster.push_back(universal_cluster[i]);
     }
   }
-
 
   //get the upper edge of the noise cluster
   auto min_it = std::min_element(cleaned_cluster.begin(), cleaned_cluster.end());
