@@ -70,7 +70,7 @@ void assign_all_variants(std::vector<variant> &variants, std::vector<variant> ba
 
   for(uint32_t i = 0; i < base_variants.size(); i++){
     //previously not assigned due to possible amplicon flux
-    if(!base_variants[i].outside_freq_range && (base_variants[i].amplicon_flux || base_variants[i].amplicon_masked)){
+    if(!base_variants[i].outside_freq_range && (base_variants[i].amplicon_flux || base_variants[i].amplicon_masked || !base_variants[i].include_clustering)){
       count++;
       tmp_var.push_back(base_variants[i]);
       variants.push_back(base_variants[i]);
@@ -735,12 +735,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, ref);
   set_deletion_flags(base_variants);
-  /*for(auto var : base_variants){
-    if(!var.include_clustering && var.gapped_freq > 0.03 && var.gapped_freq < 0.97){
-      std::cerr << var.nuc << " " << var.position << " " << var.gapped_freq << std::endl;
-    }
-  }
-  exit(0);*/
   double error_rate = cluster_error(base_variants, min_qual, min_depth);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
@@ -810,10 +804,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         continue;
       }
       std::cerr << "\nmean " << mean << " mad " << mad << " cluster size " << data.size() << "\n" << std::endl;
-      for(auto d : data){
-        std::cerr << d << " ";
-      }
-      std::cerr << "\n";
       if(data.size() > 5){
         if(mad <= 0.10){
           optimal = true;
