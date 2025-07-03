@@ -3,7 +3,7 @@
 #include "saga.h"
 
 std::vector<double> z_score(std::vector<double> data) {
-    double mean = std::accumulate(data.begin(), data.end(), 0.0) / data.size();
+    double mean = calculate_mean(data);
     double sq_sum = std::inner_product(data.begin(), data.end(), data.begin(), 0.0);
     double stddev = std::sqrt(sq_sum / data.size() - mean * mean);
 
@@ -13,16 +13,14 @@ std::vector<double> z_score(std::vector<double> data) {
     return z_scores;
 }
 
-std::vector<std::vector<uint32_t>> determine_outlier_points(std::vector<double> data, std::vector<std::vector<double>> clusters){
-    std::vector<std::vector<uint32_t>> removal_points(clusters.size());
+std::vector<uint32_t>determine_outlier_points(std::vector<double> data, std::vector<double> cluster){
+    std::vector<uint32_t> removal_points;
     //calculate cluster specific percentiles
-    for(uint32_t j=0; j < clusters.size(); j++){
-      std::vector<double> z_scores = z_score(clusters[j]);
-      for(uint32_t i=0; i < z_scores.size(); i++){
-        double abs = std::abs(z_scores[i]);
-        if(abs >= 3){
-          removal_points[j].push_back(i);
-        }
+    std::vector<double> z_scores = z_score(cluster);
+    for(uint32_t i=0; i < z_scores.size(); i++){
+      double abs = std::abs(z_scores[i]);
+      if(abs >= 3){
+        removal_points.push_back(i);
       }
     }
     return(removal_points);
@@ -43,10 +41,8 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
       useful_count_original++;
       variants_original.push_back(base_variants[i]);
       frequencies.push_back(base_variants[i].gapped_freq);
-      //std::cerr << base_variants[i].gapped_freq << " " << base_variants[i].freq << " " << base_variants[i].nuc << " " << base_variants[i].position << std::endl;
     }
   }
-  //exit(0);
   if(variants_original.empty()) return(1);
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
   uint32_t count_original=0;
@@ -67,20 +63,23 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
     chosen_peak = index;
     bool stop=false;
     for(uint32_t i=0; i < model.clusters.size(); i++){
-      double stdev = calculate_standard_deviation(model.clusters[i]);
-      double mean = std::accumulate(model.clusters[i].begin(), model.clusters[i].end(), 0.0) / model.clusters[i].size();
-      if(stdev < 0.01 && i == index) {
+      double mean = calculate_mean(model.clusters[i]);
+      double mad = calculate_mad(model.clusters[i], mean);
+      if(mad < 0.01 && i == index) {
         stop = true;
       }
-      std::cerr << "n " << n << " mean " << mean << " stdev " << stdev << " " << model.clusters[i].size() << std::endl;
+      //std::cerr << "n " << n << " mean " << mean << " mad " << mad << " " << model.clusters[i].size() << std::endl;
+      //for(auto m : model.clusters[i]){
+      //  std::cerr << m << " ";
+      //}
+      //std::cerr << "\n";
     }
     if(stop) break;
     else n++;
   }
   //for each cluster this describes the points which are outliers
-  std::vector<std::vector<uint32_t>> removal_points = determine_outlier_points(frequencies, model.clusters);
+  std::vector<uint32_t> outliers = determine_outlier_points(frequencies, model.clusters[chosen_peak]);
   std::vector<double> universal_cluster = model.clusters[chosen_peak];
-  std::vector<uint32_t> outliers = removal_points[chosen_peak];
   std::vector<double> cleaned_cluster;
   for(uint32_t i=0; i < universal_cluster.size(); i++){
     auto it = std::find(outliers.begin(), outliers.end(), i);

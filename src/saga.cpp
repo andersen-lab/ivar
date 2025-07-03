@@ -332,7 +332,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   while (sam_read1(in, header, aln) >= 0) {
     //get the name of the read
     std::string read_name = bam_get_qname(aln);
-
     if (!(aln->core.flag & BAM_FPAIRED) || !(aln->core.flag & BAM_FPROPER_PAIR)){
       //if the read is unpaired try to assign it to an amplicon anyways
       std::vector<uint32_t> positions;
