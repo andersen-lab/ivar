@@ -19,7 +19,7 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> data, std::vec
     std::vector<double> z_scores = z_score(cluster);
     for(uint32_t i=0; i < z_scores.size(); i++){
       double abs = std::abs(z_scores[i]);
-      if(abs >= 3){
+      if(abs >= 5){
         removal_points.push_back(i);
       }
     }
@@ -68,7 +68,7 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
       if(mad < 0.01 && i == index) {
         stop = true;
       }
-      //std::cerr << "n " << n << " mean " << mean << " mad " << mad << " " << model.clusters[i].size() << std::endl;
+      std::cerr << "n " << n << " mean " << mean << " mad " << mad << " " << model.clusters[i].size() << std::endl;
       //for(auto m : model.clusters[i]){
       //  std::cerr << m << " ";
       //}

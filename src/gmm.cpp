@@ -798,13 +798,16 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     for(auto data : clusters){
       double mean = calculate_mean(data);
       double mad = calculate_mad(data, mean);
+
       if(data.size() < 1){
         empty_cluster = true;
         std::cerr << "empty cluster" << std::endl;
         continue;
       }
-      std::cerr << "\nmean " << mean << " mad " << mad << " cluster size " << data.size() << "\n" << std::endl;
-      if(data.size() > 5){
+      /*for(auto d : data) std::cerr << d << " ";
+      std::cerr << "\n";
+      std::cerr << "\nmean " << mean << " mad " << mad << " cluster size " << data.size() << "\n" << std::endl;*/
+      if(data.size() >= 5){
         if(mad <= 0.10){
           optimal = true;
         } else {
@@ -812,7 +815,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
           break;
         }
       } else {
-        if(mad <= 0.03){
+        if(mad <= 0.05){
           optimal = true;
         }  else{
           optimal = false;
