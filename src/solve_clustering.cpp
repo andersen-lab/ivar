@@ -72,7 +72,7 @@ void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gaussi
     if(variants[i].freq_numbers.size() < 2) continue;
     if(!variants[i].amplicon_flux) continue;
     arma::mat final_data = arma::conv_to<arma::rowvec>::from(variants[i].freq_numbers);
-    final_data.reshape(1, model.n);
+    final_data.reshape(1, variants[i].freq_numbers.size());
     tmp.clear();
     prob_matrix.clear();
     for(uint32_t j=0; j < model.n; j++){
@@ -80,7 +80,7 @@ void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gaussi
       tmp.clear();
       for(uint32_t k=0; k < final_data.n_cols; k++){
         tmp.push_back((double)set_likelihood[k]);
-       }
+      }
       prob_matrix.push_back(tmp);
     }
     std::vector<std::vector<double>> inverse = transpose_vector(prob_matrix);
@@ -528,7 +528,6 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   }
   amplicon_specific_cluster_assignment(variants, model);
   rewrite_position_masking(variants);
-
   std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, means);
   modify_variant_masking(amplicons_to_mask, variants);
 }
