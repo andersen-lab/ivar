@@ -283,49 +283,6 @@ void generate_combinations(std::vector<double> &input, std::vector<double>& curr
 }
 
 
-std::vector<std::vector<double>> remove_unexplainable_solutions(std::vector<std::vector<double>> solutions, std::vector<double> means){
-  double error = 0.05;
-  std::vector<std::vector<double>> kept_solutions;
-  for(auto vec : solutions){
-    std::vector<double> possible_peaks;
-    for(auto x : vec){
-      possible_peaks.push_back(x);
-    }
-    std::vector<std::vector<double>> all_combinations;
-    for (uint32_t i= 1; i <= vec.size(); i++) {
-      std::vector<double> current_combination;
-      generate_combinations(vec, current_combination, 0, i, all_combinations);
-    }
-    for(auto vec_two : all_combinations){
-      double sum = std::accumulate(vec_two.begin(), vec_two.end(), 0.0);
-      possible_peaks.push_back(sum);
-    }
-
-    //find each mean
-    bool keep_solution = true;
-    for(auto mean : means){
-      bool useful = false;
-      if(mean < error){
-        continue;
-      }
-      for(auto theoretical_peak : possible_peaks){
-        if(std::abs(theoretical_peak - mean) < error){
-          useful = true;
-          break;
-        }
-      }
-      if(!useful){
-        keep_solution = false;
-        break;
-      }
-    }
-    if(keep_solution){
-      kept_solutions.push_back(vec);
-    }
-  }
-  return(kept_solutions);
-}
-
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector) {
   std::vector<std::vector<double>> transposed_vector;
   // Check if the input vector is not empty
@@ -570,55 +527,6 @@ void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, do
   }
 }
 
-void deletion_variant(std::vector<std::string> row_values, std::vector<variant> &variants, uint32_t depth_cutoff, double compare_quality, double multiplier){
-  std::string deletion = row_values[3];
-  for(uint32_t i=1; i < deletion.size(); i++){
-    variant tmp;
-    tmp.position = std::stoi(row_values[1]) + i;
-    tmp.nuc = '-';
-    tmp.depth = std::stoi(row_values[7]);
-    double freq = std::stod(row_values[10]);
-    tmp.freq = std::round(freq * multiplier) / multiplier;
-    tmp.total_depth = (uint32_t)(tmp.depth / tmp.freq) - tmp.depth;
-    tmp.qual = std::stod(row_values[6]);
-    auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "1";};
-    if(row_values.size() > 20){
-      tmp.gapped_depth = std::stoi(row_values[21]);
-      tmp.gapped_freq = std::round(std::stod(row_values[20]) * multiplier) / multiplier;
-      tmp.amplicon_flux = to_bool(row_values[22]);
-      tmp.amplicon_masked = to_bool(row_values[23]);
-      tmp.std_dev = std::stod(row_values[24]);
-      if(row_values[26] != "NA"){
-        tmp.amplicon_numbers = split_csv(row_values[26]);
-      }
-      if(row_values[25] != "NA"){
-        tmp.freq_numbers = split_csv_double(row_values[25]);
-      }
-      tmp.version_1_var = false;
-    } else {
-      tmp.gapped_freq = 0.0;
-      tmp.amplicon_flux = false;
-      tmp.amplicon_masked = false;
-      tmp.primer_masked = false;
-      tmp.std_dev = 0;
-      tmp.version_1_var = true;
-    }
-    if(!tmp.version_1_var && tmp.total_depth < depth_cutoff){
-      tmp.depth_flag = true;
-    } else if(tmp.version_1_var && tmp.depth < depth_cutoff){
-      tmp.depth_flag = true;
-    } else {
-      tmp.depth_flag = false;
-    }
-    if(tmp.qual < compare_quality){
-      tmp.qual_flag = true;
-    }   else {
-      tmp.qual_flag = false;
-    }
-    variants.push_back(std::move(tmp));
-  }
-}
-
 /**
  * @brief Parses an internally formatted variant file and populates a vector of variant objects.
  *
@@ -640,7 +548,8 @@ void deletion_variant(std::vector<std::string> row_values, std::vector<variant> 
  *
  * @see variant
  */
-void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold, std::string reference_file){
+
+void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold){
   std::ifstream infile(filename);
   std::string line;
   uint32_t count = 0;
@@ -733,7 +642,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   bool development_mode=true;
 
   std::vector<variant> base_variants;
-  parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, ref);
+  parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
   set_deletion_flags(base_variants);
   double error_rate = cluster_error(base_variants, min_qual, min_depth);
   double lower_bound = 1-error_rate+0.0001;

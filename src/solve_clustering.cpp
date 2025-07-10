@@ -214,47 +214,6 @@ std::vector<std::vector<double>> frequency_pair_finder(std::vector<variant> vari
   return(pairs);
 }
 
-bool cluster_gravity_analysis(std::vector<std::vector<double>> solutions){
-  //in the event of multiple solutions, check that the largest cluster is the same
-  std::vector<double> max_values;
-  for(auto solution : solutions){
-    double max = *std::max_element(solution.begin(), solution.end());
-    max_values.push_back(max);
-  }
-  bool all_same = std::all_of(max_values.begin() + 1, max_values.end(), [&](double x) { return x == max_values[0]; });
-  return(all_same);
-}
-
-bool account_for_clusters(std::vector<double> means, std::vector<std::vector<double>> results, double error){
-  bool keep = false;
-  std::vector<double> accounted_means;
-
-  for(uint32_t i=0; i < results.size(); i++){
-    double total = std::accumulate(results[i].begin(), results[i].end(), 0.0f);
-    //determine if this is close to a cluster
-    for(uint32_t j=0; j < means.size(); j++){
-      double diff = std::abs(total-means[j]);
-      if(diff < error){
-        accounted_means.push_back(means[j]);
-      }
-    }
-  }
-
-  for(auto val : accounted_means){
-    auto it = std::find(means.begin(), means.end(), val);
-    if (it != means.end()){
-      uint32_t index = std::distance(means.begin(), it);
-      means.erase(means.begin() + index);
-    }
-  }
-  if(means.size() == 0){
-    keep = true;
-  } else{
-    keep = false;
-  }
-  return(keep);
-}
-
 void find_combinations(std::vector<double> means, uint32_t index, std::vector<double> &current, std::vector<std::vector<double>> &results, double error){
   if (!current.empty()){
     results.push_back(current);
@@ -453,6 +412,7 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   } else{
     solution = solution_sets[0];
   }
+
 
   //TODO
   if(traditional_majority){
