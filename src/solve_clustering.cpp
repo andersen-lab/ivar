@@ -375,9 +375,11 @@ std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, dou
   std::vector<double> std_devs = model.cluster_std_devs;
   std::vector<uint32_t> noise_indices;
   for(uint32_t i=0; i < means.size(); i++){
-    //if the estimated error is within one standard deviation of the cluster mean
+    //if the estimated error is below two standard deviation of the cluster mean
     //and the standard deviation is relatively small - noise peaks tend to have smaller stdevs
-    if((means[i]-std_devs[i] <= estimated_error) && std_devs[i] < 0.05 && means[i] < 0.5){
+    if((means[i]-(std_devs[i]*2) <= estimated_error) && std_devs[i] <= 0.05 && means[i] < 0.5){
+      noise_indices.push_back(i);
+    } else if(means[i]+(std_devs[i]*2) >= (1-estimated_error) && std_devs[i] <= 0.05 && means[i] > 0.5){
       noise_indices.push_back(i);
     }
   }
@@ -402,12 +404,17 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
     auto it = std::find(noise_indices.begin(), noise_indices.end(), i);
     if(it == noise_indices.end()){
       filtered_means.push_back(means[i]);
-      std_devs.push_back(model.cluster_std_devs[i]);
+      if(model.clusters[i].size() > 1){
+        std_devs.push_back(model.cluster_std_devs[i]);
+      } else {
+        std_devs.push_back(0.05);
+      }
     }
   }
   //find position wise frequency pairs
   std::vector<std::vector<double>> pairs = frequency_pair_finder(variants, means);
   std::vector<std::vector<double>> solutions = find_solutions(filtered_means, error);
+
   //find peaks that can't be a subset of other peaks
   std::vector<double> non_subset_means;
   for(uint32_t i=0; i < filtered_means.size(); i++){
@@ -419,6 +426,7 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   //reduce solution space to things that contain the non subset peaks
   std::vector<std::vector<double>> realistic_solutions;
   std::cerr << "all solutions size " << solutions.size() << std::endl;
+
   for(uint32_t i=0; i < solutions.size(); i++){
       std::vector<double> tmp = solutions[i];
       bool found = std::all_of(non_subset_means.begin(), non_subset_means.end(), [&tmp](double value) {return std::find(tmp.begin(), tmp.end(), value) != tmp.end();});

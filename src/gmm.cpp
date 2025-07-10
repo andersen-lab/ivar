@@ -128,7 +128,7 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
   std::vector<double> total_distances;
   std::vector<double> std_devs;
   for(uint32_t j=0; j < 15; j++){
-    bool status2 = arma::kmeans(centroids, data, n, arma::random_spread, 10, false);
+    bool status2 = arma::kmeans(centroids, data, n, arma::random_subset, 10, false);
     if(!status2) continue;
     double total_dist = 0;
     for(auto point : data){
@@ -804,8 +804,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         std::cerr << "empty cluster" << std::endl;
         continue;
       }
-      /*for(auto d : data) std::cerr << d << " ";
-      std::cerr << "\n";*/
+      for(auto d : data) std::cerr << d << " ";
+      std::cerr << "\n";
       std::cerr << "\nmean " << mean << " mad " << mad << " cluster size " << data.size() << "\n" << std::endl;
       if(data.size() >= 5){
         if(mad <= 0.10){
