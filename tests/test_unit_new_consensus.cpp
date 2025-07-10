@@ -55,10 +55,12 @@ int main() {
   //this checks for correct assignment on the amplicon level
   if(output.freq_assignments[0] == 0 && output.freq_assignments[1] == 0){
     success++;
+  } else{
+    std::cerr << "first test failed" << std::endl;
   }
   rewrite_position_masking(variants); //change the position masking
   if(!variants[0].amplicon_flux) success++; //should not be flagged
-
+  else std::cerr << "second test failed" << std::endl;
 
   variants.clear();
   means.clear();
@@ -78,9 +80,13 @@ int main() {
   //here they should be assigned to different clusters
   if(output.freq_assignments[0] == 0 && output.freq_assignments[1] == 1){
     success++;
+  } else{
+    std::cerr << "third test failed" << std::endl;
   }
   if(variants[0].amplicon_flux){
     success++;
+  } else{
+    std::cerr << "fourth test failed" << std::endl;
   }
 
   /* TEST 2 - Amplicons are masked only if they
@@ -112,10 +118,13 @@ int main() {
   set_deletion_flags(variants);
   output = variants[0];
   if(output.include_clustering == 1) success++;
+  else std::cerr << "fifth test failed" << std::endl;
   output = variants[1];
   if(output.include_clustering == 1) success++;
+  else std::cerr << "sixth test failed" << std::endl;
   output = variants[2];
   if(output.include_clustering == 0) success++;
+  else std::cerr << "seventh test failed" << std::endl;
 
   std::cerr << "success " << success << " tests " << num_tests << std::endl;
   return (num_tests == success) ? 0 : -1;

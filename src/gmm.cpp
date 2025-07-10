@@ -805,8 +805,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         continue;
       }
       /*for(auto d : data) std::cerr << d << " ";
-      std::cerr << "\n";
-      std::cerr << "\nmean " << mean << " mad " << mad << " cluster size " << data.size() << "\n" << std::endl;*/
+      std::cerr << "\n";*/
+      std::cerr << "\nmean " << mean << " mad " << mad << " cluster size " << data.size() << "\n" << std::endl;
       if(data.size() >= 5){
         if(mad <= 0.10){
           optimal = true;

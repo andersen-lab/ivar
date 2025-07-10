@@ -446,6 +446,12 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
     solution = solution_sets[0];
   }
 
+  //TODO
+  if(traditional_majority){
+
+  }
+
+
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
   std::vector<std::vector<uint32_t>> inverse_groups(means.size());
