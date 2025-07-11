@@ -44,28 +44,24 @@ int main() {
   uint8_t min_qual = 20;
   double default_threshold = 0.5;
 
-  //TEST 1 - manually currated data
-  std::string var_filename = "../data/version_bump_tests/vbump_consensus_var.txt";
+  std::string ref = "";
+  std::string var_filename = "../data/version_bump_tests/vbump_majority_var.txt";
   std::string consensus_filename = "../data/version_bump_tests/vbump_consensus_ivar.fa";
-  std::string reference_file = "../data/version_bump_tests/MN908947.3_sequence.fasta";
   std::vector<variant> base_variants;
   std::vector<variant> variants;
-  uint32_t n = 2;
+  uint32_t n = 4;
 
   parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual);
   set_deletion_flags(base_variants);
 
-  double error_rate = cluster_error(base_variants, min_qual, min_depth);
-  double lower_bound = 1-error_rate+0.0001;
-  double upper_bound = error_rate-0.0001;
-  std::cerr << "lower error " << lower_bound << " upper error " << upper_bound << std::endl;
+  double lower_bound = 0.03;
+  double upper_bound = 0.97;
   uint32_t count = 0;
   set_freq_range_flags(base_variants, lower_bound, upper_bound);
 
   for(uint32_t i=0; i < base_variants.size(); i++){
     if(!base_variants[i].outside_freq_range && !base_variants[i].depth_flag && !base_variants[i].amplicon_flux && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
       variants.push_back(base_variants[i]);
-      //std::cerr << base_variants[i].position << " " << base_variants[i].nuc << std::endl;
       count++;
     }
   }
@@ -81,7 +77,8 @@ int main() {
   add_noise_variants(variants, base_variants);
 
   solve_clusters(variants, retrained, lower_bound, solution);
-  cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, reference_file);
+
+  cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, ref);
   std::vector<pair<std::string, std::string>> gt_sequences;
   read_consensus(gt_sequences, consensus_filename);
   std::string exp_sequence;

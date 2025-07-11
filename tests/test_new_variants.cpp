@@ -57,13 +57,13 @@ int main() {
   //call variants in the new way
   int result = preprocess_reads(bam_filename, bed_file, prefix, "", pair_info, primer_offset, min_depth, min_qual, reference_file);
   std::vector<variant> new_variants;
-  parse_internal_variants(prefix + ".txt", new_variants, min_depth, round_val, min_qual, reference_file);
+  parse_internal_variants(prefix + ".txt", new_variants, min_depth, round_val, min_qual);
 
   //call variants in the old way
   std::ifstream mplp(path);
   call_variants_from_plup(mplp, prefix, min_qual, min_threshold, min_depth, reference_file, "", true); //gapped depth call
   std::vector<variant> old_variants;
-  parse_internal_variants(prefix + ".tsv", old_variants, min_depth, round_val, min_qual, reference_file);
+  parse_internal_variants(prefix + ".tsv", old_variants, min_depth, round_val, min_qual);
 
   test_depth(new_variants, old_variants);
   exit(0);
@@ -135,7 +135,7 @@ int main() {
   std::string bam_filename_2 = "../data/version_bump_tests/vbump_amplicon.sorted.bam";
   int result_2 = preprocess_reads(bam_filename_2, bed_file, prefix_2, "", pair_info, primer_offset, min_depth, min_qual, reference_file);
   std::vector<variant> new_variants_2;
-  parse_internal_variants(prefix_2 + ".txt", new_variants_2, min_depth, round_val, min_qual, reference_file);
+  parse_internal_variants(prefix_2 + ".txt", new_variants_2, min_depth, round_val, min_qual);
   bool amp_flags_correct = true;
   for(auto var : new_variants_2){
     if(var.position == 670 && !var.amplicon_flux){
@@ -154,7 +154,7 @@ int main() {
   bool no_amp_info = true;
   int result_3 = preprocess_reads(bam_filename, "", prefix_3, "", "", primer_offset, min_depth, min_qual, reference_file);
   std::vector<variant> new_variants_3;
-  parse_internal_variants(prefix_3 + ".txt", new_variants_3, min_depth, round_val, min_qual, reference_file);
+  parse_internal_variants(prefix_3 + ".txt", new_variants_3, min_depth, round_val, min_qual);
   for(uint32_t i = 0; i < new_variants_3.size(); i++){
     uint32_t position = new_variants_3[i].position;
     std::string nuc = new_variants_3[i].nuc;
