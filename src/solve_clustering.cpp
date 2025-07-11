@@ -413,10 +413,8 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
     solution = solution_sets[0];
   }
 
-
-  //TODO
   if(traditional_majority){
-
+    call_majority_consensus(std::vector<variant> variants, uint32_t max_position, std::string clustering_file, double default_threshold)
   }
 
 

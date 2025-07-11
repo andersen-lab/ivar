@@ -2,7 +2,6 @@
 #include "call_consensus_clustering.h"
 #include "gmm.h"
 #include "saga.h"
-#include "ref_seq.h"
 #include <ostream>
 #include <iostream>
 #include <vector>
@@ -17,7 +16,6 @@ std::string trim_leading_ambiguities(std::string sequence, uint32_t min_position
 }
 
 void call_majority_consensus(std::vector<variant> variants, uint32_t max_position, std::string clustering_file, double default_threshold){
-  //if we can't find a solution simply take the majority variant per position
   std::vector<std::string> nucs;
   std::vector<double> freqs;
   std::vector<std::string> tmp(max_position, "N");
@@ -53,8 +51,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   }
 
   std::cerr << "calling consensus" << std::endl;
-  //parse reference sequence
-  ref_antd refantd(ref, "");
 
   double max_mean=0;
   set_freq_range_flags(variants, 0, 1);

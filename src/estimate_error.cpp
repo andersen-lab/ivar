@@ -68,7 +68,7 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
       if(mad < 0.01 && i == index) {
         stop = true;
       }
-      std::cerr << "n " << n << " mean " << mean << " mad " << mad << " " << model.clusters[i].size() << std::endl;
+      //std::cerr << "n " << n << " mean " << mean << " mad " << mad << " " << model.clusters[i].size() << std::endl;
       //for(auto m : model.clusters[i]){
       //  std::cerr << m << " ";
       //}
