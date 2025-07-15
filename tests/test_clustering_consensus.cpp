@@ -80,7 +80,7 @@ int main() {
   assign_all_variants(variants, base_variants, retrained);
   add_noise_variants(variants, base_variants);
 
-  solve_clusters(variants, retrained, lower_bound, solution);
+  solve_clusters(variants, retrained, lower_bound, solution, prefix, default_threshold);
   cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, reference_file);
   std::vector<pair<std::string, std::string>> gt_sequences;
   read_consensus(gt_sequences, consensus_filename);

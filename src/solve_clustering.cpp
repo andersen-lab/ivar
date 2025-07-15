@@ -8,6 +8,41 @@
 #include <algorithm>
 #include <numeric>
 
+void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold){
+  uint32_t max_position=0;
+  for(auto x : variants){
+    if(x.position > max_position){
+      max_position = x.position;
+    }
+  }
+  std::vector<std::string> nucs;
+  std::vector<double> freqs;
+  std::vector<std::string> tmp(max_position, "N");
+  for(uint32_t i=1; i <= max_position; i++){
+    freqs.clear();
+    nucs.clear();
+    for(uint32_t j=0; j < variants.size(); j++){
+      if(variants[j].position == i){
+        nucs.push_back(variants[j].nuc);
+        freqs.push_back(variants[j].freq);
+      }
+    }
+    if(freqs.size() == 0) continue;
+    uint32_t index = std::distance(freqs.begin(), std::max_element(freqs.begin(), freqs.end()));
+    if(freqs[index] >= (double)default_threshold){
+      tmp[i-1] = nucs[index];
+    }
+  }
+  std::string consensus_string = std::accumulate(tmp.begin(), tmp.end(), std::string(""));
+  //write the consensus to file
+  std::string consensus_filename = clustering_file + ".fa";
+  std::ofstream file(consensus_filename);
+  std::string name = ">"+clustering_file+"_"+std::to_string(default_threshold)+"_threshold";
+  file << name << "\n";
+  file << consensus_string << "\n";
+  file.close();
+}
+
 void calculate_cluster_deviations(gaussian_mixture_model &model){
   //here we calculate the standard deviation of each cluster
   std::vector<double> std_devs;
@@ -345,7 +380,7 @@ std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, dou
   return(noise_indices);
 }
 
-void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model, double estimated_error, std::vector<double> &solution){
+void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model, double estimated_error, std::vector<double> &solution, std::string prefix, double default_threshold){
   std::cerr << "solving clusters" << std::endl;
   double error = 0.05;
   double solution_error = 0.10;
@@ -412,11 +447,12 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   } else{
     solution = solution_sets[0];
   }
-
+  //TEST LINES
+  //traditional_majority = true;
   if(traditional_majority){
-    call_majority_consensus(std::vector<variant> variants, uint32_t max_position, std::string clustering_file, double default_threshold)
+    call_majority_consensus(variants, prefix, default_threshold);
   }
-
+  //exit(0);
 
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);

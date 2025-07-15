@@ -632,7 +632,7 @@ void set_deletion_flags(std::vector<variant> &variants){
   }
 }
 
-std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::string ref){
+std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::string ref, double default_threshold){
   if(ref.empty()){
     std::cerr << "Please provide a reference sequence." << std::endl;
     exit(1);
@@ -768,6 +768,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   assign_all_variants(variants, base_variants, retrained);
   add_noise_variants(variants, base_variants);
-  solve_clusters(variants, retrained, lower_bound, solution);
+  solve_clusters(variants, retrained, lower_bound, solution, output_prefix, default_threshold);
   return(variants);
 }

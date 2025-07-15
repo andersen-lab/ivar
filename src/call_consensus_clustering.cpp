@@ -15,41 +15,8 @@ std::string trim_leading_ambiguities(std::string sequence, uint32_t min_position
   return(result);
 }
 
-void call_majority_consensus(std::vector<variant> variants, uint32_t max_position, std::string clustering_file, double default_threshold){
-  std::vector<std::string> nucs;
-  std::vector<double> freqs;
-  std::vector<std::string> tmp(max_position, "N");
-  for(uint32_t i=1; i <= max_position; i++){
-    freqs.clear();
-    nucs.clear();
-    for(uint32_t j=0; j < variants.size(); j++){
-      if(variants[j].position == i){
-        nucs.push_back(variants[j].nuc);
-        freqs.push_back(variants[j].freq);
-      }
-    }
-    if(freqs.size() == 0) continue;
-    uint32_t index = std::distance(freqs.begin(), std::max_element(freqs.begin(), freqs.end()));
-    if(freqs[index] >= (double)default_threshold){
-      tmp[i-1] = nucs[index];
-    }
-  }
-  std::string consensus_string = std::accumulate(tmp.begin(), tmp.end(), std::string(""));
-  //write the consensus to file
-  std::string consensus_filename = clustering_file + ".fa";
-  std::ofstream file(consensus_filename);
-  std::string name = ">"+clustering_file+"_"+std::to_string(default_threshold)+"_threshold";
-  file << name << "\n";
-  file << consensus_string << "\n";
-  file.close();
-}
 
 void cluster_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means, std::string ref){
-  //TODO call majority
-  if(variants.size() == 0){
-    std::cerr << "haven't solved this yet" << std::endl;
-  }
-
   std::cerr << "calling consensus" << std::endl;
 
   double max_mean=0;
