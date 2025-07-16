@@ -53,7 +53,7 @@ int main() {
   uint32_t n = 2;
 
   parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual);
-  set_deletion_flags(base_variants);
+  set_deletion_flags(base_variants, 0);
 
   double error_rate = cluster_error(base_variants, min_qual, min_depth);
   double lower_bound = 1-error_rate+0.0001;

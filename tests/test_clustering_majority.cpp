@@ -52,7 +52,7 @@ int main() {
   uint32_t n = 4;
 
   parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual);
-  set_deletion_flags(base_variants);
+  set_deletion_flags(base_variants, 0);
 
   double lower_bound = 0.03;
   double upper_bound = 0.97;

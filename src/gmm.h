@@ -78,6 +78,6 @@ void handle_conflicting_del(std::vector<variant> &variants);
 void separate_deletion_positions(std::vector<variant> &variants);
 void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel);
 void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants);
-void set_deletion_flags(std::vector<variant> &variants);
+void set_deletion_flags(std::vector<variant> &variants, double lower_bound);
 double calculate_mad(const std::vector<double>& data, double mean);
 #endif

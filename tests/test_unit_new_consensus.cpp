@@ -115,7 +115,7 @@ int main() {
   variants.push_back(tmp2);
   variants.push_back(tmp3);
 
-  set_deletion_flags(variants);
+  set_deletion_flags(variants, 0);
   output = variants[0];
   if(output.include_clustering == 1) success++;
   else std::cerr << "fifth test failed" << std::endl;

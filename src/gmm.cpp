@@ -76,7 +76,6 @@ void assign_all_variants(std::vector<variant> &variants, std::vector<variant> ba
       variants.push_back(base_variants[i]);
     }
   }
-
   //populate a new armadillo dataset with more frequencies
   arma::mat final_data(1, count, arma::fill::zeros);
   for(uint32_t i = 0; i < tmp_var.size(); i++){
@@ -100,7 +99,6 @@ void assign_all_variants(std::vector<variant> &variants, std::vector<variant> ba
     stacked_matrix.push_back(row);
   }
   gmodel.prob_matrix = stacked_matrix;
-
   assign_clusters(variants, gmodel);
 }
 
@@ -380,8 +378,6 @@ std::vector<uint32_t> compare_cluster_assignment(std::vector<std::vector<double>
   return(flagged_idx);
 }
 
-
-
 /**
  * @brief Selects the permutation of assignments that maximizes the joint probability.
  *
@@ -427,7 +423,6 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
   uint32_t n = prob_matrix.size();
   std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
   std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices;
-
   // Map positions to variant indices and nucleotides
   for (uint32_t i = 0; i < variants.size(); ++i) {
     uint32_t pos = variants[i].position;
@@ -445,11 +440,11 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
     perm_generator(n, i, possible_permutations);
 
   noise_resampler(n, index, possible_permutations, 6);
-
   // Assignment by position
   for (uint32_t pos : unique_pos) {
     std::vector<uint32_t> pos_idxs;
     std::vector<std::vector<double>> tmp_prob;
+
 
     for (uint32_t variant_idx : pos_to_variant_indices[pos]) {
       auto& var = variants[variant_idx];
@@ -465,16 +460,13 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
 
       tmp_prob.push_back(std::move(prob_column));
     }
-
     if (pos_idxs.empty())
       continue;
 
     std::vector<uint32_t> assigned = calculate_joint_probabilities(tmp_prob, possible_permutations);
     if (assigned.empty())
       continue;
-
     std::vector<uint32_t> assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
-
     for (uint32_t i = 0; i < pos_idxs.size(); ++i) {
       uint32_t v_idx = pos_idxs[i];
       if (std::find(assignment_flagged.begin(), assignment_flagged.end(), i) != assignment_flagged.end()) {
@@ -610,13 +602,13 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
   }
 }
 
-void set_deletion_flags(std::vector<variant> &variants){
+void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
   std::vector<uint32_t> del_positions;
 
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].depth_flag) continue;
     bool found = std::find(variants[i].nuc.begin(), variants[i].nuc.end(), '-') != variants[i].nuc.end();
-    if(found){
+    if(found && variants[i].gapped_freq > lower_bound){
       for(uint32_t j=1; j < variants[i].nuc.size()-1; j++){
         del_positions.push_back(variants[i].position+j);
       }
@@ -628,6 +620,8 @@ void set_deletion_flags(std::vector<variant> &variants){
     bool found = std::find(del_positions.begin(), del_positions.end(), variants[i].position) != del_positions.end();
     if(found) {
       variants[i].include_clustering = false;
+    } else {
+      variants[i].include_clustering = true;
     }
   }
 }
@@ -643,11 +637,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
-  set_deletion_flags(base_variants);
+  set_deletion_flags(base_variants, 0);
   double error_rate = cluster_error(base_variants, min_qual, min_depth);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
   set_freq_range_flags(base_variants, lower_bound, upper_bound);
+  set_deletion_flags(base_variants, lower_bound);
   std::cerr << "lower bound " << lower_bound <<  " upper bound " << upper_bound << std::endl;
   //this whole things needs to be reconfigured
   uint32_t useful_var=0;
@@ -684,8 +679,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t optimal_n = 0;
   gaussian_mixture_model retrained;
 
-  //TESTLINES
-  while(counter <= n){
+   while(counter <= n){
     if(((double)useful_var / (double)counter) < 1){
       if(counter > 2){
         optimal_n = counter - 1;
@@ -766,6 +760,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     file << means_string << "\n";
     file.close();
   }
+
   assign_all_variants(variants, base_variants, retrained);
   add_noise_variants(variants, base_variants);
   solve_clusters(variants, retrained, lower_bound, solution, output_prefix, default_threshold);
