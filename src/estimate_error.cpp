@@ -26,7 +26,7 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> data, std::vec
     return(removal_points);
 }
 
-double cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold, uint32_t depth_cutoff){
+void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold, uint32_t depth_cutoff, double &error_rate){
   double lower_bound = 0.50;
   double upper_bound = 0.99;
   set_freq_range_flags(base_variants, lower_bound, upper_bound);
@@ -37,13 +37,16 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
 
    for(uint32_t i=0; i < base_variants.size(); i++){
     if(base_variants[i].position > max_pos) max_pos = base_variants[i].position;
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
+    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked){
       useful_count_original++;
       variants_original.push_back(base_variants[i]);
       frequencies.push_back(base_variants[i].gapped_freq);
     }
   }
-  if(variants_original.empty()) return(1);
+  if(variants_original.empty()){
+    error_rate = 1;
+    return;
+  }
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
   uint32_t count_original=0;
   for(uint32_t i = 0; i < variants_original.size(); i++){
@@ -90,5 +93,5 @@ double cluster_error(std::vector<variant> base_variants, uint8_t quality_thresho
 
   //get the upper edge of the noise cluster
   auto min_it = std::min_element(cleaned_cluster.begin(), cleaned_cluster.end());
-  return(*min_it);
+  error_rate = *min_it;
 }

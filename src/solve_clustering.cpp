@@ -390,7 +390,10 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   std::cerr << "estimated error " << estimated_error << std::endl;
 
   //determine if any clusters are possible noise
-  std::vector<uint32_t> noise_indices = noise_cluster_calculator(model, estimated_error);
+  std::vector<uint32_t> noise_indices;
+  if(means.size() > 2){
+    noise_indices = noise_cluster_calculator(model, estimated_error);
+  }
   //filter peaks from means by index
   std::vector<double> filtered_means;
   std::vector<double> std_devs;
@@ -472,12 +475,13 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
     solution_string += tmp;
   }
 
-  /*solution_string += "]";
-  std::string solution_filename = clustering_file + "_solution.txt";
+  solution_string += "]";
+  std::string solution_filename = prefix + "_solution.txt";
   std::ofstream file_sol(solution_filename);
   file_sol << "means\n";
   file_sol << solution_string << "\n";
-  file_sol.close();*/
+  file_sol.close();
+
   double largest = *std::max_element(solution.begin(), solution.end());
   //define the clusters which contain the majority population
   std::vector<std::vector<double>> possible_clusters;

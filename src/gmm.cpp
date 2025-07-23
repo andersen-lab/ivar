@@ -588,7 +588,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       tmp.std_dev = 0;
       tmp.version_1_var = true;
     }
-    if(tmp.gapped_depth < depth_cutoff){
+    if(tmp.total_depth < depth_cutoff){
       tmp.depth_flag = true;
     } else {
       tmp.depth_flag = false;
@@ -599,6 +599,16 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       tmp.qual_flag = false;
     }
     variants.push_back(std::move(tmp));
+  }
+}
+
+void set_insertion_flags(std::vector<variant> &variants){
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].depth_flag) continue;
+    bool found = std::find(variants[i].nuc.begin(), variants[i].nuc.end(), '+') != variants[i].nuc.end();
+    if(found){
+      variants[i].include_clustering = false;
+    }
   }
 }
 
@@ -626,7 +636,7 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
   }
 }
 
-std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::string ref, double default_threshold){
+std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::string ref, double default_threshold, double &error_rate){
   if(ref.empty()){
     std::cerr << "Please provide a reference sequence." << std::endl;
     exit(1);
@@ -638,11 +648,13 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
   set_deletion_flags(base_variants, 0);
-  double error_rate = cluster_error(base_variants, min_qual, min_depth);
+  cluster_error(base_variants, min_qual, min_depth, error_rate);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
   set_freq_range_flags(base_variants, lower_bound, upper_bound);
   set_deletion_flags(base_variants, lower_bound);
+  set_insertion_flags(base_variants);
+
   std::cerr << "lower bound " << lower_bound <<  " upper bound " << upper_bound << std::endl;
   //this whole things needs to be reconfigured
   uint32_t useful_var=0;
@@ -661,6 +673,25 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   if(useful_var < 2){
     variants.clear();
+    std::ofstream file;
+    if(development_mode){
+      //write means to string
+      file.open(output_prefix + ".txt", std::ios::trunc);
+      std::string means_string = "[";
+      means_string += "0.01,0.99";
+      means_string += "]";
+      file << "means\n";
+      file << means_string << "\n";
+      file.close();
+
+      std::string solution_string = "[0.1,0.99]";
+      std::string solution_filename = output_prefix + "_solution.txt";
+      std::ofstream file_sol(solution_filename);
+      file_sol << "means\n";
+      file_sol << solution_string << "\n";
+      file_sol.close();
+
+    }
     return(variants);
   }
   uint32_t lower_n = find_max_frequency_count(count_pos);
@@ -704,7 +735,13 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
       if(data.size() < 1){
         empty_cluster = true;
-        std::cerr << "empty cluster" << std::endl;
+        std::cerr << "empty cluster " << counter << std::endl;
+        if(counter == 2){
+          optimal_n = 2;
+          empty_cluster = false;
+          optimal = true;
+          break;
+        }
         continue;
       }
       for(auto d : data) std::cerr << d << " ";
