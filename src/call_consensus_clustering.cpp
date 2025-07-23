@@ -22,8 +22,8 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   double max_mean=0;
   set_freq_range_flags(variants, 0, 1);
   double error_rate = cluster_error(variants, min_qual, min_depth);
-  double freq_lower_bound = 1-error_rate+0.001;
-  double freq_upper_bound = error_rate-0.001;
+  double freq_lower_bound = 1-error_rate+0.0001;
+  double freq_upper_bound = error_rate-0.0001;
   set_freq_range_flags(variants, freq_lower_bound, freq_upper_bound);
   //find the largest position in the variants file
   uint32_t max_position = 0;
@@ -57,7 +57,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 16485){
+    if(variants[i].position == 29080){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -198,6 +198,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     if(it == solution.end()){
       continue;
     }
+    std::cerr << sorted_strings[i][29079] << std::endl;
     std::string trimmed_sequence = trim_leading_ambiguities(sorted_strings[i], min_position);
     file << ">"+clustering_file+"_cluster_"+ std::to_string(tmp_mean) << "\n";
     file << trimmed_sequence << "\n";
