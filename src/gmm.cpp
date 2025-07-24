@@ -617,6 +617,7 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
 
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].depth_flag) continue;
+
     bool found = std::find(variants[i].nuc.begin(), variants[i].nuc.end(), '-') != variants[i].nuc.end();
     if(found && variants[i].gapped_freq > lower_bound){
       for(uint32_t j=1; j < variants[i].nuc.size()-1; j++){
@@ -672,7 +673,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::cerr << "useful var " << useful_var << std::endl;
 
   if(useful_var < 2){
-    variants.clear();
     std::ofstream file;
     if(development_mode){
       //write means to string
@@ -692,6 +692,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       file_sol.close();
 
     }
+    call_majority_consensus(base_variants, output_prefix, default_threshold);
     return(variants);
   }
   uint32_t lower_n = find_max_frequency_count(count_pos);

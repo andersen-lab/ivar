@@ -18,6 +18,7 @@ std::string trim_leading_ambiguities(std::string sequence, uint32_t min_position
 
 void cluster_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means, std::string ref, double error_rate){
   std::cerr << "calling consensus" << std::endl;
+  if(variants.size() == 0) return;
 
   double max_mean=0;
   double freq_lower_bound = 1-error_rate+0.0001;
