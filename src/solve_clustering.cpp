@@ -9,6 +9,7 @@
 #include <numeric>
 
 void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold){
+  std::cerr << "calling majority" << std::endl;
   uint32_t max_position=0;
   for(auto x : variants){
     if(x.position > max_position){
@@ -450,12 +451,9 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   } else{
     solution = solution_sets[0];
   }
-  //TEST LINES
-  //traditional_majority = true;
   if(traditional_majority){
     call_majority_consensus(variants, prefix, default_threshold);
   }
-  //exit(0);
 
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
