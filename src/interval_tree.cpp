@@ -26,12 +26,12 @@ void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upp
   }
 
   //traverse left if there's any chance of finding a containing interval
-  if (root->left && lower <= (uint32_t)root->left->data->high) {
+  if (root->left && lower <= (uint32_t)root->data->low) {
     find_read_amplicon(root->left, lower, upper, node, amp_dist);
   }
 
   //traverse right if there's any chance of finding a containing interval
-  if (root->right && upper >= (uint32_t)root->right->data->low) {
+  if (root->right && upper >= (uint32_t)root->data->high) {
     find_read_amplicon(root->right, lower, upper, node, amp_dist);
   }
 }
@@ -157,8 +157,7 @@ std::string IntervalTree::pre_order_with_level(ITNode *root,  int level) {
 
 // A stand-alone function to create a tree containing the coordinates of each
 // amplicon based on user-specified primer pairs
-IntervalTree populate_amplicons(std::string pair_info_file,
-                                std::vector<primer> &primers) {
+IntervalTree populate_amplicons(std::string pair_info_file, std::vector<primer> &primers) {
   int amplicon_start = -1;
   int amplicon_end = -1;
   IntervalTree tree = IntervalTree();
