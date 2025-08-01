@@ -444,8 +444,6 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
   for (uint32_t pos : unique_pos) {
     std::vector<uint32_t> pos_idxs;
     std::vector<std::vector<double>> tmp_prob;
-
-
     for (uint32_t variant_idx : pos_to_variant_indices[pos]) {
       auto& var = variants[variant_idx];
       if ((var.nuc.find('+') != std::string::npos && !insertions)|| var.depth_flag)
@@ -462,10 +460,12 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
     }
     if (pos_idxs.empty())
       continue;
-
     std::vector<uint32_t> assigned = calculate_joint_probabilities(tmp_prob, possible_permutations);
     if (assigned.empty())
       continue;
+    //here we have more variants trying to assign than clusters
+    if(tmp_prob.size() > assigned.size()) return;
+
     std::vector<uint32_t> assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
     for (uint32_t i = 0; i < pos_idxs.size(); ++i) {
       uint32_t v_idx = pos_idxs[i];
@@ -614,6 +614,7 @@ void set_insertion_flags(std::vector<variant> &variants){
 
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
   std::vector<uint32_t> del_positions;
+  std::vector<uint32_t> all_del_positions;
 
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].depth_flag) continue;
@@ -624,12 +625,18 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
         del_positions.push_back(variants[i].position+j);
       }
     }
+    if(found){
+      for(uint32_t j=1; j < variants[i].nuc.size()-1; j++){
+        all_del_positions.push_back(variants[i].position+j);
+      }
+    }
   }
-
   //set the include_clustering flag to false if this covers a deletion position
   for(uint32_t i=0; i < variants.size(); i++){
     bool found = std::find(del_positions.begin(), del_positions.end(), variants[i].position) != del_positions.end();
-    if(found) {
+    size_t count = std::count(all_del_positions.begin(), all_del_positions.end(), variants[i].position);
+    //if the positions is covered by two deletions we exclude it from clustering
+    if(found || count > 1) {
       variants[i].include_clustering = false;
     } else {
       variants[i].include_clustering = true;
@@ -667,24 +674,25 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       useful_var++;
       variants.push_back(base_variants[i]);
       count_pos.push_back(base_variants[i].position);
-      std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq << std::endl;
+      std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " include " << base_variants[i].include_clustering << std::endl;
     }
   }
   std::cerr << "useful var " << useful_var << std::endl;
 
-  if(useful_var < 2){
+
+  if(useful_var < 1){
     std::ofstream file;
     if(development_mode){
       //write means to string
       file.open(output_prefix + ".txt", std::ios::trunc);
       std::string means_string = "[";
-      means_string += "0.01,0.99";
+      means_string += "0.99";
       means_string += "]";
       file << "means\n";
       file << means_string << "\n";
       file.close();
 
-      std::string solution_string = "[0.1,0.99]";
+      std::string solution_string = "[0.99]";
       std::string solution_filename = output_prefix + "_solution.txt";
       std::ofstream file_sol(solution_filename);
       file_sol << "means\n";
@@ -695,6 +703,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     call_majority_consensus(base_variants, output_prefix, default_threshold);
     return(variants);
   }
+
   uint32_t lower_n = find_max_frequency_count(count_pos);
 
   //initialize armadillo dataset and populate with frequency data
@@ -707,7 +716,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   std::vector<uint32_t> exclude_cluster_indices;
 
-  uint32_t counter = 2;
+  uint32_t counter = 1;
   uint32_t optimal_n = 0;
   gaussian_mixture_model retrained;
 
@@ -725,7 +734,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     retrained.hefts.clear();
     retrained.prob_matrix.clear();
     retrained = retrain_model(counter, data, variants, lower_n, 0.001);
-
     bool optimal = true;
     std::vector<std::vector<double>> clusters = form_clusters(counter, variants);
 
@@ -798,7 +806,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     file << means_string << "\n";
     file.close();
   }
-
   assign_all_variants(variants, base_variants, retrained);
   add_noise_variants(variants, base_variants);
   solve_clusters(variants, retrained, lower_bound, solution, output_prefix, default_threshold);
