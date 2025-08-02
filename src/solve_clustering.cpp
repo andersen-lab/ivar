@@ -16,6 +16,7 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
       max_position = x.position;
     }
   }
+  std::cerr << "max position " << max_position << std::endl;
   std::vector<std::string> nucs;
   std::vector<double> freqs;
   std::vector<std::string> tmp(max_position, "N");
@@ -25,12 +26,18 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
     for(uint32_t j=0; j < variants.size(); j++){
       if(variants[j].position == i){
         nucs.push_back(variants[j].nuc);
-        freqs.push_back(variants[j].freq);
+        freqs.push_back(variants[j].gapped_freq);
       }
     }
     if(freqs.size() == 0) continue;
+
+    //find the largest frequency
     uint32_t index = std::distance(freqs.begin(), std::max_element(freqs.begin(), freqs.end()));
-    if(freqs[index] >= (double)default_threshold){
+    if(default_threshold > 0){
+      if(freqs[index] >= default_threshold){
+        tmp[i-1] = nucs[index];
+      }
+    } else {
       tmp[i-1] = nucs[index];
     }
   }
@@ -365,20 +372,49 @@ std::vector<std::vector<double>> deduplicate_solutions(std::vector<std::vector<d
   return(solutions);
 }
 
-std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, double estimated_error){
+std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, double estimated_error, uint32_t noise_size){
   std::vector<double> means = model.means;
   std::vector<double> std_devs = model.cluster_std_devs;
   std::vector<uint32_t> noise_indices;
+
   for(uint32_t i=0; i < means.size(); i++){
     //if the estimated error is below two standard deviation of the cluster mean
     //and the standard deviation is relatively small - noise peaks tend to have smaller stdevs
-    if((means[i]-(std_devs[i]*2) <= estimated_error) && std_devs[i] <= 0.05 && means[i] < 0.5){
+    if(std_devs[i] > 0.05) continue;
+    //given the error estimate, the number of points in the error cluster, and then number of points in this cluster do we expect this cluster to be noise?
+    double percent = (double)model.clusters[i].size() / (double) noise_size;
+    uint32_t num_stddev = 0;
+    if(percent < 0.027){
+      num_stddev = 3;
+    }else if(percent < 0.045){
+      num_stddev = 2;
+    } else if(percent < 0.134){
+      num_stddev = 1.5;
+    } else{
+      num_stddev = 1;
+    }
+
+    std::cerr << "mean " << means[i] << " std dev " << std_devs[i] << " estimated error " << estimated_error << " " << num_stddev << std::endl;
+    std::cerr << means[i]+(std_devs[i]*num_stddev) << std::endl;
+
+    if((means[i]-(std_devs[i]*num_stddev) <= estimated_error) && means[i] < 0.5){
+      std::cerr << "logic 1 mean " << means[i] << " std dev " << std_devs[i] << " estimated error " << estimated_error << std::endl;
       noise_indices.push_back(i);
-    } else if(means[i]+(std_devs[i]*2) >= (1-estimated_error) && std_devs[i] <= 0.05 && means[i] > 0.5){
+    } else if(means[i]+(std_devs[i]*num_stddev) >= (1-estimated_error) && means[i] > 0.5){
+      std::cerr << "mean " << means[i] << " std dev " << std_devs[i] << " estimated error " << estimated_error << std::endl;
       noise_indices.push_back(i);
     }
   }
   return(noise_indices);
+}
+
+
+void count_noise_points(std::vector<variant> variants, uint32_t &noise_size, double upper_bound){
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].gapped_freq >= upper_bound && variants[i].gapped_freq < 0.99){
+      noise_size++;
+    }
+  }
 }
 
 void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model, double estimated_error, std::vector<double> &solution, std::string prefix, double default_threshold){
@@ -386,14 +422,17 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   double error = 0.05;
   double solution_error = 0.10;
   calculate_cluster_deviations(model);
-  //read in the cluster values
   std::vector<double> means = model.means;
+
+  uint32_t noise_size;
+  count_noise_points(variants, noise_size, 1-estimated_error);
+  std::cerr << "noise size " << noise_size << std::endl;
   std::cerr << "estimated error " << estimated_error << std::endl;
 
   //determine if any clusters are possible noise
   std::vector<uint32_t> noise_indices;
   if(means.size() > 2){
-    noise_indices = noise_cluster_calculator(model, estimated_error);
+    noise_indices = noise_cluster_calculator(model, estimated_error, noise_size);
   }
   //filter peaks from means by index
   std::vector<double> filtered_means;
@@ -409,6 +448,7 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
       }
     }
   }
+
   //find position wise frequency pairs
   std::vector<std::vector<double>> pairs = frequency_pair_finder(variants, means);
   std::vector<std::vector<double>> solutions = find_solutions(filtered_means, error);
@@ -453,6 +493,7 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   }
   if(traditional_majority){
     call_majority_consensus(variants, prefix, default_threshold);
+    return;
   }
 
   std::vector<double> unresolved;

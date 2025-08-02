@@ -198,7 +198,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     if(it == solution.end()){
       continue;
     }
-    std::cerr << sorted_strings[i][22094] << std::endl;
     std::string trimmed_sequence = trim_leading_ambiguities(sorted_strings[i], min_position);
     file << ">"+clustering_file+"_cluster_"+ std::to_string(tmp_mean) << "\n";
     file << trimmed_sequence << "\n";

@@ -3,6 +3,7 @@
 #include "saga.h"
 #include <unordered_set>
 #include <string>
+#include <numeric>
 #include <vector>
 
 void get_amplicon_numbers(std::vector<amplicon_info> amplicons, std::vector<uint32_t> &amp_numbers){
@@ -171,6 +172,7 @@ void collect_allele_stats(const std::vector<amplicon_info> &amplicons, std::unor
     }
   }
 }
+
 std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> &global_positions, uint32_t min_depth, uint8_t min_qual){
   std::vector<ITNode*> flagged_amplicons;
   std::unordered_map<std::string, std::vector<double>> allele_frequencies;
@@ -181,7 +183,7 @@ std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> 
       allele_frequencies.clear();
       allele_depths.clear();
       collect_allele_stats(global_positions[i].amplicons, allele_frequencies, allele_depths, min_qual);
-      for (const auto &[key, values] : allele_frequencies) {
+      for (auto &[key, values] : allele_frequencies) {
         double std = calculate_standard_deviation_weighted(values, allele_depths[key]);
         if(std > 0.03){
           global_positions[i].flux = true;

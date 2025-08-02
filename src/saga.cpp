@@ -189,6 +189,7 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
   uint32_t amp_dist = 429496729;
   ITNode *node=NULL;
   amplicons.find_read_amplicon(start_forward, end_reverse, node, amp_dist);
+
   if(node == NULL){
     add_variants(final_positions, final_bases, final_qualities, global_positions);
   } else {
@@ -332,6 +333,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   while (sam_read1(in, header, aln) >= 0) {
     //get the name of the read
     std::string read_name = bam_get_qname(aln);
+    //TEST LINEs
+    //if(read_name != "A00953:367:HC5WFDRXY:1:1208:18059:3051") continue;
+
     if (!(aln->core.flag & BAM_FPAIRED) || !(aln->core.flag & BAM_FPROPER_PAIR)){
       //if the read is unpaired try to assign it to an amplicon anyways
       std::vector<uint32_t> positions;
@@ -447,7 +451,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
 
       //check if this allele is a deletion
       auto dit = std::find(var.alleles[j].nuc.begin(), var.alleles[j].nuc.end(), '-');
-
       double freq = (double)var.alleles[j].depth / ((double)depth);
       double gapped_freq = (double)var.alleles[j].depth / (double)gapped_depth;
       file << ref_name <<"\t"; //region

@@ -68,10 +68,11 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     for(uint32_t i=0; i < model.clusters.size(); i++){
       double mean = calculate_mean(model.clusters[i]);
       double mad = calculate_mad(model.clusters[i], mean);
+      double std = calculate_standard_deviation(model.clusters[i]);
       if(mad < 0.01 && i == index) {
         stop = true;
       }
-      //std::cerr << "n " << n << " mean " << mean << " mad " << mad << " " << model.clusters[i].size() << std::endl;
+      std::cerr << "n " << n << " mean " << mean << " mad " << mad << " " << model.clusters[i].size() << " std " << std << std::endl;
       //for(auto m : model.clusters[i]){
       //  std::cerr << m << " ";
       //}
