@@ -50,7 +50,7 @@ double calculate_mad(const std::vector<double>& data, double mean){
     return absDevSum / data.size();
 }
 
-void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel){
+void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, bool &clustering_failed){
   std::vector<std::vector<double>> tv = transpose_vector(gmodel.prob_matrix);
   uint32_t j = 0;
   for(uint32_t i=0; i < variants.size(); i++){
@@ -59,9 +59,9 @@ void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmod
   }
   uint32_t index = smallest_value_index(gmodel.means);
   //handle everything but insertions
-  assign_variants_simple(variants, gmodel.prob_matrix, index, gmodel.lower_n, false);
+  assign_variants_simple(variants, gmodel.prob_matrix, index, gmodel.lower_n, false, clustering_failed);
   //handle insertions
-  assign_variants_simple(variants, gmodel.prob_matrix, index, gmodel.lower_n, true);
+  assign_variants_simple(variants, gmodel.prob_matrix, index, gmodel.lower_n, true, clustering_failed);
 }
 
 void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel) {
@@ -99,7 +99,8 @@ void assign_all_variants(std::vector<variant> &variants, std::vector<variant> ba
     stacked_matrix.push_back(row);
   }
   gmodel.prob_matrix = stacked_matrix;
-  assign_clusters(variants, gmodel);
+  bool clustering_failed;
+  assign_clusters(variants, gmodel, clustering_failed);
 }
 
 void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants){
@@ -172,7 +173,7 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
 }
 
 //function used for production
-gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double var_floor){
+gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double var_floor, bool &clustering_failed){
   double initial_covariance = 0.005;
   gaussian_mixture_model gmodel;
   gmodel.n = n;
@@ -198,7 +199,8 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
   bool status = model.learn(data, n, arma::eucl_dist, arma::keep_existing, 1, 10, var_floor, false);
   if(!status){
     std::cerr << "GMM failed to converge" << std::endl;
-    exit(1);
+    clustering_failed = true;
+    return(gmodel);
   }
   std::vector<double> means;
   std::vector<double> hefts;
@@ -229,7 +231,7 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
   gmodel.means = means;
   gmodel.hefts = hefts;
   gmodel.model = model;
-  assign_clusters(variants, gmodel);
+  assign_clusters(variants, gmodel, clustering_failed);
 
   std::vector<std::vector<double>> clusters = form_clusters(n, variants);
   gmodel.clusters = clusters;
@@ -419,7 +421,7 @@ std::vector<uint32_t> calculate_joint_probabilities(const std::vector<std::vecto
   return permutations[best_index];
 }
 
-void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n, bool insertions) {
+void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n, bool insertions, bool &clustering_failed) {
   uint32_t n = prob_matrix.size();
   std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
   std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices;
@@ -463,8 +465,12 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
     std::vector<uint32_t> assigned = calculate_joint_probabilities(tmp_prob, possible_permutations);
     if (assigned.empty())
       continue;
+
     //here we have more variants trying to assign than clusters
-    if(tmp_prob.size() > assigned.size()) return;
+    if(tmp_prob.size() > assigned.size()) {
+      clustering_failed = true;
+      return;
+    }
 
     std::vector<uint32_t> assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
     for (uint32_t i = 0; i < pos_idxs.size(); ++i) {
@@ -733,7 +739,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     retrained.means.clear();
     retrained.hefts.clear();
     retrained.prob_matrix.clear();
-    retrained = retrain_model(counter, data, variants, lower_n, 0.001);
+    bool clustering_failed = false;
+    retrained = retrain_model(counter, data, variants, lower_n, 0.001, clustering_failed);
+    if(clustering_failed){
+      counter++;
+      continue;
+    }
     bool optimal = true;
     std::vector<std::vector<double>> clusters = form_clusters(counter, variants);
 
@@ -783,7 +794,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     retrained.means.clear();
     retrained.hefts.clear();
     retrained.prob_matrix.clear();
-    retrained = retrain_model(optimal_n, data, variants, lower_n, 0.001);
+    bool clustering_failed = false;
+    retrained = retrain_model(optimal_n, data, variants, lower_n, 0.001, clustering_failed);
   }
   for(auto cluster : retrained.clusters){
     double mean = calculate_mean(cluster);

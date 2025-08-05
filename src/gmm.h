@@ -67,9 +67,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold);
 uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
-void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n, bool insertions);
-gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double var_floor);
-void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel);
+void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n, bool insertions, bool &clustering_failed);
+gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double var_floor, bool &clustering_failed);
+void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, bool &clustering_failed);
 double calculate_mean(const std::vector<double>& data);
 kmeans_model train_model(uint32_t n, arma::mat data, bool error);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound);

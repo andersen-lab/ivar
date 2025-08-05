@@ -58,7 +58,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   uint32_t n = 2;
   kmeans_model model;
   uint32_t chosen_peak = 0;
-  while(n <= 5){
+  while(n <= 2){
     model = train_model(n, data_original, true);
     std::vector<double> means = model.means;
     //index of largest mean
