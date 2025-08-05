@@ -43,10 +43,11 @@ void calculate_reference_qual(genomic_position var, char ref, uint32_t &qual){
   }
 }
 
-std::vector<allele> find_deletions_next(genomic_position position){
+std::vector<allele> find_deletions_next(genomic_position position, uint32_t &depth_next){
   std::vector<allele> deletions;
   if(position.depth == position.gapped_depth) return(deletions);
   for(uint32_t j=0; j < position.alleles.size(); j++){
+    depth_next += position.alleles[j].depth;
     if (position.alleles[j].nuc.find("-") != std::string::npos){
       deletions.push_back(position.alleles[j]);
     }
@@ -419,8 +420,9 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     }
     //deletions need to be shifted one position back
     del_alleles.clear();
+    uint32_t depth_next=0;
     if(var.pos+1 < global_positions.size()){
-      del_alleles = find_deletions_next(global_positions[var.pos+1]);
+      del_alleles = find_deletions_next(global_positions[var.pos+1], depth_next);
     }
 
     //remove any current deletions
@@ -453,6 +455,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       auto dit = std::find(var.alleles[j].nuc.begin(), var.alleles[j].nuc.end(), '-');
       double freq = (double)var.alleles[j].depth / ((double)depth);
       double gapped_freq = (double)var.alleles[j].depth / (double)gapped_depth;
+
       file << ref_name <<"\t"; //region
       file << std::to_string(var.pos) << "\t"; //position
       file << ref << "\t"; //ref
@@ -479,8 +482,13 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       file << blank; //alt codon
       file << blank; //alt aa
       file << blank; //pos aa
-      file << std::to_string(gapped_freq) << "\t"; //gapped freq
-      file << std::to_string(var.gapped_depth) << "\t"; //gapped depth
+      if(dit == var.alleles[j].nuc.end()){
+        file << std::to_string(gapped_freq) << "\t"; //gapped freq
+        file << std::to_string(var.gapped_depth) << "\t"; //gapped depth
+      } else {
+        file << std::to_string((double)var.alleles[j].depth / (double)depth_next) << "\t";
+        file << std::to_string(depth_next) << "\t";
+      }
       //handle variant level fluctuation
       if (var.flux){
         file << "TRUE\t";
