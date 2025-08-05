@@ -28,8 +28,6 @@ jobs:
         CC: gcc-11
       run: |
         cd htslib-1.10.2/
-        autoheader
-        autoconf
         ./configure
         make
         sudo make install
