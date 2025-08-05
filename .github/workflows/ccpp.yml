@@ -22,7 +22,7 @@ jobs:
         wget https://htslib.org/download/htslib-1.12.tar.bz2
         sudo apt-get install gcc-11
     - name: untar
-      run: tar xf 1.12.tar.gz
+      run: tar xf htslib-1.12.tar.bz2
     - name: install htslib
       env:
         CC: gcc-11
@@ -31,7 +31,7 @@ jobs:
         autoreconf -i
         ./configure
         make
-        make install
+        sudo make install
     - name: autotools
       env:
         CC: gcc-11
