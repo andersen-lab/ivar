@@ -19,7 +19,7 @@ jobs:
     - uses: actions/checkout@master
     - name: download htslib
       run: |
-        wget https://htslib.org/download/htslib-1.12.tar.bz2
+        wget https://github.com/samtools/htslib/releases/download/1.12/htslib-1.12.tar.bz2
         sudo apt-get install gcc-11
     - name: untar
       run: tar xf htslib-1.12.tar.bz2
