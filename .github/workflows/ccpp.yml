@@ -19,40 +19,38 @@ jobs:
     - uses: actions/checkout@master
     - name: download htslib
       run: |
-        wget https://github.com/samtools/htslib/archive/1.10.2.tar.gz
-        sudo apt-get install gcc-7
+        wget https://github.com/samtools/htslib/releases/download/1.12/htslib-1.12.tar.bz2
+        sudo apt-get install gcc-11
     - name: untar
-      run: tar xf 1.10.2.tar.gz
+      run: tar xf htslib-1.12.tar.bz2
     - name: install htslib
       env:
-        CC: gcc-7
+        CC: gcc-11
       run: |
-        cd htslib-1.10.2/
-        autoheader
-        autoconf
+        cd htslib-1.12/
+        autoreconf -i
         ./configure
         make
         sudo make install
-        sudo ldconfig
     - name: autotools
       env:
-        CC: gcc-7
+        CC: gcc-11
       run: ./autogen.sh
     - name: configure
       env:
-        CC: gcc-7
+        CC: gcc-11
       run: ./configure
     - name: make
       env:
-        CC: gcc-7
+        CC: gcc-11
       run: make
     - name: make check
       env:
-        CC: gcc-7
+        CC: gcc-11
       run: make check
     - name: make install
       env:
-        CC: gcc-7
+        CC: gcc-11
       run: sudo make install
 
   build-macos:
