@@ -28,6 +28,7 @@ jobs:
         CC: gcc-11
       run: |
         cd htslib-1.10.2/
+        autoreconf -i
         ./configure
         make
         sudo make install
