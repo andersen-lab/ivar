@@ -28,8 +28,14 @@ jobs:
         CC: gcc-11
       run: |
         cd htslib-1.10.2/
+        autoreconf -i
+        curl -OL https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess
+        curl -OL https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub
+        chmod +x config.guess config.sub
+        ./configure
         make
         sudo make install
+        sudo ldconfig
     - name: autotools
       env:
         CC: gcc-11
