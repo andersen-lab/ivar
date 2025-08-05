@@ -20,7 +20,7 @@ jobs:
     - name: download htslib
       run: |
         wget https://github.com/samtools/htslib/archive/1.10.2.tar.gz
-        sudo apt-get install gcc-11 build-essential zlib1g-dev libbz2-dev liblzma-dev libcurl4-openssl-dev
+        sudo apt-get install gcc-11
     - name: untar
       run: tar xf 1.10.2.tar.gz
     - name: install htslib
@@ -28,9 +28,10 @@ jobs:
         CC: gcc-11
       run: |
         cd htslib-1.10.2/
+        autoreconf -i
         ./configure
         make
-        sudo make install
+        make install
     - name: autotools
       env:
         CC: gcc-11
