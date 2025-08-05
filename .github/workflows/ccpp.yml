@@ -20,7 +20,7 @@ jobs:
     - name: download htslib
       run: |
         wget https://github.com/samtools/htslib/archive/1.10.2.tar.gz
-        sudo apt-get install gcc-11
+        sudo apt-get install gcc-11 build-essential zlib1g-dev libbz2-dev liblzma-dev libcurl4-openssl-dev
     - name: untar
       run: tar xf 1.10.2.tar.gz
     - name: install htslib
@@ -28,14 +28,9 @@ jobs:
         CC: gcc-11
       run: |
         cd htslib-1.10.2/
-        autoreconf -i
-        curl -OL https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess
-        curl -OL https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub
-        chmod +x config.guess config.sub
         ./configure
         make
         sudo make install
-        sudo ldconfig
     - name: autotools
       env:
         CC: gcc-11
