@@ -19,15 +19,15 @@ jobs:
     - uses: actions/checkout@master
     - name: download htslib
       run: |
-        wget https://github.com/samtools/htslib/archive/1.10.2.tar.gz
+        wget https://github.com/samtools/htslib/archive/1.12.tar.gz
         sudo apt-get install gcc-11
     - name: untar
-      run: tar xf 1.10.2.tar.gz
+      run: tar xf 1.12.tar.gz
     - name: install htslib
       env:
         CC: gcc-11
       run: |
-        cd htslib-1.10.2/
+        cd htslib-1.12/
         autoreconf -i
         ./configure
         make
