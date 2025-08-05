@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <numeric>
 
-void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold){
+void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth){
   std::cerr << "calling majority" << std::endl;
   uint32_t max_position=0;
   for(auto x : variants){
@@ -20,11 +20,16 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
   std::vector<std::string> nucs;
   std::vector<double> freqs;
   std::vector<std::string> tmp(max_position, "N");
+
+
   for(uint32_t i=1; i <= max_position; i++){
     freqs.clear();
     nucs.clear();
     for(uint32_t j=0; j < variants.size(); j++){
       if(variants[j].position == i){
+        if(variants[j].total_depth < min_depth){
+          continue;
+        }
         nucs.push_back(variants[j].nuc);
         freqs.push_back(variants[j].gapped_freq);
       }
@@ -417,7 +422,7 @@ void count_noise_points(std::vector<variant> variants, uint32_t &noise_size, dou
   }
 }
 
-void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model, double estimated_error, std::vector<double> &solution, std::string prefix, double default_threshold){
+void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model, double estimated_error, std::vector<double> &solution, std::string prefix, double default_threshold, uint32_t min_depth){
   std::cerr << "solving clusters" << std::endl;
   double error = 0.05;
   double solution_error = 0.10;
@@ -492,7 +497,7 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
     solution = solution_sets[0];
   }
   if(traditional_majority){
-    call_majority_consensus(variants, prefix, default_threshold);
+    call_majority_consensus(variants, prefix, default_threshold, min_depth);
     return;
   }
 
