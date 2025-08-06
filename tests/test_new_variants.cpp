@@ -10,6 +10,7 @@
 #include "../src/estimate_error.h"
 #include "../src/call_variants.h"
 #include "../src/ref_seq.h"
+#include "../src/call_consensus_clustering.h"
 #include "../src/allele_functions.h"
 #include "../src/parse_gff.h"
 #include "../src/genomic_position.h"

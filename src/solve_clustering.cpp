@@ -1,4 +1,5 @@
 #include "solve_clustering.h"
+#include "call_consensus_clustering.h"
 #include "saga.h"
 #include <ostream>
 #include <iostream>
@@ -11,9 +12,13 @@
 void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth){
   std::cerr << "calling majority" << std::endl;
   uint32_t max_position=0;
+  uint32_t min_position = 4294967295U;;
   for(auto x : variants){
     if(x.position > max_position){
       max_position = x.position;
+    }
+    if(x.position < min_position && x.total_depth > 0){
+      min_position = x.position;
     }
   }
   std::cerr << "max position " << max_position << std::endl;
@@ -47,12 +52,13 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
     }
   }
   std::string consensus_string = std::accumulate(tmp.begin(), tmp.end(), std::string(""));
+  std::string trimmed_consensus = trim_leading_ambiguities(consensus_string, min_position);
   //write the consensus to file
   std::string consensus_filename = clustering_file + ".fa";
   std::ofstream file(consensus_filename);
   std::string name = ">"+clustering_file+"_"+std::to_string(default_threshold)+"_threshold";
   file << name << "\n";
-  file << consensus_string << "\n";
+  file << trimmed_consensus << "\n";
   file.close();
 }
 

@@ -51,7 +51,7 @@ add_executable(check_variants
 )
 
 add_executable(check_variants_2
-        test_new_variants.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/gmm.cpp ../src/solve_clustering.cpp ../src/estimate_error.cpp ../src/call_variants.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp ../src/genomic_position.cpp
+        test_new_variants.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/gmm.cpp ../src/solve_clustering.cpp ../src/estimate_error.cpp ../src/call_variants.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp ../src/genomic_position.cpp ../src/call_consensus_clustering.cpp
 )
 
 add_executable(check_common_variants
