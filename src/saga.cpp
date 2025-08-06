@@ -77,7 +77,7 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
         uint32_t qpos = total_query_pos + j;
         uint32_t rpos = total_ref_pos + j;
         uint32_t tqual = static_cast<uint32_t>(qual[qpos]);
-        if(tqual < mqual) continue;
+        //if(tqual < mqual) continue;
         uint8_t base_code = bam_seqi(seq_field1, qpos);
         char nuc = seq_nt_lookup[base_code];
         positions.push_back(rpos);
