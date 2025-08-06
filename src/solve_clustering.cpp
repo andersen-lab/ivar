@@ -432,81 +432,82 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   std::cerr << "solving clusters" << std::endl;
   double error = 0.05;
   double solution_error = 0.10;
-  calculate_cluster_deviations(model);
   std::vector<double> means = model.means;
+  if(solution.size() == 0){
+      calculate_cluster_deviations(model);
 
-  uint32_t noise_size;
-  count_noise_points(variants, noise_size, 1-estimated_error);
-  std::cerr << "noise size " << noise_size << std::endl;
-  std::cerr << "estimated error " << estimated_error << std::endl;
+    uint32_t noise_size;
+    count_noise_points(variants, noise_size, 1-estimated_error);
+    std::cerr << "noise size " << noise_size << std::endl;
+    std::cerr << "estimated error " << estimated_error << std::endl;
 
-  //determine if any clusters are possible noise
-  std::vector<uint32_t> noise_indices;
-  if(means.size() > 2){
-    noise_indices = noise_cluster_calculator(model, estimated_error, noise_size);
-  }
-  //filter peaks from means by index
-  std::vector<double> filtered_means;
-  std::vector<double> std_devs;
-  for(uint32_t i=0; i < means.size(); i++){
-    auto it = std::find(noise_indices.begin(), noise_indices.end(), i);
-    if(it == noise_indices.end()){
-      filtered_means.push_back(means[i]);
-      if(model.clusters[i].size() > 1){
-        std_devs.push_back(model.cluster_std_devs[i]);
-      } else {
-        std_devs.push_back(0.05);
+    //determine if any clusters are possible noise
+    std::vector<uint32_t> noise_indices;
+    if(means.size() > 2){
+      noise_indices = noise_cluster_calculator(model, estimated_error, noise_size);
+    }
+    //filter peaks from means by index
+    std::vector<double> filtered_means;
+    std::vector<double> std_devs;
+    for(uint32_t i=0; i < means.size(); i++){
+      auto it = std::find(noise_indices.begin(), noise_indices.end(), i);
+      if(it == noise_indices.end()){
+        filtered_means.push_back(means[i]);
+        if(model.clusters[i].size() > 1){
+          std_devs.push_back(model.cluster_std_devs[i]);
+        } else {
+          std_devs.push_back(0.05);
+        }
       }
     }
-  }
 
-  //find position wise frequency pairs
-  std::vector<std::vector<double>> pairs = frequency_pair_finder(variants, means);
-  std::vector<std::vector<double>> solutions = find_solutions(filtered_means, error);
+    //find position wise frequency pairs
+    std::vector<std::vector<double>> pairs = frequency_pair_finder(variants, means);
+    std::vector<std::vector<double>> solutions = find_solutions(filtered_means, error);
 
-  //find peaks that can't be a subset of other peaks
-  std::vector<double> non_subset_means;
-  for(uint32_t i=0; i < filtered_means.size(); i++){
-    std::vector<std::vector<double>> tmp = find_subsets_with_error(filtered_means, filtered_means[i], std_devs[i]);
-    if(tmp.size() <= 1){
-      non_subset_means.push_back(filtered_means[i]);
+    //find peaks that can't be a subset of other peaks
+    std::vector<double> non_subset_means;
+    for(uint32_t i=0; i < filtered_means.size(); i++){
+      std::vector<std::vector<double>> tmp = find_subsets_with_error(filtered_means, filtered_means[i], std_devs[i]);
+      if(tmp.size() <= 1){
+        non_subset_means.push_back(filtered_means[i]);
+      }
+    }
+    //reduce solution space to things that contain the non subset peaks
+    std::vector<std::vector<double>> realistic_solutions;
+    std::cerr << "all solutions size " << solutions.size() << std::endl;
+
+    for(uint32_t i=0; i < solutions.size(); i++){
+        std::vector<double> tmp = solutions[i];
+        bool found = std::all_of(non_subset_means.begin(), non_subset_means.end(), [&tmp](double value) {return std::find(tmp.begin(), tmp.end(), value) != tmp.end();});
+       if(found){
+          realistic_solutions.push_back(solutions[i]);
+       }
+    }
+    std::cerr << "realistic solutions size " << realistic_solutions.size() << std::endl;
+    //check each solution that every possible peak is accounted for
+    std::vector<std::vector<double>> solution_sets;
+    for(uint32_t i=0; i < realistic_solutions.size(); i++){
+      bool keep = account_peaks(realistic_solutions[i], filtered_means, 1, solution_error);
+      if(keep){
+        solution_sets.push_back(realistic_solutions[i]);
+      }
+    }
+    bool traditional_majority= false; //if we can't find a solution call a traditional majority consensus
+    if(solution_sets.size() == 0){
+      std::cerr << "no solution found" << std::endl;
+      traditional_majority = true;
+    } else if(solution_sets.size() > 1){
+      std::cerr << "too many solutions" << std::endl;
+      traditional_majority = true;
+    } else{
+      solution = solution_sets[0];
+    }
+    if(traditional_majority){
+      call_majority_consensus(variants, prefix, default_threshold, min_depth);
+      return;
     }
   }
-  //reduce solution space to things that contain the non subset peaks
-  std::vector<std::vector<double>> realistic_solutions;
-  std::cerr << "all solutions size " << solutions.size() << std::endl;
-
-  for(uint32_t i=0; i < solutions.size(); i++){
-      std::vector<double> tmp = solutions[i];
-      bool found = std::all_of(non_subset_means.begin(), non_subset_means.end(), [&tmp](double value) {return std::find(tmp.begin(), tmp.end(), value) != tmp.end();});
-     if(found){
-        realistic_solutions.push_back(solutions[i]);
-     }
-  }
-  std::cerr << "realistic solutions size " << realistic_solutions.size() << std::endl;
-  //check each solution that every possible peak is accounted for
-  std::vector<std::vector<double>> solution_sets;
-  for(uint32_t i=0; i < realistic_solutions.size(); i++){
-    bool keep = account_peaks(realistic_solutions[i], filtered_means, 1, solution_error);
-    if(keep){
-      solution_sets.push_back(realistic_solutions[i]);
-    }
-  }
-  bool traditional_majority= false; //if we can't find a solution call a traditional majority consensus
-  if(solution_sets.size() == 0){
-    std::cerr << "no solution found" << std::endl;
-    traditional_majority = true;
-  } else if(solution_sets.size() > 1){
-    std::cerr << "too many solutions" << std::endl;
-    traditional_majority = true;
-  } else{
-    solution = solution_sets[0];
-  }
-  if(traditional_majority){
-    call_majority_consensus(variants, prefix, default_threshold, min_depth);
-    return;
-  }
-
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
   std::vector<std::vector<uint32_t>> inverse_groups(means.size());

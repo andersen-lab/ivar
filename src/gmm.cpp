@@ -822,6 +822,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   assign_all_variants(variants, base_variants, retrained);
   add_noise_variants(variants, base_variants);
+  if(retrained.n == 1){
+    solution = retrained.means;
+  }
   solve_clusters(variants, retrained, lower_bound, solution, output_prefix, default_threshold, min_depth);
   return(variants);
 }
