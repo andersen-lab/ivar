@@ -455,7 +455,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       auto dit = std::find(var.alleles[j].nuc.begin(), var.alleles[j].nuc.end(), '-');
       double freq = (double)var.alleles[j].depth / ((double)depth);
       double gapped_freq = (double)var.alleles[j].depth / (double)gapped_depth;
-
       file << ref_name <<"\t"; //region
       file << std::to_string(var.pos) << "\t"; //position
       file << ref << "\t"; //ref

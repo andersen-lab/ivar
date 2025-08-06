@@ -626,7 +626,9 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
     if(variants[i].depth_flag) continue;
 
     bool found = std::find(variants[i].nuc.begin(), variants[i].nuc.end(), '-') != variants[i].nuc.end();
-    if(found && variants[i].gapped_freq > lower_bound){
+
+    //here we divide by two because universal cluster could contain some noise of two var
+    if(found && variants[i].gapped_freq > (lower_bound/2 )){
       for(uint32_t j=1; j < variants[i].nuc.size()-1; j++){
         del_positions.push_back(variants[i].position+j);
       }
