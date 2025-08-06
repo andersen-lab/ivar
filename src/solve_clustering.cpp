@@ -170,7 +170,6 @@ std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, st
         auto it = std::find(variants[i].consensus_numbers.begin(), variants[i].consensus_numbers.end(), j);
         if(it == variants[i].consensus_numbers.end()) other_population_clusters.push_back(means[j]);
       }
-
       //find the second closest cluster index
       double closest_mean = find_neighboring_cluster(variants[i].gapped_freq, variants[i].cluster_assigned, other_population_clusters);
 
@@ -432,9 +431,9 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   std::cerr << "solving clusters" << std::endl;
   double error = 0.05;
   double solution_error = 0.10;
+  calculate_cluster_deviations(model);
   std::vector<double> means = model.means;
   if(solution.size() == 0){
-      calculate_cluster_deviations(model);
 
     uint32_t noise_size;
     count_noise_points(variants, noise_size, 1-estimated_error);
@@ -591,6 +590,8 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   }
   amplicon_specific_cluster_assignment(variants, model);
   rewrite_position_masking(variants);
-  std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, means);
-  modify_variant_masking(amplicons_to_mask, variants);
+  if(means.size() > 1){
+    std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, means);
+    modify_variant_masking(amplicons_to_mask, variants);
+  }
 }
