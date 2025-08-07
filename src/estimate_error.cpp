@@ -29,7 +29,7 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> data, std::vec
 void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold, uint32_t depth_cutoff, double &error_rate){
   double lower_bound = 0.50;
   double upper_bound = 0.99;
-  set_freq_range_flags(base_variants, lower_bound, upper_bound);
+  set_freq_range_flags(base_variants, lower_bound, upper_bound, false);
   std::vector<variant> variants_original;
   uint32_t useful_count_original = 0;
   uint32_t max_pos = 0;

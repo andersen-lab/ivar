@@ -23,7 +23,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   double max_mean=0;
   double freq_lower_bound = 1-error_rate+0.0001;
   double freq_upper_bound = error_rate-0.0001;
-  set_freq_range_flags(variants, freq_lower_bound, freq_upper_bound);
+  set_freq_range_flags(variants, freq_lower_bound, freq_upper_bound, true);
   //find the largest position in the variants file
   uint32_t max_position = 0;
   uint32_t min_position = 4294967295U;;

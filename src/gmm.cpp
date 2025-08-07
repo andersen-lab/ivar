@@ -515,15 +515,48 @@ std::vector<uint32_t> split_csv(const std::string& input) {
     return result;
 }
 
-void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound){
+void set_advanced_freq_range_flags(std::vector<variant> &variants, uint32_t max_pos, double lower_bound) {
+  std::unordered_map<uint32_t, std::vector<variant>> variants_by_pos;
+  for (auto &var : variants) {
+    variants_by_pos[var.position].push_back(var);
+  }
+
+  for (auto &[pos, vec] : variants_by_pos) {
+    if (pos >= max_pos) continue;
+
+    double total_noise = 0.0;
+    for (const auto &v : vec) {
+      if (v.outside_freq_range) {
+        total_noise += v.gapped_freq;
+      }
+    }
+
+    if (total_noise < lower_bound) continue;
+
+    for (auto &v : vec) {
+      if (!v.outside_freq_range && (1.0 - v.gapped_freq) >= total_noise && v.gapped_freq > 0.5) {
+        v.outside_freq_range = true;
+      }
+    }
+  }
+}
+
+
+void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced){
+  uint32_t max_pos = 0;
   for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].position > max_pos) max_pos = variants[i].position;
     if(variants[i].gapped_freq <= lower_bound || variants[i].gapped_freq >= upper_bound){
       variants[i].outside_freq_range = true;
     } else {
       variants[i].outside_freq_range = false;
     }
   }
+  if(advanced){
+    set_advanced_freq_range_flags(variants, max_pos, lower_bound);
+  }
 }
+
 
 /**
  * @brief Parses an internally formatted variant file and populates a vector of variant objects.
@@ -667,7 +700,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   cluster_error(base_variants, min_qual, min_depth, error_rate);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
-  set_freq_range_flags(base_variants, lower_bound, upper_bound);
+  set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
   set_deletion_flags(base_variants, lower_bound);
   set_insertion_flags(base_variants);
 
