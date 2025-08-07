@@ -471,7 +471,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       } else {
         double useful_freq = (double)var.alleles[j].depth / (double)gapped_depth;
         file << std::to_string(useful_freq) << "\t"; //alt freq
-        file << std::to_string(gapped_depth) << "\t";
+        file << std::to_string(depth_next) << "\t";
       }
       file << blank; //pval
       file << blank; //pass
