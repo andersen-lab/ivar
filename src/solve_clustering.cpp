@@ -172,7 +172,6 @@ std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, st
       }
       //find the second closest cluster index
       double closest_mean = find_neighboring_cluster(variants[i].gapped_freq, variants[i].cluster_assigned, other_population_clusters);
-
       //check if the cluster is within the standard dev of the variant
       bool fluctuating = test_cluster_deviation(closest_mean, means[variants[i].cluster_assigned], variants[i].std_dev);
       if(!fluctuating) continue;
@@ -590,8 +589,9 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   }
   amplicon_specific_cluster_assignment(variants, model);
   rewrite_position_masking(variants);
+  std::vector<uint32_t> amplicons_to_mask;
   if(means.size() > 1){
-    std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, means);
-    modify_variant_masking(amplicons_to_mask, variants);
+    amplicons_to_mask = rewrite_amplicon_masking(variants, means);
   }
+  modify_variant_masking(amplicons_to_mask, variants);
 }
