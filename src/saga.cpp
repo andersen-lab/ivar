@@ -8,7 +8,7 @@
 #include <unordered_set>
 #include <tuple>
 
-std::string join_uint32_vector(const std::vector<uint32_t>& vec) {
+std::string join_str_vector(const std::vector<std::string>& vec) {
     std::ostringstream oss;
     for (size_t i = 0; i < vec.size(); ++i) {
         if (i > 0) oss << ",";
@@ -402,7 +402,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   //write variants to a file
   std::unordered_map<std::string, std::vector<double>> allele_frequencies;
   std::vector<allele> del_alleles;
-  std::vector<uint32_t> amplicon_numbers;
+  std::vector<std::string> amplicon_numbers;
   std::string blank = "NA\t";
 
   ofstream file;
@@ -439,6 +439,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     //get amplicon specific frequencies
     allele_frequencies.clear();
     collect_allele_frequencies(var.amplicons, allele_frequencies);
+
     //get the amplicon numbers
     amplicon_numbers.clear();
     get_amplicon_numbers(var.amplicons, amplicon_numbers);
@@ -509,7 +510,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
 
       //write out amplicons it's assigned to
       if(amplicon_numbers.size() > 0){
-        file << join_uint32_vector(amplicon_numbers);
+        file << join_str_vector(amplicon_numbers);
       } else {
         file << "NA";
       }

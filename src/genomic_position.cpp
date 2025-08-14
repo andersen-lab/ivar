@@ -6,9 +6,10 @@
 #include <numeric>
 #include <vector>
 
-void get_amplicon_numbers(std::vector<amplicon_info> amplicons, std::vector<uint32_t> &amp_numbers){
+void get_amplicon_numbers(std::vector<amplicon_info> amplicons, std::vector<std::string> &amp_numbers){
   for(auto amp : amplicons){
-    amp_numbers.push_back((uint32_t)amp.node->data->low);
+    std::string tmp = std::to_string(amp.node->data->low) + "-" + std::to_string(amp.node->data->high);
+    amp_numbers.push_back(tmp);
   }
 }
 
@@ -156,7 +157,10 @@ void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vecto
 void collect_allele_frequencies(std::vector<amplicon_info> amplicons, std::unordered_map<std::string, std::vector<double>> &allele_frequencies) {
   for (auto amp : amplicons) {
     for (auto al : amp.amp_alleles) {
-      if(al.depth == 0) continue;
+      if(al.depth == 0){
+        allele_frequencies[al.nuc].push_back(0);
+        continue;
+      }
       double freq = (double)al.depth / (double)amp.amp_depth;
       allele_frequencies[al.nuc].push_back(freq);
     }
@@ -184,6 +188,18 @@ std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> 
       allele_depths.clear();
       collect_allele_stats(global_positions[i].amplicons, allele_frequencies, allele_depths, min_qual);
       for (auto &[key, values] : allele_frequencies) {
+        //TEST LINES
+        if(i == -1){
+          std::cerr << key << std::endl;
+          for(auto a : values){
+            std::cerr << a << " ";
+          }
+          std::cerr << "\n";
+          for(auto d : allele_depths[key]){
+            std::cerr << d << " ";
+          }
+          std::cerr << "\n";
+        }
         double std = calculate_standard_deviation_weighted(values, allele_depths[key]);
         if(std > 0.03){
           global_positions[i].flux = true;

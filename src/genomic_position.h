@@ -37,5 +37,5 @@ void add_variants(std::vector<uint32_t> &final_positions, std::vector<std::strin
 std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> &global_positions, uint32_t min_depth, uint8_t min_qual);
 void set_amplicon_flag(std::vector<ITNode*> flagged_amplicons, std::vector<genomic_position> &global_positions);
 void collect_allele_frequencies(std::vector<amplicon_info> amplicons, std::unordered_map<std::string, std::vector<double>> &allele_frequencies);
-void get_amplicon_numbers(std::vector<amplicon_info> amplicons, std::vector<uint32_t> &amp_numbers);
+void get_amplicon_numbers(std::vector<amplicon_info> amplicons, std::vector<std::string> &amp_numbers);
 #endif
