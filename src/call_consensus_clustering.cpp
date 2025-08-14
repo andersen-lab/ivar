@@ -56,7 +56,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 29871){
+    if(variants[i].position == 11649){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -82,7 +82,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     }
 
     //this variant position experiences fluctuation across amplicons
-    if(variants[i].amplicon_flux){
+    if(variants[i].amplicon_flux && variants[i].freq < freq_upper_bound){
       if(print){
         std::cerr << "amplicon in flux" << std::endl;
       }
@@ -102,7 +102,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
      bool del = variants[i].nuc.find('-') != std::string::npos;
      //handle all the cases where you never assigned anything, assign to all if it's over the upper bound
      if(variants[i].cluster_assigned == -1){
-      if(print) std::cerr << "not assigned anything " << variants[i]. gapped_freq << " " << freq_upper_bound << std::endl;
       if(variants[i].gapped_freq < freq_upper_bound) continue;
       if(print) std::cerr << "not assigned anything" << std::endl;
       for(uint32_t j=0; j < all_consensus_seqs.size(); j++){
@@ -198,9 +197,10 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     if(it == solution.end()){
       continue;
     }
-    std::string trimmed_sequence = trim_leading_ambiguities(sorted_strings[i], min_position);
+    //std::string trimmed_sequence = trim_trailing_ambiguities(sorted_strings[i], max_position);
+    std::string next_trimmed_sequence = trim_leading_ambiguities(sorted_strings[i], min_position);
     file << ">"+clustering_file+"_cluster_"+ std::to_string(tmp_mean) << "\n";
-    file << trimmed_sequence << "\n";
+    file << next_trimmed_sequence << "\n";
   }
   file.close();
 }
