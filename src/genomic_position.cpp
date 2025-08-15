@@ -16,10 +16,13 @@ void get_amplicon_numbers(std::vector<amplicon_info> amplicons, std::vector<std:
 void set_amplicon_flag(std::vector<ITNode*> flagged_amplicons, std::vector<genomic_position> &global_positions){
   for(uint32_t i =0; i < global_positions.size(); i++){
     for(auto amp : global_positions[i].amplicons){
+      if(amp.amp_depth == 0) continue;
       ITNode* tmp = amp.node;
       bool exists = std::find(flagged_amplicons.begin(), flagged_amplicons.end(), tmp) != flagged_amplicons.end();
       if(exists){
+        if(i == 1477) std::cerr << amp.node->data->low << " " << amp.node->data->high << std::endl;
         global_positions[i].amp_flux = true;
+        break;
       }
     }
   }
@@ -182,6 +185,7 @@ std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> 
   std::unordered_map<std::string, std::vector<double>> allele_frequencies;
   std::unordered_map<std::string, std::vector<uint32_t>> allele_depths;
   std::unordered_set<ITNode*> seen_amplicons;
+
   for(uint32_t i=0; i < global_positions.size(); i++){
     if(global_positions[i].amplicons.size() > 0 && global_positions[i].gapped_depth >= min_depth){
       allele_frequencies.clear();
@@ -190,7 +194,7 @@ std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> 
       for (auto &[key, values] : allele_frequencies) {
         //TEST LINES
         if(i == -1){
-          std::cerr << key << std::endl;
+          std::cerr << "key " << key << std::endl;
           for(auto a : values){
             std::cerr << a << " ";
           }
@@ -210,6 +214,7 @@ std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> 
 
           //add all amps to the flagged amps vec
           for(auto amp : global_positions[i].amplicons){
+            if(amp.amp_depth == 0) continue;
             ITNode* tmp = amp.node;
             if (seen_amplicons.insert(tmp).second) {
               flagged_amplicons.push_back(tmp);

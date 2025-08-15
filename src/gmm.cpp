@@ -64,13 +64,14 @@ void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmod
   assign_variants_simple(variants, gmodel.prob_matrix, index, gmodel.lower_n, true, clustering_failed);
 }
 
-void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel) {
+void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel, double lower_bound, double upper_bound) {
   std::vector<variant> tmp_var;
   uint32_t count = 0;
 
   for(uint32_t i = 0; i < base_variants.size(); i++){
     //previously not assigned due to possible amplicon flux
-    if(!base_variants[i].outside_freq_range && (base_variants[i].amplicon_flux || base_variants[i].amplicon_masked || !base_variants[i].include_clustering)){
+    if(base_variants[i].qual_flag) continue;
+    if((!base_variants[i].outside_freq_range && (base_variants[i].amplicon_flux || base_variants[i].amplicon_masked || !base_variants[i].include_clustering)) || (base_variants[i].outside_freq_range && base_variants[i].gapped_freq >= lower_bound && base_variants[i].gapped_freq <= upper_bound)){
       count++;
       tmp_var.push_back(base_variants[i]);
       variants.push_back(base_variants[i]);
@@ -99,8 +100,12 @@ void assign_all_variants(std::vector<variant> &variants, std::vector<variant> ba
     stacked_matrix.push_back(row);
   }
   gmodel.prob_matrix = stacked_matrix;
-  bool clustering_failed;
+  bool clustering_failed = false;
   assign_clusters(variants, gmodel, clustering_failed);
+  if(clustering_failed){
+    //std::cerr << "clustering failed" << std::endl;
+    //exit(1);
+  }
 }
 
 void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants){
@@ -468,8 +473,9 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
 
     //here we have more variants trying to assign than clusters
     if(tmp_prob.size() > assigned.size()) {
+      std::cerr << "HERE " << tmp_prob.size() << " " << assigned.size() << " " << pos << std::endl;
       clustering_failed = true;
-      return;
+      continue;
     }
 
     std::vector<uint32_t> assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
@@ -661,12 +667,12 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
     bool found = std::find(variants[i].nuc.begin(), variants[i].nuc.end(), '-') != variants[i].nuc.end();
 
     //here we divide by two because universal cluster could contain some noise of two var
-    if(found && variants[i].gapped_freq > (lower_bound/2 )){
+    if(found && variants[i].gapped_freq > (lower_bound/(double)2 )){
       for(uint32_t j=1; j < variants[i].nuc.size()-1; j++){
         del_positions.push_back(variants[i].position+j);
       }
     }
-    if(found){
+    if(found && variants[i].gapped_freq > 0.001){
       for(uint32_t j=1; j < variants[i].nuc.size()-1; j++){
         all_del_positions.push_back(variants[i].position+j);
       }
@@ -696,7 +702,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
-  set_deletion_flags(base_variants, 0);
+  set_deletion_flags(base_variants, 0.001);
   cluster_error(base_variants, min_qual, min_depth, error_rate);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
@@ -853,7 +859,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     file << means_string << "\n";
     file.close();
   }
-  assign_all_variants(variants, base_variants, retrained);
+  assign_all_variants(variants, base_variants, retrained, lower_bound, upper_bound);
   add_noise_variants(variants, base_variants);
   if(retrained.n == 1){
     solution = retrained.means;

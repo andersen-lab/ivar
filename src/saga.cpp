@@ -125,6 +125,7 @@ void parse_cigar(const bam1_t* read1, std::vector<uint32_t> &positions, std::vec
 
 void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplicons, uint8_t min_qual, ref_antd &refantd, std::string ref_name, std::vector<genomic_position> &global_positions){
   const uint32_t start_forward = read1->core.pos;
+  const uint32_t end_forward = bam_endpos(read1);
   const uint32_t start_reverse = read2->core.pos;
   const uint32_t end_reverse = bam_endpos(read2);
   const uint32_t read_len = end_reverse - start_forward;
@@ -189,8 +190,9 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
   //find assigned amplicon and populate position vector
   uint32_t amp_dist = 429496729;
   ITNode *node=NULL;
-  amplicons.find_read_amplicon(start_forward, end_reverse, node, amp_dist);
-
+  if(start_forward < end_reverse && end_forward < end_reverse){
+    amplicons.find_read_amplicon(start_forward, end_reverse, node, amp_dist);
+  }
   if(node == NULL){
     add_variants(final_positions, final_bases, final_qualities, global_positions);
   } else {
@@ -381,7 +383,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       std::vector<uint32_t> qualities;
       uint32_t start_read = it->second->core.pos;
       uint32_t end_read = bam_endpos(it->second);
-
       uint32_t read_len = end_read-start_read;
       parse_cigar(it->second, positions, bases, qualities, start_read, min_qual, refantd, ref_name, read_len);
       uint32_t amp_dist = 429496729;

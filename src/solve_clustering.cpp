@@ -2,6 +2,7 @@
 #include "call_consensus_clustering.h"
 #include "saga.h"
 #include <ostream>
+#include <unordered_set>
 #include <iostream>
 #include <vector>
 #include <sstream>
@@ -52,13 +53,14 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
     }
   }
   std::string consensus_string = std::accumulate(tmp.begin(), tmp.end(), std::string(""));
-  std::string trimmed_consensus = trim_leading_ambiguities(consensus_string, min_position);
+  //std::string trimmed_consensus = trim_trailing_ambiguities(consensus_string, max_position);
+  std::string next_trimmed_consensus = trim_leading_ambiguities(consensus_string, min_position);
   //write the consensus to file
   std::string consensus_filename = clustering_file + ".fa";
   std::ofstream file(consensus_filename);
   std::string name = ">"+clustering_file+"_"+std::to_string(default_threshold)+"_threshold";
   file << name << "\n";
-  file << trimmed_consensus << "\n";
+  file << next_trimmed_consensus << "\n";
   file.close();
 }
 
@@ -72,29 +74,42 @@ void calculate_cluster_deviations(gaussian_mixture_model &model){
   model.cluster_std_devs = std_devs;
 }
 
-void modify_variant_masking(std::vector<uint32_t> amplicons_to_mask, std::vector<variant> &variants){
-  for(uint32_t i=0; i < variants.size(); i++){
-    std::vector<uint32_t> tmp = variants[i].amplicon_numbers;
-    bool found = false;
-    for(uint32_t j=0; j < tmp.size(); j++){
-      auto it = std::find(amplicons_to_mask.begin(), amplicons_to_mask.end(), tmp[j]);
-      if(it != amplicons_to_mask.end()){
-        found = true;
-        variants[i].amplicon_masked = true;
-        break;
-      }
+std::vector<uint32_t> find_missing_indexes(const std::vector<uint32_t>& tmp, const std::vector<uint32_t>& amplicons_to_mask) {
+  std::unordered_set<uint32_t> mask_set(amplicons_to_mask.begin(), amplicons_to_mask.end());
+  std::vector<uint32_t> missing_indexes;
+  for (uint32_t i = 0; i < tmp.size(); ++i) {
+    if (mask_set.find(tmp[i]) == mask_set.end()) {
+      missing_indexes.push_back(i);
     }
-    if(!found) {
+  }
+  return missing_indexes;
+}
+
+void modify_variant_masking(std::vector<uint32_t> amplicons_to_mask, std::vector<variant> &variants, std::vector<double> means){
+  std::cerr << "modify variant masking" << std::endl;
+  for(uint32_t i=0; i < variants.size(); i++){
+
+    std::vector<uint32_t> tmp = variants[i].amplicon_numbers;
+    std::vector<uint32_t> valid_amplicons = find_missing_indexes(tmp, amplicons_to_mask);
+    if(variants[i].position == 12427) std::cerr << "IN MODIFY VAR MASK" << std::endl;
+    if(valid_amplicons.size() == 0){
+      variants[i].amplicon_masked = true;
+    } else if(valid_amplicons.size() == tmp.size()){
       variants[i].amplicon_masked = false;
       variants[i].amplicon_flux = false;
+    } else {
+      for(auto j : valid_amplicons){
+        std::cerr << variants[i].consensus_numbers.size() << std::endl;
+        std::cerr << variants[i].position << " " << variants[i].gapped_freq << " j " << j << " " << variants[i].consensus_numbers[j] << std::endl;
+        variants[i].cluster_assigned = variants[i].consensus_numbers[j];
+        variants[i].amplicon_masked = false;
+      }
     }
   }
 }
 
 bool test_cluster_deviation(double nearest_cluster, double variant_cluster, double std_dev){
   bool fluctuation = false;
-  //CLEANUP THIS CAN BE CALCULATED ONCE PER ALL CLUSTERS
-  //determine if the assigned and nearest cluster can be resolved based on variant fluctuation
   std::vector<double> tmp = {nearest_cluster, variant_cluster};
   double cluster_dev = calculate_standard_deviation(tmp);
   if(std_dev > cluster_dev){
@@ -124,7 +139,8 @@ void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gaussi
 
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].freq_numbers.size() < 2) continue;
-    if(!variants[i].amplicon_flux) continue;
+    if(variants[i].std_dev == 0) continue;
+    if(!variants[i].amplicon_flux && !variants[i].amplicon_masked) continue;
     arma::mat final_data = arma::conv_to<arma::rowvec>::from(variants[i].freq_numbers);
     final_data.reshape(1, variants[i].freq_numbers.size());
     tmp.clear();
@@ -593,5 +609,5 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   if(means.size() > 1){
     amplicons_to_mask = rewrite_amplicon_masking(variants, means);
   }
-  modify_variant_masking(amplicons_to_mask, variants);
+  modify_variant_masking(amplicons_to_mask, variants, means);
 }
