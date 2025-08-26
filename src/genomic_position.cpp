@@ -20,7 +20,6 @@ void set_amplicon_flag(std::vector<ITNode*> flagged_amplicons, std::vector<genom
       ITNode* tmp = amp.node;
       bool exists = std::find(flagged_amplicons.begin(), flagged_amplicons.end(), tmp) != flagged_amplicons.end();
       if(exists){
-        if(i == 1477) std::cerr << amp.node->data->low << " " << amp.node->data->high << std::endl;
         global_positions[i].amp_flux = true;
         break;
       }
@@ -174,8 +173,14 @@ void collect_allele_stats(const std::vector<amplicon_info> &amplicons, std::unor
   for (const auto &amp : amplicons) {
     for (const auto &al : amp.amp_alleles) {
       if (al.mean_qual < min_qual) continue;
-      allele_frequencies[al.nuc].push_back(static_cast<double>(al.depth) / amp.amp_depth);
-      depth_map[al.nuc].push_back(al.depth);
+      //check if it's a deletion
+      auto it = std::find(al.nuc.begin(), al.nuc.end(), '-');
+      //TODO
+      if (it != al.nuc.end()) {
+      } else {
+        allele_frequencies[al.nuc].push_back(static_cast<double>(al.depth) / amp.amp_depth);
+        depth_map[al.nuc].push_back(amp.amp_depth);
+      }
     }
   }
 }
@@ -187,13 +192,13 @@ std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> 
   std::unordered_set<ITNode*> seen_amplicons;
 
   for(uint32_t i=0; i < global_positions.size(); i++){
-    if(global_positions[i].amplicons.size() > 0 && global_positions[i].gapped_depth >= min_depth){
+    if(global_positions[i].amplicons.size() > 0 && global_positions[i].depth >= min_depth){
       allele_frequencies.clear();
       allele_depths.clear();
       collect_allele_stats(global_positions[i].amplicons, allele_frequencies, allele_depths, min_qual);
       for (auto &[key, values] : allele_frequencies) {
         //TEST LINES
-        if(i == -1){
+        if(i == 23604){
           std::cerr << "key " << key << std::endl;
           for(auto a : values){
             std::cerr << a << " ";
@@ -205,7 +210,8 @@ std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> 
           std::cerr << "\n";
         }
         double std = calculate_standard_deviation_weighted(values, allele_depths[key]);
-        if(std > 0.03){
+        if(i == 23604) std::cerr << std << std::endl;
+        if(std > 0.055){
           global_positions[i].flux = true;
           //add the standard dev to the allele value
           for(auto &a : global_positions[i].alleles){

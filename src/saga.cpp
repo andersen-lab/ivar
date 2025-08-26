@@ -188,10 +188,16 @@ void merge_reads(const bam1_t* read1, const bam1_t* read2, IntervalTree &amplico
   }
 
   //find assigned amplicon and populate position vector
-  uint32_t amp_dist = 429496729;
+  uint32_t amp_dist = 0;
   ITNode *node=NULL;
+  bool exists = std::find(std::begin(final_positions), std::end(final_positions), 23604) != std::end(final_positions);
   if(start_forward < end_reverse && end_forward < end_reverse){
-    amplicons.find_read_amplicon(start_forward, end_reverse, node, amp_dist);
+    //if(exists){
+   //   auto it = std::find(final_positions.begin(), final_positions.end(), 23604);
+    //  uint32_t index = std::distance(final_positions.begin(), it);
+    //  std::cerr << "\nstart\t" << final_bases[index] << std::endl;
+      amplicons.find_read_amplicon(start_forward, end_reverse, node, amp_dist);
+   // }
   }
   if(node == NULL){
     add_variants(final_positions, final_bases, final_qualities, global_positions);
@@ -337,7 +343,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     //get the name of the read
     std::string read_name = bam_get_qname(aln);
     //TEST LINEs
-    //if(read_name != "A00953:367:HC5WFDRXY:1:1208:18059:3051") continue;
+    //if(read_name != "SRR23446137.18792") continue;
 
     if (!(aln->core.flag & BAM_FPAIRED) || !(aln->core.flag & BAM_FPROPER_PAIR)){
       //if the read is unpaired try to assign it to an amplicon anyways
@@ -348,7 +354,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       uint32_t end_read = bam_endpos(aln);
       uint32_t read_len = end_read-start_read;
       parse_cigar(aln, positions, bases, qualities, start_read, min_qual, refantd, ref_name, read_len);
-      uint32_t amp_dist = 429496729;
+      uint32_t amp_dist = 0;
       ITNode *node=NULL;
       amplicons.find_read_amplicon(start_read, end_read, node, amp_dist);
       if(node == NULL){
@@ -385,7 +391,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       uint32_t end_read = bam_endpos(it->second);
       uint32_t read_len = end_read-start_read;
       parse_cigar(it->second, positions, bases, qualities, start_read, min_qual, refantd, ref_name, read_len);
-      uint32_t amp_dist = 429496729;
+      uint32_t amp_dist = 0;
       ITNode *node=NULL;
       amplicons.find_read_amplicon(start_read, end_read, node, amp_dist);
       if(node == NULL){

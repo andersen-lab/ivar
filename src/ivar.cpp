@@ -333,7 +333,7 @@ int main(int argc, char *argv[]) {
   //ivar contam
   if (cmd.compare("contam") == 0) {
     g_args.min_threshold = 0;
-    g_args.min_depth = 10;
+    g_args.min_depth = 5;
     g_args.min_qual = 20;
     g_args.ref = "";
     opt = getopt(argc, argv, contam_opt_str);

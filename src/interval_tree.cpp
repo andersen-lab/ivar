@@ -18,20 +18,25 @@ void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upp
 
   //check if current node's interval fully contains [lower, upper]
   if ((uint32_t)root->data->low <= lower && upper <= (uint32_t)root->data->high) {
-    uint32_t dist = (lower - root->data->low) + (root->data->high - upper);
-    if (dist < amp_dist) {
-      amp_dist = dist;
+    uint32_t amp_length = (uint32_t)root->data->high - (uint32_t)root->data->low;
+    if(amp_dist > 0){
+      node = NULL;
+      return;
+    }
+    //std::cerr << "fits\t" << root->data->low << "\t" << root->data->high << std::endl;
+    if (amp_length > amp_dist) {
+      //std::cerr << "larger amp\t" << root->data->low << "\t" << root->data->high << std::endl;
+      amp_dist = amp_length;
       node = root;
     }
   }
 
   //traverse left if there's any chance of finding a containing interval
-  if (root->left && lower <= (uint32_t)root->data->low) {
+  if (root->left) {
     find_read_amplicon(root->left, lower, upper, node, amp_dist);
   }
 
-  //traverse right if there's any chance of finding a containing interval
-  if (root->right && upper >= (uint32_t)root->data->high) {
+  if (root->right) {
     find_read_amplicon(root->right, lower, upper, node, amp_dist);
   }
 }

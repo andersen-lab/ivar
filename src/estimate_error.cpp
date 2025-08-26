@@ -13,13 +13,14 @@ std::vector<double> z_score(std::vector<double> data) {
     return z_scores;
 }
 
-std::vector<uint32_t>determine_outlier_points(std::vector<double> data, std::vector<double> cluster){
+std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster){
     std::vector<uint32_t> removal_points;
     //calculate cluster specific percentiles
     std::vector<double> z_scores = z_score(cluster);
     for(uint32_t i=0; i < z_scores.size(); i++){
       double abs = std::abs(z_scores[i]);
       if(abs >= 5){
+        std::cerr << abs << " " << cluster[i] << std::endl;
         removal_points.push_back(i);
       }
     }
@@ -82,7 +83,8 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     else n++;
   }
   //for each cluster this describes the points which are outliers
-  std::vector<uint32_t> outliers = determine_outlier_points(frequencies, model.clusters[chosen_peak]);
+  //std::vector<uint32_t> outliers = determine_outlier_points(model.clusters[chosen_peak]);
+  std::vector<uint32_t> outliers;
   std::vector<double> universal_cluster = model.clusters[chosen_peak];
   std::vector<double> cleaned_cluster;
   for(uint32_t i=0; i < universal_cluster.size(); i++){

@@ -75,7 +75,7 @@ int main() {
   std::vector<double> solution;
   bool clustering_failed = false;
   gaussian_mixture_model retrained = retrain_model(n, data, variants, 2, 0.001, clustering_failed);
-  assign_all_variants(variants, base_variants, retrained);
+  assign_all_variants(variants, base_variants, retrained, lower_bound, upper_bound);
   add_noise_variants(variants, base_variants);
 
   solve_clusters(variants, retrained, lower_bound, solution, prefix, default_threshold, min_depth);
