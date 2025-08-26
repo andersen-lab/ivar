@@ -1,11 +1,11 @@
 #include "get_common_variants.h"
 
-const int NUM_FIELDS = 19;
+const int NUM_FIELDS = 20;
 const std::string fields[NUM_FIELDS] = {
     "REGION",    "POS",      "REF",       "ALT",    "REF_DP",
     "REF_RV",    "REF_QUAL", "ALT_DP",    "ALT_RV", "ALT_QUAL",
     "ALT_FREQ",  "TOTAL_DP", "PVAL",      "PASS",   "GFF_FEATURE",
-    "REF_CODON", "REF_AA",   "ALT_CODON", "ALT_AA"};
+    "REF_CODON", "REF_AA",   "ALT_CODON", "ALT_AA", "POS_AA"};
 
 const std::string na_tab_delimited_str =
     "NA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA";
@@ -45,6 +45,7 @@ int read_variant_file(
         case 16:  // REF_AA
         case 17:  // ALT_CODON
         case 18:  // ALT_AA
+        case 19:  // POS_AA
           tab_delimited_key += cell + "\t";
           break;
         case 4:
@@ -103,12 +104,15 @@ int common_variants(std::string out, double min_threshold, char *files[],
   for (i = 0; i < 4; ++i) {
     fout << fields[i] << "\t";
   }
-  for (i = 14; i < 19; ++i) {
+  for (i = 14; i < 20; ++i) {
     fout << fields[i] << "\t";
   }
   for (i = 0; i < nfiles; ++i) {
     for (j = 4; j < 14; ++j) {
-      fout << fields[j] << "_" << files[i] << "\t";
+      fout << fields[j] << "_" << files[i];
+      if (!(i == nfiles - 1 && j == 13)) {  // Avoid adding a tab at the end
+        fout << "\t";
+      }
     }
   }
   fout << "\n";
