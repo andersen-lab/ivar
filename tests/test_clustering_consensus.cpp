@@ -56,7 +56,8 @@ int main() {
   set_deletion_flags(base_variants, 0);
 
   double error_rate;
-  cluster_error(base_variants, min_qual, min_depth, error_rate);
+  double error_std;
+  cluster_error(base_variants, min_qual, min_depth, error_rate, error_std);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
   std::cerr << "lower error " << lower_bound << " upper error " << upper_bound << std::endl;

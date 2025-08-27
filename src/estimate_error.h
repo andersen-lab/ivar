@@ -4,5 +4,5 @@
 #include "gmm.h"
 #ifndef estimate_error
 #define estimate_error
-void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold, uint32_t depth_cutoff, double &error_rate);
+void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold, uint32_t depth_cutoff, double &error_rate, double &error_std);
 #endif

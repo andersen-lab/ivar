@@ -699,18 +699,18 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t n=8;
   uint32_t round_val = 4;
   bool development_mode=true;
-
+  double error_std;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
   set_deletion_flags(base_variants, 0.001);
-  cluster_error(base_variants, min_qual, min_depth, error_rate);
+  cluster_error(base_variants, min_qual, min_depth, error_rate, error_std);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
   set_deletion_flags(base_variants, lower_bound);
   set_insertion_flags(base_variants);
 
-  std::cerr << "lower bound " << lower_bound <<  " upper bound " << upper_bound << std::endl;
+  std::cerr << "lower bound " << lower_bound <<  " upper bound " << upper_bound << " std " << error_std << std::endl;
   //this whole things needs to be reconfigured
   uint32_t useful_var=0;
   std::vector<variant> variants;
@@ -805,23 +805,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         }
         continue;
       }
-      for(auto d : data) std::cerr << d << " ";
-      std::cerr << "\n";
       std::cerr << "\nmean " << mean << " mad " << mad << " cluster size " << data.size() << "\n" << std::endl;
-      if(data.size() >= 5){
-        if(mad <= 0.10){
-          optimal = true;
-        } else {
-          optimal = false;
-          break;
-        }
+      if(mad <= error_std){
+        optimal = true;
       } else {
-        if(mad <= 0.05){
-          optimal = true;
-        }  else{
-          optimal = false;
-          break;
-        }
+        optimal = false;
+        break;
       }
     }
 
