@@ -2,33 +2,18 @@
 #include "gmm.h"
 #include "saga.h"
 
-double compute_noise_threshold(const std::vector<double>& noise,
-                               double m_min = 1,
-                               double m_max = 10.0,
-                               double s0 = 0.01,
-                               double gamma = 0.5) {
-    if (noise.empty()) return 0.0;
 
-    // Compute mean
-    double mean = std::accumulate(noise.begin(), noise.end(), 0.0) / noise.size();
+// Map input x [0.001,0.10] to output y [1,30], decreasing nonlinearly
+double adaptive_value(double x,
+                      double y_min = 1.0,
+                      double y_max = 15.0,
+                      double x0 = 0.015,
+                      double gamma = 2.0) {
 
-    // Compute stddev
-    double sq_sum = 0.0;
-    for (double v : noise) {
-        sq_sum += (v - mean) * (v - mean);
-    }
-    double sigma = std::sqrt(sq_sum / (noise.size() - 1));
-
-    // Reference scale: if not given, use sigma itself
-    if (s0 <= 0.0) s0 = sigma;
-
-    // Adaptive multiplier: increases with sigma, saturates at m_max
-    double m = m_min + (m_max - m_min) * std::pow(sigma / (sigma + s0), gamma);
-
-    // Final cutoff depends *only* on sigma (noise level), not mean
-    return m * sigma;
+    // Power-law / inverse mapping
+    double y = y_min + (y_max - y_min) / (std::pow(x / x0, gamma) + 1.0);
+    return y*x;
 }
-
 
 std::vector<double> z_score(std::vector<double> data) {
     double mean = calculate_mean(data);
@@ -47,8 +32,7 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster){
     std::vector<double> z_scores = z_score(cluster);
     for(uint32_t i=0; i < z_scores.size(); i++){
       double abs = std::abs(z_scores[i]);
-      if(cluster[i] < 0.90) std::cerr << abs << " " << cluster[i] << std::endl;
-      if(abs >= 5){
+      if(abs >= 3){
         std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
         removal_points.push_back(i);
       }
@@ -77,6 +61,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     error_rate = 1;
     return;
   }
+
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
   uint32_t count_original=0;
   for(uint32_t i = 0; i < variants_original.size(); i++){
@@ -85,46 +70,63 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     count_original += 1;
   }
   //start with a small n value and if we don't find two major clusters we increase the number of clusters
-  uint32_t n = 1;
+  uint32_t n = 2;
   kmeans_model model;
   uint32_t chosen_peak = 0;
 
+
+  double std = calculate_standard_deviation(frequencies);
+  uint32_t real_n = 0;
+  double err = 0;
   while(n <= 2){
     model = train_model(n, data_original, true);
     std::vector<double> means = model.means;
+
+    double mean_diff = std::abs(means[0] - means[1]);
+    if(mean_diff > std){
+      real_n = 2;
+    } else {
+      real_n = 1;
+    }
     //index of largest mean
     uint32_t index = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
     chosen_peak = index;
-    bool stop=false;
-    for(uint32_t i=0; i < model.clusters.size(); i++){
-      double mean = calculate_mean(model.clusters[i]);
-      double mad = calculate_mad(model.clusters[i], mean);
-      double std = calculate_standard_deviation(model.clusters[i]);
-      if(mad < 0.01 && i == index) {
-        stop = true;
-      }
-      std::cerr << "n " << n << " mean " << mean << " mad " << mad << " " << model.clusters[i].size() << " std " << std << std::endl;
+    for(uint32_t i=0; i < means.size(); i++){
+      double std_1 = calculate_standard_deviation(model.clusters[i]);
+      std::cerr << means[i] << " " << std_1 << std::endl;
     }
-    if(stop) break;
-    else n++;
-  }
 
-  error_std = compute_noise_threshold(model.clusters[chosen_peak]);
-  std::cerr << "error_std " << error_std  << std::endl;
-  //exit(0);
-  //for each cluster this describes the points which are outliers
-  std::vector<uint32_t> outliers = determine_outlier_points(model.clusters[chosen_peak]);
-  //std::vector<uint32_t> outliers;
-  std::vector<double> universal_cluster = model.clusters[chosen_peak];
+    n++;
+  }
+  std::cerr << real_n << std::endl;
   std::vector<double> cleaned_cluster;
-  for(uint32_t i=0; i < universal_cluster.size(); i++){
-    auto it = std::find(outliers.begin(), outliers.end(), i);
-    if(it == outliers.end()){
-      cleaned_cluster.push_back(universal_cluster[i]);
+  //for each cluster this describes the points which are outliers
+  if(real_n == 2){
+    std::vector<uint32_t> outliers = determine_outlier_points(model.clusters[chosen_peak]);
+    std::vector<double> universal_cluster = model.clusters[chosen_peak];
+    for(uint32_t i=0; i < universal_cluster.size(); i++){
+      auto it = std::find(outliers.begin(), outliers.end(), i);
+      if(it == outliers.end()){
+        cleaned_cluster.push_back(universal_cluster[i]);
+      }
     }
-  }
+    //for(auto f : cleaned_cluster) std::cerr << f << std::endl;
+    double cstd = calculate_standard_deviation(cleaned_cluster);
+    std::cerr << "c standard " << cstd<< std::endl;
+    error_std = adaptive_value(cstd);
+  } else {
+    std::vector<uint32_t> outliers = determine_outlier_points(frequencies);
+    for(uint32_t i=0; i < frequencies.size(); i++){
+      auto it = std::find(outliers.begin(), outliers.end(), i);
+      if(it == outliers.end()){
+        cleaned_cluster.push_back(frequencies[i]);
+      }
+    }
+    double cstd = calculate_standard_deviation(cleaned_cluster);
+    std::cerr << "c standard " << cstd<< std::endl;
+    error_std = adaptive_value(cstd);
 
-  //get the upper edge of the noise cluster
+  }
   auto min_it = std::min_element(cleaned_cluster.begin(), cleaned_cluster.end());
   error_rate = *min_it;
 }
