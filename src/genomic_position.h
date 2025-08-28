@@ -11,6 +11,7 @@ struct amplicon_info {
   std::vector<allele> amp_alleles;
   uint32_t amp_depth = 0;
   uint32_t amp_depth_gapped = 0;
+  uint32_t ambiguous_reads = 0; //the number of reads that could be assigned to this, or another amplicon
   void update_alleles(std::string allele, uint32_t qual);
 };
 
@@ -35,6 +36,7 @@ int check_position_exists(uint32_t p, std::vector<genomic_position> positions);
 void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vector<std::string> final_bases, std::vector<uint32_t> final_qualities, std::vector<genomic_position> &global_positions);
 void add_variants(std::vector<uint32_t> &final_positions, std::vector<std::string> &final_bases, std::vector<uint32_t> &final_qualities, std::vector<genomic_position> &global_positions);
 std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> &global_positions, uint32_t min_depth, uint8_t min_qual);
+void mark_ambiguous_reads(ITNode *node, std::vector<uint32_t> final_positions, std::vector<genomic_position> &global_positions);
 void set_amplicon_flag(std::vector<ITNode*> flagged_amplicons, std::vector<genomic_position> &global_positions);
 void collect_allele_frequencies(std::vector<amplicon_info> amplicons, std::unordered_map<std::string, std::vector<double>> &allele_frequencies);
 void get_amplicon_numbers(std::vector<amplicon_info> amplicons, std::vector<std::string> &amp_numbers);

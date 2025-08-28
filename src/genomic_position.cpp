@@ -108,6 +108,33 @@ void add_variants(std::vector<uint32_t> &final_positions, std::vector<std::strin
   }
 }
 
+
+void mark_ambiguous_reads(ITNode *node, std::vector<uint32_t> final_positions, std::vector<genomic_position> &global_positions) {
+  for(uint32_t i=0; i < final_positions.size(); i++){
+    uint32_t pos = final_positions[i];
+    //for this position, iterate the amplicons associated
+    bool found = false;
+    for(uint32_t j=0; j < global_positions[pos].amplicons.size(); j++){
+      amplicon_info &amp = global_positions[pos].amplicons[j];
+      found = node_compare(node, amp.node);
+      if(found){
+        amp.ambiguous_reads += 1;
+        break;
+      }
+    }
+    if(!found){
+      amplicon_info amp;
+      amp.node = node;
+      amp.amp_depth = 0;
+      amp.amp_depth_gapped = 0;
+      amp.amp_alleles = populate_basic_alleles();
+      amp.ambiguous_reads = 1;
+      global_positions[pos].amplicons.push_back(amp);
+    }
+  }
+}
+
+
 void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vector<std::string> final_bases, std::vector<uint32_t> final_qualities, std::vector<genomic_position> &global_positions) {
   for(uint32_t i=0; i < final_positions.size(); i++){
     uint32_t pos = final_positions[i];
@@ -122,12 +149,12 @@ void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vecto
         amp.update_alleles(final_bases[i], final_qualities[i]);
         if (!is_del && !is_ins) {
           amp.amp_depth += 1;
-          global_positions[pos].gapped_depth += 1;
-          global_positions[pos].depth += 1;
+          //global_positions[pos].gapped_depth += 1;
+          //global_positions[pos].depth += 1;
         } else if(!is_ins && is_del){
           amp.amp_depth_gapped += 1;
           for(uint32_t k=0; k <final_bases[i].size()-1; k++){
-            global_positions[pos+k].gapped_depth += 1;
+            //global_positions[pos+k].gapped_depth += 1;
           }
         }
         break;
@@ -141,12 +168,12 @@ void assign_read(ITNode *node, std::vector<uint32_t> final_positions, std::vecto
       amp.amp_depth_gapped = 0;
       if (!is_del && !is_ins) {
         amp.amp_depth += 1;
-        global_positions[pos].gapped_depth += 1;
-        global_positions[pos].depth += 1;
+        //global_positions[pos].gapped_depth += 1;
+        //global_positions[pos].depth += 1;
       } else if(!is_ins && is_del){
         amp.amp_depth_gapped += 1;
         for(uint32_t k=0; k <final_bases[i].size()-1; k++){
-          global_positions[pos+k].gapped_depth += 1;
+          //global_positions[pos+k].gapped_depth += 1;
         }
       }
       amp.amp_alleles = populate_basic_alleles();
@@ -171,6 +198,8 @@ void collect_allele_frequencies(std::vector<amplicon_info> amplicons, std::unord
 
 void collect_allele_stats(const std::vector<amplicon_info> &amplicons, std::unordered_map<std::string, std::vector<double>> &allele_frequencies, std::unordered_map<std::string, std::vector<uint32_t>> &depth_map, uint8_t min_qual){
   for (const auto &amp : amplicons) {
+    //don't use this amplicon if the number of ambiguously assigned reads exceeds the number of actual reads
+    if(amp.ambiguous_reads > amp.amp_depth) continue;
     for (const auto &al : amp.amp_alleles) {
       if (al.mean_qual < min_qual) continue;
       //check if it's a deletion
