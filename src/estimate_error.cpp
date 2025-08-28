@@ -8,7 +8,7 @@ double adaptive_value(double x,
                       double y_min = 1.0,
                       double y_max = 15.0,
                       double x0 = 0.015,
-                      double gamma = 2.0) {
+                      double gamma = 1.5) {
 
     // Power-law / inverse mapping
     double y = y_min + (y_max - y_min) / (std::pow(x / x0, gamma) + 1.0);
@@ -26,13 +26,13 @@ std::vector<double> z_score(std::vector<double> data) {
     return z_scores;
 }
 
-std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster){
+std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster, double threshold){
     std::vector<uint32_t> removal_points;
     //calculate cluster specific percentiles
     std::vector<double> z_scores = z_score(cluster);
     for(uint32_t i=0; i < z_scores.size(); i++){
       double abs = std::abs(z_scores[i]);
-      if(abs >= 3){
+      if(abs >= threshold){
         std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
         removal_points.push_back(i);
       }
@@ -93,7 +93,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     chosen_peak = index;
     for(uint32_t i=0; i < means.size(); i++){
       double std_1 = calculate_standard_deviation(model.clusters[i]);
-      std::cerr << means[i] << " " << std_1 << std::endl;
+      std::cerr << "mean " << means[i] << " std " << std_1 << " total std " << std << std::endl;
     }
 
     n++;
@@ -102,7 +102,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   std::vector<double> cleaned_cluster;
   //for each cluster this describes the points which are outliers
   if(real_n == 2){
-    std::vector<uint32_t> outliers = determine_outlier_points(model.clusters[chosen_peak]);
+    std::vector<uint32_t> outliers = determine_outlier_points(model.clusters[chosen_peak], 10);
     std::vector<double> universal_cluster = model.clusters[chosen_peak];
     for(uint32_t i=0; i < universal_cluster.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
@@ -115,7 +115,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     std::cerr << "c standard " << cstd<< std::endl;
     error_std = adaptive_value(cstd);
   } else {
-    std::vector<uint32_t> outliers = determine_outlier_points(frequencies);
+    std::vector<uint32_t> outliers = determine_outlier_points(frequencies, 3);
     for(uint32_t i=0; i < frequencies.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
       if(it == outliers.end()){
