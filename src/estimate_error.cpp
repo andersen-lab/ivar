@@ -33,11 +33,20 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster, doubl
     for(uint32_t i=0; i < z_scores.size(); i++){
       double abs = std::abs(z_scores[i]);
       if(abs >= threshold){
-        std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
+        //std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
         removal_points.push_back(i);
       }
     }
     return(removal_points);
+}
+
+bool is_within_std(const std::vector<double>& values, double mean, double std_dev) {
+  for (double val : values) {
+    if (std::abs(val - mean) < std_dev) {
+      return true;  //found at least one value within the standard deviation
+    }
+  }
+  return false; //no value within the standard deviation
 }
 
 void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold, uint32_t depth_cutoff, double &error_rate, double &error_std){
@@ -61,7 +70,6 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     error_rate = 1;
     return;
   }
-
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
   uint32_t count_original=0;
   for(uint32_t i = 0; i < variants_original.size(); i++){
@@ -69,40 +77,62 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     data_original.col(count_original) = tmp;
     count_original += 1;
   }
-  //start with a small n value and if we don't find two major clusters we increase the number of clusters
-  uint32_t n = 2;
+
+  uint32_t n = 5;
   kmeans_model model;
   uint32_t chosen_peak = 0;
-
-
-  double std = calculate_standard_deviation(frequencies);
-  uint32_t real_n = 0;
-  double err = 0;
-  while(n <= 2){
+  bool solved = true;
+  while(n >= 2){
+    bool close_clusters = false;
+    solved = true;
     model = train_model(n, data_original, true);
     std::vector<double> means = model.means;
+    //index of largest cluster
+    chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
 
-    double mean_diff = std::abs(means[0] - means[1]);
-    if(mean_diff > std){
-      real_n = 2;
-    } else {
-      real_n = 1;
-    }
-    //index of largest mean
-    uint32_t index = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
-    chosen_peak = index;
-    for(uint32_t i=0; i < means.size(); i++){
-      double std_1 = calculate_standard_deviation(model.clusters[i]);
-      std::cerr << "mean " << means[i] << " std " << std_1 << " total std " << std << std::endl;
+    std::vector<uint32_t> indices(means.size());
+    for (uint32_t i = 0; i < means.size(); ++i) {
+        indices[i] = i;
     }
 
-    n++;
+    std::sort(indices.begin(), indices.end(), [&](uint32_t a, uint32_t b) {
+      return means[a] > means[b];
+    });
+    for(auto m : means){
+      std::cerr << "m " << m << std::endl;
+    }
+    //compute centroids and within-cluster standard deviation
+    for (size_t i = 0; i < 2; ++i) {
+      uint32_t index = indices[i];
+      double centroid = means[index];
+      //remove this value from the means
+      std::vector<double> tmp_means = means;
+      if (index < tmp_means.size()) {
+        tmp_means.erase(tmp_means.begin() + index);
+      }
+
+      //make sure there isn't another cluster within a couple standard deviations
+      double within_std = calculate_standard_deviation(model.clusters[index]);
+      close_clusters = is_within_std(tmp_means,  centroid, within_std*3);
+      if(close_clusters){
+        solved = false;
+        std::cerr << "here" << std::endl;
+        break;
+      }
+    }
+    if(solved){
+      break;
+    }
+    std::cerr << "here" << std::endl;
+    n--;
   }
-  std::cerr << real_n << std::endl;
+  std::cerr << "chosen n " << n << " chosen peak " << chosen_peak << std::endl;
+  //exit(0);
   std::vector<double> cleaned_cluster;
+
   //for each cluster this describes the points which are outliers
-  if(real_n == 2){
-    std::vector<uint32_t> outliers = determine_outlier_points(model.clusters[chosen_peak], 10);
+  if(n > 1){
+    std::vector<uint32_t> outliers = determine_outlier_points(model.clusters[chosen_peak], 2);
     std::vector<double> universal_cluster = model.clusters[chosen_peak];
     for(uint32_t i=0; i < universal_cluster.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
@@ -115,7 +145,8 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     std::cerr << "c standard " << cstd<< std::endl;
     error_std = adaptive_value(cstd);
   } else {
-    std::vector<uint32_t> outliers = determine_outlier_points(frequencies, 3);
+    //TODO handle the case of n=1
+    std::vector<uint32_t> outliers = determine_outlier_points(frequencies, 2);
     for(uint32_t i=0; i < frequencies.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
       if(it == outliers.end()){
@@ -125,8 +156,9 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     double cstd = calculate_standard_deviation(cleaned_cluster);
     std::cerr << "c standard " << cstd<< std::endl;
     error_std = adaptive_value(cstd);
-
   }
+
   auto min_it = std::min_element(cleaned_cluster.begin(), cleaned_cluster.end());
+  std::cerr << *min_it << std::endl;
   error_rate = *min_it;
 }
