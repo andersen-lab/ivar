@@ -12,6 +12,43 @@
 #include <limits>
 #include <unordered_map>
 
+uint32_t elbow_method(std::vector<double> ics, bool &smallest){
+  uint32_t optimal_n;
+  std::vector<double> differences;
+  double smallest_value = *std::min_element(ics.begin(), ics.end());
+  std::cerr << "elbow"<<std::endl;
+  uint32_t count=0;
+  //if the best model is not the least complex, use it
+  for(uint32_t i=0; i < ics.size(); i++){
+    if(ics[i] == 100) continue;
+    if(ics[i] == smallest_value && count != 0){
+      std::cerr << "here" << std::endl;
+      optimal_n  = std::min_element(ics.begin(), ics.end()) - ics.begin();
+      smallest = true;
+      return(optimal_n);
+    }
+    count++;
+  }
+
+  for(uint32_t i=1; i < ics.size(); i++){
+    double diff = ics[i] - ics[i-1];
+    if(diff < 0){
+      for(uint32_t j = i-1; j >= 0; j--){
+        diff = ics[i] - ics[j];
+        if(diff > 0) break;
+      }
+    }
+    std::cerr << "ic " << ics[i] << " total diff " << diff <<std::endl;
+    differences.push_back(diff);
+  }
+  std::cerr << "all differences" << std::endl;
+  for(auto d : differences){
+    std::cerr << d << std::endl;
+  }
+  optimal_n = std::distance(differences.begin(), std::min_element(differences.begin(), differences.end()));
+  return(optimal_n);
+}
+
 std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> variants){
   std::vector<std::vector<double>> clusters(n);
   for(uint32_t i=0; i < variants.size(); i++){
@@ -131,9 +168,20 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
   std::vector<std::vector<double>> all_centroids;
   std::vector<double> total_distances;
   std::vector<double> std_devs;
-  for(uint32_t j=0; j < 15; j++){
+  std::vector<std::vector<double>> clusters(n);
+  uint32_t max_j = 15;
+  if(n == 1) max_j = 1;
+  std::vector<double> all_devs;
+  for(uint32_t j=0; j < max_j; j++){
     bool status2 = arma::kmeans(centroids, data, n, arma::random_subset, 10, false);
+    double total_dev=0;
     if(!status2) continue;
+    std::vector<std::vector<double>> clusters_2(n);
+    /*std::cerr << "kmeans " << j << std::endl;
+    for(auto c : centroids){
+      std::cerr << c << " ";
+    }
+    std::cerr << "\n";*/
     double total_dist = 0;
     for(auto point : data){
       //using std::min_element to find the closest element
@@ -142,13 +190,27 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
             return std::abs(a - point) < std::abs(b - point);
         });
        uint32_t index = std::distance(centroids.begin(), closest_it);
+       clusters_2[index].push_back(point);
        total_dist += std::abs(point-centroids[index]);
     }
     std::vector<double> tmp = arma::conv_to<std::vector<double>>::from(centroids);
     double stddev = calculate_standard_deviation(tmp);
     std_devs.emplace_back(stddev);
     all_centroids.emplace_back(std::move(tmp));
-    total_distances.emplace_back(total_dist);
+    //std::cerr << "total dist " << total_dist << " clusters size " << clusters_2.size() << std::endl;
+    for(uint32_t k=0; k < clusters_2.size(); k++){
+     // std::cerr << "kmeans init  " <<centroids[k] << " " << calculate_standard_deviation(clusters_2[k]) << std::endl;
+      double tmp = calculate_standard_deviation(clusters_2[k]);
+      if (tmp > total_dev){
+        total_dev = tmp;
+      }
+      if(centroids[k] == 0.5){
+        total_dev = 1;
+      }
+    }
+    //std::cerr << "total dev " << total_dev << std::endl;
+    //total_distances.emplace_back(total_dist);
+    total_distances.emplace_back(total_dev);
   }
   uint32_t index;
   if(!error){
@@ -161,7 +223,6 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
   std::vector<double> centroid_vec = all_centroids[index];
 
   //assign points to cluster
-  std::vector<std::vector<double>> clusters(n);
   for(auto point : data){
     //using std::min_element to find the closest element
     auto closest_it = std::min_element(centroid_vec.begin(), centroid_vec.end(),
@@ -174,11 +235,13 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
   model.n = n;
   model.means = centroid_vec;
   model.clusters = clusters;
+
   return(model);
 }
 
 //function used for production
 gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double var_floor, bool &clustering_failed){
+
   double initial_covariance = 0.005;
   gaussian_mixture_model gmodel;
   gmodel.n = n;
@@ -194,6 +257,7 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
 
   for(uint32_t c=0; c < initial_model.means.size(); c++){
     initial_means.col(c) = (double)initial_model.means[c];
+    //std::cerr << "initial mean " << initial_model.means[c] << std::endl;
     cov.col(c) = initial_covariance;
   }
 
@@ -211,7 +275,6 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
   std::vector<double> hefts;
   std::vector<double> dcovs;
   arma::mat mean_fill2 (1, n, arma::fill::zeros);
-
   for(uint32_t i=0; i < model.means.size(); i++){
     double m = (double)model.means[i];
     double factor = std::pow(10.0, 2);
@@ -240,6 +303,25 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
 
   std::vector<std::vector<double>> clusters = form_clusters(n, variants);
   gmodel.clusters = clusters;
+
+  //cluster probabilities
+  std::vector<std::vector<double>> cluster_prob(n);
+  for(auto var : variants){
+    uint32_t assigned = var.cluster_assigned;
+    if(assigned != -1){
+      double prob = var.probabilities[assigned];
+      cluster_prob[assigned].push_back(prob);
+    }
+  }
+  double total_likelihoods = 0;
+  for(auto val : cluster_prob){
+    double sum = std::accumulate(val.begin(), val.end(), 0.0);
+    total_likelihoods += sum;
+    gmodel.cluster_probabilities.push_back(sum/(double)val.size());
+  }
+  std::cerr << "total likelihoods " << total_likelihoods << "  data size " << data.size() << std::endl;
+  double bic = n+2 * std::log(data.size()) - 2 * std::log(total_likelihoods);
+  gmodel.bic = bic;
   return(gmodel);
 }
 
@@ -691,7 +773,32 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
   }
 }
 
-std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::string ref, double default_threshold, double &error_rate){
+
+arma::mat form_dataset(std::vector<variant> base_variants, std::vector<variant> &variants, double lower_bound, double upper_bound){
+  uint32_t useful_var=0;
+  std::vector<uint32_t> count_pos;
+  set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
+  for(uint32_t i=0; i < base_variants.size(); i++){
+    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
+      useful_var++;
+      variants.push_back(base_variants[i]);
+      count_pos.push_back(base_variants[i].position);
+    }
+  }
+  std::cerr << "form dataset useful var " << useful_var << std::endl;
+
+  arma::mat data(1, useful_var, arma::fill::zeros);
+
+  //(rows, cols) where each columns is a sample
+  for(uint32_t i = 0; i < variants.size(); i++){
+    double tmp = static_cast<double>(variants[i].gapped_freq);
+    data.col(i) = tmp;
+  }
+  return(data);
+
+}
+
+std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::vector<double> &std_devs, std::string ref, double default_threshold, double &error_rate){
   if(ref.empty()){
     std::cerr << "Please provide a reference sequence." << std::endl;
     exit(1);
@@ -699,23 +806,22 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t n=8;
   uint32_t round_val = 4;
   bool development_mode=true;
-  double error_std;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
   set_deletion_flags(base_variants, 0.001);
-  cluster_error(base_variants, min_qual, min_depth, error_rate, error_std);
+  cluster_error(base_variants, min_qual, min_depth, error_rate);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
   set_deletion_flags(base_variants, lower_bound);
   set_insertion_flags(base_variants);
 
-  std::cerr << "lower bound " << lower_bound <<  " upper bound " << upper_bound << " std " << error_std << std::endl;
-  //this whole things needs to be reconfigured
+  std::cerr << "lower bound " << lower_bound <<  " upper bound " << upper_bound << std::endl;
+
   uint32_t useful_var=0;
   std::vector<variant> variants;
   std::vector<uint32_t> count_pos;
-
+  set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
   for(uint32_t i=0; i < base_variants.size(); i++){
     if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
       useful_var++;
@@ -761,19 +867,14 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     double tmp = static_cast<double>(variants[i].gapped_freq);
     data.col(i) = tmp;
   }
-  std::vector<uint32_t> exclude_cluster_indices;
 
   uint32_t counter = 1;
   uint32_t optimal_n = 0;
   gaussian_mixture_model retrained;
 
+  std::vector<double> aics;
    while(counter <= n){
-    if(((double)useful_var / (double)counter) < 1){
-      if(counter > 2){
-        optimal_n = counter - 1;
-      } else {
-        optimal_n = counter;
-      }
+    if(((double)useful_var < (double)counter)){
       break;
     }
     std::cerr << "\nn: " << counter << std::endl;
@@ -786,41 +887,65 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       counter++;
       continue;
     }
-    bool optimal = true;
-    std::vector<std::vector<double>> clusters = form_clusters(counter, variants);
 
+    std::vector<std::vector<double>> clusters = retrained.clusters;
     bool empty_cluster = false;
+
+    std::vector<double> mads;
     for(auto data : clusters){
       double mean = calculate_mean(data);
       double mad = calculate_mad(data, mean);
-
+      double std = calculate_standard_deviation(data);
+      mads.push_back(mad);
       if(data.size() < 1){
         empty_cluster = true;
         std::cerr << "empty cluster " << counter << std::endl;
         if(counter == 2){
           optimal_n = 2;
           empty_cluster = false;
-          optimal = true;
           break;
         }
         continue;
       }
-      std::cerr << "\nmean " << mean << " mad " << mad << " cluster size " << data.size() << "\n" << std::endl;
-      if(mad <= error_std){
-        optimal = true;
-      } else {
-        optimal = false;
-        break;
-      }
+      std::cerr << "\nmean " << mean << " mad " << mad << " std " << std << " cluster size " << data.size() <<  std::endl;
     }
-
-    if(optimal && !empty_cluster){
+    if(empty_cluster) {
+      break;
+    }
+    //if the mean average deviation is low and the clusters are set to two, use this
+    double threshold = 0.05;
+    bool all_below = std::all_of(mads.begin(), mads.end(), [&](double v){ return v < threshold; });
+    if(counter == 2 && all_below){
       optimal_n = counter;
       break;
     }
+    threshold = 0.10;
+    bool any_above = std::any_of(mads.begin(), mads.end(), [&](double v){ return v > threshold; });
+    if(any_above){
+      aics.push_back(100);
+    } else {
+      aics.push_back(retrained.bic);
+    }
     counter++;
   }
-  if(optimal_n != retrained.means.size()){
+
+  for(uint32_t i=0; i < aics.size(); i++){
+    std::cerr << i+2 << " " << aics[i] << std::endl;
+  }
+  if(optimal_n == 0){
+    std::cerr << "elbow gmm" << std::endl;
+    bool smallest = false;
+    optimal_n = elbow_method(aics, smallest);
+    if(smallest){
+      optimal_n += 2;
+    } else {
+      optimal_n +=3;
+    }
+  }
+  std::cerr << "optimal n " << optimal_n << std::endl;
+  exit(0);
+
+   if(optimal_n != retrained.means.size()){
     retrained.means.clear();
     retrained.hefts.clear();
     retrained.prob_matrix.clear();
@@ -840,7 +965,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     file.open(output_prefix + ".txt", std::ios::trunc);
     std::string means_string = "[";
     for(uint32_t j=0; j < retrained.means.size(); j++){
-      if(j != 0) means_string += ",";
+      if(j != 0){
+        means_string += ",";
+      }
       means_string += std::to_string(retrained.means[j]);
     }
     means_string += "]";
@@ -848,11 +975,14 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     file << means_string << "\n";
     file.close();
   }
+
   assign_all_variants(variants, base_variants, retrained, lower_bound, upper_bound);
   add_noise_variants(variants, base_variants);
   if(retrained.n == 1){
     solution = retrained.means;
   }
+  calculate_cluster_deviations(retrained);
+  std_devs = retrained.cluster_std_devs;
   solve_clusters(variants, retrained, lower_bound, solution, output_prefix, default_threshold, min_depth);
   return(variants);
 }
