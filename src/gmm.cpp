@@ -12,40 +12,35 @@
 #include <limits>
 #include <unordered_map>
 
-uint32_t elbow_method(std::vector<double> ics, bool &smallest){
-  uint32_t optimal_n;
-  std::vector<double> differences;
-  double smallest_value = *std::min_element(ics.begin(), ics.end());
-  std::cerr << "elbow"<<std::endl;
-  uint32_t count=0;
-  //if the best model is not the least complex, use it
-  for(uint32_t i=0; i < ics.size(); i++){
-    if(ics[i] == 100) continue;
-    if(ics[i] == smallest_value && count != 0){
-      std::cerr << "here" << std::endl;
-      optimal_n  = std::min_element(ics.begin(), ics.end()) - ics.begin();
-      smallest = true;
-      return(optimal_n);
-    }
-    count++;
+uint32_t elbow_method(std::vector<double> ics, std::vector<double> ns, std::vector<double> exclude_ns){
+
+  std::cerr << "in elbow method" << std::endl;
+  uint32_t optimal_n=1;
+  std::vector<double> slopes;
+  for (size_t i = 0; i + 1 < ns.size(); ++i) {
+    double slope = (ics[i+1] - ics[i]) / (ns[i+1] - ns[i]);
+    slopes.push_back(slope);
   }
 
-  for(uint32_t i=1; i < ics.size(); i++){
-    double diff = ics[i] - ics[i-1];
-    if(diff < 0){
-      for(uint32_t j = i-1; j >= 0; j--){
-        diff = ics[i] - ics[j];
-        if(diff > 0) break;
+  auto [minIt, maxIt] = std::minmax_element(slopes.begin(), slopes.end());
+  double range = *maxIt - *minIt;
+
+  double smallest_slope=100;;
+  for(uint32_t i=0; i < slopes.size(); i++){
+    std::cerr << "here " << ns[i+1] << " " << ics[i+1] << " " << slopes[i] << std::endl;
+    if(slopes[i] < smallest_slope){
+      //check if this is allowed to be optimal
+      bool exists = std::find(exclude_ns.begin(), exclude_ns.end(),  ns[i+1]) != exclude_ns.end();
+      if(!exists){
+        smallest_slope = slopes[i];
+        optimal_n = ns[i+1];
       }
     }
-    std::cerr << "ic " << ics[i] << " total diff " << diff <<std::endl;
-    differences.push_back(diff);
   }
-  std::cerr << "all differences" << std::endl;
-  for(auto d : differences){
-    std::cerr << d << std::endl;
+  std::cerr << "total range " << range << std::endl;
+  if(range < 1){
+    std::cerr << "LITTLE RANGE" << std::endl;
   }
-  optimal_n = std::distance(differences.begin(), std::min_element(differences.begin(), differences.end()));
   return(optimal_n);
 }
 
@@ -173,15 +168,20 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
   if(n == 1) max_j = 1;
   std::vector<double> all_devs;
   for(uint32_t j=0; j < max_j; j++){
-    bool status2 = arma::kmeans(centroids, data, n, arma::random_subset, 10, false);
+    bool status2;
+    if(j % 2 == 0){
+      status2 = arma::kmeans(centroids, data, n, arma::random_subset, 10, false);
+    } else {
+      status2 = arma::kmeans(centroids, data, n, arma::random_spread, 10, false);
+    }
     double total_dev=0;
     if(!status2) continue;
     std::vector<std::vector<double>> clusters_2(n);
-    /*std::cerr << "kmeans " << j << std::endl;
+    std::cerr << "kmeans " << j << std::endl;
     for(auto c : centroids){
       std::cerr << c << " ";
     }
-    std::cerr << "\n";*/
+    std::cerr << "\n";
     double total_dist = 0;
     for(auto point : data){
       //using std::min_element to find the closest element
@@ -197,18 +197,17 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
     double stddev = calculate_standard_deviation(tmp);
     std_devs.emplace_back(stddev);
     all_centroids.emplace_back(std::move(tmp));
-    //std::cerr << "total dist " << total_dist << " clusters size " << clusters_2.size() << std::endl;
     for(uint32_t k=0; k < clusters_2.size(); k++){
-     // std::cerr << "kmeans init  " <<centroids[k] << " " << calculate_standard_deviation(clusters_2[k]) << std::endl;
+      std::cerr << "kmeans init  " <<centroids[k] << " " << calculate_standard_deviation(clusters_2[k]) << std::endl;
       double tmp = calculate_standard_deviation(clusters_2[k]);
       if (tmp > total_dev){
         total_dev = tmp;
       }
       if(centroids[k] == 0.5){
-        total_dev = 1;
+        total_dev += 1;
       }
     }
-    //std::cerr << "total dev " << total_dev << std::endl;
+    std::cerr << "total dev " << total_dev << std::endl;
     //total_distances.emplace_back(total_dist);
     total_distances.emplace_back(total_dev);
   }
@@ -257,7 +256,7 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
 
   for(uint32_t c=0; c < initial_model.means.size(); c++){
     initial_means.col(c) = (double)initial_model.means[c];
-    //std::cerr << "initial mean " << initial_model.means[c] << std::endl;
+    std::cerr << "initial mean " << initial_model.means[c] << std::endl;
     cov.col(c) = initial_covariance;
   }
 
@@ -319,8 +318,7 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<var
     total_likelihoods += sum;
     gmodel.cluster_probabilities.push_back(sum/(double)val.size());
   }
-  std::cerr << "total likelihoods " << total_likelihoods << "  data size " << data.size() << std::endl;
-  double bic = n+2 * std::log(data.size()) - 2 * std::log(total_likelihoods);
+  double bic = ((2 * n) + (n-1)) * std::log(data.size()) - (2 * total_likelihoods);
   gmodel.bic = bic;
   return(gmodel);
 }
@@ -873,6 +871,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   gaussian_mixture_model retrained;
 
   std::vector<double> aics;
+  std::vector<double> ns;
+  std::vector<double> exclude_ns;
    while(counter <= n){
     if(((double)useful_var < (double)counter)){
       break;
@@ -907,7 +907,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         }
         continue;
       }
-      std::cerr << "\nmean " << mean << " mad " << mad << " std " << std << " cluster size " << data.size() <<  std::endl;
+      std::cerr << "mean " << mean << " mad " << mad << " std " << std << " cluster size " << data.size() <<  std::endl;
     }
     if(empty_cluster) {
       break;
@@ -921,10 +921,10 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     }
     threshold = 0.10;
     bool any_above = std::any_of(mads.begin(), mads.end(), [&](double v){ return v > threshold; });
+    ns.push_back((double)counter);
+    aics.push_back(retrained.bic);
     if(any_above){
-      aics.push_back(100);
-    } else {
-      aics.push_back(retrained.bic);
+      exclude_ns.push_back((double)counter);
     }
     counter++;
   }
@@ -934,13 +934,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   if(optimal_n == 0){
     std::cerr << "elbow gmm" << std::endl;
-    bool smallest = false;
-    optimal_n = elbow_method(aics, smallest);
-    if(smallest){
-      optimal_n += 2;
-    } else {
-      optimal_n +=3;
-    }
+    optimal_n = elbow_method(aics, ns, exclude_ns);
   }
   std::cerr << "optimal n " << optimal_n << std::endl;
   exit(0);
