@@ -90,10 +90,17 @@ void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmod
     j++;
   }
   uint32_t index = smallest_value_index(gmodel.means);
+  //generate all permutations up to lower_n
+  std::vector<std::vector<uint32_t>> possible_permutations;
+  for (uint32_t i = 1; i <= gmodel.lower_n; ++i)
+    perm_generator(gmodel.n, i, possible_permutations);
+
+  noise_resampler(gmodel.n, index, possible_permutations, 6);
+  
   //handle everything but insertions
-  assign_variants_simple(variants, gmodel.prob_matrix, index, gmodel.lower_n, false, clustering_failed);
+  assign_variants_simple(variants, gmodel.prob_matrix, false, clustering_failed, possible_permutations);
   //handle insertions
-  assign_variants_simple(variants, gmodel.prob_matrix, index, gmodel.lower_n, true, clustering_failed);
+  assign_variants_simple(variants, gmodel.prob_matrix, true, clustering_failed, possible_permutations);
 }
 
 void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel, double lower_bound, double upper_bound) {
@@ -166,7 +173,7 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
   status = arma::kmeans(centroids, data, n, arma::random_subset, 10, false);
   if(!status) return(model);
   for(uint32_t c=0; c < centroids.n_cols; c++){
-    //std::cerr << centroids(0, c) << " " << centroids(1, c) << std::endl;
+    std::cerr << centroids(0, c) << " " << centroids(1, c) << std::endl;
     means.push_back(centroids(0,c));
   }
   model.n = n;
@@ -459,11 +466,11 @@ std::vector<uint32_t> calculate_joint_probabilities(const std::vector<std::vecto
   return permutations[best_index];
 }
 
-void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, uint32_t index, uint32_t lower_n, bool insertions, bool &clustering_failed) {
+void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, bool insertions, bool &clustering_failed, std::vector<std::vector<uint32_t>> possible_permutations) {
   uint32_t n = prob_matrix.size();
   std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
   std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices;
-  // Map positions to variant indices and nucleotides
+  //map positions to variant indices and nucleotides
   for (uint32_t i = 0; i < variants.size(); ++i) {
     uint32_t pos = variants[i].position;
     all_nts[pos].push_back(variants[i].nuc);
@@ -474,12 +481,7 @@ void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vec
   for (const auto& kv : all_nts)
     unique_pos.push_back(kv.first);
 
-  // Generate all permutations up to lower_n
-  std::vector<std::vector<uint32_t>> possible_permutations;
-  for (uint32_t i = 1; i <= lower_n; ++i)
-    perm_generator(n, i, possible_permutations);
 
-  noise_resampler(n, index, possible_permutations, 6);
   // Assignment by position
   for (uint32_t pos : unique_pos) {
     std::vector<uint32_t> pos_idxs;
