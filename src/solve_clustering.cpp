@@ -56,7 +56,7 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
   //std::string trimmed_consensus = trim_trailing_ambiguities(consensus_string, max_position);
   std::string next_trimmed_consensus = trim_leading_ambiguities(consensus_string, min_position);
   //write the consensus to file
-  std::string consensus_filename = clustering_file + ".fa";
+  std::string consensus_filename = clustering_file + "_threshold.fa";
   std::ofstream file(consensus_filename);
   std::string name = ">"+clustering_file+"_"+std::to_string(default_threshold)+"_threshold";
   file << name << "\n";
@@ -404,29 +404,15 @@ std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, dou
 
   for(uint32_t i=0; i < means.size(); i++){
     //if the estimated error is below two standard deviation of the cluster mean
-    //and the standard deviation is relatively small - noise peaks tend to have smaller stdevs
     if(std_devs[i] > 0.05) continue;
-    //given the error estimate, the number of points in the error cluster, and then number of points in this cluster do we expect this cluster to be noise?
-    double percent = (double)model.clusters[i].size() / (double) noise_size;
-    uint32_t num_stddev = 0;
-    if(percent < 0.027){
-      num_stddev = 3;
-    }else if(percent < 0.045){
-      num_stddev = 2;
-    } else if(percent < 0.134){
-      num_stddev = 1.5;
-    } else{
-      num_stddev = 1;
-    }
+    double upper_bound = 1-estimated_error;
+    double lower_bound = estimated_error;
 
-    std::cerr << "mean " << means[i] << " std dev " << std_devs[i] << " estimated error " << estimated_error << " " << num_stddev << std::endl;
-    std::cerr << means[i]+(std_devs[i]*num_stddev) << std::endl;
+    double cluster_lower_edge = means[i] - std_devs[i];
+    double cluster_upper_edge = means[i] + std_devs[i];
 
-    if((means[i]-(std_devs[i]*num_stddev) <= estimated_error) && means[i] < 0.5){
-      std::cerr << "logic 1 mean " << means[i] << " std dev " << std_devs[i] << " estimated error " << estimated_error << std::endl;
-      noise_indices.push_back(i);
-    } else if(means[i]+(std_devs[i]*num_stddev) >= (1-estimated_error) && means[i] > 0.5){
-      std::cerr << "mean " << means[i] << " std dev " << std_devs[i] << " estimated error " << estimated_error << std::endl;
+    if(cluster_lower_edge < lower_bound || cluster_upper_edge > upper_bound){
+      std::cerr << "HERE " << means[i] << " std dev " << std_devs[i] << " estimated error " << estimated_error << " " << cluster_lower_edge << " " << cluster_upper_edge << std::endl;
       noise_indices.push_back(i);
     }
   }
@@ -446,7 +432,8 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
   std::cerr << "solving clusters" << std::endl;
   double error = 0.05;
   double solution_error = 0.10;
-  calculate_cluster_deviations(model);
+  //calculate_cluster_deviations(model);
+
   std::vector<double> means = model.means;
   if(solution.size() == 0){
 
@@ -487,6 +474,7 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
         non_subset_means.push_back(filtered_means[i]);
       }
     }
+
     //reduce solution space to things that contain the non subset peaks
     std::vector<std::vector<double>> realistic_solutions;
     std::cerr << "all solutions size " << solutions.size() << std::endl;
@@ -519,7 +507,8 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
     }
     if(traditional_majority){
       call_majority_consensus(variants, prefix, default_threshold, min_depth);
-      return;
+      solution = filtered_means;
+      //return;
     }
   }
   std::vector<double> unresolved;

@@ -10,4 +10,5 @@ void rewrite_position_masking(std::vector<variant> &variants);
 void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gaussian_mixture_model model);
 void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth);
 std::string trim_trailing_ambiguities(std::string sequence, uint32_t max_position);
+void calculate_cluster_deviations(gaussian_mixture_model &model);
 #endif

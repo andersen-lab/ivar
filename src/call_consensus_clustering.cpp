@@ -15,8 +15,7 @@ std::string trim_leading_ambiguities(std::string sequence, uint32_t min_position
   return(result);
 }
 
-
-void cluster_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means, std::string ref, double error_rate){
+void cluster_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means, std::vector<double> std_devs, std::string ref, double error_rate){
   std::cerr << "calling consensus" << std::endl;
   if(variants.size() == 0) return;
 
@@ -56,7 +55,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 12427){
+    if(variants[i].position == 1063){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
