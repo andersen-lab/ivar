@@ -82,7 +82,151 @@ double calculate_mad(const std::vector<double>& data, double mean){
     return absDevSum / data.size();
 }
 
-void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, bool &clustering_failed){
+void generate_ordered(const std::vector<uint32_t>& elements,
+                      uint32_t n,
+                      uint32_t target,
+                      std::vector<std::vector<uint32_t>> &results) {
+    std::vector<uint32_t> seq;
+    seq.reserve(n);
+    int targetCount = 0;
+
+    std::function<void()> backtrack = [&]() {
+        if (seq.size() == n) {
+            if (targetCount >= 2) results.push_back(seq);
+            return;
+        }
+        for (uint32_t e : elements) {
+            seq.push_back(e);
+            if (e == target) targetCount++;
+            backtrack();
+            if (e == target) targetCount--;
+            seq.pop_back();
+        }
+    };
+
+    backtrack();
+}
+
+
+std::vector<uint32_t> compare_cluster_assignment(std::vector<std::vector<double>> prob_matrix, std::vector<uint32_t> assigned){
+  double threshold = 2;
+  std::vector<uint32_t> flagged_idx;
+
+  for(uint32_t i=0; i < prob_matrix.size(); i++){
+    double assigned_prob = prob_matrix[i][assigned[i]];
+    std::vector<double> tmp = prob_matrix[i];
+    tmp.erase(tmp.begin() + assigned[i]);
+    std::sort(tmp.begin(), tmp.end(), std::greater<double>());
+    for(uint32_t j=0; j < tmp.size(); j++){
+      if(exp(tmp[j]) * threshold > exp(assigned_prob)){
+        flagged_idx.push_back(i);
+      }
+      break;
+    }
+  }
+  return(flagged_idx);
+}
+
+/**
+ * @brief Selects the permutation of assignments that maximizes the joint probability.
+ *
+ * This function evaluates a set of possible assignments (permutations) and computes the
+ * total joint probability score for each, using the provided probability matrix.
+ * It returns the permutation that yields the highest score.
+ *
+ * @param prob_matrix A 2D vector of probabilities, sized [n_variants][n_clusters].
+ * @param permutations A vector of permutations to evaluate, each representing a possible assignment.
+ *                     Each permutation must have a size equal to the number of clusters.
+ * @return The permutation (as a vector of cluster indices) with the highest joint probability.
+ */
+std::vector<uint32_t> calculate_joint_probabilities(const std::vector<std::vector<double>>  &prob_matrix, const std::vector<std::vector<uint32_t>> &permutations) {
+  if (permutations.empty() || prob_matrix.empty()) {
+    return {};
+  }
+  size_t n_clusters = prob_matrix.size();
+  double best_score = -std::numeric_limits<double>::infinity();
+  size_t best_index = 0;
+  for (size_t i = 0; i < permutations.size(); ++i) {
+    const auto& perm = permutations[i];
+    if (perm.size() != n_clusters) {
+        continue;
+    }
+    double score = 0.0;
+    for (size_t j = 0; j < n_clusters; ++j) {
+      // Guard against invalid index in permutation
+      if (perm[j] >= prob_matrix[j].size()) {
+        score = -std::numeric_limits<double>::infinity();
+        break;
+      }
+      score += prob_matrix[j][perm[j]];
+    }
+    if (score > best_score) {
+      best_score = score;
+      best_index = i;
+    }
+  }
+  return permutations[best_index];
+}
+
+void assign_variants_simple(std::vector<variant> &variants, 
+                            const std::vector<std::vector<double>> &prob_matrix, 
+                            bool insertions, 
+                            bool &clustering_failed, 
+                            const std::vector<std::vector<uint32_t>> &possible_permutations,
+                            const std::vector<uint32_t> &unique_pos, 
+                            std::unordered_map<uint32_t, std::vector<uint32_t>> &pos_to_variant_indices) {
+  uint32_t n = prob_matrix.size();
+
+
+  // Assignment by position
+  for (uint32_t pos : unique_pos) {
+    std::vector<uint32_t> pos_idxs;
+    std::vector<std::vector<double>> tmp_prob;
+    for (uint32_t variant_idx : pos_to_variant_indices[pos]) {
+      auto& var = variants[variant_idx];
+      if ((var.nuc.find('+') != std::string::npos && !insertions)|| var.depth_flag)
+        continue;
+      else if ((var.nuc.find('+') == std::string::npos && insertions)|| var.depth_flag)
+        continue;
+      pos_idxs.push_back(variant_idx);
+      std::vector<double> prob_column;
+      prob_column.reserve(n);
+      for (uint32_t row = 0; row < n; ++row)
+        prob_column.push_back(prob_matrix[row][variant_idx]);
+
+      tmp_prob.push_back(std::move(prob_column));
+    }
+    if (pos_idxs.empty())
+      continue;
+    std::vector<uint32_t> assigned = calculate_joint_probabilities(tmp_prob, possible_permutations);
+    if (assigned.empty())
+      continue;
+
+    //here we have more variants trying to assign than clusters
+    if(tmp_prob.size() > assigned.size()) {
+      std::cerr << "HERE " << tmp_prob.size() << " " << assigned.size() << " " << pos << std::endl;
+      clustering_failed = true;
+      continue;
+    }
+
+    std::vector<uint32_t> assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
+    for (uint32_t i = 0; i < pos_idxs.size(); ++i) {
+      uint32_t v_idx = pos_idxs[i];
+      if (std::find(assignment_flagged.begin(), assignment_flagged.end(), i) != assignment_flagged.end()) {
+        variants[v_idx].vague_assignment = true;
+      }
+      variants[v_idx].cluster_assigned = assigned[i];
+    }
+  }
+}
+
+void assign_clusters(std::vector<variant> &variants, 
+                    gaussian_mixture_model gmodel, 
+                    bool &clustering_failed, 
+                    std::vector<std::vector<uint32_t>> possible_permutations,
+                    std::vector<uint32_t> unique_pos,
+                    std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices
+                    ){
   std::vector<std::vector<double>> tv = transpose_vector(gmodel.prob_matrix);
   uint32_t j = 0;
   for(uint32_t i=0; i < variants.size(); i++){
@@ -91,19 +235,21 @@ void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmod
   }
   uint32_t index = smallest_value_index(gmodel.means);
   //generate all permutations up to lower_n
-  std::vector<std::vector<uint32_t>> possible_permutations;
-  for (uint32_t i = 1; i <= gmodel.lower_n; ++i)
-    perm_generator(gmodel.n, i, possible_permutations);
+
 
   noise_resampler(gmodel.n, index, possible_permutations, 6);
   
   //handle everything but insertions
-  assign_variants_simple(variants, gmodel.prob_matrix, false, clustering_failed, possible_permutations);
+  assign_variants_simple(variants, gmodel.prob_matrix, false, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
   //handle insertions
-  assign_variants_simple(variants, gmodel.prob_matrix, true, clustering_failed, possible_permutations);
+  assign_variants_simple(variants, gmodel.prob_matrix, true, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
 }
 
-void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel, double lower_bound, double upper_bound) {
+void assign_all_variants(std::vector<variant> &variants, 
+                        std::vector<variant> base_variants, 
+                        gaussian_mixture_model &gmodel, 
+                        double lower_bound, 
+                        double upper_bound) {
   std::vector<variant> tmp_var;
   uint32_t count = 0;
 
@@ -116,6 +262,18 @@ void assign_all_variants(std::vector<variant> &variants, std::vector<variant> ba
       variants.push_back(base_variants[i]);
     }
   }
+  std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
+  std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices;
+  for (uint32_t i = 0; i < variants.size(); ++i) {
+    uint32_t pos = variants[i].position;
+    all_nts[pos].push_back(variants[i].nuc);
+    pos_to_variant_indices[pos].push_back(i);
+  }
+
+  std::vector<uint32_t> unique_pos;
+  for (const auto& kv : all_nts)
+    unique_pos.push_back(kv.first);
+
   //populate a new armadillo dataset with more frequencies
   arma::mat final_data(1, count, arma::fill::zeros);
   for(uint32_t i = 0; i < tmp_var.size(); i++){
@@ -140,7 +298,11 @@ void assign_all_variants(std::vector<variant> &variants, std::vector<variant> ba
   }
   gmodel.prob_matrix = stacked_matrix;
   bool clustering_failed = false;
-  assign_clusters(variants, gmodel, clustering_failed);
+  std::vector<std::vector<uint32_t>> possible_permutations;
+  for (uint32_t i = 1; i <= gmodel.lower_n; ++i) {
+    perm_generator(gmodel.n, i, possible_permutations);
+  }
+  assign_clusters(variants, gmodel, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
   if(clustering_failed){
     //std::cerr << "clustering failed" << std::endl;
     //exit(1);
@@ -181,9 +343,28 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
   return(model);
 }
 
-//function used for production
-gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, arma::mat second_dim_data, std::vector<variant> &variants, uint32_t lower_n, double var_floor, bool &clustering_failed){
+gaussian_mixture_model retrain_model(uint32_t n, 
+                                    arma::mat data, 
+                                    arma::mat second_dim_data, 
+                                    std::vector<variant> &variants, 
+                                    uint32_t lower_n, 
+                                    double var_floor, 
+                                    bool &clustering_failed){
 
+   //this is used in the variant assignement portion of the code
+  std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
+  std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices;
+  //map positions to variant indices and nucleotides
+  for (uint32_t i = 0; i < variants.size(); ++i) {
+    uint32_t pos = variants[i].position;
+    all_nts[pos].push_back(variants[i].nuc);
+    pos_to_variant_indices[pos].push_back(i);
+  }
+
+  std::vector<uint32_t> unique_pos;
+  for (const auto& kv : all_nts)
+    unique_pos.push_back(kv.first);
+  
   double initial_covariance = 0.005;
   uint32_t j = 0;
   std::vector<gaussian_mixture_model> all_models;
@@ -247,7 +428,11 @@ gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, arma::mat secon
     gmodel.means = means;
     gmodel.hefts = hefts;
     gmodel.model = model;
-    assign_clusters(variants, gmodel, clustering_failed);
+    std::vector<std::vector<uint32_t>> possible_permutations;
+    for (uint32_t i = 1; i <= gmodel.lower_n; ++i){
+      perm_generator(gmodel.n, i, possible_permutations);
+    }
+    assign_clusters(variants, gmodel, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
 
     std::vector<std::vector<double>> clusters = form_clusters(n, variants);
     gmodel.clusters = clusters;
@@ -347,50 +532,30 @@ std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<
   return transposed_vector;
 }
 
-void generate_permutations(const std::vector<uint32_t>& elements, int n, int target, std::vector<std::vector<uint32_t>> &other_tmp) {
-    std::vector<uint32_t> subset(elements);
-    n = std::min(n, static_cast<int>(elements.size()));
-    std::set<std::vector<uint32_t>> seen; // store unique permutations
-    std::sort(subset.begin(), subset.end()); // needed for std::next_permutation
-    do {
-        std::vector<uint32_t> tmp(subset.begin(), subset.begin() + n);
-        int count = std::count(tmp.begin(), tmp.end(), target);
-        if (count >= 2 && seen.insert(tmp).second) {
-            // only add if this permutation is new
-            other_tmp.push_back(tmp);
-        }
-    } while (std::next_permutation(subset.begin(), subset.end()));
-}
-
-void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample){
+void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample) {
   std::vector<uint32_t> tmp;
-  for(uint32_t i=0; i < n; i++){
-    if(i == index){
-      for(uint32_t j=0; j < amount_resample; j++){
-        tmp.push_back(i);
-      }
-    } else {
-      tmp.push_back(i);
-    }
-  }
-  generate_permutations(tmp, 2, index, possible_permutations);
-  generate_permutations(tmp, 3, index, possible_permutations);
-  generate_permutations(tmp, 4, index, possible_permutations);
+  tmp.reserve(n + amount_resample);
 
-  std::vector<std::vector<uint32_t>> keep_solutions;
-  for(auto perm : possible_permutations){
-    bool keep = false;
-    for(auto clust : perm){
-      if(clust != index) keep = true;
-    }
-    if(keep && perm.size() > 1){
-      keep_solutions.push_back(perm);
-    } else if(perm.size() == 1){
-      keep_solutions.push_back(perm);
-    }
+  for (uint32_t i = 0; i < n; i++) {
+    if (i == index)
+      tmp.insert(tmp.end(), amount_resample, i);
+      else
+        tmp.push_back(i);
   }
-  possible_permutations.clear();
-  possible_permutations = keep_solutions;
+
+  generate_ordered(tmp, 2, index, possible_permutations);
+  generate_ordered(tmp, 3, index, possible_permutations);
+  generate_ordered(tmp, 4, index, possible_permutations);
+
+
+  possible_permutations.erase(
+    std::remove_if(possible_permutations.begin(),
+                    possible_permutations.end(), [&](const std::vector<uint32_t>& perm) {
+                    if (perm.size() == 1) return false;
+                    return std::all_of(perm.begin(), perm.end(),
+                    [&](uint32_t v){ return v == index; });
+    }),
+  possible_permutations.end());
 }
 
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations){
@@ -404,124 +569,6 @@ void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_p
         possible_permutations.push_back(tmp);
         std::reverse(d.begin()+k,d.end());
     } while(std::next_permutation(d.begin(),d.end()));
-}
-
-std::vector<uint32_t> compare_cluster_assignment(std::vector<std::vector<double>> prob_matrix, std::vector<uint32_t> assigned){
-  double threshold = 2;
-  std::vector<uint32_t> flagged_idx;
-
-  for(uint32_t i=0; i < prob_matrix.size(); i++){
-    double assigned_prob = prob_matrix[i][assigned[i]];
-    std::vector<double> tmp = prob_matrix[i];
-    tmp.erase(tmp.begin() + assigned[i]);
-    std::sort(tmp.begin(), tmp.end(), std::greater<double>());
-    for(uint32_t j=0; j < tmp.size(); j++){
-      if(exp(tmp[j]) * threshold > exp(assigned_prob)){
-        flagged_idx.push_back(i);
-      }
-      break;
-    }
-  }
-  return(flagged_idx);
-}
-
-/**
- * @brief Selects the permutation of assignments that maximizes the joint probability.
- *
- * This function evaluates a set of possible assignments (permutations) and computes the
- * total joint probability score for each, using the provided probability matrix.
- * It returns the permutation that yields the highest score.
- *
- * @param prob_matrix A 2D vector of probabilities, sized [n_variants][n_clusters].
- * @param permutations A vector of permutations to evaluate, each representing a possible assignment.
- *                     Each permutation must have a size equal to the number of clusters.
- * @return The permutation (as a vector of cluster indices) with the highest joint probability.
- */
-std::vector<uint32_t> calculate_joint_probabilities(const std::vector<std::vector<double>> prob_matrix, const std::vector<std::vector<uint32_t>> permutations) {
-  if (permutations.empty() || prob_matrix.empty()) {
-    return {};
-  }
-  size_t n_clusters = prob_matrix.size();
-  double best_score = -std::numeric_limits<double>::infinity();
-  size_t best_index = 0;
-  for (size_t i = 0; i < permutations.size(); ++i) {
-    const auto& perm = permutations[i];
-    if (perm.size() != n_clusters) {
-        continue;
-    }
-    double score = 0.0;
-    for (size_t j = 0; j < n_clusters; ++j) {
-      // Guard against invalid index in permutation
-      if (perm[j] >= prob_matrix[j].size()) {
-        score = -std::numeric_limits<double>::infinity();
-        break;
-      }
-      score += prob_matrix[j][perm[j]];
-    }
-    if (score > best_score) {
-      best_score = score;
-      best_index = i;
-    }
-  }
-  return permutations[best_index];
-}
-
-void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, bool insertions, bool &clustering_failed, std::vector<std::vector<uint32_t>> possible_permutations) {
-  uint32_t n = prob_matrix.size();
-  std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
-  std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices;
-  //map positions to variant indices and nucleotides
-  for (uint32_t i = 0; i < variants.size(); ++i) {
-    uint32_t pos = variants[i].position;
-    all_nts[pos].push_back(variants[i].nuc);
-    pos_to_variant_indices[pos].push_back(i);
-  }
-
-  std::vector<uint32_t> unique_pos;
-  for (const auto& kv : all_nts)
-    unique_pos.push_back(kv.first);
-
-
-  // Assignment by position
-  for (uint32_t pos : unique_pos) {
-    std::vector<uint32_t> pos_idxs;
-    std::vector<std::vector<double>> tmp_prob;
-    for (uint32_t variant_idx : pos_to_variant_indices[pos]) {
-      auto& var = variants[variant_idx];
-      if ((var.nuc.find('+') != std::string::npos && !insertions)|| var.depth_flag)
-        continue;
-      else if ((var.nuc.find('+') == std::string::npos && insertions)|| var.depth_flag)
-        continue;
-      pos_idxs.push_back(variant_idx);
-      std::vector<double> prob_column;
-      prob_column.reserve(n);
-      for (uint32_t row = 0; row < n; ++row)
-        prob_column.push_back(prob_matrix[row][variant_idx]);
-
-      tmp_prob.push_back(std::move(prob_column));
-    }
-    if (pos_idxs.empty())
-      continue;
-    std::vector<uint32_t> assigned = calculate_joint_probabilities(tmp_prob, possible_permutations);
-    if (assigned.empty())
-      continue;
-
-    //here we have more variants trying to assign than clusters
-    if(tmp_prob.size() > assigned.size()) {
-      std::cerr << "HERE " << tmp_prob.size() << " " << assigned.size() << " " << pos << std::endl;
-      clustering_failed = true;
-      continue;
-    }
-
-    std::vector<uint32_t> assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
-    for (uint32_t i = 0; i < pos_idxs.size(); ++i) {
-      uint32_t v_idx = pos_idxs[i];
-      if (std::find(assignment_flagged.begin(), assignment_flagged.end(), i) != assignment_flagged.end()) {
-        variants[v_idx].vague_assignment = true;
-      }
-      variants[v_idx].cluster_assigned = assigned[i];
-    }
-  }
 }
 
 void split(std::string &s, char delim, std::vector<std::string> &elems){
@@ -840,7 +887,10 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     second_dim_data(0,i) = tmp;
     second_dim_data(1, i) = perturb;
   }
-  
+
+ 
+
+  //initialize things prior to clustering
   uint32_t counter = 1;
   uint32_t optimal_n = 0;
   gaussian_mixture_model retrained;
@@ -849,6 +899,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<double> ns;
   std::vector<double> exclude_ns;
    while(counter <= n){
+    //must have at least one point per cluster
     if(((double)useful_var < (double)counter)){
       break;
     }

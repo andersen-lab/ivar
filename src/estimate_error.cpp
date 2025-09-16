@@ -50,25 +50,51 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     return;
   }
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
+  arma::mat data_second_dim(2, useful_count_original, arma::fill::zeros); 
   uint32_t count_original=0;
   for(uint32_t i = 0; i < variants_original.size(); i++){
     double tmp = static_cast<double>(variants_original[i].gapped_freq);
     data_original.col(count_original) = tmp;
+    data_second_dim(0, i) = tmp;
+    data_second_dim(1, i) = 0;
     count_original += 1;
   }
 
   uint32_t n = 1;
   gaussian_mixture_model model;
   uint32_t chosen_peak = 0;
-  bool solved = true;
+
   bool clustering_failed = false;
   uint32_t optimal_n=0;
   std::vector<double> bics;
-  while(n <= 4){
+  std::vector<double> ns;
+  while(n <= 5){
     std::cerr << "error estimate " << n << std::endl;
-    solved = true;
-    model = retrain_model(n, data_original, variants_original, 2, 0.001, clustering_failed);
+
+    model = retrain_model(n, data_original, data_second_dim, variants_original, 2, 0.001, clustering_failed);
+    if(clustering_failed) {
+      n++;
+      continue;
+    }
+    for(auto cluster : model.clusters){
+      if(cluster.size() == 0){
+        clustering_failed = true;
+      }
+    }
+    if(clustering_failed) {
+      n++;
+      continue;
+    }
+    if(n == 1){
+      double std = calculate_standard_deviation(model.clusters[0]);
+      if(std < 0.03){
+        optimal_n = 1;
+        break;
+      }
+    }
+
     bics.push_back(model.bic);
+    ns.push_back((double)n);
     std::cerr << "bic " << model.bic << std::endl;
     std::vector<double> means = model.means;
     for(uint32_t i=0; i < means.size(); i++){
@@ -78,12 +104,13 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
     n++;
   }
-  bool smallest;
-  optimal_n = elbow_method(bics, smallest);
-  optimal_n += 1;
+  if(optimal_n == 0){
+    std::vector<double> exclude_ns;
+    optimal_n = elbow_method(bics, ns, exclude_ns);
+  }
   std::cerr << "optimal n " << optimal_n << std::endl;
 
-  model = retrain_model(optimal_n, data_original, variants_original, 2, 0.001, clustering_failed);
+  model = retrain_model(optimal_n, data_original, data_second_dim, variants_original, 2, 0.001, clustering_failed);
   std::vector<double> means = model.means;
   chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
 
@@ -92,7 +119,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
   //for each cluster this describes the points which are outliers
   if(n > 1){
-    outliers = determine_outlier_points(model.clusters[chosen_peak], 3);
+    //outliers = determine_outlier_points(model.clusters[chosen_peak], 3);
     std::vector<double> universal_cluster = model.clusters[chosen_peak];
     for(uint32_t i=0; i < universal_cluster.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);

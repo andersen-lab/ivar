@@ -71,15 +71,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold);
 uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
-void assign_variants_simple(std::vector<variant> &variants, std::vector<std::vector<double>> prob_matrix, bool insertions, bool &clustering_failed, std::vector<std::vector<uint32_t>> possible_permutations);
 gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, arma::mat second_dim_data, std::vector<variant> &variants, uint32_t lower_n, double var_floor, bool &clustering_failed);
-void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, bool &clustering_failed);
+void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, bool &clustering_failed, std::vector<std::vector<uint32_t>> possible_permutations);
 double calculate_mean(const std::vector<double>& data);
 kmeans_model train_model(uint32_t n, arma::mat data, bool error);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
 void calculate_reference_frequency(std::vector<variant> &variants, std::string ref_path);
-void handle_conflicting_del(std::vector<variant> &variants);
-void separate_deletion_positions(std::vector<variant> &variants);
 void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel, double lower_bound, double upper_bound);
 void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants);
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound);
