@@ -338,7 +338,6 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
   status = arma::kmeans(centroids, data, n, arma::random_subset, 10, false);
   if(!status) return(model);
   for(uint32_t c=0; c < centroids.n_cols; c++){
-    std::cerr << centroids(0, c) << " " << centroids(1, c) << std::endl;
     means.push_back(centroids(0,c));
   }
   model.n = n;
@@ -388,7 +387,6 @@ gaussian_mixture_model retrain_model(uint32_t n,
 
     for(uint32_t c=0; c < n; c++){
       initial_means.col(c) = (double)initial_model.means[c];
-      std::cerr << "initial mean " << initial_model.means[c] << std::endl;
       cov.col(c) = initial_covariance;
     }
     arma::gmm_diag model;
@@ -399,7 +397,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
     if(!status){
       std::cerr << "GMM failed to converge" << std::endl;
       clustering_failed = true;
-      return(gmodel);
+      continue;
     }
     
     std::vector<double> means;
@@ -456,7 +454,6 @@ gaussian_mixture_model retrain_model(uint32_t n,
     }
     double bic = ((2 * n) + (n-1)) * std::log(data.size()) - (2 * total_likelihoods);
     gmodel.bic = bic;
-    std::cerr << "model bic " << bic << std::endl;
 
     all_bics.push_back(bic);
     all_models.push_back(gmodel);
@@ -464,7 +461,6 @@ gaussian_mixture_model retrain_model(uint32_t n,
   }
   auto it = std::min_element(all_bics.begin(), all_bics.end());
   uint32_t index_best = std::distance(all_bics.begin(), it);
-  std::cerr << "chosen bic " << all_bics[index_best] << std::endl;
   gaussian_mixture_model chosen = all_models[index_best];
 
   return(chosen);
@@ -787,7 +783,6 @@ arma::mat form_dataset(std::vector<variant> base_variants, std::vector<variant> 
       count_pos.push_back(base_variants[i].position);
     }
   }
-  std::cerr << "form dataset useful var " << useful_var << std::endl;
 
   arma::mat data(1, useful_var, arma::fill::zeros);
 
@@ -839,10 +834,10 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       second_dimension.push_back(position_counts[base_variants[i].position]);
       variants.push_back(base_variants[i]);
       count_pos.push_back(base_variants[i].position);
-      std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " include " << base_variants[i].include_clustering << std::endl;
+      //std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " include " << base_variants[i].include_clustering << std::endl;
     }
   }
-  std::cerr << "useful var " << useful_var << std::endl;
+  //std::cerr << "useful var " << useful_var << std::endl;
 
   if(useful_var < 1){
     std::ofstream file;
@@ -885,7 +880,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   for(uint32_t i = 0; i < variants.size(); i++){
     double tmp = static_cast<double>(variants[i].gapped_freq);
     double perturb = (double)second_dimension[i];
-    std::cerr << tmp << " " << perturb << std::endl; 
     second_dim_data(0,i) = tmp;
     second_dim_data(1, i) = perturb;
   }
@@ -963,7 +957,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     optimal_n = elbow_method(aics, ns, exclude_ns);
   }
   std::cerr << "optimal n " << optimal_n << std::endl;
-  exit(0);
+
 
    if(optimal_n != retrained.means.size()){
     retrained.means.clear();
