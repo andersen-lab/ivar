@@ -12,36 +12,41 @@
 #include <limits>
 #include <unordered_map>
 
-uint32_t elbow_method(std::vector<double> ics, std::vector<double> ns, std::vector<double> exclude_ns){
+uint32_t elbow_method(std::vector<double> ics,
+                      std::vector<double> ns,
+                      std::vector<double> exclude_ns) {
+    std::vector<double> slopes;
+    std::vector<uint32_t> valid_ns;
 
-  std::cerr << "in elbow method" << std::endl;
-  uint32_t optimal_n=1;
-  std::vector<double> slopes;
-  for (size_t i = 0; i + 1 < ns.size(); ++i) {
-    double slope = (ics[i+1] - ics[i]) / (ns[i+1] - ns[i]);
-    slopes.push_back(slope);
-  }
-
-  auto [minIt, maxIt] = std::minmax_element(slopes.begin(), slopes.end());
-  double range = *maxIt - *minIt;
-
-  double smallest_slope=100;;
-  for(uint32_t i=0; i < slopes.size(); i++){
-    std::cerr << "here " << ns[i+1] << " " << ics[i+1] << " " << slopes[i] << std::endl;
-    if(slopes[i] < smallest_slope){
-      //check if this is allowed to be optimal
-      bool exists = std::find(exclude_ns.begin(), exclude_ns.end(),  ns[i+1]) != exclude_ns.end();
-      if(!exists){
-        smallest_slope = slopes[i];
-        optimal_n = ns[i+1];
-      }
+    // Build aligned slope and n vectors, skipping excluded ns
+    for (size_t i = 0; i + 1 < ns.size(); ++i) {
+        double slope = (ics[i+1] - ics[i]) / (ns[i+1] - ns[i]);
+        uint32_t n_val = static_cast<uint32_t>(ns[i+1]);
+          slopes.push_back(slope);
+          valid_ns.push_back(n_val);
     }
-  }
-  std::cerr << "total range " << range << std::endl;
-  if(range < 1){
-    std::cerr << "LITTLE RANGE" << std::endl;
-  }
-  return(optimal_n);
+
+    if (slopes.empty()) {
+        std::cerr << "Warning: no valid slopes after exclusion, defaulting to n=1" << std::endl;
+        return 1;
+    }
+
+    // Find largest increase (smallest -> largest slope transition)
+    double max_jump = -1e9;
+    uint32_t jump_index = 0;
+    for (uint32_t i = 0; i + 1 < slopes.size(); ++i) {
+        double jump = slopes[i+1] - slopes[i];
+        if (jump > max_jump) {
+            max_jump = jump;
+            jump_index = i;  // return the "smaller" slope's index
+        }
+    }
+
+    std::cerr << "Elbow at n=" << valid_ns[jump_index]
+              << " with slope change " << slopes[jump_index]
+              << " -> " << slopes[jump_index+1] << std::endl;
+
+    return valid_ns[jump_index];
 }
 
 std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> variants){
@@ -206,7 +211,7 @@ void assign_variants_simple(std::vector<variant> &variants,
     if(tmp_prob.size() > assigned.size()) {
       std::cerr << "HERE " << tmp_prob.size() << " " << assigned.size() << " " << pos << std::endl;
       clustering_failed = true;
-      continue;
+      return;
     }
 
     std::vector<uint32_t> assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
@@ -235,8 +240,6 @@ void assign_clusters(std::vector<variant> &variants,
   }
   uint32_t index = smallest_value_index(gmodel.means);
   //generate all permutations up to lower_n
-
-
   noise_resampler(gmodel.n, index, possible_permutations, 6);
   
   //handle everything but insertions
@@ -388,7 +391,6 @@ gaussian_mixture_model retrain_model(uint32_t n,
       std::cerr << "initial mean " << initial_model.means[c] << std::endl;
       cov.col(c) = initial_covariance;
     }
-    std::cerr << "HERE" << std::endl;
     arma::gmm_diag model;
     model.reset(1, n);
     model.set_means(initial_means);
@@ -441,7 +443,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
     std::vector<std::vector<double>> cluster_prob(n);
     for(auto var : variants){
       uint32_t assigned = var.cluster_assigned;
-      if(assigned != -1){
+      if(assigned != (uint32_t)-1){
         double prob = var.probabilities[assigned];
         cluster_prob[assigned].push_back(prob);
       }
@@ -887,8 +889,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     second_dim_data(0,i) = tmp;
     second_dim_data(1, i) = perturb;
   }
-
- 
 
   //initialize things prior to clustering
   uint32_t counter = 1;
