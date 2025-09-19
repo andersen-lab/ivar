@@ -930,6 +930,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       std::cerr << "mean " << mean << " mad " << mad << " std " << std << " cluster size " << data.size() <<  std::endl;
     }
     if(empty_cluster) {
+      ns.push_back((double)counter);
+      aics.push_back(retrained.bic);
+      exclude_ns.push_back((double)counter);
       break;
     }
     //if the mean average deviation is low and the clusters are set to two, use this
