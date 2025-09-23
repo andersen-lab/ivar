@@ -70,17 +70,14 @@ int main() {
     }
   }
   arma::mat data(1, count, arma::fill::zeros);
-  arma::mat data_second_dim(2, count, arma::fill::zeros);
   //(rows, cols) where each columns is a sample
   for(uint32_t i = 0; i < variants.size(); i++){
     double tmp = static_cast<double>(variants[i].gapped_freq);
     data.col(i) = tmp;
-    data_second_dim(0, i) = tmp;
-    data_second_dim(1, i) = tmp;
   }
   std::vector<double> solution;
   bool clustering_failed = false;
-  gaussian_mixture_model retrained = retrain_model(n, data, data_second_dim, variants, 2, 0.001, clustering_failed);
+  gaussian_mixture_model retrained = retrain_model(n, data, variants, 2, 0.001, clustering_failed);
   assign_all_variants(variants, base_variants, retrained, lower_bound, upper_bound);
   add_noise_variants(variants, base_variants);
 

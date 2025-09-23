@@ -7,7 +7,7 @@ std::vector<double> z_score(std::vector<double> data) {
     double mean = calculate_mean(data);
     double sq_sum = std::inner_product(data.begin(), data.end(), data.begin(), 0.0);
     double stddev = std::sqrt(sq_sum / data.size() - mean * mean);
-
+    std::cerr << mean << " " << stddev << std::endl;
     std::vector<double> z_scores;
     for (double x : data)
         z_scores.push_back((x - mean) / stddev);
@@ -18,6 +18,8 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster, doubl
     std::vector<uint32_t> removal_points;
     //calculate cluster specific percentiles
     std::vector<double> z_scores = z_score(cluster);
+    double mean = calculate_mean(cluster);
+    double std = calculate_standard_deviation(cluster);
     for(uint32_t i=0; i < z_scores.size(); i++){
       double abs = std::abs(z_scores[i]);
       if(abs >= threshold){
@@ -50,13 +52,10 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     return;
   }
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
-  arma::mat data_second_dim(2, useful_count_original, arma::fill::zeros); 
   uint32_t count_original=0;
   for(uint32_t i = 0; i < variants_original.size(); i++){
     double tmp = static_cast<double>(variants_original[i].gapped_freq);
     data_original.col(count_original) = tmp;
-    data_second_dim(0, i) = tmp;
-    data_second_dim(1, i) = 0;
     count_original += 1;
   }
 
@@ -68,10 +67,11 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   uint32_t optimal_n=0;
   std::vector<double> bics;
   std::vector<double> ns;
-  while(n <= 5){
-    std::cerr << "error estimate " << n << std::endl;
+  std::vector<double> exclude_ns;
 
-    model = retrain_model(n, data_original, data_second_dim, variants_original, 2, 0.001, clustering_failed);
+  while(n <= 6){
+    std::cerr << "error estimate " << n << std::endl;
+    model = retrain_model(n, data_original, variants_original, 2, 0.00001, clustering_failed);
     if(clustering_failed) {
       n++;
       continue;
@@ -95,22 +95,27 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
     bics.push_back(model.bic);
     ns.push_back((double)n);
-    std::cerr << "bic " << model.bic << std::endl;
+    std::cerr << "bic " << model.bic << " " << model.maximum_likelihood << std::endl;
     std::vector<double> means = model.means;
     for(uint32_t i=0; i < means.size(); i++){
-      std::cerr << means[i] << " " << calculate_standard_deviation(model.clusters[i]) << std::endl;
+      double mad = calculate_mad(model.clusters[i], means[i]);
+      std::cerr << means[i] << " " << mad << std::endl;
+      if(mad > 0.10){
+        exclude_ns.push_back(n);
+        //break;
+      }
     }
     //index of largest cluster
     chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
     n++;
   }
+
   if(optimal_n == 0){
-    std::vector<double> exclude_ns;
     optimal_n = elbow_method(bics, ns, exclude_ns);
   }
   std::cerr << "optimal n " << optimal_n << std::endl;
 
-  model = retrain_model(optimal_n, data_original, data_second_dim, variants_original, 2, 0.001, clustering_failed);
+  model = retrain_model(optimal_n, data_original, variants_original, 2, 0.001, clustering_failed);
   std::vector<double> means = model.means;
   chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
 
@@ -119,7 +124,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
   //for each cluster this describes the points which are outliers
   if(n > 1){
-    //outliers = determine_outlier_points(model.clusters[chosen_peak], 3);
+    outliers = determine_outlier_points(model.clusters[chosen_peak], 2.5);
     std::vector<double> universal_cluster = model.clusters[chosen_peak];
     for(uint32_t i=0; i < universal_cluster.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
@@ -129,7 +134,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     }
   } else {
     //TODO handle the case of n=1
-    outliers = determine_outlier_points(frequencies, 3);
+    outliers = determine_outlier_points(frequencies, 2);
     for(uint32_t i=0; i < frequencies.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
       if(it == outliers.end()){

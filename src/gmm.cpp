@@ -1,8 +1,8 @@
 #include "./include/armadillo"
+#include "solve_clustering.h"
 #include "gmm.h"
 #include "saga.h"
 #include "call_consensus_clustering.h"
-#include "solve_clustering.h"
 #include "estimate_error.h"
 #include "ref_seq.h"
 #include <fstream>
@@ -15,6 +15,7 @@
 uint32_t elbow_method(std::vector<double> ics,
                       std::vector<double> ns,
                       std::vector<double> exclude_ns) {
+    
     std::vector<double> slopes;
     std::vector<uint32_t> valid_ns;
 
@@ -22,6 +23,9 @@ uint32_t elbow_method(std::vector<double> ics,
     for (size_t i = 0; i + 1 < ns.size(); ++i) {
         double slope = (ics[i+1] - ics[i]) / (ns[i+1] - ns[i]);
         uint32_t n_val = static_cast<uint32_t>(ns[i+1]);
+        if (std::find(exclude_ns.begin(), exclude_ns.end(), ns[i+1]) != exclude_ns.end())
+            continue;
+          std::cerr << "n " << n_val << " slope "  << slope << std::endl;
           slopes.push_back(slope);
           valid_ns.push_back(n_val);
     }
@@ -35,11 +39,11 @@ uint32_t elbow_method(std::vector<double> ics,
     double max_jump = -1e9;
     uint32_t jump_index = 0;
     for (uint32_t i = 0; i + 1 < slopes.size(); ++i) {
-        double jump = slopes[i+1] - slopes[i];
-        if (jump > max_jump) {
-            max_jump = jump;
-            jump_index = i;  // return the "smaller" slope's index
-        }
+      double jump = slopes[i+1] - slopes[i];
+      if (jump > max_jump) {
+          max_jump = jump;
+          jump_index = i;  // return the "smaller" slope's index
+      }
     }
 
     std::cerr << "Elbow at n=" << valid_ns[jump_index]
@@ -209,9 +213,10 @@ void assign_variants_simple(std::vector<variant> &variants,
 
     //here we have more variants trying to assign than clusters
     if(tmp_prob.size() > assigned.size()) {
-      std::cerr << "HERE " << tmp_prob.size() << " " << assigned.size() << " " << pos << std::endl;
-      clustering_failed = true;
-      return;
+      //std::cerr << "HERE " << tmp_prob.size() << " " << assigned.size() << " " << pos << std::endl;
+      //clustering_failed = true;
+      //return;
+      continue;
     }
 
     std::vector<uint32_t> assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
@@ -329,16 +334,19 @@ void add_noise_variants(std::vector<variant> &variants, std::vector<variant> bas
 */
 kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
   arma::mat centroids;
+  //arma::mat initial_means(2, n, arma::fill::zeros);
   arma::mat initial_means(1, n, arma::fill::zeros);
   kmeans_model model;
  
   std::vector<double> means;
   std::vector<std::vector<double>> clusters(n);
   bool status = true;
-  status = arma::kmeans(centroids, data, n, arma::random_subset, 10, false);
+  status = arma::kmeans(centroids, data, n, arma::random_spread, 10, false);
   if(!status) return(model);
   for(uint32_t c=0; c < centroids.n_cols; c++){
-    means.push_back(centroids(0,c));
+    //means.push_back(centroids(0,c));
+    //std::cerr << centroids(c) << std::endl;
+    means.push_back(centroids(c));
   }
   model.n = n;
   model.means = means;
@@ -346,8 +354,7 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
 }
 
 gaussian_mixture_model retrain_model(uint32_t n, 
-                                    arma::mat data, 
-                                    arma::mat second_dim_data, 
+                                    arma::mat data,
                                     std::vector<variant> &variants, 
                                     uint32_t lower_n, 
                                     double var_floor, 
@@ -383,12 +390,13 @@ gaussian_mixture_model retrain_model(uint32_t n,
     std::vector<std::vector<double>> all_centroids;
 
     //run a kmeans to seed the GMM
-    kmeans_model initial_model = train_model(n, second_dim_data, false);
+    kmeans_model initial_model = train_model(n, data, false);
 
     for(uint32_t c=0; c < n; c++){
       initial_means.col(c) = (double)initial_model.means[c];
       cov.col(c) = initial_covariance;
     }
+
     arma::gmm_diag model;
     model.reset(1, n);
     model.set_means(initial_means);
@@ -399,19 +407,9 @@ gaussian_mixture_model retrain_model(uint32_t n,
       clustering_failed = true;
       continue;
     }
-    
     std::vector<double> means;
     std::vector<double> hefts;
     std::vector<double> dcovs;
-    arma::mat mean_fill2 (1, n, arma::fill::zeros);
-    for(uint32_t i=0; i < model.means.size(); i++){
-      double m = (double)model.means[i];
-      double factor = std::pow(10.0, 2);
-      double rounded = std::round(m * factor) / factor;
-      mean_fill2.col(i) = rounded;
-      means.push_back(rounded);
-    }
-    model.set_means(mean_fill2);
 
     std::vector<std::vector<double>> prob_matrix;
     std::vector<double> tmp;
@@ -423,19 +421,38 @@ gaussian_mixture_model retrain_model(uint32_t n,
       }
       prob_matrix.push_back(tmp);
     }
+
+    for(uint32_t i=0; i < model.means.size(); i++){
+      double m = (double)model.means[i];
+      means.push_back(m);
+    }
     gmodel.dcovs = dcovs;
     gmodel.prob_matrix = prob_matrix;
-    gmodel.means = means;
     gmodel.hefts = hefts;
     gmodel.model = model;
+    gmodel.means = means;
+
     std::vector<std::vector<uint32_t>> possible_permutations;
     for (uint32_t i = 1; i <= gmodel.lower_n; ++i){
       perm_generator(gmodel.n, i, possible_permutations);
     }
-    assign_clusters(variants, gmodel, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
 
+    assign_clusters(variants, gmodel, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
     std::vector<std::vector<double>> clusters = form_clusters(n, variants);
     gmodel.clusters = clusters;
+
+    means.clear();
+    //set means
+    arma::mat mean_fill2 (1, n, arma::fill::zeros);
+    for(uint32_t i=0; i < clusters.size(); i++){
+      double m = calculate_mean(clusters[i]);
+      double factor = std::pow(10.0, 2);
+      double rounded = std::round(m * factor) / factor;
+      mean_fill2.col(i) = rounded;
+      means.push_back(rounded);
+    }
+    model.set_means(mean_fill2);
+    gmodel.means = means;
 
     //cluster probabilities
     std::vector<std::vector<double>> cluster_prob(n);
@@ -454,7 +471,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
     }
     double bic = ((2 * n) + (n-1)) * std::log(data.size()) - (2 * total_likelihoods);
     gmodel.bic = bic;
-
+    gmodel.maximum_likelihood = total_likelihoods;
     all_bics.push_back(bic);
     all_models.push_back(gmodel);
     j++;
@@ -675,7 +692,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
 
   auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "1";};
   //track which ref alleles we've already added
-  //std::vector<uint32_t> ref_pos_used;
   while (std::getline(infile, line)) {
     if(count++ == 0) continue;
     std::vector<std::string> row_values;
@@ -800,7 +816,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     std::cerr << "Please provide a reference sequence." << std::endl;
     exit(1);
   }
-  uint32_t n=8;
+  uint32_t n=10;
   uint32_t round_val = 4;
   bool development_mode=true;
   std::vector<variant> base_variants;
@@ -817,27 +833,17 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   uint32_t useful_var=0;
   std::vector<variant> variants;
-  std::vector<uint32_t> count_pos;
-  std::vector<uint32_t> second_dimension;
- 
+  std::vector<uint32_t> count_pos; 
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
-  std::map<uint32_t, uint32_t> position_counts;
 
   for(uint32_t i=0; i < base_variants.size(); i++){
     if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
       useful_var++;
-      if(position_counts.find(base_variants[i].position) != position_counts.end()){
-        position_counts[base_variants[i].position] = 0;
-      } else {
-        position_counts[base_variants[i].position] += 1;
-      }
-      second_dimension.push_back(position_counts[base_variants[i].position]);
       variants.push_back(base_variants[i]);
       count_pos.push_back(base_variants[i].position);
-      //std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " include " << base_variants[i].include_clustering << std::endl;
+      std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " include " << base_variants[i].include_clustering << std::endl;
     }
   }
-  //std::cerr << "useful var " << useful_var << std::endl;
 
   if(useful_var < 1){
     std::ofstream file;
@@ -873,17 +879,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     double tmp = static_cast<double>(variants[i].gapped_freq);
     data.col(i) = tmp;
   }
-
-  arma::mat second_dim_data(2, useful_var, arma::fill::zeros);
-
-  //(rows, cols) where each columns is a sample
-  for(uint32_t i = 0; i < variants.size(); i++){
-    double tmp = static_cast<double>(variants[i].gapped_freq);
-    double perturb = (double)second_dimension[i];
-    second_dim_data(0,i) = tmp;
-    second_dim_data(1, i) = perturb;
-  }
-
   //initialize things prior to clustering
   uint32_t counter = 1;
   uint32_t optimal_n = 0;
@@ -902,10 +897,39 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     retrained.hefts.clear();
     retrained.prob_matrix.clear();
     bool clustering_failed = false;
-    retrained = retrain_model(counter, data, second_dim_data, variants, lower_n, 0.001, clustering_failed);
+    retrained = retrain_model(counter, data, variants, lower_n, 0.001, clustering_failed);
     if(clustering_failed){
+      std::cerr << "cluster failure " << retrained.bic << std::endl;
+      ns.push_back((double)counter);
+      aics.push_back(retrained.maximum_likelihood);
+      exclude_ns.push_back((double)counter);
       counter++;
       continue;
+    }
+    //add in the subset sub problem
+    calculate_cluster_deviations(retrained);
+    std::vector<std::vector<double>> solution_sets;
+    solution_sets = subset_sum(retrained, lower_bound);
+    std::cerr << "total solutions " << solution_sets.size() << std::endl;
+
+    if(solution_sets.size() == 0){
+      ns.push_back((double)counter);
+      aics.push_back(retrained.bic);
+      exclude_ns.push_back((double)counter);
+      counter++;
+      for(auto data : retrained.clusters){
+        double mean = calculate_mean(data);
+        double mad = calculate_mad(data, mean);
+        std::cerr << mean << " " << mad << std::endl;
+      }
+      continue;  
+    }
+
+    for(auto sol : solution_sets){
+      for(auto s : sol){
+        std::cerr << s << " ";
+      }
+      std::cerr << "\n";
     }
 
     std::vector<std::vector<double>> clusters = retrained.clusters;
@@ -931,7 +955,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     }
     if(empty_cluster) {
       ns.push_back((double)counter);
-      aics.push_back(retrained.bic);
+      aics.push_back(retrained.maximum_likelihood);
       exclude_ns.push_back((double)counter);
       break;
     }
@@ -939,36 +963,31 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     double threshold = 0.05;
     bool all_below = std::all_of(mads.begin(), mads.end(), [&](double v){ return v < threshold; });
     if(counter == 2 && all_below){
-      optimal_n = counter;
-      break;
+      //optimal_n = counter;
+      //break;
     }
     threshold = 0.10;
     bool any_above = std::any_of(mads.begin(), mads.end(), [&](double v){ return v > threshold; });
     ns.push_back((double)counter);
-    aics.push_back(retrained.bic);
+    aics.push_back(retrained.maximum_likelihood);
     if(any_above){
       exclude_ns.push_back((double)counter);
     }
     counter++;
   }
 
-  for(uint32_t i=0; i < aics.size(); i++){
-    std::cerr << i+2 << " " << aics[i] << std::endl;
+  for(uint32_t i=0; i < ns.size(); i++){
+    std::cerr << ns[i] << " " << aics[i] << std::endl;
   }
-  if(optimal_n == 0){
-    std::cerr << "elbow gmm" << std::endl;
-    optimal_n = elbow_method(aics, ns, exclude_ns);
-  }
-  std::cerr << "optimal n " << optimal_n << std::endl;
-
-
-   if(optimal_n != retrained.means.size()){
+  exit(0);
+  if(optimal_n != retrained.means.size()){
     retrained.means.clear();
     retrained.hefts.clear();
     retrained.prob_matrix.clear();
     bool clustering_failed = false;
-    retrained = retrain_model(optimal_n, data, second_dim_data, variants, lower_n, 0.001, clustering_failed);
+    retrained = retrain_model(optimal_n, data, variants, lower_n, 0.001, clustering_failed);
   }
+
   for(auto cluster : retrained.clusters){
     double mean = calculate_mean(cluster);
     means.push_back(mean);
@@ -998,8 +1017,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   if(retrained.n == 1){
     solution = retrained.means;
   }
-  calculate_cluster_deviations(retrained);
-  std_devs = retrained.cluster_std_devs;
+
   solve_clusters(variants, retrained, lower_bound, solution, output_prefix, default_threshold, min_depth);
   return(variants);
 }

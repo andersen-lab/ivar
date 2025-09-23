@@ -11,7 +11,6 @@
 #include <numeric>
 
 void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth){
-  std::cerr << "calling majority" << std::endl;
   uint32_t max_position=0;
   uint32_t min_position = 4294967295U;;
   for(auto x : variants){
@@ -22,7 +21,7 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
       min_position = x.position;
     }
   }
-  std::cerr << "max position " << max_position << std::endl;
+
   std::vector<std::string> nucs;
   std::vector<double> freqs;
   std::vector<std::string> tmp(max_position, "N");
@@ -397,7 +396,7 @@ std::vector<std::vector<double>> deduplicate_solutions(std::vector<std::vector<d
   return(solutions);
 }
 
-std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, double estimated_error, uint32_t noise_size){
+  std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, double estimated_error){
   std::vector<double> means = model.means;
   std::vector<double> std_devs = model.cluster_std_devs;
   std::vector<uint32_t> noise_indices;
@@ -419,33 +418,15 @@ std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, dou
   return(noise_indices);
 }
 
-
-void count_noise_points(std::vector<variant> variants, uint32_t &noise_size, double upper_bound){
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].gapped_freq >= upper_bound && variants[i].gapped_freq < 0.99){
-      noise_size++;
-    }
-  }
-}
-
-void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model, double estimated_error, std::vector<double> &solution, std::string prefix, double default_threshold, uint32_t min_depth){
-  std::cerr << "solving clusters" << std::endl;
+std::vector<std::vector<double>> subset_sum(gaussian_mixture_model model, double estimated_error){
+  std::cerr << "solving subset sum" << std::endl;
   double error = 0.05;
-  double solution_error = 0.10;
-  //calculate_cluster_deviations(model);
-
+  double solution_error = 0.05;
   std::vector<double> means = model.means;
-  if(solution.size() == 0){
-
-    uint32_t noise_size;
-    count_noise_points(variants, noise_size, 1-estimated_error);
-    std::cerr << "noise size " << noise_size << std::endl;
-    std::cerr << "estimated error " << estimated_error << std::endl;
-
-    //determine if any clusters are possible noise
+  //determine if any clusters are possible noise
     std::vector<uint32_t> noise_indices;
     if(means.size() > 2){
-      noise_indices = noise_cluster_calculator(model, estimated_error, noise_size);
+      noise_indices = noise_cluster_calculator(model, estimated_error);
     }
     //filter peaks from means by index
     std::vector<double> filtered_means;
@@ -461,9 +442,6 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
         }
       }
     }
-
-    //find position wise frequency pairs
-    std::vector<std::vector<double>> pairs = frequency_pair_finder(variants, means);
     std::vector<std::vector<double>> solutions = find_solutions(filtered_means, error);
 
     //find peaks that can't be a subset of other peaks
@@ -486,6 +464,7 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
           realistic_solutions.push_back(solutions[i]);
        }
     }
+
     std::cerr << "realistic solutions size " << realistic_solutions.size() << std::endl;
     //check each solution that every possible peak is accounted for
     std::vector<std::vector<double>> solution_sets;
@@ -495,21 +474,28 @@ void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model
         solution_sets.push_back(realistic_solutions[i]);
       }
     }
-    bool traditional_majority= false; //if we can't find a solution call a traditional majority consensus
-    if(solution_sets.size() == 0){
-      std::cerr << "no solution found" << std::endl;
-      traditional_majority = true;
-    } else if(solution_sets.size() > 1){
-      std::cerr << "too many solutions" << std::endl;
-      traditional_majority = true;
-    } else{
-      solution = solution_sets[0];
-    }
-    if(traditional_majority){
-      call_majority_consensus(variants, prefix, default_threshold, min_depth);
-      solution = filtered_means;
-      //return;
-    }
+    return(solution_sets);
+}
+
+void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model, double estimated_error, std::vector<double> &solution, std::string prefix, double default_threshold, uint32_t min_depth){
+  std::cerr << "solving clusters" << std::endl;
+  double error = 0.05;
+  std::vector<double> means = model.means;
+  std::vector<std::vector<double>> solution_sets = subset_sum(model, estimated_error);
+  bool traditional_majority= false; //if we can't find a solution call a traditional majority consensus
+  if(solution_sets.size() == 0){
+   std::cerr << "no solution found" << std::endl;
+   traditional_majority = true;
+  } else if(solution_sets.size() > 1){
+    std::cerr << "too many solutions" << std::endl;
+    traditional_majority = true;
+  } else{
+    solution = solution_sets[0];
+  }
+  if(traditional_majority){
+    call_majority_consensus(variants, prefix, default_threshold, min_depth);
+    //this was originally filtered means
+    solution = means;
   }
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
