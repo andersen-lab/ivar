@@ -214,7 +214,7 @@ void assign_variants_simple(std::vector<variant> &variants,
     //here we have more variants trying to assign than clusters
     if(tmp_prob.size() > assigned.size()) {
       //std::cerr << "HERE " << tmp_prob.size() << " " << assigned.size() << " " << pos << std::endl;
-      //clustering_failed = true;
+      clustering_failed = true;
       //return;
       continue;
     }
@@ -332,7 +332,7 @@ void add_noise_variants(std::vector<variant> &variants, std::vector<variant> bas
 * @param error A booleans value that indicates if this kmeans is being used to detected error levels.
 * @return kmeans_model A kmeans_modle object storing centroids and clusters.
 */
-kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
+kmeans_model train_model(uint32_t n, arma::mat data, bool error, uint32_t iteration) {
   arma::mat centroids;
   //arma::mat initial_means(2, n, arma::fill::zeros);
   arma::mat initial_means(1, n, arma::fill::zeros);
@@ -341,11 +341,14 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error) {
   std::vector<double> means;
   std::vector<std::vector<double>> clusters(n);
   bool status = true;
-  status = arma::kmeans(centroids, data, n, arma::random_spread, 10, false);
+  //half of the runs initiate with subset the other half with spread
+  if(iteration % 2 == 0){
+    status = arma::kmeans(centroids, data, n, arma::random_subset, 10, false);
+  } else { 
+    status = arma::kmeans(centroids, data, n, arma::random_spread, 10, false);
+  }
   if(!status) return(model);
   for(uint32_t c=0; c < centroids.n_cols; c++){
-    //means.push_back(centroids(0,c));
-    //std::cerr << centroids(c) << std::endl;
     means.push_back(centroids(c));
   }
   model.n = n;
@@ -379,7 +382,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
   std::vector<gaussian_mixture_model> all_models;
   std::vector<double> all_bics;
 
-  while(j < 10) {
+  while(j < 20) {
     gaussian_mixture_model gmodel;
     gmodel.n = n;
     gmodel.lower_n = lower_n;
@@ -390,7 +393,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
     std::vector<std::vector<double>> all_centroids;
 
     //run a kmeans to seed the GMM
-    kmeans_model initial_model = train_model(n, data, false);
+    kmeans_model initial_model = train_model(n, data, false, j);
 
     for(uint32_t c=0; c < n; c++){
       initial_means.col(c) = (double)initial_model.means[c];
@@ -845,6 +848,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     }
   }
 
+  //handle the case of no variants less than the universal cluster
   if(useful_var < 1){
     std::ofstream file;
     if(development_mode){
@@ -868,7 +872,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
     return(variants);
   }
-
   uint32_t lower_n = find_max_frequency_count(count_pos);
 
   //initialize armadillo dataset and populate with frequency data
@@ -884,10 +887,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t optimal_n = 0;
   gaussian_mixture_model retrained;
 
-  std::vector<double> aics;
-  std::vector<double> ns;
-  std::vector<double> exclude_ns;
-   while(counter <= n){
+  //store things during loop
+  std::unordered_map<uint32_t, double> model_bics;
+  std::unordered_map<uint32_t, double> model_n; 
+  std::unordered_map<uint32_t, gaussian_mixture_model> all_models; 
+
+  while(counter <= n){
     //must have at least one point per cluster
     if(((double)useful_var < (double)counter)){
       break;
@@ -899,10 +904,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     bool clustering_failed = false;
     retrained = retrain_model(counter, data, variants, lower_n, 0.001, clustering_failed);
     if(clustering_failed){
-      std::cerr << "cluster failure " << retrained.bic << std::endl;
-      ns.push_back((double)counter);
-      aics.push_back(retrained.maximum_likelihood);
-      exclude_ns.push_back((double)counter);
+      if(counter == 1){
+        double bic = ((2 * 1) + (1-1)) * std::log(useful_var) - (2 * retrained.maximum_likelihood);
+        model_bics[counter] = bic;
+        model_n[counter] = 1;
+        all_models[counter] = retrained;
+      }
       counter++;
       continue;
     }
@@ -910,28 +917,39 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     calculate_cluster_deviations(retrained);
     std::vector<std::vector<double>> solution_sets;
     solution_sets = subset_sum(retrained, lower_bound);
-    std::cerr << "total solutions " << solution_sets.size() << std::endl;
-
+    double complex;
+    //we cannot find a solution
     if(solution_sets.size() == 0){
-      ns.push_back((double)counter);
-      aics.push_back(retrained.bic);
-      exclude_ns.push_back((double)counter);
       counter++;
-      for(auto data : retrained.clusters){
-        double mean = calculate_mean(data);
-        double mad = calculate_mad(data, mean);
-        std::cerr << mean << " " << mad << std::endl;
-      }
       continue;  
-    }
-
-    for(auto sol : solution_sets){
-      for(auto s : sol){
-        std::cerr << s << " ";
+    } else {
+      //calculate average number viral populations found
+      double num_pop = 0;
+      for(auto sol : solution_sets){
+        num_pop += (double)sol.size();
+        for(auto s : sol){
+          std::cerr << s << " ";
+        }
+        std::cerr << "\n";
       }
-      std::cerr << "\n";
+      complex = num_pop / (double)solution_sets.size();
+    }
+    //bic calculation based on number of viral populations
+    double bic = ((2 * complex) + (complex-1)) * std::log(useful_var) - (2 * retrained.maximum_likelihood);
+    //here store the values
+    if (model_bics.find(complex) != model_bics.end()){
+      if(bic < model_bics[complex]){
+        model_bics[complex] = bic;
+        model_n[complex] = (double)counter;
+        all_models[complex] = retrained;
+      }
+    } else {
+      model_bics[complex] = bic;
+      model_n[complex] = counter;
+      all_models[complex] = retrained;
     }
 
+    std::cerr << "complexity " << complex << std::endl;
     std::vector<std::vector<double>> clusters = retrained.clusters;
     bool empty_cluster = false;
 
@@ -954,45 +972,14 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       std::cerr << "mean " << mean << " mad " << mad << " std " << std << " cluster size " << data.size() <<  std::endl;
     }
     if(empty_cluster) {
-      ns.push_back((double)counter);
-      aics.push_back(retrained.maximum_likelihood);
-      exclude_ns.push_back((double)counter);
       break;
-    }
-    //if the mean average deviation is low and the clusters are set to two, use this
-    double threshold = 0.05;
-    bool all_below = std::all_of(mads.begin(), mads.end(), [&](double v){ return v < threshold; });
-    if(counter == 2 && all_below){
-      //optimal_n = counter;
-      //break;
-    }
-    threshold = 0.10;
-    bool any_above = std::any_of(mads.begin(), mads.end(), [&](double v){ return v > threshold; });
-    ns.push_back((double)counter);
-    aics.push_back(retrained.maximum_likelihood);
-    if(any_above){
-      exclude_ns.push_back((double)counter);
     }
     counter++;
   }
 
-  for(uint32_t i=0; i < ns.size(); i++){
-    std::cerr << ns[i] << " " << aics[i] << std::endl;
+  for (const auto& [key, value] : model_bics) {
+    std::cerr << key << " -> " << value << " " << model_n[key] << "\n";
   }
-  exit(0);
-  if(optimal_n != retrained.means.size()){
-    retrained.means.clear();
-    retrained.hefts.clear();
-    retrained.prob_matrix.clear();
-    bool clustering_failed = false;
-    retrained = retrain_model(optimal_n, data, variants, lower_n, 0.001, clustering_failed);
-  }
-
-  for(auto cluster : retrained.clusters){
-    double mean = calculate_mean(cluster);
-    means.push_back(mean);
-  }
-  retrained.means = means;
 
   //TODO this can be put in function
   std::ofstream file;
@@ -1014,10 +1001,10 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   assign_all_variants(variants, base_variants, retrained, lower_bound, upper_bound);
   add_noise_variants(variants, base_variants);
-  if(retrained.n == 1){
-    solution = retrained.means;
+  for(auto s : solution){
+    std::cerr << "HERE " << s << std::endl;
   }
-
+  exit(0);
   solve_clusters(variants, retrained, lower_bound, solution, output_prefix, default_threshold, min_depth);
   return(variants);
 }

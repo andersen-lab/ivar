@@ -102,11 +102,9 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
       std::cerr << means[i] << " " << mad << std::endl;
       if(mad > 0.10){
         exclude_ns.push_back(n);
-        //break;
+        break;
       }
     }
-    //index of largest cluster
-    chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
     n++;
   }
 
@@ -118,7 +116,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   model = retrain_model(optimal_n, data_original, variants_original, 2, 0.001, clustering_failed);
   std::vector<double> means = model.means;
   chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
-
+  std::cerr << "chosen peak " << chosen_peak << std::endl;
   std::vector<double> cleaned_cluster;
   std::vector<uint32_t> outliers;
 
@@ -134,7 +132,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     }
   } else {
     //TODO handle the case of n=1
-    outliers = determine_outlier_points(frequencies, 2);
+    outliers = determine_outlier_points(frequencies, 2.5);
     for(uint32_t i=0; i < frequencies.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
       if(it == outliers.end()){

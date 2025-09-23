@@ -477,8 +477,13 @@ std::vector<std::vector<double>> subset_sum(gaussian_mixture_model model, double
     return(solution_sets);
 }
 
-void solve_clusters(std::vector<variant> &variants, gaussian_mixture_model model, double estimated_error, std::vector<double> &solution, std::string prefix, double default_threshold, uint32_t min_depth){
-  std::cerr << "solving clusters" << std::endl;
+void solve_clusters(std::vector<variant> &variants, 
+                    gaussian_mixture_model model, 
+                    double estimated_error, 
+                    std::vector<double> &solution, 
+                    std::string prefix, 
+                    double default_threshold, 
+                    uint32_t min_depth){
   double error = 0.05;
   std::vector<double> means = model.means;
   std::vector<std::vector<double>> solution_sets = subset_sum(model, estimated_error);

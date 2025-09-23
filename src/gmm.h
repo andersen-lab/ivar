@@ -75,7 +75,6 @@ std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<
 gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double var_floor, bool &clustering_failed);
 void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, bool &clustering_failed, std::vector<std::vector<uint32_t>> possible_permutations);
 double calculate_mean(const std::vector<double>& data);
-kmeans_model train_model(uint32_t n, arma::mat data, bool error);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
 void calculate_reference_frequency(std::vector<variant> &variants, std::string ref_path);
 void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel, double lower_bound, double upper_bound);

@@ -67,7 +67,6 @@ int main() {
   parse_internal_variants(prefix + ".tsv", old_variants, min_depth, round_val, min_qual);
 
   test_depth(new_variants, old_variants);
-  exit(0);
 
   //compare variants depths between old and new method
   bool depths_match = true;
