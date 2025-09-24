@@ -396,17 +396,15 @@ std::vector<std::vector<double>> deduplicate_solutions(std::vector<std::vector<d
   return(solutions);
 }
 
-  std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, double estimated_error){
+std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, double estimated_error){
   std::vector<double> means = model.means;
   std::vector<double> std_devs = model.cluster_std_devs;
-  std::vector<uint32_t> noise_indices;
-
+  std::vector<uint32_t> noise_indices; 
   for(uint32_t i=0; i < means.size(); i++){
     //if the estimated error is below two standard deviation of the cluster mean
     if(std_devs[i] > 0.05) continue;
     double upper_bound = 1-estimated_error;
     double lower_bound = estimated_error;
-
     double cluster_lower_edge = means[i] - std_devs[i];
     double cluster_upper_edge = means[i] + std_devs[i];
 
@@ -423,11 +421,12 @@ std::vector<std::vector<double>> subset_sum(gaussian_mixture_model model, double
   double error = 0.05;
   double solution_error = 0.05;
   std::vector<double> means = model.means;
+
   //determine if any clusters are possible noise
-    std::vector<uint32_t> noise_indices;
-    if(means.size() > 2){
-      noise_indices = noise_cluster_calculator(model, estimated_error);
-    }
+  std::vector<uint32_t> noise_indices;
+  if(means.size() > 2){
+    noise_indices = noise_cluster_calculator(model, estimated_error);
+  }
     //filter peaks from means by index
     std::vector<double> filtered_means;
     std::vector<double> std_devs;
@@ -510,14 +509,19 @@ void solve_clusters(std::vector<variant> &variants,
       inverse_groups[cluster_groups[i][j]].push_back(i);
     }
   }
-  //TESTLINES MEAN CODE
-  std::string solution_string = "[";
-  for(uint32_t i=0; i < solution.size(); i++){
-    if(i != 0){
-      solution_string += ",";
-    }
-    std::string tmp = std::to_string(solution[i]);
-    solution_string += tmp;
+  //TESTLINES CHANGE THIS
+  std::string solution_string = "";
+  for(uint32_t i=0; i < solution_sets.size(); i++){
+    if(i !=0) solution_string += ",";
+    solution_string += "[";
+      for(uint32_t j=0; j < solution_sets[i].size(); j++){
+        if(j != 0){
+          solution_string += ",";
+        }
+        std::string tmp = std::to_string(solution_sets[i][j]);
+        solution_string += tmp;
+      }
+    solution_string +="]";
   }
 
   solution_string += "]";
@@ -526,6 +530,7 @@ void solve_clusters(std::vector<variant> &variants,
   file_sol << "means\n";
   file_sol << solution_string << "\n";
   file_sol.close();
+  exit(0);
 
   double largest = *std::max_element(solution.begin(), solution.end());
   //define the clusters which contain the majority population
