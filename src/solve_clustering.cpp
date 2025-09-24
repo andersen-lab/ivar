@@ -510,7 +510,7 @@ void solve_clusters(std::vector<variant> &variants,
     }
   }
   //TESTLINES CHANGE THIS
-  std::string solution_string = "";
+  std::string solution_string = "[";
   for(uint32_t i=0; i < solution_sets.size(); i++){
     if(i !=0) solution_string += ",";
     solution_string += "[";

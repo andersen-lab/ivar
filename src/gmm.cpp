@@ -18,6 +18,22 @@ uint32_t elbow_method(std::vector<double> ics,
     
     std::vector<double> slopes;
     std::vector<uint32_t> valid_ns;
+    
+    // Sort ns and ics together by ns
+    std::vector<std::pair<double,double>> pairs;
+    for (size_t i = 0; i < ns.size(); ++i)
+        pairs.push_back({ns[i], ics[i]});
+
+    std::sort(pairs.begin(), pairs.end(),
+              [](const std::pair<double,double>& a,
+                 const std::pair<double,double>& b) {
+                  return a.first < b.first;
+              });
+
+    for (size_t i = 0; i < pairs.size(); ++i) {
+        ns[i]  = pairs[i].first;
+        ics[i] = pairs[i].second;
+    }
 
     // Build aligned slope and n vectors, skipping excluded ns
     for (size_t i = 0; i + 1 < ns.size(); ++i) {
@@ -237,16 +253,18 @@ void assign_clusters(std::vector<variant> &variants,
                     std::vector<uint32_t> unique_pos,
                     std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices
                     ){
+
   std::vector<std::vector<double>> tv = transpose_vector(gmodel.prob_matrix);
   uint32_t j = 0;
   for(uint32_t i=0; i < variants.size(); i++){
     variants[i].probabilities = tv[j];
     j++;
   }
+
   uint32_t index = smallest_value_index(gmodel.means);
   //generate all permutations up to lower_n
   noise_resampler(gmodel.n, index, possible_permutations, 6);
-  
+
   //handle everything but insertions
   assign_variants_simple(variants, gmodel.prob_matrix, false, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
   //handle insertions
@@ -885,36 +903,43 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //initialize things prior to clustering
   uint32_t counter = 1;
   uint32_t optimal_n = 0;
-  gaussian_mixture_model retrained;
 
   //store things during loop
   std::unordered_map<uint32_t, double> model_bics;
-  std::unordered_map<uint32_t, double> model_n; 
-  std::unordered_map<uint32_t, gaussian_mixture_model> all_models; 
+  std::unordered_map<uint32_t, double> model_n; //number of populations
+  std::vector<gaussian_mixture_model> all_models;
 
-  while(counter <= n){
+  bool empty_cluster = false;
+  while(counter <= n && !empty_cluster){
     //must have at least one point per cluster
     if(((double)useful_var < (double)counter)){
       break;
     }
     std::cerr << "\nn: " << counter << std::endl;
-    retrained.means.clear();
-    retrained.hefts.clear();
-    retrained.prob_matrix.clear();
+    gaussian_mixture_model retrained;
     bool clustering_failed = false;
     retrained = retrain_model(counter, data, variants, lower_n, 0.001, clustering_failed);
+    calculate_cluster_deviations(retrained);
+    std::vector<std::vector<double>> clusters = retrained.clusters;
+    for(auto c : clusters){
+      if(c.size() == 0 && counter > 1){
+        empty_cluster = true;
+        break;
+      } 
+    }
+    if(empty_cluster) break;
+
+    all_models.push_back(retrained);
     if(clustering_failed){
       if(counter == 1){
         double bic = ((2 * 1) + (1-1)) * std::log(useful_var) - (2 * retrained.maximum_likelihood);
         model_bics[counter] = bic;
         model_n[counter] = 1;
-        all_models[counter] = retrained;
       }
       counter++;
       continue;
     }
-    //add in the subset sub problem
-    calculate_cluster_deviations(retrained);
+    //add in the subset sub problem 
     std::vector<std::vector<double>> solution_sets;
     solution_sets = subset_sum(retrained, lower_bound);
     double complex;
@@ -941,18 +966,13 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       if(bic < model_bics[complex]){
         model_bics[complex] = bic;
         model_n[complex] = (double)counter;
-        all_models[complex] = retrained;
       }
     } else {
       model_bics[complex] = bic;
       model_n[complex] = counter;
-      all_models[complex] = retrained;
     }
 
     std::cerr << "complexity " << complex << std::endl;
-    std::vector<std::vector<double>> clusters = retrained.clusters;
-    bool empty_cluster = false;
-
     std::vector<double> mads;
     for(auto data : clusters){
       double mean = calculate_mean(data);
@@ -960,26 +980,37 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       double std = calculate_standard_deviation(data);
       mads.push_back(mad);
       if(data.size() < 1){
-        empty_cluster = true;
         std::cerr << "empty cluster " << counter << std::endl;
         if(counter == 2){
           optimal_n = 2;
-          empty_cluster = false;
           break;
         }
         continue;
       }
       std::cerr << "mean " << mean << " mad " << mad << " std " << std << " cluster size " << data.size() <<  std::endl;
     }
-    if(empty_cluster) {
-      break;
-    }
     counter++;
   }
 
+  std::vector<double> ics;
+  std::vector<double> complexity;
+  std::vector<double> blank;
+
+  uint32_t min_index;
+  double smallest = 1000;
   for (const auto& [key, value] : model_bics) {
     std::cerr << key << " -> " << value << " " << model_n[key] << "\n";
+    if(value < smallest){
+      smallest = value;
+      min_index = model_n[key];
+    }
+    complexity.push_back((double)key);
+    ics.push_back(value);
   }
+  optimal_n = elbow_method(ics, complexity, blank);
+
+  //here we pick the smallest bic as best model
+  gaussian_mixture_model retrained = all_models[min_index-1];
 
   //TODO this can be put in function
   std::ofstream file;
@@ -998,13 +1029,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     file << means_string << "\n";
     file.close();
   }
-
   assign_all_variants(variants, base_variants, retrained, lower_bound, upper_bound);
   add_noise_variants(variants, base_variants);
-  for(auto s : solution){
-    std::cerr << "HERE " << s << std::endl;
-  }
-  exit(0);
+
   solve_clusters(variants, retrained, lower_bound, solution, output_prefix, default_threshold, min_depth);
   return(variants);
 }
