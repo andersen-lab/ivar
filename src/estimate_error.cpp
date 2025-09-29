@@ -67,7 +67,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   uint32_t optimal_n=0;
   std::vector<double> bics;
   std::vector<double> ns;
-  std::vector<double> exclude_ns;
+  std::vector<bool> exclude_ns;
 
   while(n <= 6){
     std::cerr << "error estimate " << n << std::endl;
@@ -101,15 +101,17 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
       double mad = calculate_mad(model.clusters[i], means[i]);
       std::cerr << means[i] << " " << mad << std::endl;
       if(mad > 0.10){
-        exclude_ns.push_back(n);
+        exclude_ns.push_back(true);
         break;
+      } else {
+        exclude_ns.push_back(false);
       }
     }
     n++;
   }
 
   if(optimal_n == 0){
-    optimal_n = elbow_method(bics, ns, exclude_ns);
+    optimal_n = (uint32_t)elbow_method(bics, ns, exclude_ns);
   }
   std::cerr << "optimal n " << optimal_n << std::endl;
 

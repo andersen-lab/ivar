@@ -46,7 +46,6 @@ struct variant {
   std::vector<double> freq_numbers;
   //per amplicon frequency assignments to clusters
   std::vector<uint32_t> freq_assignments;
-
   //the consensus sequence this variant is assigned to
   std::vector<uint32_t> consensus_numbers;
   //if this cluster is fully resolveable or not
@@ -65,7 +64,7 @@ struct variant {
   std::vector<double> probabilities;
 
 };
-uint32_t elbow_method(std::vector<double> ics, std::vector<double> ns, std::vector<double> exclude_ns);
+double elbow_method(std::vector<double> ics, std::vector<double> ns, std::vector<bool> exclude_ns);
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations);
 void split(std::string &s, char delim, std::vector<std::string> &elems);
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::vector<double> &std_devs, std::string ref, double default_threshold, double &error_rate);
