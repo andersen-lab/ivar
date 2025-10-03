@@ -23,7 +23,7 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster, doubl
     for(uint32_t i=0; i < z_scores.size(); i++){
       double abs = std::abs(z_scores[i]);
       if(abs >= threshold){
-        std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
+        //std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
         removal_points.push_back(i);
       }
     }
@@ -70,7 +70,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   std::vector<bool> exclude_ns;
 
   while(n <= 6){
-    std::cerr << "error estimate " << n << std::endl;
+    //std::cerr << "error estimate " << n << std::endl;
     model = retrain_model(n, data_original, variants_original, 2, 0.00001, clustering_failed);
     if(clustering_failed) {
       n++;
@@ -95,11 +95,11 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
     bics.push_back(model.bic);
     ns.push_back((double)n);
-    std::cerr << "bic " << model.bic << " " << model.maximum_likelihood << std::endl;
+    //std::cerr << "bic " << model.bic << " " << model.maximum_likelihood << std::endl;
     std::vector<double> means = model.means;
     for(uint32_t i=0; i < means.size(); i++){
       double mad = calculate_mad(model.clusters[i], means[i]);
-      std::cerr << means[i] << " " << mad << std::endl;
+      //std::cerr << means[i] << " " << mad << std::endl;
       if(mad > 0.10){
         exclude_ns.push_back(true);
         break;
@@ -113,12 +113,12 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   if(optimal_n == 0){
     optimal_n = (uint32_t)elbow_method(bics, ns, exclude_ns);
   }
-  std::cerr << "optimal n " << optimal_n << std::endl;
+  //std::cerr << "optimal n " << optimal_n << std::endl;
 
   model = retrain_model(optimal_n, data_original, variants_original, 2, 0.001, clustering_failed);
   std::vector<double> means = model.means;
   chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
-  std::cerr << "chosen peak " << chosen_peak << std::endl;
+  //std::cerr << "chosen peak " << chosen_peak << std::endl;
   std::vector<double> cleaned_cluster;
   std::vector<uint32_t> outliers;
 
@@ -144,6 +144,6 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   }
 
   auto min_it = std::min_element(cleaned_cluster.begin(), cleaned_cluster.end());
-  std::cerr << *min_it << std::endl;
+  //std::cerr << *min_it << std::endl;
   error_rate = *min_it;
 }

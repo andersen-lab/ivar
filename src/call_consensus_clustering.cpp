@@ -15,7 +15,16 @@ std::string trim_leading_ambiguities(std::string sequence, uint32_t min_position
   return(result);
 }
 
-void cluster_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means, std::vector<double> std_devs, std::string ref, double error_rate){
+void cluster_consensus(std::vector<variant> variants, \
+                      std::string clustering_file, \
+                      double default_threshold, \
+                      uint32_t min_depth, \
+                      uint8_t min_qual, \
+                      std::vector<double> solution, \
+                      std::vector<double> means, \
+                      std::vector<double> std_devs, \
+                      std::string ref, \
+                      double error_rate){
   std::cerr << "calling consensus" << std::endl;
   if(variants.size() == 0) return;
 
@@ -41,10 +50,6 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
     std::vector<std::string> tmp(max_position, "N");
     all_consensus_seqs.push_back(tmp);
   }
-
-  for(auto m  : means){
-    std::cerr << m << " ";
-  }
   //order varaints by position
   std::sort(variants.begin(), variants.end(), [](const variant& a, const variant& b) {return a.position < b.position;});
   std::vector<uint32_t> last_adjustment(all_consensus_seqs.size(), 0);
@@ -55,7 +60,8 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 1063){
+
+    if(variants[i].position == 0){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -71,7 +77,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       if(print) std::cerr << "min qual, freq, or depth issue " << qual << " " << freq << " " << depth << " flb " << freq_lower_bound << " mq " << (double)min_qual << " md " << min_depth << std::endl;
       continue;
     }
-
+ 
     //if this amplicon is experiencing fluctuation across amplicons, call ambiguity
     if(variants[i].amplicon_masked && variants[i].freq < freq_upper_bound){
       if(print){
@@ -87,8 +93,9 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       }
       continue;
     }
-     uint32_t position = variants[i].position;
-     if(variants[i].vague_assignment && variants[i].freq < freq_upper_bound && variants[i].freq < max_mean){
+
+    uint32_t position = variants[i].position;
+    if(variants[i].vague_assignment && variants[i].freq < freq_upper_bound && variants[i].freq < max_mean){
        if(print){
           std::cerr << "d" << std::endl;
           for(auto a : variants[i].probabilities){
@@ -97,7 +104,8 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
           std::cerr << "\n";
        }
        continue;
-     }
+    }
+
      bool del = variants[i].nuc.find('-') != std::string::npos;
      //handle all the cases where you never assigned anything, assign to all if it's over the upper bound
      if(variants[i].cluster_assigned == -1){
@@ -132,6 +140,7 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
       }
       continue;
     }
+
     for(uint32_t j=0; j < variants[i].consensus_numbers.size(); j++){
         uint32_t k = variants[i].consensus_numbers[j];
         bool found_del = std::find(deletions[k].begin(), deletions[k].end(), variants[i].position) != deletions[k].end();
@@ -163,13 +172,13 @@ void cluster_consensus(std::vector<variant> variants, std::string clustering_fil
         }
     }
   }
+
   std::vector<std::string> all_sequences;
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
     std::string tmp = std::accumulate(all_consensus_seqs[i].begin(), all_consensus_seqs[i].end(), std::string(""));
     tmp.erase(std::remove(tmp.begin(), tmp.end(), '-'), tmp.end());
     all_sequences.push_back(tmp);
   }
-
   //write the consensus string to file
   std::string consensus_filename = clustering_file + ".fa";
   std::ofstream file(consensus_filename);

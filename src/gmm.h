@@ -17,7 +17,7 @@ struct gaussian_mixture_model {
   uint32_t lower_n;
   double var_floor;
   double bic;
-  double maximum_likelihood;
+  double log_likelihood;
   std::vector<double> means;
   std::vector<double> hefts;
   std::vector<double> dcovs;
