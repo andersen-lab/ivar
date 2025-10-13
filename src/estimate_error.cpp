@@ -7,7 +7,7 @@ std::vector<double> z_score(std::vector<double> data) {
     double mean = calculate_mean(data);
     double sq_sum = std::inner_product(data.begin(), data.end(), data.begin(), 0.0);
     double stddev = std::sqrt(sq_sum / data.size() - mean * mean);
-    std::cerr << mean << " " << stddev << std::endl;
+    //std::cerr << mean << " " << stddev << std::endl;
     std::vector<double> z_scores;
     for (double x : data)
         z_scores.push_back((x - mean) / stddev);
@@ -23,7 +23,7 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster, doubl
     for(uint32_t i=0; i < z_scores.size(); i++){
       double abs = std::abs(z_scores[i]);
       if(abs >= threshold){
-        //std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
+        std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
         removal_points.push_back(i);
       }
     }
@@ -60,22 +60,18 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   }
 
   uint32_t n = 1;
-  gaussian_mixture_model model;
   uint32_t chosen_peak = 0;
 
   bool clustering_failed = false;
   uint32_t optimal_n=0;
-  std::vector<double> bics;
-  std::vector<double> ns;
-  std::vector<bool> exclude_ns;
+  //std::vector<double> bics;
+  //std::vector<double> ns;
+  //std::vector<bool> exclude_ns;
 
-  while(n <= 6){
+  while(n <= 5){
+    reset_variants_info(variants_original);
     //std::cerr << "error estimate " << n << std::endl;
-    model = retrain_model(n, data_original, variants_original, 2, 0.00001, clustering_failed);
-    if(clustering_failed) {
-      n++;
-      continue;
-    }
+    gaussian_mixture_model model = retrain_model(n, data_original, variants_original, 2, 0.00001, clustering_failed);
     for(auto cluster : model.clusters){
       if(cluster.size() == 0){
         clustering_failed = true;
@@ -90,32 +86,34 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
       if(std < 0.03){
         optimal_n = 1;
         break;
-      }
-    }
-
-    bics.push_back(model.bic);
-    ns.push_back((double)n);
-    //std::cerr << "bic " << model.bic << " " << model.maximum_likelihood << std::endl;
-    std::vector<double> means = model.means;
-    for(uint32_t i=0; i < means.size(); i++){
-      double mad = calculate_mad(model.clusters[i], means[i]);
-      //std::cerr << means[i] << " " << mad << std::endl;
-      if(mad > 0.10){
-        exclude_ns.push_back(true);
-        break;
       } else {
-        exclude_ns.push_back(false);
+        n++;
+        continue;
       }
     }
+    double emp = empirical_misclassification_probability(variants_original);
+    std::vector<double> mads;
+    for(uint32_t i=0; i < model.means.size(); i++){
+      double mad = calculate_mad(model.clusters[i], model.means[i]);
+      //std::cerr << model.means[i] << " " << mad << std::endl; 
+      mads.push_back(mad);
+    }
+    //std::cerr << "emp " << emp << std::endl;
+    double threshold = 0.10;
+    bool all_below = std::all_of(mads.begin(), mads.end(), [threshold](double v){ return v < threshold;});
+    if(all_below && emp <= 0.10){
+      optimal_n = n;
+      break;
+    }
+    std::vector<double> means = model.means;
     n++;
   }
 
   if(optimal_n == 0){
-    optimal_n = (uint32_t)elbow_method(bics, ns, exclude_ns);
+    optimal_n = 2;
   }
-  //std::cerr << "optimal n " << optimal_n << std::endl;
 
-  model = retrain_model(optimal_n, data_original, variants_original, 2, 0.001, clustering_failed);
+  gaussian_mixture_model model = retrain_model(optimal_n, data_original, variants_original, 2, 0.001, clustering_failed);
   std::vector<double> means = model.means;
   chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
   //std::cerr << "chosen peak " << chosen_peak << std::endl;
@@ -124,7 +122,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
   //for each cluster this describes the points which are outliers
   if(n > 1){
-    outliers = determine_outlier_points(model.clusters[chosen_peak], 2.5);
+    outliers = determine_outlier_points(model.clusters[chosen_peak], 3);
     std::vector<double> universal_cluster = model.clusters[chosen_peak];
     for(uint32_t i=0; i < universal_cluster.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
@@ -134,7 +132,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     }
   } else {
     //TODO handle the case of n=1
-    outliers = determine_outlier_points(frequencies, 2.5);
+    outliers = determine_outlier_points(frequencies, 3);
     for(uint32_t i=0; i < frequencies.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
       if(it == outliers.end()){
@@ -144,6 +142,5 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   }
 
   auto min_it = std::min_element(cleaned_cluster.begin(), cleaned_cluster.end());
-  //std::cerr << *min_it << std::endl;
   error_rate = *min_it;
 }

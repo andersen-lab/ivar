@@ -254,6 +254,7 @@ std::vector<std::vector<double>> find_subsets_with_error(std::vector<double> mea
   std::vector<std::vector<double>> results;
   find_combinations(means, 0, current, results, 0);
   std::vector<std::vector<double>> valid_combinations;
+
   for(uint32_t i=0; i < results.size(); i++){
     bool in_range = within_error_range(results[i], target, error);
     if(in_range){
@@ -445,6 +446,7 @@ std::vector<std::vector<double>> subset_sum(gaussian_mixture_model model, double
       }
     }
   }
+
   std::vector<std::vector<double>> solutions = find_solutions(filtered_means, error);
   //std::cerr << "solution size " << solutions.size() << std::endl;
   //find peaks that can't be a subset of other peaks
@@ -455,7 +457,6 @@ std::vector<std::vector<double>> subset_sum(gaussian_mixture_model model, double
       non_subset_means.push_back(filtered_means[i]);
     }
   }
-
   //reduce solution space to things that contain the non subset peaks
   std::vector<std::vector<double>> realistic_solutions;
   for(uint32_t i=0; i < solutions.size(); i++){

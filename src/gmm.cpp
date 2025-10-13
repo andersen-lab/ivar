@@ -573,7 +573,6 @@ gaussian_mixture_model retrain_model(uint32_t n,
 
   while(j < 20) {
     gaussian_mixture_model gmodel;
-
     gmodel.n = n;
     gmodel.lower_n = lower_n;
     arma::mat initial_means(1, n, arma::fill::zeros);
@@ -1018,8 +1017,10 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   bool development_mode=true;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
+
   set_deletion_flags(base_variants, 0.001);
   cluster_error(base_variants, min_qual, min_depth, error_rate);
+
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
 
@@ -1042,7 +1043,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       //std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " include " << base_variants[i].include_clustering << std::endl;
     }
   }
-
+  //exit(0);
   //handle the case of no variants less than the universal cluster
   if(useful_var < 1){
     std::ofstream file;
@@ -1078,7 +1079,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     subsample_position.push_back(variants[i].position);
     data.col(i) = tmp;
   }
-
+  std::cerr << "useful var " << useful_var << std::endl;
   //store things during loop
   std::unordered_map<double, double> model_bics; //complexity vs. bics
   std::unordered_map<double, uint32_t> model_n; //complexity vs. n
@@ -1088,15 +1089,15 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   bool empty_cluster = false;
   std::vector<std::vector<double>> solution_sets;
 
-  gaussian_mixture_model retrained;
   uint32_t counter = 1;
   bool clustering_failed =false;
   double k = 0; //complexity
   double complex = 0; //number of populations
   std::vector<variant> subsampled_variants;
   uint32_t bootstrap_reps = 100;
-  uint32_t final_n;
-  for(uint32_t i =0; i < bootstrap_reps; i++){
+  uint32_t final_n=0;
+  
+  /*for(uint32_t i =0; i < bootstrap_reps; i++){
     empty_cluster = false;
     subsampled_variants.clear();
     arma::mat subsample = subsample_with_replacement(data, data.size(), subsample_position, subsampled_variants, variants);
@@ -1115,7 +1116,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         if((subsampled_variants.size() < counter)){
           break;
         }
-        retrained = retrain_model(counter, subsample, subsampled_variants, lower_n, 0.001, clustering_failed);
+        gaussian_mixture_model retrained = retrain_model(counter, subsample, subsampled_variants, lower_n, 0.001, clustering_failed);
         calculate_cluster_deviations(retrained);
         if(clustering_failed){
           //std::cerr << "clustering failed" << std::endl;
@@ -1138,9 +1139,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
           } 
         }
         if(empty_cluster) continue;
-
-
-
         //add in the subset sub problem
         solution_sets = subset_sum(retrained, lower_bound);
         complex = 0;
@@ -1184,6 +1182,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     std::vector<bool> exclude_pass;
     uint32_t used = 0;
     for (const auto& [complex, bic] : model_bics) {
+      std::cerr << output_prefix << std::endl;
+      std::cerr << "complex " << complex << " bic " << bic << " " << exclude[complex] << std::endl;
       complexity.push_back(complex);
       ics.push_back(bic);
       exclude_pass.push_back(exclude[complex]);      
@@ -1221,30 +1221,73 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   if(final_n ==0){
     std::cerr << output_prefix << " no solution found" << std::endl;
     exit(1);
-  }
+  }*/
 
-  /*uint32_t count = 0;
+
+  //need at least 1 of 100 solutions to go forward
+  bootstrap_reps=100;
+  std::unordered_map<uint32_t, bool> viability_counts;
+  for(uint32_t j=lower_n; j < n; j++){
+    if(j > useful_var){
+      viability_counts[j] = false;
+      continue;
+    }
+    for(uint32_t i=0; i < bootstrap_reps; i++){
+      clustering_failed = false;
+      empty_cluster = false;
+      solution_sets.clear();
+      reset_variants_info(variants);
+      gaussian_mixture_model retrained = retrain_model(j, data, variants, lower_n, 0.001, clustering_failed);
+      if(clustering_failed) continue;
+      for(auto m : retrained.means){
+        if(m == 0){
+          empty_cluster = true;
+          break;
+        }
+      }
+      if(empty_cluster) continue;
+      calculate_cluster_deviations(retrained);
+      solution_sets = subset_sum(retrained, lower_bound);
+      if(solution_sets.size() == 0){ 
+        continue;
+      }
+      viability_counts[j] = true;
+      std::cerr << j << " viable!" << std::endl;
+      break;
+    }
+  }
+  //check if there's only 1 viable N value
+  bool one_true = std::count_if(viability_counts.begin(), viability_counts.end(),
+    [](const std::pair<const uint32_t, bool>& p){ return p.second; }) == 1;
+  final_n = one_true ? std::find_if(viability_counts.begin(), viability_counts.end(),
+    [](const std::pair<const uint32_t, bool>& p){ return p.second; })->first : 0;
+
+
+  uint32_t count = 0;
   double total_emp = 0;
-  uint32_t mad_count = 0;
-  double total_mad = 0;
   std::unordered_map<uint32_t, std::vector<std::vector<double>>> track_means;
   std::vector<double> solutions_k;
   std::cerr << "starting bootstrapping" << std::endl;
   for(uint32_t k=2; k <= 10; k++){
+    if(final_n != 0) continue;
     if(k < lower_n) {
+      solutions_k.push_back(0);
+      continue;
+    }
+    if(!viability_counts[k]){
+      solutions_k.push_back(0);
+      continue;
+    }
+    if(useful_var < k) {
       solutions_k.push_back(0);
       continue;
     }
     std::cerr << "k " << k << std::endl;
 
     count = 0;
-    total_emp = 0;
-    mad_count = 0;
-    total_mad = 0;
     uint32_t viable_solutions=0;
     std::vector<variant> subsampled_variants;
     std::vector<std::vector<double>> means;
-    
     for(uint32_t i =0; i < bootstrap_reps; i++){
       empty_cluster = false;
       subsampled_variants.clear();
@@ -1260,36 +1303,35 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       }
       calculate_cluster_deviations(retrained);
       std::vector<std::vector<double>> solution_sets = subset_sum(retrained, lower_bound);
-      std::cerr << "solution size " << solution_sets.size() << std::endl;
-      if(solution_sets.size() != 0){
-        for(auto m : retrained.means){
-          std::cerr << m << " ";
-        }
-        std::cerr << "\n";
-        viable_solutions++;
-        means.push_back(retrained.means);
+      //std::cerr << "solution size " << solution_sets.size() << std::endl;
+      if(solution_sets.size() == 0){
+        continue;
       };
       reset_variants_info(variants);
       assign_bootstrap_variants(variants, retrained, lower_bound, upper_bound);
       for(auto r : retrained.clusters) {
         double m = calculate_mean(r);
         double mad = calculate_mad(r, m);
-        total_mad += mad;
-        mad_count++;
+        if(mad > 0.10) empty_cluster = true;
       }
+      if(empty_cluster) continue;
       double emp = empirical_misclassification_probability(variants);
       total_emp += emp;
       count++;
+      viable_solutions++;
+      means.push_back(retrained.means);
     }
     track_means[k] = means;
-    solutions_k.push_back((double)viable_solutions);
     double average_emp = total_emp / (double)count;
-    double average_mad = total_mad / (double)mad_count;
+    solutions_k.push_back((double)viable_solutions); 
+
 
     std::cerr << "average emp " << average_emp << std::endl;
     std::cerr << "num solutions " << viable_solutions << std::endl;
-    std::cerr << "average mad " << average_mad << std::endl;
-    if(k == 2 && average_emp < 0.10 && average_mad < 0.10){
+
+    
+    //viable solutions condition takes care of cluster spread, emp takes care of clusters closer together
+    if(k == 2 && average_emp < 0.10 && ((double)viable_solutions > (double)bootstrap_reps * 0.95)){
       final_n = 2;
       break;
     }
@@ -1306,7 +1348,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       }
       std::cerr << i+2 << " " << solutions_k[i] << std::endl;
     }
-  }*/
+  }
 
   std::cerr << "new final n " << final_n << std::endl;
   double best_likelihood = 0;
@@ -1316,7 +1358,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     empty_cluster = false;
     solution_sets.clear();
     reset_variants_info(variants);
-
     gaussian_mixture_model retrained = retrain_model(final_n, data, variants, lower_n, 0.001, clustering_failed);
     if(clustering_failed) continue;
     for(auto m : retrained.means){
