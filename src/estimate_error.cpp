@@ -2,12 +2,10 @@
 #include "gmm.h"
 #include "saga.h"
 
-
 std::vector<double> z_score(std::vector<double> data) {
     double mean = calculate_mean(data);
     double sq_sum = std::inner_product(data.begin(), data.end(), data.begin(), 0.0);
     double stddev = std::sqrt(sq_sum / data.size() - mean * mean);
-    //std::cerr << mean << " " << stddev << std::endl;
     std::vector<double> z_scores;
     for (double x : data)
         z_scores.push_back((x - mean) / stddev);
@@ -16,7 +14,6 @@ std::vector<double> z_score(std::vector<double> data) {
 
 std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster, double threshold){
     std::vector<uint32_t> removal_points;
-    //calculate cluster specific percentiles
     std::vector<double> z_scores = z_score(cluster);
     double mean = calculate_mean(cluster);
     double std = calculate_standard_deviation(cluster);
@@ -39,14 +36,16 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   uint32_t useful_count_original = 0;
   std::vector<double> frequencies;
 
-   for(uint32_t i=0; i < base_variants.size(); i++){
-
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked){
+  for(uint32_t i=0; i < base_variants.size(); i++){
+    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && \
+      !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && \
+      !base_variants[i].amplicon_masked){
       useful_count_original++;
       variants_original.push_back(base_variants[i]);
       frequencies.push_back(base_variants[i].gapped_freq);
     }
   }
+
   if(variants_original.empty()){
     error_rate = 1;
     return;
@@ -64,13 +63,10 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
   bool clustering_failed = false;
   uint32_t optimal_n=0;
-  //std::vector<double> bics;
-  //std::vector<double> ns;
-  //std::vector<bool> exclude_ns;
 
   while(n <= 5){
     reset_variants_info(variants_original);
-    //std::cerr << "error estimate " << n << std::endl;
+    std::cerr << "error estimate " << n << std::endl;
     gaussian_mixture_model model = retrain_model(n, data_original, variants_original, 2, 0.00001, clustering_failed);
     for(auto cluster : model.clusters){
       if(cluster.size() == 0){
@@ -82,7 +78,8 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
       continue;
     }
     if(n == 1){
-      double std = calculate_standard_deviation(model.clusters[0]);
+      double std = calculate_mad(model.clusters[0], model.means[0]);
+      std::cerr << std << std::endl;
       if(std < 0.03){
         optimal_n = 1;
         break;
@@ -95,13 +92,20 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     std::vector<double> mads;
     for(uint32_t i=0; i < model.means.size(); i++){
       double mad = calculate_mad(model.clusters[i], model.means[i]);
-      //std::cerr << model.means[i] << " " << mad << std::endl; 
+      std::cerr << model.means[i] << " " << mad << std::endl; 
       mads.push_back(mad);
     }
-    //std::cerr << "emp " << emp << std::endl;
+    std::cerr << "emp " << emp << std::endl;
     double threshold = 0.10;
     bool all_below = std::all_of(mads.begin(), mads.end(), [threshold](double v){ return v < threshold;});
     if(all_below && emp <= 0.10){
+      optimal_n = n;
+      break;
+    }
+    //secondary condition says if all clusters are tight (even if close together we're good)
+    threshold = 0.05;
+    all_below = std::all_of(mads.begin(), mads.end(), [threshold](double v){ return v < threshold;});
+    if(all_below){
       optimal_n = n;
       break;
     }
@@ -122,7 +126,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
   //for each cluster this describes the points which are outliers
   if(n > 1){
-    outliers = determine_outlier_points(model.clusters[chosen_peak], 3);
+    //outliers = determine_outlier_points(model.clusters[chosen_peak], 2.5);
     std::vector<double> universal_cluster = model.clusters[chosen_peak];
     for(uint32_t i=0; i < universal_cluster.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
@@ -132,7 +136,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     }
   } else {
     //TODO handle the case of n=1
-    outliers = determine_outlier_points(frequencies, 3);
+    outliers = determine_outlier_points(frequencies, 2.5);
     for(uint32_t i=0; i < frequencies.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
       if(it == outliers.end()){

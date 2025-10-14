@@ -342,7 +342,6 @@ void assign_variants_simple(std::vector<variant> &variants,
     if(tmp_prob.size() > assigned.size()) {
       //std::cerr << "HERE " << tmp_prob.size() << " " << assigned.size() << " " << pos << std::endl;
       clustering_failed = true;
-      //return;
       continue;
     }
 
@@ -486,10 +485,6 @@ void assign_all_variants(std::vector<variant> &variants,
     perm_generator(gmodel.n, i, possible_permutations);
   }
   assign_clusters(variants, gmodel, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
-  if(clustering_failed){
-    //std::cerr << "clustering failed" << std::endl;
-    //exit(1);
-  }
 }
 
 void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants){
@@ -1027,7 +1022,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
   set_deletion_flags(base_variants, lower_bound);
   set_insertion_flags(base_variants);
-
+  std::cerr << "filename: " << output_prefix << std::endl;
   std::cerr << "lower bound " << lower_bound <<  " upper bound " << upper_bound << std::endl;
 
   uint32_t useful_var=0;
@@ -1040,10 +1035,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       useful_var++;
       variants.push_back(base_variants[i]);
       count_pos.push_back(base_variants[i].position);
-      //std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " include " << base_variants[i].include_clustering << std::endl;
+      std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " include " << base_variants[i].include_clustering << std::endl;
     }
   }
-  //exit(0);
   //handle the case of no variants less than the universal cluster
   if(useful_var < 1){
     std::ofstream file;
@@ -1227,11 +1221,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //need at least 1 of 100 solutions to go forward
   bootstrap_reps=100;
   std::unordered_map<uint32_t, bool> viability_counts;
-  for(uint32_t j=lower_n; j < n; j++){
+  for(uint32_t j=1; j < n; j++){
     if(j > useful_var){
       viability_counts[j] = false;
       continue;
     }
+    std::cerr << "viability check " << j << std::endl;
     for(uint32_t i=0; i < bootstrap_reps; i++){
       clustering_failed = false;
       empty_cluster = false;
@@ -1239,8 +1234,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       reset_variants_info(variants);
       gaussian_mixture_model retrained = retrain_model(j, data, variants, lower_n, 0.001, clustering_failed);
       if(clustering_failed) continue;
-      for(auto m : retrained.means){
-        if(m == 0){
+      for(auto m : retrained.clusters){
+        if(m.size() == 0){
           empty_cluster = true;
           break;
         }
@@ -1256,6 +1251,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       break;
     }
   }
+  std::cerr << "end of viability check" << std::endl;
   //check if there's only 1 viable N value
   bool one_true = std::count_if(viability_counts.begin(), viability_counts.end(),
     [](const std::pair<const uint32_t, bool>& p){ return p.second; }) == 1;
@@ -1268,12 +1264,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::unordered_map<uint32_t, std::vector<std::vector<double>>> track_means;
   std::vector<double> solutions_k;
   std::cerr << "starting bootstrapping" << std::endl;
-  for(uint32_t k=2; k <= 10; k++){
+  for(uint32_t k=1; k <= 10; k++){
     if(final_n != 0) continue;
-    if(k < lower_n) {
-      solutions_k.push_back(0);
-      continue;
-    }
     if(!viability_counts[k]){
       solutions_k.push_back(0);
       continue;
@@ -1312,26 +1304,37 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       for(auto r : retrained.clusters) {
         double m = calculate_mean(r);
         double mad = calculate_mad(r, m);
-        if(mad > 0.10) empty_cluster = true;
+        if(mad > 0.10){
+          if(k == 2)
+          std::cerr << mad << std::endl;
+          for(auto m : retrained.means){
+            std::cerr << m << " ";
+          }
+          std::cerr << "\n";
+          empty_cluster = true;
+        }
       }
       if(empty_cluster) continue;
       double emp = empirical_misclassification_probability(variants);
+      if(emp > 1) continue;
       total_emp += emp;
       count++;
       viable_solutions++;
       means.push_back(retrained.means);
     }
     track_means[k] = means;
+    if(count == 0) {
+      solutions_k.push_back(0);
+      continue;
+    }
     double average_emp = total_emp / (double)count;
     solutions_k.push_back((double)viable_solutions); 
 
-
     std::cerr << "average emp " << average_emp << std::endl;
     std::cerr << "num solutions " << viable_solutions << std::endl;
-
-    
+ 
     //viable solutions condition takes care of cluster spread, emp takes care of clusters closer together
-    if(k == 2 && average_emp < 0.10 && ((double)viable_solutions > (double)bootstrap_reps * 0.95)){
+    if(k == 2 && average_emp < 0.10 && ((double)viable_solutions >= (double)bootstrap_reps * 0.90)){
       final_n = 2;
       break;
     }
@@ -1340,14 +1343,18 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t max_sol=0;
   if(final_n != 2){
     for(uint32_t i=0; i < solutions_k.size(); i++){
-      if(i+2 != 2){
+      if(i+1 != 2){
         if(solutions_k[i] > max_sol){
           max_sol = solutions_k[i];
-          final_n = i+2;
+          final_n = i+1;
         }
       }
-      std::cerr << i+2 << " " << solutions_k[i] << std::endl;
+      std::cerr << i+1 << " " << solutions_k[i] << std::endl;
     }
+  }
+  if(final_n == 0){
+    std::cerr << "no proper solution found" << std::endl;
+    exit(1);
   }
 
   std::cerr << "new final n " << final_n << std::endl;
@@ -1360,8 +1367,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     reset_variants_info(variants);
     gaussian_mixture_model retrained = retrain_model(final_n, data, variants, lower_n, 0.001, clustering_failed);
     if(clustering_failed) continue;
-    for(auto m : retrained.means){
-      if(m == 0){
+    for(auto m : retrained.clusters){
+      if(m.size() == 0){
         empty_cluster = true;
         break;
       }
@@ -1402,6 +1409,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   assign_all_variants(variants, base_variants, best_model, lower_bound, upper_bound);
   add_noise_variants(variants, base_variants);
   solve_clusters(variants, best_model, lower_bound, solution, output_prefix, default_threshold, min_depth);
+  std::cerr << "back from solving clusters" << std::endl;
   means = best_model.means;
   return(variants);
 }

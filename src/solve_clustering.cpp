@@ -87,10 +87,9 @@ std::vector<uint32_t> find_missing_indexes(const std::vector<uint32_t>& tmp, con
 void modify_variant_masking(std::vector<uint32_t> amplicons_to_mask, std::vector<variant> &variants, std::vector<double> means){
   std::cerr << "modify variant masking" << std::endl;
   for(uint32_t i=0; i < variants.size(); i++){
-
+    if(variants[i].consensus_numbers.size() == 0) continue;
     std::vector<uint32_t> tmp = variants[i].amplicon_numbers;
     std::vector<uint32_t> valid_amplicons = find_missing_indexes(tmp, amplicons_to_mask);
-    if(variants[i].position == 12427) std::cerr << "IN MODIFY VAR MASK" << std::endl;
     if(valid_amplicons.size() == 0){
       variants[i].amplicon_masked = true;
     } else if(valid_amplicons.size() == tmp.size()){
@@ -98,13 +97,13 @@ void modify_variant_masking(std::vector<uint32_t> amplicons_to_mask, std::vector
       variants[i].amplicon_flux = false;
     } else {
       for(auto j : valid_amplicons){
-        std::cerr << variants[i].consensus_numbers.size() << std::endl;
-        std::cerr << variants[i].position << " " << variants[i].gapped_freq << " j " << j << " " << variants[i].consensus_numbers[j] << std::endl;
+        //std::cerr << variants[i].position << " " << variants[i].cluster_assigned << " " << variants[i].gapped_freq << std::endl;
         variants[i].cluster_assigned = variants[i].consensus_numbers[j];
         variants[i].amplicon_masked = false;
       }
     }
   }
+  std::cerr << "end variant masking" << std::endl;
 }
 
 bool test_cluster_deviation(double nearest_cluster, double variant_cluster, double std_dev){
@@ -541,7 +540,7 @@ void solve_clusters(std::vector<variant> &variants,
   file_sol << "means\n";
   file_sol << solution_string << "\n";
   file_sol.close();
-  exit(0);
+  //exit(0);
 
   double largest = *std::max_element(solution.begin(), solution.end());
   //define the clusters which contain the majority population
@@ -582,6 +581,17 @@ void solve_clusters(std::vector<variant> &variants,
     auto it = std::find(unresolved.begin(), unresolved.end(), means[variants[i].cluster_assigned]);
     if(it != unresolved.end()){
       variants[i].resolved = false;
+    }
+  }
+
+  //for 100% cases assign all consensus genomes to the variant
+  std::vector<uint32_t> all_genomes;
+  for(uint32_t i=0; i < solution.size(); i++){
+    all_genomes.push_back(i);
+  }
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].gapped_freq >= 1-estimated_error && variants[i].cluster_assigned == -1){
+      variants[i].consensus_numbers = all_genomes;
     }
   }
 

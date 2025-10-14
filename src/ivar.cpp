@@ -287,7 +287,7 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
-static const char *contam_opt_str = "p:s:t:r:h?";
+static const char *contam_opt_str = "p:s:t:m:r:h?";
 
 std::string get_filename_without_extension(std::string f, std::string ext) {
   if (ext.length() > f.length())  // If extension longer than filename
@@ -347,6 +347,9 @@ int main(int argc, char *argv[]) {
           break;
         case 't':
           g_args.min_threshold = atof(optarg);
+          break;
+        case 'm':
+          g_args.min_depth = std::stoi(optarg);
           break;
         case 'r':
           g_args.ref = optarg;
