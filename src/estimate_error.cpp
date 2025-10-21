@@ -63,7 +63,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
   bool clustering_failed = false;
   uint32_t optimal_n=0;
-
+  bool done = false;
   while(n <= 5){
     reset_variants_info(variants_original);
     std::cerr << "error estimate " << n << std::endl;
@@ -88,28 +88,37 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
         continue;
       }
     }
-    double emp = empirical_misclassification_probability(variants_original);
     std::vector<double> mads;
+    std::vector<double> means = model.means;
     for(uint32_t i=0; i < model.means.size(); i++){
       double mad = calculate_mad(model.clusters[i], model.means[i]);
       std::cerr << model.means[i] << " " << mad << std::endl; 
       mads.push_back(mad);
     }
-    std::cerr << "emp " << emp << std::endl;
-    double threshold = 0.10;
-    bool all_below = std::all_of(mads.begin(), mads.end(), [threshold](double v){ return v < threshold;});
-    if(all_below && emp <= 0.10){
-      optimal_n = n;
-      break;
-    }
-    //secondary condition says if all clusters are tight (even if close together we're good)
-    threshold = 0.05;
-    all_below = std::all_of(mads.begin(), mads.end(), [threshold](double v){ return v < threshold;});
-    if(all_below){
-      optimal_n = n;
-      break;
-    }
-    std::vector<double> means = model.means;
+    std::vector<uint32_t> indices(means.size());
+    for (uint32_t i = 0; i < indices.size(); ++i) indices[i] = i;
+    std::sort(indices.begin(), indices.end(),
+              [&](uint32_t a, uint32_t b) { return means[a] > means[b]; });
+
+    uint32_t first = indices[0];
+    uint32_t second = indices[1];
+
+    double mad_1 = mads[first];
+    double mad_2 = mads[second];
+
+    if (mad_1 > 0.0 && mad_2 > 0.0) {
+      double largest = means[first] - (mad_1 * 2);
+      double second_largest = means[second] + (mad_2 * 2);
+      if(largest <= means[second] || second_largest >= means[first]){
+        done = false;
+      } else {
+        done = true;
+      }
+      if(done){
+        optimal_n = n;
+        break;
+      }
+    } 
     n++;
   }
 

@@ -61,6 +61,7 @@ struct variant {
   bool outside_freq_range=false; //outside of useful frequency range for model
   bool cluster_outlier=false; //is an outlier for the cluster assigned
   bool include_clustering=true; //here we flag the later positions of deletions
+  bool imbalance=false;
   std::vector<double> probabilities;
 
 };

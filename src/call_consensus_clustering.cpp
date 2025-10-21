@@ -60,8 +60,7 @@ void cluster_consensus(std::vector<variant> variants, \
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-
-    if(variants[i].position == 0){
+    if(variants[i].position == 11211){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -126,6 +125,7 @@ void cluster_consensus(std::vector<variant> variants, \
           all_consensus_seqs[j][adjusted_pos].insert(0, variants[i].nuc);
         } else {
           if(!del){
+            if(print) std::cerr << j << " " << adjusted_pos << " " << variants[i].nuc << std::endl;
             all_consensus_seqs[j][adjusted_pos] = variants[i].nuc;
             last_adjustment[j] = position;
           } else {
@@ -175,6 +175,7 @@ void cluster_consensus(std::vector<variant> variants, \
 
   std::vector<std::string> all_sequences;
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
+    std::cerr << all_consensus_seqs[i][11210] << std::endl;
     std::string tmp = std::accumulate(all_consensus_seqs[i].begin(), all_consensus_seqs[i].end(), std::string(""));
     tmp.erase(std::remove(tmp.begin(), tmp.end(), '-'), tmp.end());
     all_sequences.push_back(tmp);

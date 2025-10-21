@@ -72,7 +72,7 @@ arma::mat subsample_with_replacement(
     chosen_cols.reserve(n_subsample); // approximate
 
     uint32_t pos = 0;
-    for (std::size_t i = 0; i < n_subsample; ++i) {
+    for (std::size_t i = 0; i <= n_subsample; ++i) {
       uint32_t group = group_ids[dist(gen)];
       const auto& cols = groups[group];
       chosen_cols.insert(chosen_cols.end(), cols.begin(), cols.end());
@@ -438,7 +438,7 @@ void assign_all_variants(std::vector<variant> &variants,
   for(uint32_t i = 0; i < base_variants.size(); i++){
     //previously not assigned due to possible amplicon flux
     if(base_variants[i].qual_flag) continue;
-    if((!base_variants[i].outside_freq_range && (base_variants[i].amplicon_flux || base_variants[i].amplicon_masked || !base_variants[i].include_clustering)) || (base_variants[i].outside_freq_range && base_variants[i].gapped_freq >= lower_bound && base_variants[i].gapped_freq <= upper_bound)){
+    if((!base_variants[i].outside_freq_range && (base_variants[i].amplicon_flux || base_variants[i].amplicon_masked || base_variants[i].imbalance || !base_variants[i].include_clustering)) || (base_variants[i].outside_freq_range && base_variants[i].gapped_freq >= lower_bound && base_variants[i].gapped_freq <= upper_bound)){
       count++;
       tmp_var.push_back(base_variants[i]);
       variants.push_back(base_variants[i]);
@@ -1030,7 +1030,19 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<uint32_t> count_pos; 
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
 
+  std::unordered_map<uint32_t, uint32_t> position_counts;
+  // first pass: count how many times each position appears
+  for (uint32_t i=0; i < base_variants.size(); i++) {
+    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){ 
+      position_counts[base_variants[i].position]++;
+    }
+  }
+
   for(uint32_t i=0; i < base_variants.size(); i++){
+    if (position_counts[base_variants[i].position] < 2) {
+      base_variants[i].imbalance = true;
+      continue;
+    }
     if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
       useful_var++;
       variants.push_back(base_variants[i]);
@@ -1226,7 +1238,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       viability_counts[j] = false;
       continue;
     }
-    std::cerr << "viability check " << j << std::endl;
     for(uint32_t i=0; i < bootstrap_reps; i++){
       clustering_failed = false;
       empty_cluster = false;
@@ -1243,7 +1254,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       if(empty_cluster) continue;
       calculate_cluster_deviations(retrained);
       solution_sets = subset_sum(retrained, lower_bound);
-      if(solution_sets.size() == 0){ 
+      if(solution_sets.size() == 0){
         continue;
       }
       viability_counts[j] = true;
@@ -1304,13 +1315,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       for(auto r : retrained.clusters) {
         double m = calculate_mean(r);
         double mad = calculate_mad(r, m);
-        if(mad > 0.10){
-          if(k == 2)
-          std::cerr << mad << std::endl;
-          for(auto m : retrained.means){
-            std::cerr << m << " ";
-          }
-          std::cerr << "\n";
+        if(mad > 0.10){ 
           empty_cluster = true;
         }
       }
@@ -1409,7 +1414,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   assign_all_variants(variants, base_variants, best_model, lower_bound, upper_bound);
   add_noise_variants(variants, base_variants);
   solve_clusters(variants, best_model, lower_bound, solution, output_prefix, default_threshold, min_depth);
-  std::cerr << "back from solving clusters" << std::endl;
   means = best_model.means;
   return(variants);
 }
