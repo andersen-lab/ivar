@@ -92,25 +92,25 @@ arma::mat subsample_with_replacement(
     return subsample;
 }
 
-double calculate_BIC(double k, const std::vector<variant>& variants, double useful_var) {
-    std::size_t N = variants.size();
+double calculate_BIC(double k, double logL, int N) {
+//    std::size_t N = variants.size();
     if (N == 0) return std::numeric_limits<double>::infinity();
 
-    double logL = 0.0;
-
-    for (const auto& v : variants) {
-        if (v.probabilities.empty()) continue;
-
-        // log-sum-exp for stability
-        double max_log = *std::max_element(v.probabilities.begin(), v.probabilities.end());
-        double sum_exp = 0.0;
-        for (double lp : v.probabilities) {
-            sum_exp += std::exp(lp - max_log);
-        }
-        double log_px = max_log + std::log(sum_exp);
-        logL += log_px;
-    }
-    double bic = -2.0 * logL + k * std::log(useful_var);
+//    double logL = 0.0;
+//
+//    for (const auto& v : variants) {
+//        if (v.probabilities.empty()) continue;
+//
+//        // log-sum-exp for stability
+//        double max_log = *std::max_element(v.probabilities.begin(), v.probabilities.end());
+//        double sum_exp = 0.0;
+//        for (double lp : v.probabilities) {
+//            sum_exp += std::exp(lp - max_log);
+//        }
+//        double log_px = max_log + std::log(sum_exp);
+//        logL += log_px;
+//    }
+    double bic = -2.0 * logL + k * std::log(N);
     return bic;
 }
 
@@ -658,7 +658,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
     }
 
     double k = (2 * n) + (n-1);
-    double bic = calculate_BIC(k, variants, (double)data.size()); 
+    double bic = calculate_BIC(k, gmodel.model.sum_log_p(data), (int) data.n_cols);
     gmodel.bic = bic;
     all_bics.push_back(bic);
     all_models.push_back(gmodel);
