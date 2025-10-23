@@ -6,6 +6,7 @@
 
 struct kmeans_model {
   std::vector<std::vector<double>> clusters; //stored assigned clusters
+  std::vector<double> covariances;
   uint32_t n; //number of clusters
   std::vector<double> means; //centroids
 };

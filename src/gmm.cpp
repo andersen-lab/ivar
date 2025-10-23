@@ -520,8 +520,31 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error, uint32_t iterat
   for(uint32_t c=0; c < centroids.n_cols; c++){
     means.push_back(centroids(c));
   }
+  for(auto d : data){
+    uint32_t idx;
+    double closest=1;
+    for(uint32_t i=0; i < means.size(); i++){
+      double dist = std::abs((double)d - means[i]);
+      if(dist < closest){
+        closest = dist;
+        idx = i;
+      }
+    }
+    clusters[idx].push_back(d);
+  }
+
+  //center cluster points and square
+  std::vector<std::vector<double>> deviations(n);
+  for(uint32_t i =0; i < clusters.size(); i++){
+    for(uint32_t j=0; j < clusters[i].size(); j++){
+
+    }
+  }
+
+
   model.n = n;
   model.means = means;
+  model.clusters = clusters;
   return(model);
 }
 void calculate_log_likelihood(gaussian_mixture_model& model, std::vector<variant> variants){
@@ -561,7 +584,6 @@ gaussian_mixture_model retrain_model(uint32_t n,
   for (const auto& kv : all_nts)
     unique_pos.push_back(kv.first);
   
-  double initial_covariance = 0.005;
   uint32_t j = 0;
   std::vector<gaussian_mixture_model> all_models;
   std::vector<double> all_bics;
@@ -572,22 +594,15 @@ gaussian_mixture_model retrain_model(uint32_t n,
     gmodel.lower_n = lower_n;
     arma::mat initial_means(1, n, arma::fill::zeros);
 
-    arma::mat cov (1, n, arma::fill::zeros);
-    std::vector<double> total_distances;
-    std::vector<std::vector<double>> all_centroids;
-
-    //run a kmeans to seed the GMM
     kmeans_model initial_model = train_model(n, data, false, j);
-
     for(uint32_t c=0; c < n; c++){
       initial_means.col(c) = (double)initial_model.means[c];
-      cov.col(c) = initial_covariance;
     }
 
     arma::gmm_diag model;
     model.reset(1, n);
     model.set_means(initial_means);
-    model.set_dcovs(cov);
+    //model.set_dcovs(cov);
     bool status = model.learn(data, n, arma::eucl_dist, arma::keep_existing, 1, 10, var_floor, false);
     if(!status){
       std::cerr << "GMM failed to converge" << std::endl;
@@ -627,7 +642,6 @@ gaussian_mixture_model retrain_model(uint32_t n,
     assign_clusters(variants, gmodel, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
     std::vector<std::vector<double>> clusters = form_clusters(n, variants);
     gmodel.clusters = clusters;
-
     means.clear();
     //set means
     arma::mat mean_fill2 (1, n, arma::fill::zeros);
@@ -660,6 +674,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
     double k = (2 * n) + (n-1);
     double bic = calculate_BIC(k, gmodel.model.sum_log_p(data), (int) data.n_cols);
     gmodel.bic = bic;
+    std::cerr << "j " << j << " n " << n << " " << bic << std::endl;
     all_bics.push_back(bic);
     all_models.push_back(gmodel);
     j++;
@@ -1015,7 +1030,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   set_deletion_flags(base_variants, 0.001);
   cluster_error(base_variants, min_qual, min_depth, error_rate);
-
+  error_rate = 0.95;
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
 
@@ -1086,32 +1101,24 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     data.col(i) = tmp;
   }
   std::cerr << "useful var " << useful_var << std::endl;
-  //store things during loop
-  std::unordered_map<double, double> model_bics; //complexity vs. bics
-  std::unordered_map<double, uint32_t> model_n; //complexity vs. n
-  std::unordered_map<double, uint32_t> exclude; //complexity vs. exclusion
-  std::unordered_map<uint32_t, uint32_t> model_counter; //track the number of times each model wins
+
+  std::unordered_map<uint32_t, uint32_t> model_counter; 
 
   bool empty_cluster = false;
   std::vector<std::vector<double>> solution_sets;
 
   uint32_t counter = 1;
   bool clustering_failed =false;
-  double k = 0; //complexity
-  double complex = 0; //number of populations
   std::vector<variant> subsampled_variants;
-  uint32_t bootstrap_reps = 100;
+  uint32_t bootstrap_reps = 10;
   uint32_t final_n=0;
   
-  /*for(uint32_t i =0; i < bootstrap_reps; i++){
+  for(uint32_t i =0; i < bootstrap_reps; i++){
     empty_cluster = false;
     subsampled_variants.clear();
     arma::mat subsample = subsample_with_replacement(data, data.size(), subsample_position, subsampled_variants, variants);
-
-    model_bics.clear();
-    model_n.clear();
-    exclude.clear();
     counter = 1;
+    std::vector<double> all_bics;
 
     while(counter <= n && !empty_cluster){ 
         clustering_failed = false;
@@ -1122,114 +1129,51 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         if((subsampled_variants.size() < counter)){
           break;
         }
-        gaussian_mixture_model retrained = retrain_model(counter, subsample, subsampled_variants, lower_n, 0.001, clustering_failed);
-        calculate_cluster_deviations(retrained);
-        if(clustering_failed){
-          //std::cerr << "clustering failed" << std::endl;
-          if(counter == 1){
-            k = (2 * 1) + (1-1);
-            double bic = calculate_BIC(k, subsampled_variants, subsampled_variants.size()); 
-            model_bics[(double)counter] = bic;
-            model_n[(double)counter] = 1;
-            exclude[(double)counter] = true;
-          }
-          counter++;
-          continue;
-        }
-        //std::cerr << "\nn: " << counter << std::endl;
-        for(auto c : retrained.clusters){
-          if(c.size() == 0){
-            //std::cerr << "empty cluster" << std::endl;
-            empty_cluster = true;
-            break;
-          } 
-        }
-        if(empty_cluster) continue;
+        //arma::gmm_diag retrained;
+        //clustering_failed = retrained.learn(data, counter, arma::eucl_dist, arma::random_spread, 10, 5, 1e-2, false);
+        //double k = (2 * counter) + (counter-1);
+        //double bic = calculate_BIC(k, retrained.sum_log_p(data), (int) data.n_cols);
+        gaussian_mixture_model retrained = retrain_model(counter, data, variants, lower_n, 0.001, clustering_failed);
+        double bic = retrained.bic;
+        all_bics.push_back(bic);
+        //calculate_cluster_deviations(retrained);
         //add in the subset sub problem
-        solution_sets = subset_sum(retrained, lower_bound);
-        complex = 0;
+        //solution_sets = subset_sum(retrained, lower_bound);
         //std::cerr << "solution sets " << solution_sets.size() << std::endl;
         //we cannot find a solution
-        if(solution_sets.size() == 0){
+        /*if(solution_sets.size() == 0){
           counter++;
           continue;  
-        } else {
-          //calculate average number viral populations found
-          double num_pop = 0;
-          for(auto sol : solution_sets){
-            num_pop += (double)sol.size();
-          }
-          complex = num_pop / (double)solution_sets.size();
-        }
-        if(complex < lower_n){
-          exclude[complex] = true;
-        } else {
-          exclude[complex] = false;
-        }
-
-        k = (2 * complex) + (complex-1);
-        double bic = calculate_BIC(k, subsampled_variants, subsampled_variants.size());
-        //std::cerr << "bic " << bic << " complex " << complex << std::endl; 
-        if (model_bics.find(complex) != model_bics.end()) {
-          if(model_bics[complex] > bic){
-            model_bics[complex] = bic;
-            model_n[complex] = counter;
-          }
-        } else {
-          model_bics[complex] = bic;
-          model_n[complex] = counter;
-        }
-
+        }*/
         counter++;
     }
 
-    std::vector<double> ics; //bic scores
-    std::vector<double> complexity; //number of populations/complexity
-    std::vector<bool> exclude_pass;
-    uint32_t used = 0;
-    for (const auto& [complex, bic] : model_bics) {
-      std::cerr << output_prefix << std::endl;
-      std::cerr << "complex " << complex << " bic " << bic << " " << exclude[complex] << std::endl;
-      complexity.push_back(complex);
-      ics.push_back(bic);
-      exclude_pass.push_back(exclude[complex]);      
-      if(!exclude[complex]) used++;
-    }
-
-    if(used < 2){
-      double min_bic = 100;
-      for (const auto& [complex, bic] : model_bics) {
-        if(!exclude[complex]){
-          if(bic < min_bic){
-            min_bic = bic;
-            //std::cerr << "under two " << model_n[complex] << std::endl;
-            model_counter[model_n[complex]] += 1;
-          }
-        }
+    double lowest = 0;
+    uint32_t winner;
+    for(uint32_t i=0; i < all_bics.size(); i++){
+      if(all_bics[i] < lowest){
+        lowest = all_bics[i];
+        winner = i+1;
       }
-    } else {
-      double optimal_n = elbow_method(ics, complexity, exclude_pass);
-      if(optimal_n != -1){
-        //std::cerr << model_n[optimal_n] << " optimal n " << optimal_n << std::endl;
-        model_counter[model_n[optimal_n]] += 1;
-      }
+      std::cerr << i+1 << " " << all_bics[i] << "\n";
     }
+    model_counter[winner] += 1;
   }
-  
-  uint32_t biggest_count = 0;
-  for (const auto& [n, count] : model_counter){
-    if(count > biggest_count){
-      biggest_count = count;
-      final_n = n;
+  uint32_t highest = 0;
+  for (const auto& [key, value] : model_counter) {
+    if(value > highest){
+      final_n = key;
+      highest = value;
     }
-    std::cerr << n << " counter " << count << std::endl;
-  }
+    std::cerr << key << " : " << value << '\n';
+  } 
+  std::cerr << "final n " << final_n << std::endl;
   if(final_n ==0){
     std::cerr << output_prefix << " no solution found" << std::endl;
     exit(1);
-  }*/
+  }
 
-
+  /*
   //need at least 1 of 100 solutions to go forward
   bootstrap_reps=100;
   std::unordered_map<uint32_t, bool> viability_counts;
@@ -1360,16 +1304,22 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   if(final_n == 0){
     std::cerr << "no proper solution found" << std::endl;
     exit(1);
-  }
+  }*/
 
   std::cerr << "new final n " << final_n << std::endl;
   double best_likelihood = 0;
   gaussian_mixture_model best_model;
-  for(uint32_t i=0; i < bootstrap_reps; i++){
+  for(uint32_t i=0; i < 1; i++){
     clustering_failed = false;
-    empty_cluster = false;
-    solution_sets.clear();
+    /*empty_cluster = false;
+    solution_sets.clear();*/
     reset_variants_info(variants);
+    
+    //arma::gmm_diag retrained;
+    //clustering_failed = retrained.learn(data, final_n, arma::eucl_dist, arma::random_subset, 10, 5, 1e-2, false);
+    //double k = (2 * final_n) + (final_n-1);
+    //double bic = calculate_BIC(k, retrained.sum_log_p(data), (int) data.n_cols);
+
     gaussian_mixture_model retrained = retrain_model(final_n, data, variants, lower_n, 0.001, clustering_failed);
     if(clustering_failed) continue;
     for(auto m : retrained.clusters){
@@ -1380,21 +1330,17 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     }
     if(empty_cluster) continue;
     calculate_cluster_deviations(retrained);
-    solution_sets = subset_sum(retrained, lower_bound);
-    if(solution_sets.size() == 0){
-      continue;
-    }
-    calculate_log_likelihood(retrained, variants);
-    if(retrained.log_likelihood > best_likelihood){
-      best_likelihood = retrained.log_likelihood;
-      best_model = retrained;
-    }
+   std::cerr << "bic " << retrained.bic << std::endl;
+   for(auto m : retrained.means){
+      std::cerr << m << " ";
+   }
+   std::cerr << "\n";
+    /*if(bic < best_likelihood){
+      best_likelihood = bic;
+      best_model.model = retrained;
+    }*/
   }
-
-  if(best_model.means.size() == 0){
-    std::cerr << "model not converged on a solution" << std::endl;
-    exit(1);
-  }
+  exit(0);
   std::ofstream file;
   if(development_mode){
     //write means to string
