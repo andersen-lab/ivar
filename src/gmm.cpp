@@ -537,14 +537,33 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error, uint32_t iterat
   std::vector<std::vector<double>> deviations(n);
   for(uint32_t i =0; i < clusters.size(); i++){
     for(uint32_t j=0; j < clusters[i].size(); j++){
-
+      double centered = std::abs(clusters[i][j] - means[i]);
+      deviations[i].push_back(centered * centered);
     }
   }
+  std::vector<double> diag_cov;
+  for(uint32_t i = 0; i < deviations.size(); i++){
+    double sum = 0;
+    for(double d : deviations[i]) {
+      sum += d;
+    }
+    diag_cov.push_back(sum / deviations[i].size());
+  }
 
+  std::vector<double> hefts;
+  for(uint32_t i=0; i < clusters.size(); i++){
+    hefts.push_back((double)clusters[i].size()/(double)data.size());
+  }
+  double sum_hefts = std::accumulate(hefts.begin(), hefts.end(), 0.0);
+  for(auto &h : hefts) {
+    h /= sum_hefts;
+  } 
 
   model.n = n;
   model.means = means;
   model.clusters = clusters;
+  model.covariances = diag_cov;
+  model.hefts = hefts;
   return(model);
 }
 void calculate_log_likelihood(gaussian_mixture_model& model, std::vector<variant> variants){
@@ -561,6 +580,17 @@ void calculate_log_likelihood(gaussian_mixture_model& model, std::vector<variant
   }
 
   model.log_likelihood = logL;
+}
+//test function
+std::string vec_to_pylist(const std::vector<double>& v){
+    std::ostringstream ss;
+    ss << "[";
+    for (size_t i = 0; i < v.size(); ++i) {
+        ss << v[i];
+        if (i + 1 < v.size()) ss << ", ";
+    }
+    ss << "]";
+    return ss.str();
 }
 
 gaussian_mixture_model retrain_model(uint32_t n, 
@@ -584,107 +614,76 @@ gaussian_mixture_model retrain_model(uint32_t n,
   for (const auto& kv : all_nts)
     unique_pos.push_back(kv.first);
   
-  uint32_t j = 0;
-  std::vector<gaussian_mixture_model> all_models;
-  std::vector<double> all_bics;
+  gaussian_mixture_model gmodel;
+  gmodel.n = n;
+  gmodel.lower_n = lower_n;
+  arma::gmm_diag model;
 
-  while(j < 20) {
-    gaussian_mixture_model gmodel;
-    gmodel.n = n;
-    gmodel.lower_n = lower_n;
-    arma::mat initial_means(1, n, arma::fill::zeros);
-
-    kmeans_model initial_model = train_model(n, data, false, j);
-    for(uint32_t c=0; c < n; c++){
-      initial_means.col(c) = (double)initial_model.means[c];
-    }
-
-    arma::gmm_diag model;
-    model.reset(1, n);
-    model.set_means(initial_means);
-    //model.set_dcovs(cov);
-    bool status = model.learn(data, n, arma::eucl_dist, arma::keep_existing, 1, 10, var_floor, false);
-    if(!status){
-      std::cerr << "GMM failed to converge" << std::endl;
-      clustering_failed = true;
-      continue;
-    }
-    std::vector<double> means;
-    std::vector<double> hefts;
-    std::vector<double> dcovs;
-
-    std::vector<std::vector<double>> prob_matrix;
-    std::vector<double> tmp;
-    for(uint32_t i=0; i < n; i++){
-      arma::rowvec set_likelihood = model.log_p(data, i);
-      tmp.clear();
-      for(uint32_t k=0; k < data.n_cols; k++){
-        tmp.push_back((double)set_likelihood[k]);
-      }
-      prob_matrix.push_back(tmp);
-    }
-
-    for(uint32_t i=0; i < model.means.size(); i++){
-      double m = (double)model.means[i];
-      means.push_back(m);
-    }
-    gmodel.dcovs = dcovs;
-    gmodel.prob_matrix = prob_matrix;
-    gmodel.hefts = hefts;
-    gmodel.model = model;
-    gmodel.means = means;
-
-    std::vector<std::vector<uint32_t>> possible_permutations;
-    for (uint32_t i = 1; i <= gmodel.lower_n; ++i){
-      perm_generator(gmodel.n, i, possible_permutations);
-    }
-
-    assign_clusters(variants, gmodel, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
-    std::vector<std::vector<double>> clusters = form_clusters(n, variants);
-    gmodel.clusters = clusters;
-    means.clear();
-    //set means
-    arma::mat mean_fill2 (1, n, arma::fill::zeros);
-    for(uint32_t i=0; i < clusters.size(); i++){
-      double m = calculate_mean(clusters[i]);
-      double factor = std::pow(10.0, 2);
-      double rounded = std::round(m * factor) / factor;
-      mean_fill2.col(i) = rounded;
-      means.push_back(rounded);
-    }
-    model.set_means(mean_fill2);
-    gmodel.means = means;
-
-    //cluster probabilities
-    std::vector<std::vector<double>> cluster_prob(n);
-    for(auto var : variants){
-      uint32_t assigned = var.cluster_assigned;
-      if(assigned != (uint32_t)-1){
-        double prob = var.probabilities[assigned];
-        cluster_prob[assigned].push_back(prob);
-      }
-    }
-    double total_likelihoods = 0;
-    for(auto val : cluster_prob){
-      double sum = std::accumulate(val.begin(), val.end(), 0.0);
-      total_likelihoods += sum;
-      gmodel.cluster_probabilities.push_back(sum/(double)val.size());
-    }
-
-    double k = (2 * n) + (n-1);
-    double bic = calculate_BIC(k, gmodel.model.sum_log_p(data), (int) data.n_cols);
-    gmodel.bic = bic;
-    std::cerr << "j " << j << " n " << n << " " << bic << std::endl;
-    all_bics.push_back(bic);
-    all_models.push_back(gmodel);
-    j++;
+  bool status = model.learn(data, n, arma::eucl_dist, arma::static_spread, 10, 10, var_floor, false);
+  if(!status){
+    std::cerr << "GMM failed to converge" << std::endl;
+    clustering_failed = true;
+    return(gmodel);
   }
-  auto it = std::min_element(all_bics.begin(), all_bics.end());
-  uint32_t index_best = std::distance(all_bics.begin(), it);
-  gaussian_mixture_model chosen = all_models[index_best];
-  calculate_log_likelihood(chosen, variants);
+  std::vector<double> means;
 
-  return(chosen);
+  std::vector<std::vector<double>> prob_matrix;
+  std::vector<double> tmp;
+  for(uint32_t i=0; i < n; i++){
+    arma::rowvec set_likelihood = model.log_p(data, i);
+    tmp.clear();
+    for(uint32_t k=0; k < data.n_cols; k++){
+      tmp.push_back((double)set_likelihood[k]);
+    }
+    prob_matrix.push_back(tmp);
+  }
+  for(uint32_t i=0; i < model.means.size(); i++){
+    double m = (double)model.means[i];
+    means.push_back(m);
+  }
+  gmodel.prob_matrix = prob_matrix;
+  gmodel.model = model;
+  gmodel.means = means;
+
+  std::vector<std::vector<uint32_t>> possible_permutations;
+  for (uint32_t i = 1; i <= gmodel.lower_n; ++i){
+    perm_generator(gmodel.n, i, possible_permutations);
+  }
+
+  assign_clusters(variants, gmodel, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
+  std::vector<std::vector<double>> clusters = form_clusters(n, variants);
+  gmodel.clusters = clusters;
+  means.clear();
+  //set means
+  arma::mat mean_fill2 (1, n, arma::fill::zeros);
+  for(uint32_t i=0; i < clusters.size(); i++){
+    double m = calculate_mean(clusters[i]);
+    double factor = std::pow(10.0, 2);
+    double rounded = std::round(m * factor) / factor;
+    mean_fill2.col(i) = rounded;
+    means.push_back(rounded);
+  }
+  model.set_means(mean_fill2);
+  gmodel.means = means;
+
+  //cluster probabilities
+  std::vector<std::vector<double>> cluster_prob(n);
+  for(auto var : variants){
+    uint32_t assigned = var.cluster_assigned;
+    if(assigned != (uint32_t)-1){
+      double prob = var.probabilities[assigned];
+      cluster_prob[assigned].push_back(prob);
+    }
+  }
+  for(auto val : cluster_prob){
+    double sum = std::accumulate(val.begin(), val.end(), 0.0);
+    gmodel.cluster_probabilities.push_back(sum/(double)val.size());
+  }
+
+  double k = (2 * n) + (n-1);
+  double bic = calculate_BIC(k, gmodel.model.sum_log_p(data), (int) data.n_cols);
+  gmodel.bic = bic;
+  return(gmodel);
 }
 
 double calculate_distance(double point, double mean) {
@@ -1029,7 +1028,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
 
   set_deletion_flags(base_variants, 0.001);
-  cluster_error(base_variants, min_qual, min_depth, error_rate);
+  //cluster_error(base_variants, min_qual, min_depth, error_rate);
   error_rate = 0.95;
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
@@ -1110,7 +1109,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t counter = 1;
   bool clustering_failed =false;
   std::vector<variant> subsampled_variants;
-  uint32_t bootstrap_reps = 10;
+  uint32_t bootstrap_reps = 1;
   uint32_t final_n=0;
   
   for(uint32_t i =0; i < bootstrap_reps; i++){
@@ -1119,7 +1118,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     arma::mat subsample = subsample_with_replacement(data, data.size(), subsample_position, subsampled_variants, variants);
     counter = 1;
     std::vector<double> all_bics;
-
     while(counter <= n && !empty_cluster){ 
         clustering_failed = false;
         solution_sets.clear();
@@ -1129,22 +1127,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         if((subsampled_variants.size() < counter)){
           break;
         }
-        //arma::gmm_diag retrained;
-        //clustering_failed = retrained.learn(data, counter, arma::eucl_dist, arma::random_spread, 10, 5, 1e-2, false);
-        //double k = (2 * counter) + (counter-1);
-        //double bic = calculate_BIC(k, retrained.sum_log_p(data), (int) data.n_cols);
         gaussian_mixture_model retrained = retrain_model(counter, data, variants, lower_n, 0.001, clustering_failed);
         double bic = retrained.bic;
         all_bics.push_back(bic);
-        //calculate_cluster_deviations(retrained);
-        //add in the subset sub problem
-        //solution_sets = subset_sum(retrained, lower_bound);
-        //std::cerr << "solution sets " << solution_sets.size() << std::endl;
-        //we cannot find a solution
-        /*if(solution_sets.size() == 0){
-          counter++;
-          continue;  
-        }*/
         counter++;
     }
 
@@ -1173,6 +1158,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     exit(1);
   }
 
+  exit(0);
   /*
   //need at least 1 of 100 solutions to go forward
   bootstrap_reps=100;
@@ -1340,7 +1326,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       best_model.model = retrained;
     }*/
   }
-  exit(0);
+
   std::ofstream file;
   if(development_mode){
     //write means to string
