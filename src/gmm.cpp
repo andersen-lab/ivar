@@ -618,6 +618,8 @@ gaussian_mixture_model retrain_model(uint32_t n,
   gmodel.n = n;
   gmodel.lower_n = lower_n;
   arma::gmm_diag model;
+  var_floor = 0.0001;
+  std::cerr << "var_floor " << var_floor << std::endl;  
 
   bool status = model.learn(data, n, arma::eucl_dist, arma::static_spread, 10, 10, var_floor, false);
   if(!status){
@@ -1127,12 +1129,17 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
           break;
         }
         gaussian_mixture_model retrained = retrain_model(counter, data, variants, lower_n, 0.001, clustering_failed);
+        if(clustering_failed){
+          all_bics.push_back(std::numeric_limits<double>::max());
+          counter++;
+          continue;  
+        }
         double bic = retrained.bic;
         all_bics.push_back(bic);
         counter++;
     }
 
-    double lowest = 0;
+    double lowest = std::numeric_limits<double>::max(); 
     uint32_t winner;
     for(uint32_t i=0; i < all_bics.size(); i++){
       if(all_bics[i] < lowest){
@@ -1297,10 +1304,18 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
     reset_variants_info(variants);
     best_model= retrain_model(final_n, data, variants, lower_n, 0.001, clustering_failed);
-    if(clustering_failed) continue;
- 
+    if(clustering_failed) continue; 
     calculate_cluster_deviations(best_model);
   }
+  for(auto m : best_model.means){
+    std::cerr << "mean " << m << std::endl;  
+  }
+
+  std::ofstream out("means_bic_0.005.tsv", std::ios::app);
+      out << vec_to_pylist(best_model.cluster_std_devs) << "\t"
+        << vec_to_pylist(best_model.means) << "\t"
+        << output_prefix << "\n";
+      out.close();
 
   std::ofstream file;
   if(development_mode){

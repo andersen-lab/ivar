@@ -19,6 +19,9 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster, doubl
     double std = calculate_standard_deviation(cluster);
     for(uint32_t i=0; i < z_scores.size(); i++){
       double abs = std::abs(z_scores[i]);
+      if(abs > 1){
+        std::cerr << abs << " " << cluster[i] << std::endl; 
+      } 
       if(abs >= threshold){
         std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
         removal_points.push_back(i);
@@ -106,6 +109,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
       std::cerr << i+1 << " " << all_bics[i] << "\n";
     } 
   }
+  std::cerr << "optimal n " << optimal_n << std::endl;
   gaussian_mixture_model model = retrain_model(optimal_n, data_original, variants_original, 2, 0.001, clustering_failed);
   std::vector<double> means = model.means;
   chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
@@ -114,7 +118,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   std::vector<uint32_t> outliers;
 
   //for each cluster this describes the points which are outliers
-  if(n > 1){
+  if(optimal_n > 1){
     //outliers = determine_outlier_points(model.clusters[chosen_peak], 2.5);
     std::vector<double> universal_cluster = model.clusters[chosen_peak];
     for(uint32_t i=0; i < universal_cluster.size(); i++){
