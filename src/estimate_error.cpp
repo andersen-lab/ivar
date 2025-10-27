@@ -50,6 +50,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     error_rate = 1;
     return;
   }
+
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
   uint32_t count_original=0;
   for(uint32_t i = 0; i < variants_original.size(); i++){
@@ -63,7 +64,8 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
   bool clustering_failed = false;
   uint32_t optimal_n=0;
-  bool done = false;
+  std::vector<double> all_bics;
+
   while(n <= 5){
     reset_variants_info(variants_original);
     std::cerr << "error estimate " << n << std::endl;
@@ -75,11 +77,13 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     }
     if(clustering_failed) {
       n++;
+      all_bics.push_back(std::numeric_limits<double>::infinity());  
       continue;
     }
     if(n == 1){
       double std = calculate_mad(model.clusters[0], model.means[0]);
       std::cerr << std << std::endl;
+      all_bics.push_back(model.bic);
       if(std < 0.03){
         optimal_n = 1;
         break;
@@ -88,44 +92,20 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
         continue;
       }
     }
-    std::vector<double> mads;
-    std::vector<double> means = model.means;
-    for(uint32_t i=0; i < model.means.size(); i++){
-      double mad = calculate_mad(model.clusters[i], model.means[i]);
-      std::cerr << model.means[i] << " " << mad << std::endl; 
-      mads.push_back(mad);
-    }
-    std::vector<uint32_t> indices(means.size());
-    for (uint32_t i = 0; i < indices.size(); ++i) indices[i] = i;
-    std::sort(indices.begin(), indices.end(),
-              [&](uint32_t a, uint32_t b) { return means[a] > means[b]; });
-
-    uint32_t first = indices[0];
-    uint32_t second = indices[1];
-
-    double mad_1 = mads[first];
-    double mad_2 = mads[second];
-
-    if (mad_1 > 0.0 && mad_2 > 0.0) {
-      double largest = means[first] - (mad_1 * 2);
-      double second_largest = means[second] + (mad_2 * 2);
-      if(largest <= means[second] || second_largest >= means[first]){
-        done = false;
-      } else {
-        done = true;
-      }
-      if(done){
-        optimal_n = n;
-        break;
-      }
-    } 
+    all_bics.push_back(model.bic);
     n++;
   }
 
   if(optimal_n == 0){
-    optimal_n = 2;
+    double lowest = std::numeric_limits<double>::infinity();
+    for(uint32_t i=0; i < all_bics.size(); i++){
+      if(all_bics[i] < lowest){
+        lowest = all_bics[i];
+        optimal_n = i+1;
+      }
+      std::cerr << i+1 << " " << all_bics[i] << "\n";
+    } 
   }
-
   gaussian_mixture_model model = retrain_model(optimal_n, data_original, variants_original, 2, 0.001, clustering_failed);
   std::vector<double> means = model.means;
   chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));

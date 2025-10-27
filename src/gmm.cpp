@@ -1028,8 +1028,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
 
   set_deletion_flags(base_variants, 0.001);
-  //cluster_error(base_variants, min_qual, min_depth, error_rate);
-  error_rate = 0.95;
+  cluster_error(base_variants, min_qual, min_depth, error_rate);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
 
@@ -1158,7 +1157,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     exit(1);
   }
 
-  exit(0);
   /*
   //need at least 1 of 100 solutions to go forward
   bootstrap_reps=100;
@@ -1293,38 +1291,15 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }*/
 
   std::cerr << "new final n " << final_n << std::endl;
-  double best_likelihood = 0;
   gaussian_mixture_model best_model;
   for(uint32_t i=0; i < 1; i++){
     clustering_failed = false;
-    /*empty_cluster = false;
-    solution_sets.clear();*/
-    reset_variants_info(variants);
-    
-    //arma::gmm_diag retrained;
-    //clustering_failed = retrained.learn(data, final_n, arma::eucl_dist, arma::random_subset, 10, 5, 1e-2, false);
-    //double k = (2 * final_n) + (final_n-1);
-    //double bic = calculate_BIC(k, retrained.sum_log_p(data), (int) data.n_cols);
 
-    gaussian_mixture_model retrained = retrain_model(final_n, data, variants, lower_n, 0.001, clustering_failed);
+    reset_variants_info(variants);
+    best_model= retrain_model(final_n, data, variants, lower_n, 0.001, clustering_failed);
     if(clustering_failed) continue;
-    for(auto m : retrained.clusters){
-      if(m.size() == 0){
-        empty_cluster = true;
-        break;
-      }
-    }
-    if(empty_cluster) continue;
-    calculate_cluster_deviations(retrained);
-   std::cerr << "bic " << retrained.bic << std::endl;
-   for(auto m : retrained.means){
-      std::cerr << m << " ";
-   }
-   std::cerr << "\n";
-    /*if(bic < best_likelihood){
-      best_likelihood = bic;
-      best_model.model = retrained;
-    }*/
+ 
+    calculate_cluster_deviations(best_model);
   }
 
   std::ofstream file;
