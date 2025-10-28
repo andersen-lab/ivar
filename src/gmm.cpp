@@ -93,23 +93,7 @@ arma::mat subsample_with_replacement(
 }
 
 double calculate_BIC(double k, double logL, int N) {
-//    std::size_t N = variants.size();
     if (N == 0) return std::numeric_limits<double>::infinity();
-
-//    double logL = 0.0;
-//
-//    for (const auto& v : variants) {
-//        if (v.probabilities.empty()) continue;
-//
-//        // log-sum-exp for stability
-//        double max_log = *std::max_element(v.probabilities.begin(), v.probabilities.end());
-//        double sum_exp = 0.0;
-//        for (double lp : v.probabilities) {
-//            sum_exp += std::exp(lp - max_log);
-//        }
-//        double log_px = max_log + std::log(sum_exp);
-//        logL += log_px;
-//    }
     double bic = -2.0 * logL + k * std::log(N);
     return bic;
 }
@@ -566,21 +550,7 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error, uint32_t iterat
   model.hefts = hefts;
   return(model);
 }
-void calculate_log_likelihood(gaussian_mixture_model& model, std::vector<variant> variants){
-  double logL = 0;
-  for (const auto& v : variants) {
-    if (v.probabilities.empty()) continue;
-      double max_log = *std::max_element(v.probabilities.begin(), v.probabilities.end());
-      double sum_exp = 0.0;
-      for (double lp : v.probabilities) {
-        sum_exp += std::exp(lp - max_log);
-      }
-      double log_px = max_log + std::log(sum_exp);
-      logL += log_px;
-  }
 
-  model.log_likelihood = logL;
-}
 //test function
 std::string vec_to_pylist(const std::vector<double>& v){
     std::ostringstream ss;
@@ -618,7 +588,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
   gmodel.n = n;
   gmodel.lower_n = lower_n;
   arma::gmm_diag model;
-  var_floor = 0.0001;
+  var_floor = 0.005;
   std::cerr << "var_floor " << var_floor << std::endl;  
 
   bool status = model.learn(data, n, arma::eucl_dist, arma::static_spread, 10, 10, var_floor, false);
@@ -1071,9 +1041,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     if(development_mode){
       //write means to string
       file.open(output_prefix + ".txt", std::ios::trunc);
-      std::string means_string = "[";
+      std::string means_string = "[[";
       means_string += "0.99";
-      means_string += "]";
+      means_string += "]]";
       file << "means\n";
       file << means_string << "\n";
       file.close();
@@ -1164,157 +1134,23 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     exit(1);
   }
 
-  /*
-  //need at least 1 of 100 solutions to go forward
-  bootstrap_reps=100;
-  std::unordered_map<uint32_t, bool> viability_counts;
-  for(uint32_t j=1; j < n; j++){
-    if(j > useful_var){
-      viability_counts[j] = false;
-      continue;
-    }
-    for(uint32_t i=0; i < bootstrap_reps; i++){
-      clustering_failed = false;
-      empty_cluster = false;
-      solution_sets.clear();
-      reset_variants_info(variants);
-      gaussian_mixture_model retrained = retrain_model(j, data, variants, lower_n, 0.001, clustering_failed);
-      if(clustering_failed) continue;
-      for(auto m : retrained.clusters){
-        if(m.size() == 0){
-          empty_cluster = true;
-          break;
-        }
-      }
-      if(empty_cluster) continue;
-      calculate_cluster_deviations(retrained);
-      solution_sets = subset_sum(retrained, lower_bound);
-      if(solution_sets.size() == 0){
-        continue;
-      }
-      viability_counts[j] = true;
-      std::cerr << j << " viable!" << std::endl;
-      break;
-    }
-  }
-  std::cerr << "end of viability check" << std::endl;
-  //check if there's only 1 viable N value
-  bool one_true = std::count_if(viability_counts.begin(), viability_counts.end(),
-    [](const std::pair<const uint32_t, bool>& p){ return p.second; }) == 1;
-  final_n = one_true ? std::find_if(viability_counts.begin(), viability_counts.end(),
-    [](const std::pair<const uint32_t, bool>& p){ return p.second; })->first : 0;
-
-
-  uint32_t count = 0;
-  double total_emp = 0;
-  std::unordered_map<uint32_t, std::vector<std::vector<double>>> track_means;
-  std::vector<double> solutions_k;
-  std::cerr << "starting bootstrapping" << std::endl;
-  for(uint32_t k=1; k <= 10; k++){
-    if(final_n != 0) continue;
-    if(!viability_counts[k]){
-      solutions_k.push_back(0);
-      continue;
-    }
-    if(useful_var < k) {
-      solutions_k.push_back(0);
-      continue;
-    }
-    std::cerr << "k " << k << std::endl;
-
-    count = 0;
-    uint32_t viable_solutions=0;
-    std::vector<variant> subsampled_variants;
-    std::vector<std::vector<double>> means;
-    for(uint32_t i =0; i < bootstrap_reps; i++){
-      empty_cluster = false;
-      subsampled_variants.clear();
-      arma::mat subsample = subsample_with_replacement(data, data.size(), subsample_position, subsampled_variants, variants);
-      if(subsampled_variants.size() < k) continue;
-      clustering_failed = false;
-      gaussian_mixture_model retrained = retrain_model(k, subsample, subsampled_variants, lower_n, 0.001, clustering_failed);
-      for(auto m : retrained.means){
-        if(m == 0) empty_cluster = true;
-      }
-      if(empty_cluster) {
-        continue;
-      }
-      calculate_cluster_deviations(retrained);
-      std::vector<std::vector<double>> solution_sets = subset_sum(retrained, lower_bound);
-      //std::cerr << "solution size " << solution_sets.size() << std::endl;
-      if(solution_sets.size() == 0){
-        continue;
-      };
-      reset_variants_info(variants);
-      assign_bootstrap_variants(variants, retrained, lower_bound, upper_bound);
-      for(auto r : retrained.clusters) {
-        double m = calculate_mean(r);
-        double mad = calculate_mad(r, m);
-        if(mad > 0.10){ 
-          empty_cluster = true;
-        }
-      }
-      if(empty_cluster) continue;
-      double emp = empirical_misclassification_probability(variants);
-      if(emp > 1) continue;
-      total_emp += emp;
-      count++;
-      viable_solutions++;
-      means.push_back(retrained.means);
-    }
-    track_means[k] = means;
-    if(count == 0) {
-      solutions_k.push_back(0);
-      continue;
-    }
-    double average_emp = total_emp / (double)count;
-    solutions_k.push_back((double)viable_solutions); 
-
-    std::cerr << "average emp " << average_emp << std::endl;
-    std::cerr << "num solutions " << viable_solutions << std::endl;
- 
-    //viable solutions condition takes care of cluster spread, emp takes care of clusters closer together
-    if(k == 2 && average_emp < 0.10 && ((double)viable_solutions >= (double)bootstrap_reps * 0.90)){
-      final_n = 2;
-      break;
-    }
-  }
-  
-  uint32_t max_sol=0;
-  if(final_n != 2){
-    for(uint32_t i=0; i < solutions_k.size(); i++){
-      if(i+1 != 2){
-        if(solutions_k[i] > max_sol){
-          max_sol = solutions_k[i];
-          final_n = i+1;
-        }
-      }
-      std::cerr << i+1 << " " << solutions_k[i] << std::endl;
-    }
-  }
-  if(final_n == 0){
-    std::cerr << "no proper solution found" << std::endl;
-    exit(1);
-  }*/
-
   std::cerr << "new final n " << final_n << std::endl;
   gaussian_mixture_model best_model;
-  for(uint32_t i=0; i < 1; i++){
-    clustering_failed = false;
 
-    reset_variants_info(variants);
-    best_model= retrain_model(final_n, data, variants, lower_n, 0.001, clustering_failed);
-    if(clustering_failed) continue; 
-    calculate_cluster_deviations(best_model);
-  }
+  clustering_failed = false;
+  reset_variants_info(variants);
+  best_model= retrain_model(final_n, data, variants, lower_n, 0.001, clustering_failed); 
+  calculate_cluster_deviations(best_model);
+  
   for(auto m : best_model.means){
     std::cerr << "mean " << m << std::endl;  
   }
 
-  std::ofstream out("means_bic_0.005.tsv", std::ios::app);
+  std::ofstream out("means_bic_adaptive_floor.tsv", std::ios::app);
       out << vec_to_pylist(best_model.cluster_std_devs) << "\t"
         << vec_to_pylist(best_model.means) << "\t"
-        << output_prefix << "\n";
+        << output_prefix << "\t" 
+        << std::to_string(upper_bound) << "\n";
       out.close();
 
   std::ofstream file;
