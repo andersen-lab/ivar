@@ -64,7 +64,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
   uint32_t n = 1;
   uint32_t chosen_peak = 0;
-
+  double var_floor;
   bool clustering_failed = false;
   uint32_t optimal_n=0;
   std::vector<double> all_bics;
@@ -72,7 +72,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   while(n <= 5){
     reset_variants_info(variants_original);
     std::cerr << "error estimate " << n << std::endl;
-    gaussian_mixture_model model = retrain_model(n, data_original, variants_original, 2, 0.00001, clustering_failed);
+    gaussian_mixture_model model = retrain_model(n, data_original, variants_original, 2, var_floor, clustering_failed, true);
     for(auto cluster : model.clusters){
       if(cluster.size() == 0){
         clustering_failed = true;
@@ -110,10 +110,10 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     } 
   }
   std::cerr << "optimal n " << optimal_n << std::endl;
-  gaussian_mixture_model model = retrain_model(optimal_n, data_original, variants_original, 2, 0.001, clustering_failed);
+  gaussian_mixture_model model = retrain_model(optimal_n, data_original, variants_original, 2, var_floor, clustering_failed, true);
   std::vector<double> means = model.means;
   chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
-  //std::cerr << "chosen peak " << chosen_peak << std::endl;
+  std::cerr << "chosen peak " << chosen_peak << std::endl;
   std::vector<double> cleaned_cluster;
   std::vector<uint32_t> outliers;
 

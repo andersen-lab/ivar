@@ -13,28 +13,6 @@
 #include <limits>
 #include <unordered_map>
 
-double empirical_misclassification_probability(const std::vector<variant>& all_variants){
-  double total_misclass_prob = 0.0;
-  uint32_t total_count = 0;
-
-  for (const auto& v : all_variants) {
-    if (v.cluster_assigned == -1) {
-      continue;
-    }
-    double max_log = *std::max_element(v.probabilities.begin(), v.probabilities.end());
-    double denom = 0.0;
-    for (double logp : v.probabilities) {
-      denom += std::exp(logp - max_log);
-    }
-    denom = std::log(denom) + max_log;
-    double assigned_prob = std::exp(v.probabilities[v.cluster_assigned] - denom);
-    double misclass_prob = 1.0 - assigned_prob;
-    total_misclass_prob += misclass_prob;
-    total_count++;
-  }
-  return total_misclass_prob / static_cast<double>(total_count);
-}
-
 void reset_variants_info(std::vector<variant> &variants){
   //reset cluster assignments and probabilities prior to rerunning another model
   for(auto &var : variants){
@@ -486,24 +464,20 @@ void add_noise_variants(std::vector<variant> &variants, std::vector<variant> bas
 * @param error A booleans value that indicates if this kmeans is being used to detected error levels.
 * @return kmeans_model A kmeans_modle object storing centroids and clusters.
 */
-kmeans_model train_model(uint32_t n, arma::mat data, bool error, uint32_t iteration) {
+kmeans_model train_model(uint32_t n, arma::mat data, bool &status, uint32_t iteration) {
   arma::mat centroids;
   arma::mat initial_means(1, n, arma::fill::zeros);
   kmeans_model model;
  
   std::vector<double> means;
   std::vector<std::vector<double>> clusters(n);
-  bool status = true;
   //half of the runs initiate with subset the other half with spread
-  if(iteration % 2 == 0){
-    status = arma::kmeans(centroids, data, n, arma::random_subset, 10, false);
-  } else { 
-    status = arma::kmeans(centroids, data, n, arma::random_spread, 10, false);
-  }
+  status = arma::kmeans(centroids, data, n, arma::static_spread, 10, false);
   if(!status) return(model);
   for(uint32_t c=0; c < centroids.n_cols; c++){
     means.push_back(centroids(c));
   }
+
   for(auto d : data){
     uint32_t idx;
     double closest=1;
@@ -525,6 +499,7 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error, uint32_t iterat
       deviations[i].push_back(centered * centered);
     }
   }
+
   std::vector<double> diag_cov;
   for(uint32_t i = 0; i < deviations.size(); i++){
     double sum = 0;
@@ -540,7 +515,9 @@ kmeans_model train_model(uint32_t n, arma::mat data, bool error, uint32_t iterat
   }
   double sum_hefts = std::accumulate(hefts.begin(), hefts.end(), 0.0);
   for(auto &h : hefts) {
-    h /= sum_hefts;
+    if(sum_hefts > 0){
+      h /= sum_hefts;
+    }
   } 
 
   model.n = n;
@@ -567,8 +544,9 @@ gaussian_mixture_model retrain_model(uint32_t n,
                                     arma::mat data,
                                     std::vector<variant> &variants, 
                                     uint32_t lower_n, 
-                                    double var_floor, 
-                                    bool &clustering_failed){
+                                    double &var_floor, 
+                                    bool &clustering_failed, 
+                                    bool error_clustering){
 
    //this is used in the variant assignement portion of the code
   std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
@@ -583,13 +561,17 @@ gaussian_mixture_model retrain_model(uint32_t n,
   std::vector<uint32_t> unique_pos;
   for (const auto& kv : all_nts)
     unique_pos.push_back(kv.first);
-  
+
   gaussian_mixture_model gmodel;
   gmodel.n = n;
   gmodel.lower_n = lower_n;
   arma::gmm_diag model;
-  var_floor = 0.005;
-  std::cerr << "var_floor " << var_floor << std::endl;  
+
+  if(error_clustering){
+    var_floor = 0.0001;
+  } else {
+    var_floor = var_floor;
+  }
 
   bool status = model.learn(data, n, arma::eucl_dist, arma::static_spread, 10, 10, var_floor, false);
   if(!status){
@@ -598,6 +580,16 @@ gaussian_mixture_model retrain_model(uint32_t n,
     return(gmodel);
   }
   std::vector<double> means;
+  
+  for(auto h: model.hefts){
+    double heft = (double)h;
+    gmodel.hefts.push_back(heft);
+  }
+
+  for(auto d : model.dcovs){
+    //std::cerr << d << std::endl;
+    gmodel.dcovs.push_back(std::sqrt((double)d));
+  }
 
   std::vector<std::vector<double>> prob_matrix;
   std::vector<double> tmp;
@@ -613,6 +605,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
     double m = (double)model.means[i];
     means.push_back(m);
   }
+
   gmodel.prob_matrix = prob_matrix;
   gmodel.model = model;
   gmodel.means = means;
@@ -634,24 +627,10 @@ gaussian_mixture_model retrain_model(uint32_t n,
     double rounded = std::round(m * factor) / factor;
     mean_fill2.col(i) = rounded;
     means.push_back(rounded);
+
   }
   model.set_means(mean_fill2);
   gmodel.means = means;
-
-  //cluster probabilities
-  std::vector<std::vector<double>> cluster_prob(n);
-  for(auto var : variants){
-    uint32_t assigned = var.cluster_assigned;
-    if(assigned != (uint32_t)-1){
-      double prob = var.probabilities[assigned];
-      cluster_prob[assigned].push_back(prob);
-    }
-  }
-  for(auto val : cluster_prob){
-    double sum = std::accumulate(val.begin(), val.end(), 0.0);
-    gmodel.cluster_probabilities.push_back(sum/(double)val.size());
-  }
-
   double k = (2 * n) + (n-1);
   double bic = calculate_BIC(k, gmodel.model.sum_log_p(data), (int) data.n_cols);
   gmodel.bic = bic;
@@ -1080,36 +1059,53 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t counter = 1;
   bool clustering_failed =false;
   std::vector<variant> subsampled_variants;
-  uint32_t bootstrap_reps = 1;
+  uint32_t bootstrap_reps = 1000;
   uint32_t final_n=0;
-  
+  double var_floor;
+  std::vector<double> all_var_floors = {0.01, 0.005, 0.001}; 
+
+  std::vector<double> track_var_floors;
+  std::vector<double> track_bics;
+  std::vector<std::vector<double>> track_means;
+  std::vector<std::vector<double>> track_std_devs;
+  std::vector<uint32_t> track_ns;
+  std::vector<uint32_t> track_bootstraps;
+
   for(uint32_t i =0; i < bootstrap_reps; i++){
     empty_cluster = false;
     subsampled_variants.clear();
     arma::mat subsample = subsample_with_replacement(data, data.size(), subsample_position, subsampled_variants, variants);
     counter = 1;
     std::vector<double> all_bics;
-    while(counter <= n && !empty_cluster){ 
-        clustering_failed = false;
-        solution_sets.clear();
-        reset_variants_info(subsampled_variants);
-        reset_variants_info(variants);
-        //must have at least one point per cluster
-        if((subsampled_variants.size() < counter)){
-          break;
-        }
-        gaussian_mixture_model retrained = retrain_model(counter, data, variants, lower_n, 0.001, clustering_failed);
-        if(clustering_failed){
-          all_bics.push_back(std::numeric_limits<double>::max());
-          counter++;
-          continue;  
-        }
-        double bic = retrained.bic;
-        all_bics.push_back(bic);
-        counter++;
-    }
+    for(uint32_t j=0; j < all_var_floors.size(); j++){
+      counter = 1;
+      while(counter <= n && !empty_cluster){ 
+          clustering_failed = false;
+          reset_variants_info(subsampled_variants);
+          reset_variants_info(variants);
+          var_floor = all_var_floors[j];
+          gaussian_mixture_model retrained = retrain_model(counter, subsample, subsampled_variants, lower_n, var_floor, clustering_failed, false);
+          if(clustering_failed){
+            all_bics.push_back(std::numeric_limits<double>::max());
+            counter++;
+            continue;  
+          }
 
-    double lowest = std::numeric_limits<double>::max(); 
+          calculate_cluster_deviations(retrained);
+          track_ns.push_back(counter);
+          track_var_floors.push_back(var_floor);
+          track_means.push_back(retrained.means);
+          track_std_devs.push_back(retrained.dcovs);
+          track_bics.push_back(retrained.bic);
+          track_bootstraps.push_back(i+1);
+
+          std::cerr << "bootstrap rep " << i << " bic " << retrained.bic << " n " << counter << "  var floor " << var_floor << std::endl;
+          double bic = retrained.bic;
+          all_bics.push_back(bic);
+          counter++;
+        }
+    }
+    /*double lowest = std::numeric_limits<double>::max(); 
     uint32_t winner;
     for(uint32_t i=0; i < all_bics.size(); i++){
       if(all_bics[i] < lowest){
@@ -1118,7 +1114,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       }
       std::cerr << i+1 << " " << all_bics[i] << "\n";
     }
-    model_counter[winner] += 1;
+    model_counter[winner] += 1;*/
   }
   uint32_t highest = 0;
   for (const auto& [key, value] : model_counter) {
@@ -1127,32 +1123,40 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       highest = value;
     }
     std::cerr << key << " : " << value << '\n';
-  } 
-  std::cerr << "final n " << final_n << std::endl;
+  }
+  gaussian_mixture_model best_model; 
+  /*std::cerr << "final n " << final_n << std::endl;
   if(final_n ==0){
     std::cerr << output_prefix << " no solution found" << std::endl;
     exit(1);
   }
 
   std::cerr << "new final n " << final_n << std::endl;
-  gaussian_mixture_model best_model;
+
 
   clustering_failed = false;
   reset_variants_info(variants);
-  best_model= retrain_model(final_n, data, variants, lower_n, 0.001, clustering_failed); 
+  best_model= retrain_model(final_n, data, variants, lower_n, var_floor, clustering_failed, false); 
   calculate_cluster_deviations(best_model);
   
   for(auto m : best_model.means){
     std::cerr << "mean " << m << std::endl;  
+  }*/
+
+  //n, means, output_prefix, bic, var_floor, widths 
+  std::ofstream out("bootstrap_stats.tsv", std::ios::app);
+  for(uint32_t i=0; i < track_bics.size(); i++){
+    out << track_ns[i] << "\t"
+        << vec_to_pylist(track_means[i]) << "\t"
+        << output_prefix << "\t"
+        << std::to_string(track_bics[i]) << "\t"
+        << std::to_string(track_var_floors[i]) << "\t"
+        << vec_to_pylist(track_std_devs[i]) << "\t"
+        << std::to_string(track_bootstraps[i]) << "\n";
   }
-
-  std::ofstream out("means_bic_adaptive_floor.tsv", std::ios::app);
-      out << vec_to_pylist(best_model.cluster_std_devs) << "\t"
-        << vec_to_pylist(best_model.means) << "\t"
-        << output_prefix << "\t" 
-        << std::to_string(upper_bound) << "\n";
-      out.close();
-
+  out.close();
+  exit(0); 
+  
   std::ofstream file;
   if(development_mode){
     //write means to string

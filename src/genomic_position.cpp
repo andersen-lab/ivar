@@ -221,13 +221,16 @@ std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> 
   std::unordered_set<ITNode*> seen_amplicons;
 
   for(uint32_t i=0; i < global_positions.size(); i++){
+
     if(global_positions[i].amplicons.size() > 0 && global_positions[i].depth >= min_depth){
       allele_frequencies.clear();
       allele_depths.clear();
+
       collect_allele_stats(global_positions[i].amplicons, allele_frequencies, allele_depths, min_qual);
+
       for (auto &[key, values] : allele_frequencies) {
         //TEST LINES
-        if(i == 23604){
+        if(i == 27627){
           std::cerr << "key " << key << std::endl;
           for(auto a : values){
             std::cerr << a << " ";
@@ -239,7 +242,7 @@ std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> 
           std::cerr << "\n";
         }
         double std = calculate_standard_deviation_weighted(values, allele_depths[key]);
-        if(i == 23604) std::cerr << std << std::endl;
+        if(i == 27627) std::cerr << std << std::endl;
         if(std > 0.055){
           global_positions[i].flux = true;
           //add the standard dev to the allele value
