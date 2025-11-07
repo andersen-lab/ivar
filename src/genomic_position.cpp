@@ -5,6 +5,7 @@
 #include <string>
 #include <numeric>
 #include <vector>
+#include <cmath>
 
 void get_amplicon_numbers(std::vector<amplicon_info> amplicons, std::vector<std::string> &amp_numbers){
   for(auto amp : amplicons){
@@ -310,4 +311,34 @@ void populate_positions(std::vector<genomic_position> &positions, uint32_t max_p
     tmp.gapped_depth = 0;
     positions.push_back(tmp);
   }
+}
+
+
+double calculate_standard_deviation(std::vector<double> data) {
+  double sum = 0, mean;
+  mean = std::accumulate(data.begin(), data.end(), 0.0f) / data.size();
+  for (double val : data) {
+    sum += std::pow(val - mean, 2);
+  }
+  return std::sqrt(sum / data.size());
+}
+
+double  calculate_standard_deviation_weighted(std::vector<double> values, std::vector<uint32_t> weights) {
+  double weighted_sum = 0.0, total_weight = 0.0;
+
+  // Compute weighted mean
+  for (size_t i = 0; i < values.size(); ++i) {
+    weighted_sum += values[i] * weights[i];
+    total_weight += weights[i];
+  }
+  double mean = weighted_sum / total_weight;
+
+  // Compute weighted variance
+  double variance = 0.0f;
+  for (size_t i = 0; i < values.size(); ++i) {
+    variance += weights[i] * std::pow(values[i] - mean, 2);
+  }
+  variance /= total_weight;
+
+  return std::sqrt(variance);
 }

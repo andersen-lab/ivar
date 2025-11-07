@@ -209,35 +209,6 @@ void generate_range(uint32_t start, uint32_t end, std::vector<uint32_t> &result)
   }
 }
 
-double calculate_standard_deviation(std::vector<double> data) {
-    double sum = 0, mean;
-    mean = std::accumulate(data.begin(), data.end(), 0.0f) / data.size();
-    for (double val : data) {
-        sum += std::pow(val - mean, 2);
-    }
-    return std::sqrt(sum / data.size());
-}
-
-double  calculate_standard_deviation_weighted(std::vector<double> values, std::vector<uint32_t> weights) {
-    double weighted_sum = 0.0, total_weight = 0.0;
-
-    // Compute weighted mean
-    for (size_t i = 0; i < values.size(); ++i) {
-        weighted_sum += values[i] * weights[i];
-        total_weight += weights[i];
-    }
-    double mean = weighted_sum / total_weight;
-
-    // Compute weighted variance
-    double variance = 0.0f;
-    for (size_t i = 0; i < values.size(); ++i) {
-        variance += weights[i] * std::pow(values[i] - mean, 2);
-    }
-    variance /= total_weight;
-
-    return std::sqrt(variance);
-}
-
 //first main function call
 int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std::string cmd, std::string pair_info, int32_t primer_offset, uint32_t min_depth, uint8_t min_qual, std::string ref_file){
   if(ref_file.empty()){
