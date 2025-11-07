@@ -69,11 +69,13 @@ void variant_caller::set_amplicons(IntervalTree &amps) {
   amplicons = amps;
 }
 
-// Unpaired read
+void variant_caller::set_refantd(ref_antd &ref) {
+  refantd = ref;
+}
+
 void variant_caller::add_variants(std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities){
   if (positions.empty()) return;
 
-  // TODO: Restructure genomic_position so positions with depth = 0, don't need to be stored
   uint32_t max_pos = *std::max_element(positions.begin(), positions.end());
   if (global_positions.size() <= max_pos) {
     global_positions.reserve(max_pos + 1); // reserve prevents reallocations
@@ -113,7 +115,7 @@ void variant_caller::add_variants(std::vector<uint32_t> &positions, std::vector<
   }
 }
 
-void variant_caller::get_read_amplicons(uint32_t start_pos, uint32_t end_pos, std::vector<ITNode*> &nodes, uint32_t &amp_dist){
+void variant_caller::get_read_amplicons(uint32_t start_pos, uint32_t end_pos, std::vector<ITNode*> &nodes){
   amplicons.find_read_amplicon(start_pos, end_pos, nodes);
 }
 
@@ -176,5 +178,55 @@ void variant_caller::assign_amplicon_depths(ITNode *node, std::vector<uint32_t> 
       }
       global_positions[pos].amplicons.push_back(amp);
     }
+  }
+}
+
+void variant_caller::merge_reads(std::vector<uint32_t> &positions1,
+                                 std::vector<uint32_t> &positions2,
+                                 std::vector<std::string> &bases1,
+                                 std::vector<std::string> &bases2,
+                                 std::vector<uint32_t> &qualities1,
+                                 std::vector<uint32_t> &qualities2,
+                                 std::vector<uint32_t> &final_positions,
+                                 std::vector<std::string> &final_bases,
+                                 std::vector<uint32_t> &final_qualities) {
+  size_t i = 0, j = 0;
+  while (i < positions1.size() && j < positions2.size()) {
+    uint32_t p1 = positions1[i];
+    uint32_t p2 = positions2[j];
+
+    if (p1 < p2) {
+      final_positions.push_back(p1);
+      final_bases.push_back(bases1[i]);
+      final_qualities.push_back(qualities1[i]);
+      ++i;
+    } else if (p2 < p1) {
+      final_positions.push_back(p2);
+      final_bases.push_back(bases2[j]);
+      final_qualities.push_back(qualities2[j]);
+      ++j;
+    } else {
+      // p1 == p2: compare bases
+      if (bases1[i] == bases2[j]) {
+        final_positions.push_back(p1);
+        final_bases.push_back(bases1[i]);
+        final_qualities.push_back(qualities1[i]); // or avg of two?
+      }
+      ++i;
+      ++j;
+    }
+  }
+
+  while (i < positions1.size()) {
+    final_positions.push_back(positions1[i]);
+    final_bases.push_back(bases1[i]);
+    final_qualities.push_back(qualities1[i]);
+    ++i;
+  }
+  while (j < positions2.size()) {
+    final_positions.push_back(positions2[j]);
+    final_bases.push_back(bases2[j]);
+    final_qualities.push_back(qualities2[j]);
+    ++j;
   }
 }

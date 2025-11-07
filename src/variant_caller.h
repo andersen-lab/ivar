@@ -25,9 +25,19 @@ class variant_caller {
   ~variant_caller();
   void parse_read(const bam1_t* read, std::string ref_name, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities);
   void set_amplicons(IntervalTree &amps);
+  void set_refantd(ref_antd &ref);
   void add_variants(std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities);
-  void get_read_amplicons(uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes, uint32_t &amp_dist);
+  void get_read_amplicons(uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes);
   void assign_amplicon_depths(ITNode *node, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, bool ambiguous);
+  void merge_reads(std::vector<uint32_t> &positions1,
+                   std::vector<uint32_t> &positions2,
+                   std::vector<std::string> &bases1,
+                   std::vector<std::string> &bases2,
+                   std::vector<uint32_t> &qualities1,
+                   std::vector<uint32_t> &qualities2,
+                   std::vector<uint32_t> &final_positions,
+                   std::vector<std::string> &final_bases,
+                   std::vector<uint32_t> &final_qualities);
 };
 
-#endif  // IVAR_PARSE_CIGAR_H
+#endif  // VARIANT_CALLER_H
