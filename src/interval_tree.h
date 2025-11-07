@@ -22,6 +22,7 @@ class ITNode {
   Interval *data; // pointer to node's interval data object
   ITNode *left, *right; // pointer to node's left & right child node objects
   int max;
+  int min;
   int height; // height of node
 
   ITNode(Interval value)
@@ -29,6 +30,7 @@ class ITNode {
         left(nullptr),
         right(nullptr),
         max(value.high),
+        min(value.low),
         height(0){}
 
   // Get method to handle null case
@@ -51,6 +53,14 @@ class ITNode {
     if (right != nullptr)
       max = std::max(max, right->max);
   }
+
+  void update_min(){
+    min = data->low;
+    if (left != nullptr)
+      min = std::min(min, left->min);
+    if (right != nullptr)
+      min = std::min(min, right->min);
+  }
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -69,7 +79,7 @@ class IntervalTree {
   void print_amplicons(ITNode *root);
   void get_max_pos(ITNode *root);
   int unpaired_primers(ITNode *root, primer prim);
-  void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes, uint32_t &amp_dist);
+  void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes);
   void calculate_overlaps(ITNode *root, std::vector<genomic_position> &positions);
 
  public:
@@ -85,7 +95,7 @@ class IntervalTree {
   void get_max_pos() {get_max_pos(_root);}
   int unpaired_primers(primer prim) { return unpaired_primers(_root, prim);}
   void calculate_overlaps(std::vector<genomic_position> &positions) {calculate_overlaps(_root, positions);}
-  void find_read_amplicon(uint32_t lower, uint32_t upper, std::vector<ITNode*>&nodes, uint32_t &amp_dist) {find_read_amplicon(_root, lower, upper, nodes, amp_dist);}
+  void find_read_amplicon(uint32_t lower, uint32_t upper, std::vector<ITNode*>&nodes) {find_read_amplicon(_root, lower, upper, nodes);}
 };
 
 int unpaired_primers(ITNode *root, primer prim);
