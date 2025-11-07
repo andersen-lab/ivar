@@ -30,7 +30,7 @@ int test_left_rotate() {
 
   std::string pre_order_str = tree.pre_order_with_level();
 
-  return (pre_order_str == "[20,25](0), [10,15](1), [30,35](1), ") ? 0 : 1;
+  return (pre_order_str == "[(20,25)(10,35)](0), [(10,15)(10,15)](1), [(30,35)(30,35)](1), ") ? 0 : 1;
 }
 
 int test_right_rotate() {
@@ -43,7 +43,7 @@ int test_right_rotate() {
 
   std::string pre_order_str = tree.pre_order_with_level();
 
-  return (pre_order_str == "[20,25](0), [10,15](1), [30,35](1), ") ? 0 : 1;
+  return (pre_order_str == "[(20,25)(10,35)](0), [(10,15)(10,15)](1), [(30,35)(30,35)](1), ") ? 0 : 1;
 }
 
 int test_right_left_rotate() {
@@ -56,7 +56,7 @@ int test_right_left_rotate() {
 
   std::string pre_order_str = tree.pre_order_with_level();
 
-  return (pre_order_str == "[20,25](0), [10,15](1), [30,35](1), ") ? 0 : 1;
+  return (pre_order_str == "[(20,25)(10,35)](0), [(10,15)(10,15)](1), [(30,35)(30,35)](1), ") ? 0 : 1;
 }
 
 int test_left_right_rotate() {
@@ -69,7 +69,7 @@ int test_left_right_rotate() {
 
   std::string pre_order_str = tree.pre_order_with_level();
 
-  return (pre_order_str == "[20,25](0), [10,15](1), [30,35](1), ") ? 0 : 1;
+  return (pre_order_str == "[(20,25)(10,35)](0), [(10,15)(10,15)](1), [(30,35)(30,35)](1), ") ? 0 : 1;
 }
 
 int test_interval_overlap(){
@@ -84,8 +84,9 @@ int test_interval_overlap(){
 
   std::string pre_order_str = tree.pre_order_with_level();
 
-  if(pre_order_str != "[10,30](0), [5,20](1), [25,40](1), [15,25](2), [50,60](2), ")
+  if(pre_order_str != "[(10,30)(5,60)](0), [(5,20)(5,20)](1), [(25,40)(15,60)](1), [(15,25)(15,25)](2), [(50,60)(50,60)](2), ")
     return 1;
+
 
   Interval ints[] = {Interval(15, 25), Interval(16, 24), Interval(5, 60), Interval(31, 35), Interval(45, 55), Interval(70, 80)};
   bool results[] = {true, true, false, true, false, false};
@@ -93,6 +94,39 @@ int test_interval_overlap(){
   for(int i = 0; i < 5; i++){
     if(results[i] != tree.is_interval_contained(ints[i]))
       return 1;
+  }
+
+  // Find if read overlaps fully with any interval
+  std::vector<std::vector<int>> test_intervals = {
+      {12, 18},
+      {6, 19},
+      {16, 27},
+      {55, 59},
+      {17, 19}
+  };
+
+  // expected nodes output should be in order of traversal of interval tree
+  std::vector<std::vector<Interval>> expected_nodes = {
+      {Interval(10, 30), Interval(5, 20)},
+      {Interval(5, 20)},
+      {Interval(10, 30)},
+      {Interval(50, 60)},
+      {Interval(10, 30), Interval(5, 20), Interval(15, 25)}
+  };
+
+  for(int i = 0; i < test_intervals.size(); i++){
+    std::vector<ITNode*> nodes;
+    tree.find_read_amplicon(test_intervals[i][0], test_intervals[i][1], nodes);
+    if (nodes.size() != expected_nodes[i].size()) {
+      std::cerr << "Nodes size did not match for test interval " << test_intervals[i][0] << "-" << test_intervals[i][1] << "\n";
+      return 1;
+    }
+    for(int j = 0; j < nodes.size(); j++){
+        if(nodes[j]->data->low != expected_nodes[i][j].low || nodes[j]->data->high != expected_nodes[i][j].high) {
+          std::cerr << "Node interval did not match for test interval " << test_intervals[i][0] << "-" << test_intervals[i][1] << "\n";
+          return 1;
+        }
+    }
   }
 
   return 0;
