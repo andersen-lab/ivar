@@ -102,6 +102,10 @@ add_executable(check_amplicon_search
         test_amplicon_search.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
+add_executable(check_variant_caller
+        test_variant_caller.cpp ../src/variant_caller.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/genomic_position.cpp
+)
+
 set(ALL_TEST_EXECUTABLES check_primer_trim
         check_trim
         check_quality_trim
@@ -125,6 +129,7 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_interval_tree
         check_amplicon_search
         check_consensus_min_insert_threshold
+        check_variant_caller
 )
 
 if(HTSLIB_PREFIX)
