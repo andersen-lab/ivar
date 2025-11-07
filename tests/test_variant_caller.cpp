@@ -29,18 +29,18 @@ int main(){
   sam_hdr_t *header = sam_hdr_read(bam);
   bam1_t *aln = bam_init1();
   int ctr = 0, test_idx = 0;
-  std::vector<uint32_t> positions1 = {};
-  std::vector<std::string> bases1;
-  std::vector<uint32_t> qualities1;
 
+  std::vector<uint32_t> positions;
+  std::vector<std::string> bases;
+  std::vector<uint32_t> qualities;
+
+  // Test parse_read()
   while (sam_read1(bam, header, aln) >= 0) {
     if (ctr != 0 && ctr != 1 && ctr != 2 && ctr != 7) {
       ctr ++;
       continue;
     }
-    std::vector<uint32_t> positions;
-    std::vector<std::string> bases;
-    std::vector<uint32_t> qualities;
+
 
     vc.parse_read(aln, "test", positions, bases, qualities);
 
@@ -75,5 +75,37 @@ int main(){
     ctr++;
     test_idx++;
   }
+
+  // Test add_variants()
+  positions.assign({10, 11, 14, 17});
+  bases.assign({"A", "C", "-GT", "+A"});
+  qualities.assign({30, 40, min_qual, 60});
+
+  vc.add_variants(positions, bases, qualities);
+
+  positions.assign({11, 11, 14, 17});
+  bases.assign({"+AT", "T", "C", "C"});
+  qualities.assign({30, 40, min_qual, 60});
+
+  vc.add_variants(positions, bases, qualities);
+
+  std::vector<genomic_position> global_positions = vc.get_global_positions();
+
+  // TODO: Include expected depth, gapped_path, and alleles in a vector for testing
+  if(global_positions[10].depth != 1 ||
+      global_positions[10].gapped_depth != 1 ||
+      global_positions[10].alleles[0].nuc != "A")
+    return 1;
+
+  if(global_positions[14].depth != 1 ||
+      global_positions[14].gapped_depth != 2 ||
+      global_positions[14].alleles[0].nuc != "-GT")
+    return 1;
+
+  if(global_positions[11].depth != 2 ||
+      global_positions[11].gapped_depth != 2 ||
+      global_positions[11].alleles[1].nuc != "+AT")
+    return 1;
+
   return 0;
 }
