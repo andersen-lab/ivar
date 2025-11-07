@@ -230,3 +230,11 @@ void variant_caller::merge_reads(std::vector<uint32_t> &positions1,
     ++j;
   }
 }
+
+void variant_caller::clear_global_positions() {
+  global_positions.clear();
+}
+
+std::vector<genomic_position> variant_caller::get_global_positions() {
+  return global_positions;
+}

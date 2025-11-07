@@ -38,6 +38,8 @@ class variant_caller {
                    std::vector<uint32_t> &final_positions,
                    std::vector<std::string> &final_bases,
                    std::vector<uint32_t> &final_qualities);
+  void clear_global_positions();
+  std::vector<genomic_position> get_global_positions();
 };
 
 #endif  // VARIANT_CALLER_H
