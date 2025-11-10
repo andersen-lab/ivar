@@ -103,7 +103,7 @@ add_executable(check_amplicon_search
 )
 
 add_executable(check_variant_caller
-        test_variant_caller.cpp ../src/variant_caller.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/genomic_position.cpp ../src/site_state.cpp
+        test_variant_caller.cpp ../src/variant_caller.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/genomic_position.cpp ../src/site_state.cpp ../src/site_aggregator.cpp ../src/site_aggregator_stats.cpp
 )
 
 add_executable(check_site_aggregator

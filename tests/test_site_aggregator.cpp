@@ -42,7 +42,6 @@ int main() {
   std::vector<ITNode*> amp2;
   test_amplicons.find_read_amplicon(20, 25, amp2);
 
-  // TODO: Move intiialization to functions
   std::vector<site_state> site_states;
   site_state ss;
 

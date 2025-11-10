@@ -102,36 +102,54 @@ int main(){
     test_idx++;
   }
 
-  // Test add_variants()
-//  positions.assign({10, 11, 14, 17});
-//  bases.assign({"A", "C", "-GT", "+A"});
-//  qualities.assign({30, 40, min_qual, 60});
-//
-//  vc.add_variants(positions, bases, qualities);
-//
-//  positions.assign({11, 11, 14, 17});
-//  bases.assign({"+AT", "T", "C", "C"});
-//  qualities.assign({30, 40, min_qual, 60});
-//
-//  vc.add_variants(positions, bases, qualities);
-//
-//  std::vector<genomic_position> global_positions = vc.get_global_positions();
-//
-//  // TODO: Include expected depth, gapped_path, and alleles in a vector for testing
-//  if(global_positions[10].depth != 1 ||
-//      global_positions[10].gapped_depth != 1 ||
-//      global_positions[10].alleles[0].nuc != "A")
-//    return 1;
-//
-//  if(global_positions[14].depth != 1 ||
-//      global_positions[14].gapped_depth != 2 ||
-//      global_positions[14].alleles[0].nuc != "-GT")
-//    return 1;
-//
-//  if(global_positions[11].depth != 2 ||
-//      global_positions[11].gapped_depth != 2 ||
-//      global_positions[11].alleles[1].nuc != "+AT")
-//    return 1;
+  // Test merge_reads()
+  std::vector<site_state> read_site_states_one;
+  std::vector<site_state> read_site_states_two;
+  std::vector<site_state> merged_site_states;
+
+  // Read 1: A  C (+TC) G (-CT) T  G +GT C
+  // Qual:  20 20   10 30 20   30 40 20  30
+  std::vector<std::string> read1_nuc = {"A", "C", "+TC", "G", "-CT", "T", "G", "+GT", "C"};
+  std::vector<uint8_t> read1_qual = {20, 10, 20, 30, 20, 30, 40, 20, 20};
+  for(int i = 0; i < read1_nuc.size(); i++) {
+    site_state ss1;
+    ss1.set_nucleotide(read1_nuc[i], read1_qual[i], i+1);
+    read_site_states_one.push_back(ss1);
+  }
+
+  // Read 2:    C (+GT)  G (-CT) G  G +TG C
+  // Qual:     10   10   30 20   30 20 20  20
+  // Read starts at position 2
+  std::vector<std::string> read2_nuc = {"C", "+GT", "G", "-CT", "G", "G", "+GT", "C"};
+  std::vector<uint8_t> read2_qual = {10, 20, 30, 20, 30, 20, 20, 20};
+  for(int i = 0; i < read2_nuc.size(); i++) {
+    site_state ss2;
+    ss2.set_nucleotide(read2_nuc[i], read2_qual[i], i+2);
+    read_site_states_two.push_back(ss2);
+  }
+
+  vc.merge_reads(read_site_states_one, read_site_states_two, merged_site_states);
+
+  std::vector<uint32_t> expected_merged_positions = {1, 2, 4, 5, 7, 8, 9};
+  std::vector<std::string> expected_merged_nuc = {"A", "C", "G", "-CT", "G", "+GT", "C"};
+  std::vector<uint8_t> expected_merged_qual = {20, 10, 30, 20, 30, 20, 20};
+
+
+  if(expected_merged_positions.size() != merged_site_states.size()) {
+    std::cerr << "Merged site states size incorrect." << std::endl;
+    return 1;
+  }
+  for(int i = 0; i < merged_site_states.size(); i++){
+    if(merged_site_states[i].coordinate.position != expected_merged_positions[i] ||
+        merged_site_states[i].state != expected_merged_nuc[i] ||
+        merged_site_states[i].quality != expected_merged_qual[i]) {
+      std::cerr << "Merged site states did not match at index " << i << std::endl;
+      return 1;
+    }
+  }
+
+  sam_hdr_destroy(header);
+  sam_close(bam);
 
   return 0;
 }
