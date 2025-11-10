@@ -34,11 +34,16 @@ bool variant_caller::parse_read(const bam1_t* read, std::string ref_name, std::v
       std::string tmp = "-";
       for(uint32_t j=0; j < len; j++){
         tmp += refantd.get_base(total_ref_pos+j, ref_name);
+        if(j > 0){
+          // Add gap character for remaining positions
+          site_state ss;
+          ss.set_nucleotide_gap(min_qual, total_ref_pos + j);
+          read_site_states.emplace_back(ss);
+        }
       }
       site_state ss;
       ss.set_nucleotide(tmp, min_qual, total_ref_pos);
       read_site_states.emplace_back(ss);
-      // TODO: Add gap markers for deletions
     } else if(op == 1){
       std::string tmp = "+";
       double qual_sum = 0;

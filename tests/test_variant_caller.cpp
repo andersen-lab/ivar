@@ -20,16 +20,19 @@ int main(){
   // TODO: Initialize expected_read_site_states better
   std::vector<std::vector<site_state>> expected_read_site_states(4);
   site_state ss;
+
   // Read name: test_outside_primer
   ss.set_nucleotide("-C", 20, 9);
   expected_read_site_states[0].push_back(ss);
   ss.set_nucleotide("G", 52, 42);
   expected_read_site_states[0].push_back(ss);
+
   // Read name: test_20_381_1:0:0_6:0:0_1_150
   ss.set_nucleotide("+G", 63, 30);
   expected_read_site_states[1].push_back(ss);
   ss.set_nucleotide("T", 49, 42);
   expected_read_site_states[1].push_back(ss);
+
   // Read name: test_20_381_1_softclip:0:0_6:0:0_1_150
   ss.set_nucleotide("C", 20, 20);
   expected_read_site_states[2].push_back(ss);
@@ -37,8 +40,17 @@ int main(){
   expected_read_site_states[2].push_back(ss);
   ss.set_nucleotide("-CT", 20, 23);
   expected_read_site_states[2].push_back(ss);
+  ss.set_nucleotide_gap(min_qual, 24);
+  expected_read_site_states[2].push_back(ss);
+
   // Read name: test_20_381_1:0:0_6:0:0_1_150
   ss.set_nucleotide("-ACCA", 20, 353);
+  expected_read_site_states[3].push_back(ss);
+  ss.set_nucleotide_gap(min_qual, 354);
+  expected_read_site_states[3].push_back(ss);
+  ss.set_nucleotide_gap(min_qual, 355);
+  expected_read_site_states[3].push_back(ss);
+  ss.set_nucleotide_gap(min_qual, 356);
   expected_read_site_states[3].push_back(ss);
   ss.set_nucleotide("T", 27, 365);
   expected_read_site_states[3].push_back(ss);
@@ -69,8 +81,9 @@ int main(){
     int pass = 0;
     for(int i = 0; i < read_site_states.size(); i++){
       for (int j = 0; j < expected_read_site_states[test_idx].size(); j++){
-        if(expected_read_site_states[test_idx][j] == read_site_states[i])
+        if(expected_read_site_states[test_idx][j] == read_site_states[i]) {
           pass += 1;
+        }
       }
     }
 

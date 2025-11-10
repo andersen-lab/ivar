@@ -40,12 +40,14 @@ class site_state {
   site_coordinate coordinate;
   std::string state;
   uint8_t quality;
+  static const std::string GAP;
 
   ITNode* amplicon;
   bool is_ambiguous;
 
   void set_nucleotide(std::string nucleotide, uint8_t qual, uint32_t position);
   void set_amplicon(ITNode* node, bool is_ambiguous = false);
+  void set_nucleotide_gap(uint8_t min_qual, uint32_t position);
 
   bool operator == (const site_state &other) const {
     return (coordinate == other.coordinate) && (state == other.state) && (quality == other.quality);
