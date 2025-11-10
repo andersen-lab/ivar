@@ -76,73 +76,6 @@ double calculate_BIC(double k, double logL, int N) {
     return bic;
 }
 
-double elbow_method(std::vector<double> ics,
-                    std::vector<double> ns,
-                    std::vector<bool> exclude_ns) {
-    
-    std::vector<double> slopes;
-    std::vector<double> valid_ns;
-
-    // combine ns, ics, and exclusion flag into a single struct
-    struct Point {
-        double n;
-        double ic;
-        bool exclude;
-    };
-
-    std::vector<Point> points;
-    for (size_t i = 0; i < ns.size(); ++i) {
-        points.push_back({ns[i], ics[i], exclude_ns[i]});
-    }
-
-    // sort by n
-    std::sort(points.begin(), points.end(),
-              [](const Point& a, const Point& b) {
-                  return a.n < b.n;
-              });
-
-    // Build aligned slope and n vectors, skipping excluded ns
-    for (size_t i = 0; i + 1 < points.size(); ++i) {
-        /*if (points[i].exclude || points[i+1].exclude) {
-            continue; // skip if either endpoint is excluded
-        }*/
-        double slope = (points[i+1].ic - points[i].ic) / 
-                       (points[i+1].n - points[i].n);
-        uint32_t n_val = static_cast<uint32_t>(points[i+1].n);
-        std::cerr << "n " << n_val << " slope " << slope << std::endl;
-        slopes.push_back(slope);
-        valid_ns.push_back(n_val);
-    }
-
-    if (slopes.empty()) {
-        std::cerr << "Warning: no valid slopes after exclusion, defaulting to n=1" << std::endl;
-        return -1;
-    }
-
-    //we don't have sufficient data to make this comparison
-    if (slopes.size() < 3) {
-        auto it = std::min_element(slopes.begin(), slopes.end());
-        std::size_t index = std::distance(slopes.begin(), it);
-        return valid_ns[index];
-    }
-
-    // Find largest increase (smallest -> largest slope transition)
-    double max_jump = -1e9;
-    uint32_t jump_index = 0;
-    for (uint32_t i = 0; i + 1 < slopes.size(); ++i) {
-        double jump = slopes[i+1] - slopes[i];
-        if (jump > max_jump && !exclude_ns[i]) {
-            max_jump = jump;
-            jump_index = i;  // return the "smaller" slope's index
-        }
-    }
-    std::cerr << "Elbow at n=" << valid_ns[jump_index]
-              << " with slope change " << slopes[jump_index]
-              << " -> " << slopes[jump_index+1] << std::endl;
-
-    return valid_ns[jump_index];
-}
-
 std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> variants){
   std::vector<std::vector<double>> clusters(n);
   for(uint32_t i=0; i < variants.size(); i++){
@@ -343,52 +276,6 @@ void assign_clusters(std::vector<variant> &variants,
   assign_variants_simple(variants, gmodel.prob_matrix, true, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
 }
 
-void assign_bootstrap_variants(std::vector<variant> &variants,
-                        gaussian_mixture_model &gmodel, 
-                        double lower_bound, 
-                        double upper_bound) {
-  gmodel.prob_matrix.clear();
-  std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
-  std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices;
-  for (uint32_t i = 0; i < variants.size(); ++i) {
-    uint32_t pos = variants[i].position;
-    all_nts[pos].push_back(variants[i].nuc);
-    pos_to_variant_indices[pos].push_back(i);
-  }
-
-  std::vector<uint32_t> unique_pos;
-  for (const auto& kv : all_nts)
-    unique_pos.push_back(kv.first);
-
-  //populate a new armadillo dataset with more frequencies
-  arma::mat final_data(1, variants.size(), arma::fill::zeros);
-  for(uint32_t i = 0; i < variants.size(); i++){
-    final_data.col(i) = static_cast<double>(variants[i].gapped_freq);
-    //std::cerr << variants[i].gapped_freq << std::endl;
-  }
-  //recalculate the prob matrix based on the new dataset
-  std::vector<std::vector<double>> prob_matrix;
-  std::vector<double> tmp;
-  for(uint32_t i=0; i < gmodel.n; i++){
-    arma::rowvec set_likelihood = gmodel.model.log_p(final_data, i);
-    tmp.clear();
-    for(uint32_t j=0; j < final_data.n_cols; j++){ 
-      tmp.push_back((double)set_likelihood[j]);
-    }
-    prob_matrix.push_back(tmp);
-  }
-
-  gmodel.prob_matrix = prob_matrix;
-  bool clustering_failed = false;
-
-  std::vector<std::vector<uint32_t>> possible_permutations;
-  for (uint32_t i = 1; i <= gmodel.lower_n; ++i) {
-    perm_generator(gmodel.n, i, possible_permutations);
-  }
-  
-  assign_clusters(variants, gmodel, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
-}
-
 void assign_all_variants(std::vector<variant> &variants, 
                         std::vector<variant> base_variants, 
                         gaussian_mixture_model &gmodel, 
@@ -458,76 +345,6 @@ void add_noise_variants(std::vector<variant> &variants, std::vector<variant> bas
   }
 }
 
-/**
-* @brief Train a KMeans model to seed other analyses.
-* @params n An integer indicating the number of model components.
-* @param error A booleans value that indicates if this kmeans is being used to detected error levels.
-* @return kmeans_model A kmeans_modle object storing centroids and clusters.
-*/
-kmeans_model train_model(uint32_t n, arma::mat data, bool &status, uint32_t iteration) {
-  arma::mat centroids;
-  arma::mat initial_means(1, n, arma::fill::zeros);
-  kmeans_model model;
- 
-  std::vector<double> means;
-  std::vector<std::vector<double>> clusters(n);
-  //half of the runs initiate with subset the other half with spread
-  status = arma::kmeans(centroids, data, n, arma::static_spread, 10, false);
-  if(!status) return(model);
-  for(uint32_t c=0; c < centroids.n_cols; c++){
-    means.push_back(centroids(c));
-  }
-
-  for(auto d : data){
-    uint32_t idx;
-    double closest=1;
-    for(uint32_t i=0; i < means.size(); i++){
-      double dist = std::abs((double)d - means[i]);
-      if(dist < closest){
-        closest = dist;
-        idx = i;
-      }
-    }
-    clusters[idx].push_back(d);
-  }
-
-  //center cluster points and square
-  std::vector<std::vector<double>> deviations(n);
-  for(uint32_t i =0; i < clusters.size(); i++){
-    for(uint32_t j=0; j < clusters[i].size(); j++){
-      double centered = std::abs(clusters[i][j] - means[i]);
-      deviations[i].push_back(centered * centered);
-    }
-  }
-
-  std::vector<double> diag_cov;
-  for(uint32_t i = 0; i < deviations.size(); i++){
-    double sum = 0;
-    for(double d : deviations[i]) {
-      sum += d;
-    }
-    diag_cov.push_back(sum / deviations[i].size());
-  }
-
-  std::vector<double> hefts;
-  for(uint32_t i=0; i < clusters.size(); i++){
-    hefts.push_back((double)clusters[i].size()/(double)data.size());
-  }
-  double sum_hefts = std::accumulate(hefts.begin(), hefts.end(), 0.0);
-  for(auto &h : hefts) {
-    if(sum_hefts > 0){
-      h /= sum_hefts;
-    }
-  } 
-
-  model.n = n;
-  model.means = means;
-  model.clusters = clusters;
-  model.covariances = diag_cov;
-  model.hefts = hefts;
-  return(model);
-}
-
 //test function
 std::string vec_to_pylist(const std::vector<double>& v){
     std::ostringstream ss;
@@ -587,7 +404,6 @@ gaussian_mixture_model retrain_model(uint32_t n,
   }
 
   for(auto d : model.dcovs){
-    //std::cerr << d << std::endl;
     gmodel.dcovs.push_back(std::sqrt((double)d));
   }
 
@@ -680,7 +496,6 @@ void generate_combinations(std::vector<double> &input, std::vector<double>& curr
     current_combination.pop_back();
   }
 }
-
 
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector) {
   std::vector<std::vector<double>> transposed_vector;
@@ -941,30 +756,6 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
   }
 }
 
-
-arma::mat form_dataset(std::vector<variant> base_variants, std::vector<variant> &variants, double lower_bound, double upper_bound){
-  uint32_t useful_var=0;
-  std::vector<uint32_t> count_pos;
-  set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
-  for(uint32_t i=0; i < base_variants.size(); i++){
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
-      useful_var++;
-      variants.push_back(base_variants[i]);
-      count_pos.push_back(base_variants[i].position);
-    }
-  }
-
-  arma::mat data(1, useful_var, arma::fill::zeros);
-
-  //(rows, cols) where each columns is a sample
-  for(uint32_t i = 0; i < variants.size(); i++){
-    double tmp = static_cast<double>(variants[i].gapped_freq);
-    data.col(i) = tmp;
-  }
-  return(data);
-
-}
-
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, std::vector<double> &std_devs, \
                               std::string ref, double default_threshold, double &error_rate){
@@ -1062,7 +853,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t bootstrap_reps = 1000;
   uint32_t final_n=0;
   double var_floor;
-  std::vector<double> all_var_floors = {0.01, 0.005, 0.001}; 
+  std::vector<double> all_var_floors = {0.005}; 
 
   std::vector<double> track_var_floors;
   std::vector<double> track_bics;
@@ -1091,7 +882,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
             continue;  
           }
 
-          calculate_cluster_deviations(retrained);
+          //calculate_cluster_deviations(retrained);
           track_ns.push_back(counter);
           track_var_floors.push_back(var_floor);
           track_means.push_back(retrained.means);
@@ -1105,7 +896,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
           counter++;
         }
     }
-    /*double lowest = std::numeric_limits<double>::max(); 
+    double lowest = std::numeric_limits<double>::max(); 
     uint32_t winner;
     for(uint32_t i=0; i < all_bics.size(); i++){
       if(all_bics[i] < lowest){
@@ -1114,18 +905,19 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       }
       std::cerr << i+1 << " " << all_bics[i] << "\n";
     }
-    model_counter[winner] += 1;*/
+    model_counter[winner] += 1;
   }
+
   uint32_t highest = 0;
   for (const auto& [key, value] : model_counter) {
-    if(value > highest){
+    if(value >= 900){
       final_n = key;
       highest = value;
     }
     std::cerr << key << " : " << value << '\n';
   }
   gaussian_mixture_model best_model; 
-  /*std::cerr << "final n " << final_n << std::endl;
+  std::cerr << "final n " << final_n << std::endl;
   if(final_n ==0){
     std::cerr << output_prefix << " no solution found" << std::endl;
     exit(1);
@@ -1141,10 +933,10 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   
   for(auto m : best_model.means){
     std::cerr << "mean " << m << std::endl;  
-  }*/
+  }
 
   //n, means, output_prefix, bic, var_floor, widths 
-  std::ofstream out("bootstrap_stats.tsv", std::ios::app);
+  /*std::ofstream out("bootstrap_stats_0.005_0.90.tsv", std::ios::app);
   for(uint32_t i=0; i < track_bics.size(); i++){
     out << track_ns[i] << "\t"
         << vec_to_pylist(track_means[i]) << "\t"
@@ -1154,8 +946,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         << vec_to_pylist(track_std_devs[i]) << "\t"
         << std::to_string(track_bootstraps[i]) << "\n";
   }
-  out.close();
-  exit(0); 
+  out.close();*/
   
   std::ofstream file;
   if(development_mode){

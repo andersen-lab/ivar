@@ -4,15 +4,6 @@
 #ifndef gmm
 #define gmm
 
-struct kmeans_model {
-  std::vector<std::vector<double>> clusters; //stored assigned clusters
-  std::vector<double> covariances;
-  uint32_t n; //number of clusters
-  std::vector<double> means; //centroids
-  std::vector<double> hefts;
-};
-
-
 struct gaussian_mixture_model {
   std::vector<std::vector<double>> prob_matrix;
   uint32_t n;
@@ -67,7 +58,7 @@ struct variant {
   std::vector<double> probabilities;
 
 };
-double elbow_method(std::vector<double> ics, std::vector<double> ns, std::vector<bool> exclude_ns);
+
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations);
 void split(std::string &s, char delim, std::vector<std::string> &elems);
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::vector<double> &std_devs, std::string ref, double default_threshold, double &error_rate);
@@ -75,15 +66,12 @@ void parse_internal_variants(std::string filename, std::vector<variant> &base_va
 uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
 gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double &var_floor, bool &clustering_failed, bool error_clustering);
-void assign_clusters(std::vector<variant> &variants, gaussian_mixture_model gmodel, bool &clustering_failed, std::vector<std::vector<uint32_t>> possible_permutations);
 double calculate_mean(const std::vector<double>& data);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
-void calculate_reference_frequency(std::vector<variant> &variants, std::string ref_path);
 void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel, double lower_bound, double upper_bound);
 void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants);
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound);
 double calculate_mad(const std::vector<double>& data, double mean);
 void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample);
-double empirical_misclassification_probability(const std::vector<variant>& all_variants);
 void reset_variants_info(std::vector<variant> &variants);
 #endif
