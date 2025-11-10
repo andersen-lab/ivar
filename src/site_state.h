@@ -24,6 +24,26 @@ struct site_coordinate {
   bool operator == (const site_coordinate &other) const {
     return (type == other.type) && (position == other.position);
   }
+
+  bool operator > (const site_coordinate &other) const {
+    if (type != other.type) throw std::logic_error("cross-type comparison");
+    return position > other.position;
+  }
+
+  bool operator < (const site_coordinate &other) const {
+    if (type != other.type) throw std::logic_error("cross-type comparison");
+    return position < other.position;
+  }
+
+  bool operator >= (const site_coordinate &other) const {
+    if (type != other.type) throw std::logic_error("cross-type comparison");
+    return position >= other.position;
+  }
+
+  bool operator <= (const site_coordinate &other) const {
+    if (type != other.type) throw std::logic_error("cross-type comparison");
+    return position <= other.position;
+  }
 };
 
 namespace std {

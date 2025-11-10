@@ -1,7 +1,3 @@
-//
-// Created by Karthik on 11/9/25.
-//
-
 #include "site_aggregator_stats.h"
 
 void site_aggregator_stats::add_site(site_state ss) {

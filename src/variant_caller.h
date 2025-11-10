@@ -4,8 +4,8 @@
 #include "ref_seq.h"
 #include "interval_tree.h"
 #include "allele_functions.h"
-#include "genomic_position.h"
 #include "site_state.h"
+#include "site_aggregator.h"
 
 #ifndef VARIANT_CALLER_H
 #define VARIANT_CALLER_H
@@ -19,7 +19,8 @@ class variant_caller {
   uint8_t min_qual;
   ref_antd refantd;
   IntervalTree amplicons;
-  std::vector<genomic_position> global_positions;
+  site_aggregator sa;
+
   void get_read_amplicons(uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes);
 
  public:
@@ -28,20 +29,9 @@ class variant_caller {
   bool parse_read(const bam1_t* read, std::string ref_name, std::vector<site_state> &read_site_states);
   void set_amplicons(IntervalTree &amps);
   void set_refantd(ref_antd &ref);
-  void add_variants(std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities);
+  void add_variants(std::vector<site_state> read_site_states);
   void assign_amplicon_to_read(uint32_t lower, uint32_t upper, std::vector<site_state> &read_site_states);
-  void assign_amplicon_depths(ITNode *node, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities, bool ambiguous);
-  void merge_reads(std::vector<uint32_t> &positions1,
-                   std::vector<uint32_t> &positions2,
-                   std::vector<std::string> &bases1,
-                   std::vector<std::string> &bases2,
-                   std::vector<uint32_t> &qualities1,
-                   std::vector<uint32_t> &qualities2,
-                   std::vector<uint32_t> &final_positions,
-                   std::vector<std::string> &final_bases,
-                   std::vector<uint32_t> &final_qualities);
-  void clear_global_positions();
-  std::vector<genomic_position> get_global_positions();
+  void merge_reads(std::vector<site_state> &read_site_states_one, std::vector<site_state> &read_site_states_two, std::vector<site_state> &merged_site_states);
 };
 
 #endif  // VARIANT_CALLER_H
