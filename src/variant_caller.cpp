@@ -8,7 +8,7 @@ variant_caller::variant_caller(uint8_t min_qual, std::string ref_path, std::stri
 
 variant_caller::~variant_caller() {}
 
-void variant_caller::parse_read(const bam1_t* read, std::string ref_name, std::vector<uint32_t> &positions, std::vector<std::string> &bases, std::vector<uint32_t> &qualities){
+bool variant_caller::parse_read(const bam1_t* read, std::string ref_name, std::vector<site_state> &read_site_states){
   uint32_t total_query_pos=0;
   const uint8_t* query_sequence = bam_get_seq(read);
   std::cout << std::endl;
@@ -26,18 +26,19 @@ void variant_caller::parse_read(const bam1_t* read, std::string ref_name, std::v
         uint8_t tqual = static_cast<uint8_t>(qual[qpos]);
         uint8_t base_code = bam_seqi(query_sequence, qpos);
         char nuc = seq_nt_lookup[base_code];
-        positions.push_back(rpos);
-        bases.emplace_back(1, nuc);
-        qualities.push_back(tqual);
+        site_state ss;
+        ss.set_nucleotide(std::string(1, nuc), tqual, rpos);
+        read_site_states.emplace_back(ss);
       }
     } else if(op == 2){
       std::string tmp = "-";
       for(uint32_t j=0; j < len; j++){
         tmp += refantd.get_base(total_ref_pos+j, ref_name);
       }
-      positions.push_back(total_ref_pos);
-      bases.push_back(tmp);
-      qualities.push_back(min_qual);
+      site_state ss;
+      ss.set_nucleotide(tmp, min_qual, total_ref_pos);
+      read_site_states.emplace_back(ss);
+      // TODO: Add gap markers for deletions
     } else if(op == 1){
       std::string tmp = "+";
       double qual_sum = 0;
@@ -50,9 +51,9 @@ void variant_caller::parse_read(const bam1_t* read, std::string ref_name, std::v
         qual_sum += qual[qpos];
       }
       uint8_t avg_qual = static_cast<uint8_t>(qual_sum / len);
-      positions.push_back(total_ref_pos-1); // Move insertion position to previous ref
-      bases.push_back(tmp);
-      qualities.push_back(avg_qual);
+      site_state ss;
+      ss.set_nucleotide(tmp, avg_qual, total_ref_pos-1); // Move insertion position to previous ref
+      read_site_states.emplace_back(ss);
     }
 
     //consumes ref
@@ -63,6 +64,7 @@ void variant_caller::parse_read(const bam1_t* read, std::string ref_name, std::v
       total_query_pos += len;
     }
   }
+  return true;
 }
 
 void variant_caller::set_amplicons(IntervalTree &amps) {
@@ -237,4 +239,18 @@ void variant_caller::clear_global_positions() {
 
 std::vector<genomic_position> variant_caller::get_global_positions() {
   return global_positions;
+}
+
+void variant_caller::assign_amplicon_to_read(uint32_t lower, uint32_t upper, std::vector<site_state> &read_site_states) {
+  std::vector<ITNode*> assigned_amplicons;
+  get_read_amplicons(lower, upper, assigned_amplicons);
+  if (assigned_amplicons.empty() || assigned_amplicons.size() > 1) {
+    for(int i = 0; i < read_site_states.size(); i++){
+      read_site_states[i].set_amplicon(nullptr, true);
+    }
+  } else if (assigned_amplicons.size() == 1){
+    for(int i = 0; i < read_site_states.size(); i++){
+      read_site_states[i].set_amplicon(assigned_amplicons[0], false);
+    }
+  }
 }
