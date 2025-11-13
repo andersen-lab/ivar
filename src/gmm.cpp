@@ -27,6 +27,62 @@ arma::mat subsample_with_replacement(
     const std::vector<uint32_t>& position,
     std::vector<variant> &subsampled_variants,
     std::vector<variant> variants) {
+
+    // Build mapping: group_id (position) -> indices of columns belonging to it
+    std::unordered_map<uint32_t, std::vector<std::size_t>> groups;
+    for (std::size_t i = 0; i < position.size(); ++i) {
+        groups[position[i]].push_back(i);
+    }
+
+    // Collect group IDs and their weights (total_depth per position)
+    std::vector<uint32_t> group_ids;
+    std::vector<double> weights;
+    group_ids.reserve(groups.size());
+    weights.reserve(groups.size());
+
+    for (const auto& kv : groups) {
+        group_ids.push_back(kv.first);
+        // Take the total_depth from the first variant in this position
+        weights.push_back(variants[kv.second[0]].total_depth);
+    }
+
+    // Random generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::discrete_distribution<std::size_t> dist(weights.begin(), weights.end());
+
+    std::vector<arma::uword> chosen_cols;
+    chosen_cols.reserve(n_subsample); // approximate
+
+    uint32_t pos = 0;
+    std::size_t i = 0;
+    while (i < n_subsample) {
+        std::size_t group_idx = dist(gen);
+        uint32_t group = group_ids[group_idx];
+        const auto& cols = groups[group];
+
+        chosen_cols.insert(chosen_cols.end(), cols.begin(), cols.end());
+
+        for (auto c : cols) {
+            auto &var = variants[c];
+            var.position = pos;
+            subsampled_variants.push_back(var);
+        }
+
+        i += cols.size();
+        pos += 1;
+    }
+
+    arma::mat subsample = data.cols(arma::uvec(chosen_cols));
+    return subsample;
+}
+
+arma::mat subsample_with_replacement_og(
+    const arma::mat& data,
+    std::size_t n_subsample,
+    const std::vector<uint32_t>& position,
+    std::vector<variant> &subsampled_variants,
+    std::vector<variant> variants) {
     
     // Build mapping: group_id -> indices of columns belonging to it
     std::unordered_map<uint32_t, std::vector<std::size_t>> groups;
@@ -63,8 +119,7 @@ arma::mat subsample_with_replacement(
       i--;
       pos += 1;
     }
-
-    // Build subsample matrix from chosen columns
+  
     arma::mat subsample = data.cols(arma::uvec(chosen_cols));
 
     return subsample;
@@ -802,7 +857,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       useful_var++;
       variants.push_back(base_variants[i]);
       count_pos.push_back(base_variants[i].position);
-      std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " include " << base_variants[i].include_clustering << std::endl;
+      std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " total_depth " << base_variants[i].total_depth << std::endl;
     }
   }
   //handle the case of no variants less than the universal cluster
@@ -889,8 +944,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
           track_std_devs.push_back(retrained.dcovs);
           track_bics.push_back(retrained.bic);
           track_bootstraps.push_back(i+1);
-
-          std::cerr << "bootstrap rep " << i << " bic " << retrained.bic << " n " << counter << "  var floor " << var_floor << std::endl;
+          //std::cerr << "bootstrap rep " << i << " bic " << retrained.bic << " n " << counter << "  var floor " << var_floor << std::endl;
           double bic = retrained.bic;
           all_bics.push_back(bic);
           counter++;
@@ -903,7 +957,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         lowest = all_bics[i];
         winner = i+1;
       }
-      std::cerr << i+1 << " " << all_bics[i] << "\n";
+      //std::cerr << i+1 << " " << all_bics[i] << "\n";
     }
     model_counter[winner] += 1;
   }
