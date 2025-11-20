@@ -65,7 +65,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold);
 uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
-gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double &var_floor, bool &clustering_failed, bool error_clustering);
+gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double &var_floor, bool &clustering_failed);
 double calculate_mean(const std::vector<double>& data);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
 void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel, double lower_bound, double upper_bound);
@@ -74,4 +74,5 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound);
 double calculate_mad(const std::vector<double>& data, double mean);
 void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample);
 void reset_variants_info(std::vector<variant> &variants);
+arma::mat subsample_with_replacement(const arma::mat& data, std::size_t n_subsample, const std::vector<uint32_t>& position, std::vector<variant> &subsampled_variants, std::vector<variant> variants);
 #endif

@@ -27,7 +27,6 @@ arma::mat subsample_with_replacement(
     const std::vector<uint32_t>& position,
     std::vector<variant> &subsampled_variants,
     std::vector<variant> variants) {
-
     // Build mapping: group_id (position) -> indices of columns belonging to it
     std::unordered_map<uint32_t, std::vector<std::size_t>> groups;
     for (std::size_t i = 0; i < position.size(); ++i) {
@@ -41,12 +40,10 @@ arma::mat subsample_with_replacement(
     weights.reserve(groups.size());
 
     for (const auto& kv : groups) {
-        group_ids.push_back(kv.first);
-        // Take the total_depth from the first variant in this position
+        group_ids.push_back(kv.first); 
         weights.push_back(variants[kv.second[0]].total_depth);
     }
 
-    // Random generator
     std::random_device rd;
     std::mt19937 gen(rd());
     std::discrete_distribution<std::size_t> dist(weights.begin(), weights.end());
@@ -56,6 +53,7 @@ arma::mat subsample_with_replacement(
 
     uint32_t pos = 0;
     std::size_t i = 0;
+
     while (i < n_subsample) {
         std::size_t group_idx = dist(gen);
         uint32_t group = group_ids[group_idx];
@@ -67,6 +65,7 @@ arma::mat subsample_with_replacement(
             auto &var = variants[c];
             var.position = pos;
             subsampled_variants.push_back(var);
+            //std::cerr << var.gapped_depth << " " << var.gapped_freq << std::endl;
         }
 
         i += cols.size();
@@ -74,54 +73,7 @@ arma::mat subsample_with_replacement(
     }
 
     arma::mat subsample = data.cols(arma::uvec(chosen_cols));
-    return subsample;
-}
-
-arma::mat subsample_with_replacement_og(
-    const arma::mat& data,
-    std::size_t n_subsample,
-    const std::vector<uint32_t>& position,
-    std::vector<variant> &subsampled_variants,
-    std::vector<variant> variants) {
-    
-    // Build mapping: group_id -> indices of columns belonging to it
-    std::unordered_map<uint32_t, std::vector<std::size_t>> groups;
-    for (std::size_t i = 0; i < position.size(); ++i) {
-        groups[position[i]].push_back(i);
-    }
-
-    // Collect unique group IDs into a vector (for random selection)
-    std::vector<uint32_t> group_ids;
-    group_ids.reserve(groups.size());
-    for (const auto& kv : groups) {
-        group_ids.push_back(kv.first);
-    }
-
-    // Random generator
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<std::size_t> dist(0, group_ids.size() - 1);
-
-    std::vector<arma::uword> chosen_cols;
-    chosen_cols.reserve(n_subsample); // approximate
-
-    uint32_t pos = 0;
-    for (std::size_t i = 0; i <= n_subsample; ++i) {
-      uint32_t group = group_ids[dist(gen)];
-      const auto& cols = groups[group];
-      chosen_cols.insert(chosen_cols.end(), cols.begin(), cols.end());
-      for(auto c : cols){
-        auto &var = variants[c];
-        var.position = pos;
-        subsampled_variants.push_back(var);
-      }
-      i += cols.size();
-      i--;
-      pos += 1;
-    }
-  
-    arma::mat subsample = data.cols(arma::uvec(chosen_cols));
-
+    //std::cerr << "subsample size " << subsampled_variants.size() << std::endl;
     return subsample;
 }
 
@@ -290,7 +242,6 @@ void assign_variants_simple(std::vector<variant> &variants,
 
     //here we have more variants trying to assign than clusters
     if(tmp_prob.size() > assigned.size()) {
-      //std::cerr << "HERE " << tmp_prob.size() << " " << assigned.size() << " " << pos << std::endl;
       clustering_failed = true;
       continue;
     }
@@ -417,8 +368,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
                                     std::vector<variant> &variants, 
                                     uint32_t lower_n, 
                                     double &var_floor, 
-                                    bool &clustering_failed, 
-                                    bool error_clustering){
+                                    bool &clustering_failed){
 
    //this is used in the variant assignement portion of the code
   std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
@@ -439,12 +389,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
   gmodel.lower_n = lower_n;
   arma::gmm_diag model;
 
-  if(error_clustering){
-    var_floor = 0.0001;
-  } else {
-    var_floor = var_floor;
-  }
-
+  //std::cerr << "var floor " << var_floor << std::endl;
   bool status = model.learn(data, n, arma::eucl_dist, arma::static_spread, 10, 10, var_floor, false);
   if(!status){
     std::cerr << "GMM failed to converge" << std::endl;
@@ -930,7 +875,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
           reset_variants_info(subsampled_variants);
           reset_variants_info(variants);
           var_floor = all_var_floors[j];
-          gaussian_mixture_model retrained = retrain_model(counter, subsample, subsampled_variants, lower_n, var_floor, clustering_failed, false);
+          gaussian_mixture_model retrained = retrain_model(counter, subsample, subsampled_variants, lower_n, var_floor, clustering_failed);
           if(clustering_failed){
             all_bics.push_back(std::numeric_limits<double>::max());
             counter++;
@@ -945,6 +890,10 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
           track_bics.push_back(retrained.bic);
           track_bootstraps.push_back(i+1);
           //std::cerr << "bootstrap rep " << i << " bic " << retrained.bic << " n " << counter << "  var floor " << var_floor << std::endl;
+          /*for(auto m : retrained.means){
+            std::cerr << m << " ";
+          }
+          std::cerr << "\n";*/
           double bic = retrained.bic;
           all_bics.push_back(bic);
           counter++;
@@ -982,7 +931,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   clustering_failed = false;
   reset_variants_info(variants);
-  best_model= retrain_model(final_n, data, variants, lower_n, var_floor, clustering_failed, false); 
+  best_model= retrain_model(final_n, data, variants, lower_n, var_floor, clustering_failed); 
   calculate_cluster_deviations(best_model);
   
   for(auto m : best_model.means){

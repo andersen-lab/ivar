@@ -508,8 +508,7 @@ void solve_clusters(std::vector<variant> &variants,
   }
   if(traditional_majority){
     call_majority_consensus(variants, prefix, default_threshold, min_depth);
-    //this was originally filtered means
-    solution = means;
+    exit(0);
   }
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
