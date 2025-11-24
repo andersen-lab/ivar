@@ -26,54 +26,68 @@ arma::mat subsample_with_replacement(
     std::size_t n_subsample,
     const std::vector<uint32_t>& position,
     std::vector<variant> &subsampled_variants,
-    std::vector<variant> variants) {
-    // Build mapping: group_id (position) -> indices of columns belonging to it
+    const std::vector<variant> variants) {
+
+    // --- Group variants by position ---
     std::unordered_map<uint32_t, std::vector<std::size_t>> groups;
     for (std::size_t i = 0; i < position.size(); ++i) {
         groups[position[i]].push_back(i);
     }
 
-    // Collect group IDs and their weights (total_depth per position)
+    // --- Collect group IDs and weights (total_depth per position) ---
     std::vector<uint32_t> group_ids;
-    std::vector<double> weights;
+    std::vector<double> group_weights;
     group_ids.reserve(groups.size());
-    weights.reserve(groups.size());
+    group_weights.reserve(groups.size());
 
     for (const auto& kv : groups) {
-        group_ids.push_back(kv.first); 
-        weights.push_back(variants[kv.second[0]].total_depth);
+        group_ids.push_back(kv.first);
+        group_weights.push_back(variants[kv.second[0]].total_depth);
     }
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::discrete_distribution<std::size_t> dist(weights.begin(), weights.end());
+    std::discrete_distribution<std::size_t> group_dist(group_weights.begin(), group_weights.end());
 
     std::vector<arma::uword> chosen_cols;
-    chosen_cols.reserve(n_subsample); // approximate
+    chosen_cols.reserve(n_subsample);
 
-    uint32_t pos = 0;
+    uint32_t pos_counter = 0;
     std::size_t i = 0;
 
     while (i < n_subsample) {
-        std::size_t group_idx = dist(gen);
+        // --- First level: choose a position ---
+        std::size_t group_idx = group_dist(gen);
         uint32_t group = group_ids[group_idx];
         const auto& cols = groups[group];
 
-        chosen_cols.insert(chosen_cols.end(), cols.begin(), cols.end());
-
+        // --- Second level: resample variants within this position ---
+        std::vector<double> variant_weights;
+        variant_weights.reserve(cols.size());
         for (auto c : cols) {
-            auto &var = variants[c];
-            var.position = pos;
-            subsampled_variants.push_back(var);
-            //std::cerr << var.gapped_depth << " " << var.gapped_freq << std::endl;
+            variant_weights.push_back(variants[c].gapped_depth);
         }
 
-        i += cols.size();
-        pos += 1;
+        std::discrete_distribution<std::size_t> variant_dist(variant_weights.begin(), variant_weights.end());
+
+        // Here we pick each variant once, could also pick multiple if you want
+        for (std::size_t k = 0; k < cols.size(); ++k) {
+            std::size_t idx = variant_dist(gen);
+            std::size_t var_idx = cols[idx];
+
+            auto var_copy = variants[var_idx];  // copy so we can modify
+            var_copy.position = pos_counter;
+            subsampled_variants.push_back(var_copy);
+            chosen_cols.push_back(var_idx);
+            i++;
+            if (i >= n_subsample)
+                break;
+        }
+
+        pos_counter++;
     }
 
     arma::mat subsample = data.cols(arma::uvec(chosen_cols));
-    //std::cerr << "subsample size " << subsampled_variants.size() << std::endl;
     return subsample;
 }
 
@@ -146,12 +160,35 @@ void generate_ordered(const std::vector<uint32_t>& elements,
     backtrack();
 }
 
+std::vector<double> loglikelihoods_to_posteriors(const std::vector<double>& loglikes){
+    const size_t K = loglikes.size();
+    if (K == 0) return {};
+    // 1. Find max for numerical stability
+    double m = *std::max_element(loglikes.begin(), loglikes.end());
+    // 2. Exponentiate shifted log-likelihoods
+    std::vector<double> exps(K);
+    double sum_exp = 0.0;
+    for (size_t k = 0; k < K; ++k) {
+        exps[k] = std::exp(loglikes[k] - m);
+        sum_exp += exps[k];
+    }
+    // 3. Normalize
+    for (size_t k = 0; k < K; ++k) {
+        exps[k] /= sum_exp;
+    }
+    return exps;
+}
 
 std::vector<uint32_t> compare_cluster_assignment(std::vector<std::vector<double>> prob_matrix, std::vector<uint32_t> assigned){
   double threshold = 2;
   std::vector<uint32_t> flagged_idx;
 
   for(uint32_t i=0; i < prob_matrix.size(); i++){
+    std::vector<double> probs = loglikelihoods_to_posteriors(prob_matrix[i]);
+    /*for(auto p : probs){
+      std::cerr << p << " ";
+    }
+    std::cerr << "\n";*/
     double assigned_prob = prob_matrix[i][assigned[i]];
     std::vector<double> tmp = prob_matrix[i];
     tmp.erase(tmp.begin() + assigned[i]);
@@ -392,7 +429,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
   //std::cerr << "var floor " << var_floor << std::endl;
   bool status = model.learn(data, n, arma::eucl_dist, arma::static_spread, 10, 10, var_floor, false);
   if(!status){
-    std::cerr << "GMM failed to converge" << std::endl;
+    //std::cerr << "GMM failed to converge" << std::endl;
     clustering_failed = true;
     return(gmodel);
   }
@@ -881,16 +918,14 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
             counter++;
             continue;  
           }
-
-          //calculate_cluster_deviations(retrained);
           track_ns.push_back(counter);
           track_var_floors.push_back(var_floor);
           track_means.push_back(retrained.means);
           track_std_devs.push_back(retrained.dcovs);
           track_bics.push_back(retrained.bic);
           track_bootstraps.push_back(i+1);
-          //std::cerr << "bootstrap rep " << i << " bic " << retrained.bic << " n " << counter << "  var floor " << var_floor << std::endl;
-          /*for(auto m : retrained.means){
+          /*std::cerr << "bootstrap rep " << i << " bic " << retrained.bic << " n " << counter << "  var floor " << var_floor << std::endl;
+          for(auto m : retrained.means){
             std::cerr << m << " ";
           }
           std::cerr << "\n";*/
@@ -906,7 +941,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         lowest = all_bics[i];
         winner = i+1;
       }
-      //std::cerr << i+1 << " " << all_bics[i] << "\n";
     }
     model_counter[winner] += 1;
   }

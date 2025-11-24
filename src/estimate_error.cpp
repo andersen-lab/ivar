@@ -120,7 +120,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
   //for each cluster this describes the points which are outliers
   if(optimal_n > 1){
-    outliers = determine_outlier_points(model.clusters[chosen_peak], 2.5);
+    //outliers = determine_outlier_points(model.clusters[chosen_peak], 2.5);
     std::vector<double> universal_cluster = model.clusters[chosen_peak];
     for(uint32_t i=0; i < universal_cluster.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
