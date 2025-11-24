@@ -12,7 +12,7 @@
 
 void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth){
   uint32_t max_position=0;
-  uint32_t min_position = 4294967295U;;
+  uint32_t min_position = 4294967295U;
   for(auto x : variants){
     if(x.position > max_position){
       max_position = x.position;
@@ -55,6 +55,7 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
   //std::string trimmed_consensus = trim_trailing_ambiguities(consensus_string, max_position);
   std::string next_trimmed_consensus = trim_leading_ambiguities(consensus_string, min_position);
   //write the consensus to file
+
   std::string consensus_filename = clustering_file + "_threshold.fa";
   std::ofstream file(consensus_filename);
   std::string name = ">"+clustering_file+"_"+std::to_string(default_threshold)+"_threshold";

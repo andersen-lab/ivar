@@ -957,6 +957,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::cerr << "final n " << final_n << std::endl;
   if(final_n ==0){
     std::cerr << output_prefix << " no solution found" << std::endl;
+    call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
     exit(1);
   }
 
