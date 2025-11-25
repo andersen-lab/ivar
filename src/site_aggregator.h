@@ -9,37 +9,25 @@
 #ifndef SITE_AGGREGATOR_H
 #define SITE_AGGREGATOR_H
 
-struct site_aggregator_key {
-  site_coordinate coordinate;
-  std::string state;
-
-  size_t hash() const {
-    size_t h = coordinate.hash();
-    h = hash_utils::hash_combine(h, std::hash<std::string>{}(state));
-    return h;
-  }
-
-  bool operator==(const site_aggregator_key& other) const {
-    return (coordinate == other.coordinate) && (state == other.state);
-  }
-
-};
-
-namespace std {
-  template<>
-  struct hash<site_aggregator_key> {
-    size_t operator()(const site_aggregator_key& c) const {
-      return c.hash();
-    }
-  };
-}
-
 class site_aggregator {
  private:
-  std::unordered_map<site_aggregator_key, site_aggregator_stats> aggregated_site_states;
+  std::vector<site_aggregator_stats> aggregated_site_states;
+  std::vector<ITNode*> masked_amplicons;
+
  public:
-  void aggregate(const std::vector<site_state> site_states);
-  const std::unordered_map<site_aggregator_key, site_aggregator_stats>& get_data();
+  bool initialize(int64_t ref_len) {
+    if(ref_len >= 0) {
+        aggregated_site_states.resize(ref_len + 1);  // To account for 1-based position
+        return true;
+    }
+    return false;
+  }
+  void aggregate(const std::vector<site_state> &site_states);
+  const std::vector<site_aggregator_stats>& get_data();
+  bool calculate_amplicon_depths(site_coordinate coord, std::unordered_map<ITNode*, uint32_t> &amp_depths);
+  void add_to_masked_amplicons(ITNode* amp);
+  bool is_amplicon_masked(ITNode *amp);
+  void clear();
 };
 
 #endif  // SITE_AGGREGATOR_H
