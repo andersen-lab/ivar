@@ -20,18 +20,28 @@ class variant_caller {
   ref_antd refantd;
   IntervalTree amplicons;
   site_aggregator sa;
+  std::ofstream output_file;
+  static const std::string FILE_HEADER;
+  static const std::string DELIMITER;
 
   void get_read_amplicons(uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes);
 
  public:
   variant_caller(uint8_t min_qual, std::string ref_path, std::string gff_path = "");
+  bool initialize_region(std::string region);
   ~variant_caller();
   bool parse_read(const bam1_t* read, std::string ref_name, std::vector<site_state> &read_site_states);
+  bool parse_paired_reads(const bam1_t* read1, const bam1_t* read2, std::string ref_name, std::vector<site_state> &read_site_states);
+  bool parse_single_read(const bam1_t* read, std::string ref_name, std::vector<site_state> &read_site_states) {
+    return parse_read(read, ref_name, read_site_states);
+  };
   void set_amplicons(IntervalTree &amps);
   void set_refantd(ref_antd &ref);
-  void add_variants(std::vector<site_state> read_site_states);
+  void add_variants(std::vector<site_state> &read_site_states);
   void assign_amplicon_to_read(uint32_t lower, uint32_t upper, std::vector<site_state> &read_site_states);
   void merge_reads(std::vector<site_state> &read_site_states_one, std::vector<site_state> &read_site_states_two, std::vector<site_state> &merged_site_states);
+
+  void write_to_file(std::string output_path, std::string ref_name);
 };
 
 #endif  // VARIANT_CALLER_H
