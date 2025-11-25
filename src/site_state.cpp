@@ -20,3 +20,14 @@ void site_state::set_nucleotide_gap(uint8_t min_qual, uint32_t position) {
   coordinate.type = NUCLEOTIDE;
   coordinate.position = position;
 }
+bool site_state::is_deletion(const std::string &state) {
+    return state[0] == '-';
+}
+
+bool site_state::is_insertion(const std::string &state) {
+    return state[0] == '+';
+}
+
+bool site_state::is_gap(const std::string &state) {
+    return state == GAP;
+}

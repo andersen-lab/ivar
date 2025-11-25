@@ -61,6 +61,9 @@ class site_state {
   std::string state;
   uint8_t quality;
   static const std::string GAP;
+  static bool is_deletion(const std::string &state);
+  static bool is_insertion(const std::string &state);
+  static bool is_gap(const std::string &state);
 
   ITNode* amplicon;
   bool is_ambiguous;
