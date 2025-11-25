@@ -49,92 +49,161 @@ int main() {
   set_site_state("+G", 20, 24, amp1[0], false, site_states);
   set_site_state("+G", 20, 24, amp1[0], false, site_states);
 
-  // Expected values
-
-
   site_aggregator sa;
+  sa.initialize(24);
   sa.aggregate(site_states);
-  std::unordered_map<site_aggregator_key, site_aggregator_stats> aggregated_site_states = sa.get_data();
+  std::vector<site_aggregator_stats> aggregated_site_states = sa.get_data();
 
-  std::vector<site_aggregator_key> expected_keys = {
+  // Expected values
+  std::vector<site_coordinate> expected_coord_keys = {
     {
-      {
-          NUCLEOTIDE,
-          1
-      },
-      "A"
+      NUCLEOTIDE,
+      1
     },
     {
-      {
-          NUCLEOTIDE,
-          1
-      },
-      "T"
+      NUCLEOTIDE,
+      1
     },
     {
-      {
-          NUCLEOTIDE,
-          22
-      },
-      "-TC"
+      NUCLEOTIDE,
+      22
     },
     {
-      {
       NUCLEOTIDE,
       23
-      },
-      site_state::GAP
     },
     {
-      {
       NUCLEOTIDE,
       23
-      },
-      "C"
     },
     {
-      {
       NUCLEOTIDE,
       24
-      },
-      "+G"
     }
+  };
+
+  std::vector<std::string> expected_site_states = {
+    "A",
+    "T",
+    "-TC",
+    site_state::GAP,
+    "C",
+    "+G"
   };
 
   std::vector<site_amplicon_aggregator_stats> expected_site_amplicon_aggregator_stats;
   site_amplicon_aggregator_stats saas;
   // 1 A
-  saas.set_stats(1, 1, 30);
+  saas.set_stats(1, 30);
   expected_site_amplicon_aggregator_stats.push_back(saas);
   // 1 T
   saas.clear();
-  saas.set_stats(2, 2, 35);
+  saas.set_stats(2, 35);
   expected_site_amplicon_aggregator_stats.push_back(saas);
   // 22 -TC
   saas.clear();
-  saas.set_stats(0, 2, 22);
+  saas.set_stats(2, 22);
   expected_site_amplicon_aggregator_stats.push_back(saas);
   // 23 GAP
   saas.clear();
-  saas.set_stats(0, 2, 20);
+  saas.set_stats(2, 20);
   expected_site_amplicon_aggregator_stats.push_back(saas);
   // 23 C
   saas.clear();
-  saas.set_stats(1, 1, 20);
+  saas.set_stats(1, 20);
   expected_site_amplicon_aggregator_stats.push_back(saas);
   // 24 +G
   saas.clear();
-  saas.set_stats(2, 2, 20);
+  saas.set_stats(2, 20);
   expected_site_amplicon_aggregator_stats.push_back(saas);
 
   int pass = 0;
   for(int i = 0; i < expected_site_amplicon_aggregator_stats.size(); i++){
-    if(aggregated_site_states[expected_keys[i]].get_site_amplicon_stats()[amp1[0]] == expected_site_amplicon_aggregator_stats[i]) {
+    if(aggregated_site_states[expected_coord_keys[i].position].get_site_state_stats()[expected_site_states[i]].get_amplicon_stats()[amp1[0]] == expected_site_amplicon_aggregator_stats[i]) {
       pass +=1;
     } else {
-      std::cerr << "Aggregated stats not match for site " << expected_keys[i].coordinate.position << " " << expected_keys[i].state << std::endl;
+      std::cerr << "Aggregated stats not match for site " << expected_coord_keys[i].position << " " << expected_site_states[i] << std::endl;
+      std::cerr << "Observed states for site " << expected_coord_keys[i].position << ":" << aggregated_site_states[expected_coord_keys[i].position].get_site_state_stats()[expected_site_states[i]].get_amplicon_stats()[amp1[0]].get_count() << std::endl;
     }
   }
 
-  return (pass == expected_site_amplicon_aggregator_stats.size()) ? 0 : 1;
+  if(pass != expected_site_amplicon_aggregator_stats.size()) {
+    std::cerr << "Failed site amplicon aggregator stats test." << std::endl;
+    return 1;
+  }
+
+  site_states.clear();
+
+  // Position 1
+  set_site_state("A", 30, 1, amp2[0], false, site_states);
+  set_site_state("T", 25, 1, amp1[0], false, site_states);
+  set_site_state("T", 45, 1, amp1[0], false, site_states);
+
+  // Position 22
+  set_site_state("-TC", 22, 22, amp1[0], false, site_states);
+  set_site_state("-TC", 22, 22, amp1[0], false, site_states);
+
+  // Position 23
+  // Gap from -TC at 22
+  set_site_state_nucleotide_gap(20, 23, amp1[0], false, site_states);
+  set_site_state_nucleotide_gap(20, 23, amp2[0], false, site_states);
+
+  // Position 24
+  set_site_state("+G", 20, 24, amp1[0], false, site_states);
+  set_site_state("+G", 20, 24, amp2[0], false, site_states);
+
+  sa.clear();
+  aggregated_site_states.clear();
+
+  sa.initialize(24);
+  sa.aggregate(site_states);
+
+  // Expected amplicon depths
+  std::vector<std::unordered_map<ITNode*, uint32_t>> expected_amp_depths = {
+      {
+        {amp1[0], 2},
+        {amp2[0], 1}
+      },
+      {
+        {amp1[0], 2}
+      },
+      {
+        {amp1[0], 1},
+        {amp2[0], 1}
+      },
+      {}
+  };
+
+  std::unordered_map<ITNode*, uint32_t> amp_depths;
+  site_coordinate coord{
+  NUCLEOTIDE,
+  1
+  };
+
+  int positions[] = {1, 22, 23, 24};
+
+  for(int i = 0; i < 4; i++) {
+    coord.position = positions[i];
+    amp_depths.clear();
+    sa.calculate_amplicon_depths(coord, amp_depths);
+    if(amp_depths.size() != expected_amp_depths[i].size()) {
+      for(auto it = amp_depths.begin(); it != amp_depths.end(); ++it){
+        std::cerr << it->second << std::endl;
+      }
+      std::cerr << "Amplicon depths size mismatch for " << i << std::endl;
+      return 1;
+    }
+
+    for (auto it = expected_amp_depths[i].begin(); it != expected_amp_depths[i].end(); ++it){
+      ITNode *amplicon = it->first;
+      uint32_t depth = it->second;
+      if(amp_depths[amplicon] != depth) {
+        std::cerr << "Amplicon depth mismatch for amplicon: [" << amplicon->data->low << ", " << amplicon->data->high << "]" << std::endl;
+        return 1;
+      }
+    }
+
+
+  }
+  return 0;
 }

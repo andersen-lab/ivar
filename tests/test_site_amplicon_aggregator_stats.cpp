@@ -13,9 +13,9 @@ void set_site_amplicon_aggregator_stats(std::vector<site_state> &site_states, si
   }
 }
 
-site_amplicon_aggregator_stats get_expected_site_amplicon_aggregator_stats(uint32_t depth, uint32_t gapped_depth, uint8_t mean_quality) {
+site_amplicon_aggregator_stats get_expected_site_amplicon_aggregator_stats(uint32_t depth, uint8_t mean_quality) {
   site_amplicon_aggregator_stats expected_sas;
-  expected_sas.set_stats(depth, gapped_depth, mean_quality);
+  expected_sas.set_stats(depth, mean_quality);
   return expected_sas;
 }
 
@@ -35,7 +35,7 @@ int main() {
   set_site_state("A", 30, 1, nullptr, false, site_states);
   site_amplicon_aggregator_stats saas;
   set_site_amplicon_aggregator_stats(site_states, saas);
-  if (saas == get_expected_site_amplicon_aggregator_stats(1, 1, 30)){
+  if (saas == get_expected_site_amplicon_aggregator_stats(1, 30)){
       pass += 1;
   } else {
     std::cerr << "Failed at position 1 state A" << std::endl;
@@ -50,7 +50,7 @@ int main() {
 
   set_site_amplicon_aggregator_stats(site_states, saas);
 
-  if (saas == get_expected_site_amplicon_aggregator_stats(2, 2, 35)){
+  if (saas == get_expected_site_amplicon_aggregator_stats(2, 35)){
     pass += 1;
   } else {
     std::cerr << "Failed at position 1 state T" << std::endl;
@@ -65,7 +65,7 @@ int main() {
 
   set_site_amplicon_aggregator_stats(site_states, saas);
 
-  if (saas == get_expected_site_amplicon_aggregator_stats(0, 2, 23)){
+  if (saas == get_expected_site_amplicon_aggregator_stats(2, 23)){
     pass += 1;
   } else {
     std::cerr << "Failed at position 22 state -TC" << std::endl;
@@ -81,7 +81,7 @@ int main() {
 
   set_site_amplicon_aggregator_stats(site_states, saas);
 
-  if (saas == get_expected_site_amplicon_aggregator_stats(0, 2, 20)){
+  if (saas == get_expected_site_amplicon_aggregator_stats(2, 20)){
     pass += 1;
   } else {
     std::cerr << "Failed at position 23 state GAP" << std::endl;
@@ -95,7 +95,7 @@ int main() {
 
   set_site_amplicon_aggregator_stats(site_states, saas);
 
-  if (saas == get_expected_site_amplicon_aggregator_stats(1, 1, 20)){
+  if (saas == get_expected_site_amplicon_aggregator_stats(1, 20)){
     pass += 1;
   } else {
     std::cerr << "Failed at position 23 state C" << std::endl;
@@ -111,12 +111,12 @@ int main() {
 
   set_site_amplicon_aggregator_stats(site_states, saas);
 
-  if (saas == get_expected_site_amplicon_aggregator_stats(2, 2, 20)){
+  if (saas == get_expected_site_amplicon_aggregator_stats(2, 20)){
     pass += 1;
   } else {
     std::cerr << "Failed at position 24 state +G" << std::endl;
     return 1;
   }
 
-  return (pass == 5) ? 0 : 1;
+  return (pass == 6) ? 0 : 1;
 }

@@ -12,6 +12,7 @@ int main(){
   uint8_t min_qual = 20;
   std::string ref_path="../../data/db/test_ref.fa";
   variant_caller vc(min_qual, ref_path, "");
+  vc.initialize_region("test");
   samFile *bam = sam_open("../../data/test.unmapped.sorted.bam", "r");
   sam_hdr_t *header = sam_hdr_read(bam);
   bam1_t *aln = bam_init1();
