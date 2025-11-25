@@ -13,6 +13,10 @@ class Interval{
 
   Interval(int val1, int val2)
       : low(std::min(val1, val2)), high(std::max(val1, val2)) {}  // constructor
+
+  bool operator==(const Interval& other) const {
+    return (low == other.low) && (high == other.high);
+  }
 };
 
 // A node in IntervalTree
@@ -24,6 +28,10 @@ class ITNode {
   int max;
   int min;
   int height; // height of node
+
+  bool operator==(const ITNode& other) const {
+    return data == other.data;
+  }
 
   ITNode(Interval value)
       : data(new Interval(value)),
@@ -60,6 +68,10 @@ class ITNode {
       min = std::min(min, left->min);
     if (right != nullptr)
       min = std::min(min, right->min);
+  }
+
+  std::string to_string() const{
+    return std::to_string(data->low) + "-" + std::to_string(data->high);
   }
 };
 
