@@ -32,6 +32,13 @@ char ref_antd::get_base(int64_t pos, std::string region) {  // 1-based position
   return base;
 }
 
+int64_t ref_antd::get_length(std::string region) {
+  if (!region.empty() && this->fai != NULL) {
+    return faidx_seq_len64(this->fai, region.c_str());
+  }
+  return -1;
+}
+
 void ref_antd::reverse_complement_codon(char* codon) {
     char temp = comp_base[(unsigned char)codon[2]];
     codon[2] = comp_base[(unsigned char)codon[0]];

@@ -19,6 +19,7 @@ class ref_antd {
   ref_antd(std::string ref_path, std::string gff_path);
   ~ref_antd();
   char get_base(int64_t pos, std::string region);
+  int64_t get_length(std::string region);
   void reverse_complement_codon(char* codon);
   int add_gff(std::string path);
   int add_seq(std::string path);
