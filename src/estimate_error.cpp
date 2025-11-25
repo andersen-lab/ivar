@@ -16,7 +16,7 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster, doubl
     std::vector<uint32_t> removal_points;
     std::vector<double> z_scores = z_score(cluster);
     double mean = calculate_mean(cluster);
-    double std = calculate_standard_deviation(cluster);
+//    double std = calculate_standard_deviation(cluster);
     for(uint32_t i=0; i < z_scores.size(); i++){
       double abs = std::abs(z_scores[i]);
       if(abs > 1){

@@ -215,56 +215,56 @@ void collect_allele_stats(const std::vector<amplicon_info> &amplicons, std::unor
   }
 }
 
-std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> &global_positions, uint32_t min_depth, uint8_t min_qual){
-  std::vector<ITNode*> flagged_amplicons;
-  std::unordered_map<std::string, std::vector<double>> allele_frequencies;
-  std::unordered_map<std::string, std::vector<uint32_t>> allele_depths;
-  std::unordered_set<ITNode*> seen_amplicons;
-
-  for(uint32_t i=0; i < global_positions.size(); i++){
-
-    if(global_positions[i].amplicons.size() > 0 && global_positions[i].depth >= min_depth){
-      allele_frequencies.clear();
-      allele_depths.clear();
-
-      collect_allele_stats(global_positions[i].amplicons, allele_frequencies, allele_depths, min_qual);
-
-      for (auto &[key, values] : allele_frequencies) {
-        //TEST LINES
-        if(i == 27627){
-          std::cerr << "key " << key << std::endl;
-          for(auto a : values){
-            std::cerr << a << " ";
-          }
-          std::cerr << "\n";
-          for(auto d : allele_depths[key]){
-            std::cerr << d << " ";
-          }
-          std::cerr << "\n";
-        }
-        double std = calculate_standard_deviation_weighted(values, allele_depths[key]);
-        if(i == 27627) std::cerr << std << std::endl;
-        if(std > 0.055){
-          global_positions[i].flux = true;
-          //add the standard dev to the allele value
-          for(auto &a : global_positions[i].alleles){
-            if(a.nuc == key) a.stddev= std;
-          }
-
-          //add all amps to the flagged amps vec
-          for(auto amp : global_positions[i].amplicons){
-            if(amp.amp_depth == 0) continue;
-            ITNode* tmp = amp.node;
-            if (seen_amplicons.insert(tmp).second) {
-              flagged_amplicons.push_back(tmp);
-            }
-          }
-        }
-      }
-    }
-  }
-  return(flagged_amplicons);
-}
+//std::vector<ITNode*> calculate_amplicon_variation(std::vector<genomic_position> &global_positions, uint32_t min_depth, uint8_t min_qual){
+//  std::vector<ITNode*> flagged_amplicons;
+//  std::unordered_map<std::string, std::vector<double>> allele_frequencies;
+//  std::unordered_map<std::string, std::vector<uint32_t>> allele_depths;
+//  std::unordered_set<ITNode*> seen_amplicons;
+//
+//  for(uint32_t i=0; i < global_positions.size(); i++){
+//
+//    if(global_positions[i].amplicons.size() > 0 && global_positions[i].depth >= min_depth){
+//      allele_frequencies.clear();
+//      allele_depths.clear();
+//
+//      collect_allele_stats(global_positions[i].amplicons, allele_frequencies, allele_depths, min_qual);
+//
+//      for (auto &[key, values] : allele_frequencies) {
+//        //TEST LINES
+//        if(i == 27627){
+//          std::cerr << "key " << key << std::endl;
+//          for(auto a : values){
+//            std::cerr << a << " ";
+//          }
+//          std::cerr << "\n";
+//          for(auto d : allele_depths[key]){
+//            std::cerr << d << " ";
+//          }
+//          std::cerr << "\n";
+//        }
+//        double std = calculate_standard_deviation_weighted(values, allele_depths[key]);
+//        if(i == 27627) std::cerr << std << std::endl;
+//        if(std > 0.055){
+//          global_positions[i].flux = true;
+//          //add the standard dev to the allele value
+//          for(auto &a : global_positions[i].alleles){
+//            if(a.nuc == key) a.stddev= std;
+//          }
+//
+//          //add all amps to the flagged amps vec
+//          for(auto amp : global_positions[i].amplicons){
+//            if(amp.amp_depth == 0) continue;
+//            ITNode* tmp = amp.node;
+//            if (seen_amplicons.insert(tmp).second) {
+//              flagged_amplicons.push_back(tmp);
+//            }
+//          }
+//        }
+//      }
+//    }
+//  }
+//  return(flagged_amplicons);
+//}
 
 void add_allele_vectors(std::vector<allele> &alleles, const std::vector<allele> &amp_alleles){
   for (const auto &amp_al : amp_alleles) {
