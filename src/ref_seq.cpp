@@ -21,14 +21,21 @@ const unsigned char comp_base[256] = {
     240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
 };
 
-char ref_antd::get_base(int64_t pos, std::string region) {  // 1-based position
+void ref_antd::set_seq(std::string &region) {
   int len;
-  char base = 0;
+  seq = NULL;
   if (!region.empty() && this->fai != NULL) {
     seq = fai_fetch(this->fai, region.c_str(), &len);
   }
-  if (seq) base = *(seq + (pos - 1));
-  free(seq);
+}
+
+char ref_antd::get_base(int64_t pos, std::string region) {  // 1-based position
+  int len;
+  char base = 0;
+  if (seq == NULL) {
+    set_seq(region);
+  }
+  base = *(seq + (pos - 1));
   return base;
 }
 
@@ -48,8 +55,9 @@ void ref_antd::reverse_complement_codon(char* codon) {
 
 char *ref_antd::get_codon(int64_t pos, std::string region,
                           gff3_feature feature) {
-  int len;
-  seq = fai_fetch(this->fai, region.c_str(), &len);
+  if(seq == NULL){
+    set_seq(region);
+  }
   int64_t edit_pos = feature.get_edit_position(), codon_start_pos;
   std::string edit_sequence = feature.get_edit_sequence();
   int64_t edit_sequence_size = edit_sequence.size();
@@ -102,14 +110,14 @@ char *ref_antd::get_codon(int64_t pos, std::string region,
       reverse_complement_codon(codon);
   }
 
-  free(seq);
   return codon;
 }
 
 char *ref_antd::get_codon(int64_t pos, std::string region, gff3_feature feature,
                           char alt) {
-  int len;
-  seq = fai_fetch(this->fai, region.c_str(), &len);
+  if(seq == NULL){
+    set_seq(region);
+  }
   int64_t edit_pos = feature.get_edit_position(), codon_start_pos;
   std::string edit_sequence = feature.get_edit_sequence();
   int64_t edit_sequence_size = edit_sequence.size();
@@ -169,7 +177,6 @@ char *ref_antd::get_codon(int64_t pos, std::string region, gff3_feature feature,
       reverse_complement_codon(codon);
   }
 
-  free(seq);
   return codon;
 }
 
@@ -179,7 +186,7 @@ int ref_antd::add_gff(std::string path) {
   return 0;
 }
 
-int ref_antd::add_seq(std::string path) {
+int ref_antd::set_index(std::string path) {
   this->fai = NULL;
   // Read reference file
   if (!path.empty()) this->fai = fai_load(path.c_str());
@@ -192,12 +199,12 @@ int ref_antd::add_seq(std::string path) {
 
 ref_antd::ref_antd(std::string ref_path) {
   this->seq = NULL;
-  this->add_seq(ref_path);
+  this->set_index(ref_path);
 }
 
 ref_antd::ref_antd(std::string ref_path, std::string gff_path) {
   this->seq = NULL;
-  this->add_seq(ref_path);
+  this->set_index(ref_path);
   this->add_gff(gff_path);
 }
 
