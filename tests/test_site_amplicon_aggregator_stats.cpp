@@ -9,12 +9,12 @@ void set_site_state(std::string nuc, uint8_t quality, uint32_t position, ITNode 
 
 void set_site_amplicon_aggregator_stats(std::vector<site_state> &site_states, site_amplicon_aggregator_stats &saas) {
   for(int i = 0; i < site_states.size(); i++){
-    saas.add_site(site_states[i]);
+    saas.add_site(site_states[i].quality);
   }
 }
 
 site_amplicon_aggregator_stats get_expected_site_amplicon_aggregator_stats(uint32_t depth, uint8_t mean_quality) {
-  site_amplicon_aggregator_stats expected_sas;
+  site_amplicon_aggregator_stats expected_sas(nullptr);
   expected_sas.set_stats(depth, mean_quality);
   return expected_sas;
 }
@@ -33,7 +33,7 @@ int main() {
 
   // Position 1 state A
   set_site_state("A", 30, 1, nullptr, false, site_states);
-  site_amplicon_aggregator_stats saas;
+  site_amplicon_aggregator_stats saas(nullptr);
   set_site_amplicon_aggregator_stats(site_states, saas);
   if (saas == get_expected_site_amplicon_aggregator_stats(1, 30)){
       pass += 1;

@@ -92,7 +92,7 @@ int main() {
   };
 
   std::vector<site_amplicon_aggregator_stats> expected_site_amplicon_aggregator_stats;
-  site_amplicon_aggregator_stats saas;
+  site_amplicon_aggregator_stats saas(amp1[0]);
   // 1 A
   saas.set_stats(1, 30);
   expected_site_amplicon_aggregator_stats.push_back(saas);
@@ -119,11 +119,13 @@ int main() {
 
   int pass = 0;
   for(int i = 0; i < expected_site_amplicon_aggregator_stats.size(); i++){
-    if(aggregated_site_states[expected_coord_keys[i].position].get_site_state_stats()[expected_site_states[i]].get_amplicon_stats()[amp1[0]] == expected_site_amplicon_aggregator_stats[i]) {
+    if(*(aggregated_site_states[expected_coord_keys[i].position]
+            .get_site_state_aggregator_stats(expected_site_states[i])
+            ->get_site_amplicon_aggregator_stats(amp1[0])) == expected_site_amplicon_aggregator_stats[i]) {
       pass +=1;
     } else {
       std::cerr << "Aggregated stats not match for site " << expected_coord_keys[i].position << " " << expected_site_states[i] << std::endl;
-      std::cerr << "Observed states for site " << expected_coord_keys[i].position << ":" << aggregated_site_states[expected_coord_keys[i].position].get_site_state_stats()[expected_site_states[i]].get_amplicon_stats()[amp1[0]].get_count() << std::endl;
+      std::cerr << "Observed states for site " << expected_coord_keys[i].position << ":" << aggregated_site_states[expected_coord_keys[i].position].get_site_state_aggregator_stats(expected_site_states[i])->get_site_amplicon_aggregator_stats(amp1[0])->get_count() << std::endl;
     }
   }
 
