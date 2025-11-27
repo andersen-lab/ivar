@@ -9,10 +9,19 @@
 class site_aggregator_stats {
  private:
   // Map from state to its stats
-  std::unordered_map<std::string, site_state_aggregator_stats> site_state_stats;
+  std::vector<site_state_aggregator_stats> site_state_stats;
+
+  site_state_aggregator_stats* find_or_create_site_state_aggregator_stats(const std::string &state);
+
  public:
+
+  site_aggregator_stats() {
+    site_state_stats.reserve(4);
+  }
+  const site_state_aggregator_stats* get_site_state_aggregator_stats(const std::string &state) const;
+
   void add_site(site_state ss);
-  std::unordered_map<std::string, site_state_aggregator_stats> get_site_state_stats() const {
+  std::vector<site_state_aggregator_stats> get_site_state_stats() const {
     return site_state_stats;
   }
   void accumulate_amplicon_depths(std::unordered_map<ITNode*, uint32_t> &amp_depths);
