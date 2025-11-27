@@ -43,6 +43,8 @@ bool variant_caller::initialize_region(std::string region) {
 variant_caller::~variant_caller() {}
 
 bool variant_caller::parse_read(const bam1_t* read, std::string ref_name, std::vector<site_state> &read_site_states){
+  read_site_states.clear();
+  read_site_states.reserve(read->core.l_qseq);
   uint32_t total_query_pos=0;
   const uint8_t* query_sequence = bam_get_seq(read);
   uint32_t *cigar = bam_get_cigar(read);
@@ -59,24 +61,18 @@ bool variant_caller::parse_read(const bam1_t* read, std::string ref_name, std::v
         uint8_t tqual = static_cast<uint8_t>(qual[qpos]);
         uint8_t base_code = bam_seqi(query_sequence, qpos);
         char nuc = seq_nt_lookup[base_code];
-        site_state ss;
-        ss.set_nucleotide(std::string(1, nuc), tqual, rpos);
-        read_site_states.emplace_back(ss);
+        read_site_states.emplace_back(nuc, tqual, rpos, NUCLEOTIDE);
       }
     } else if(op == 2){
-      std::string tmp = "-";
+      std::string del_state = "-";
       for(uint32_t j=0; j < len; j++){
-        tmp += refantd.get_base(total_ref_pos+j, ref_name);
+        del_state += refantd.get_base(total_ref_pos+j, ref_name);
         if(j > 0){
           // Add gap character for remaining positions
-          site_state ss;
-          ss.set_nucleotide_gap(min_qual, total_ref_pos + j);
-          read_site_states.emplace_back(ss);
+          read_site_states.emplace_back(min_qual, total_ref_pos + j, NUCLEOTIDE);
         }
       }
-      site_state ss;
-      ss.set_nucleotide(tmp, min_qual, total_ref_pos);
-      read_site_states.emplace_back(ss);
+      read_site_states.emplace_back(del_state, min_qual, total_ref_pos, NUCLEOTIDE);
     } else if(op == 1){
       std::string tmp = "+";
       double qual_sum = 0;
@@ -89,9 +85,7 @@ bool variant_caller::parse_read(const bam1_t* read, std::string ref_name, std::v
         qual_sum += qual[qpos];
       }
       uint8_t avg_qual = static_cast<uint8_t>(qual_sum / len);
-      site_state ss;
-      ss.set_nucleotide(tmp, avg_qual, total_ref_pos-1); // Move insertion position to previous ref
-      read_site_states.emplace_back(ss);
+      read_site_states.emplace_back(tmp, avg_qual, total_ref_pos-1, NUCLEOTIDE);
     }
 
     //consumes ref
@@ -134,17 +128,17 @@ void variant_caller::merge_reads(std::vector<site_state> &read_site_states_one, 
   merged_site_states.reserve(read_site_states_one.size() + read_site_states_two.size());
   while (i < read_site_states_one.size() && j < read_site_states_two.size()) {
     if (read_site_states_one[i].coordinate < read_site_states_two[j].coordinate) {
-      merged_site_states.push_back(read_site_states_one[i]);
+      merged_site_states.emplace_back(read_site_states_one[i]);
       i++;
     } else if (read_site_states_one[i].coordinate > read_site_states_two[j].coordinate) {
-      merged_site_states.push_back(read_site_states_two[j]);
+      merged_site_states.emplace_back(read_site_states_two[j]);
       j++;
     } else {
       if(read_site_states_one[i].state == read_site_states_two[j].state) {
         read_site_states_one[i].quality = static_cast<uint8_t>(
           static_cast<double>(read_site_states_one[i].quality + read_site_states_two[j].quality) / 2
         );
-        merged_site_states.push_back(read_site_states_one[i]);
+        merged_site_states.emplace_back(read_site_states_one[i]);
       }
       i++;
       j++;
@@ -211,11 +205,10 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
       continue;
     }
 
-    for(auto const &site_state_pair: site_stats.get_site_state_stats()) {
-      const std::string &state = site_state_pair.first;
+    for(auto const &state_stats: site_stats.get_site_state_stats()) {
+      const std::string &state = state_stats.get_state();
       if(site_state::is_gap(state))
         continue;
-      const site_state_aggregator_stats &state_stats = site_state_pair.second;
 
       file << ref_name << DELIMITER; // region
       file << ((site_state::is_deletion(state)) ? coord.position - 1 : coord.position) << DELIMITER; // POS
