@@ -2,8 +2,15 @@
 
 const std::string site_state::GAP = "_";
 
-void site_state::set_nucleotide(std::string nucleotide, uint8_t qual, uint32_t position) {
+void site_state::set_nucleotide(const std::string &nucleotide, uint8_t qual, uint32_t position) {
   state = nucleotide;
+  quality = qual;
+  coordinate.type = NUCLEOTIDE;
+  coordinate.position = position;
+}
+
+void site_state::set_nucleotide(const char &nucleotide, uint8_t qual, uint32_t position) {
+  state.assign(1, nucleotide);
   quality = qual;
   coordinate.type = NUCLEOTIDE;
   coordinate.position = position;

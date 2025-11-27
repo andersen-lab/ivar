@@ -60,15 +60,43 @@ class site_state {
   site_coordinate coordinate;
   std::string state;
   uint8_t quality;
+  ITNode* amplicon;
+  bool is_ambiguous;
+
   static const std::string GAP;
   static bool is_deletion(const std::string &state);
   static bool is_insertion(const std::string &state);
   static bool is_gap(const std::string &state);
 
-  ITNode* amplicon;
-  bool is_ambiguous;
+  site_state() = default;
 
-  void set_nucleotide(std::string nucleotide, uint8_t qual, uint32_t position);
+  site_state(std::string state, uint8_t qual, uint32_t position, site_type st) {
+    if(st == NUCLEOTIDE) {
+      set_nucleotide(state, qual, position);
+      amplicon = nullptr;
+      is_ambiguous = false;
+    }
+  }
+
+  site_state(char state, uint8_t qual, uint32_t position, site_type st) {
+    if(st == NUCLEOTIDE) {
+      set_nucleotide(state, qual, position);
+      amplicon = nullptr;
+      is_ambiguous = false;
+    }
+  }
+
+  site_state(uint8_t qual, uint32_t position, site_type st) {
+    if(st == NUCLEOTIDE) {
+      set_nucleotide_gap(qual, position);
+      amplicon = nullptr;
+      is_ambiguous = false;
+    }
+  }
+
+  void set_nucleotide(const std::string &nucleotide, uint8_t qual, uint32_t position);
+  void set_nucleotide(const char &nucleotide, uint8_t qual, uint32_t position);
+
   void set_amplicon(ITNode* node, bool is_ambiguous = false);
   void set_nucleotide_gap(uint8_t min_qual, uint32_t position);
 
