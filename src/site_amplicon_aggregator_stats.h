@@ -8,9 +8,15 @@ class site_amplicon_aggregator_stats {
  private:
   uint32_t count=0;
   uint8_t mean_quality=0;
+  ITNode* amplicon = nullptr;
 
  public:
-  void add_site(site_state ss);
+
+  explicit site_amplicon_aggregator_stats(ITNode* amp) {
+    amplicon = amp;
+  }
+
+  void add_site(uint8_t ss_quality);
 
   void set_stats(uint32_t c, uint8_t mq) {
     count = c;
@@ -23,6 +29,10 @@ class site_amplicon_aggregator_stats {
 
   uint8_t get_mean_quality() const {
     return mean_quality;
+  }
+
+  ITNode* get_amplicon() const {
+    return amplicon;
   }
 
   bool operator == (const site_amplicon_aggregator_stats &other) const {
