@@ -54,6 +54,7 @@ bool variant_caller::parse_read(const bam1_t* read, std::string ref_name, std::v
   for (uint32_t i = 0; i < read->core.n_cigar; i++){
     uint32_t op = bam_cigar_op(cigar[i]);
     uint32_t len = bam_cigar_oplen(cigar[i]);
+    //TODO: Implement minimum quality filter
     if(op == 0){
       for(uint32_t j=0; j < len; j++){
         uint32_t qpos = total_query_pos + j;
@@ -206,6 +207,7 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
     }
 
     for(auto const &state_stats: site_stats.get_site_state_stats()) {
+      //TODO: Implement minimum depth and minimum frequency filter
       const std::string &state = state_stats.get_state();
       if(site_state::is_gap(state))
         continue;
