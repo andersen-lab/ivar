@@ -29,6 +29,7 @@ struct variant {
   double qual;
   double freq;
   double gapped_freq = 0;
+  double logit = 0;
   int cluster_assigned = -1;
   bool version_1_var=false;
   double std_dev;
@@ -59,6 +60,7 @@ struct variant {
 
 };
 
+double logit(double p);
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations);
 void split(std::string &s, char delim, std::vector<std::string> &elems);
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::vector<double> &std_devs, std::string ref, double default_threshold, double &error_rate);
@@ -74,5 +76,5 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound);
 double calculate_mad(const std::vector<double>& data, double mean);
 void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample);
 void reset_variants_info(std::vector<variant> &variants);
-arma::mat subsample_with_replacement(const arma::mat& data, std::size_t n_subsample, const std::vector<uint32_t>& position, std::vector<variant> &subsampled_variants, std::vector<variant> variants);
+arma::mat subsample_with_replacement(const arma::mat& data, std::size_t n_subsample, const std::vector<uint32_t>& position, std::vector<variant> &subsampled_variants, std::vector<variant> variants, bool error);
 #endif

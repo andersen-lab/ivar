@@ -13,6 +13,14 @@
 #include <limits>
 #include <unordered_map>
 
+double inv_logit(double x) {
+  return 1.0 / (1.0 + std::exp(-x));
+}
+
+double logit(double p) {
+  return std::log(p / (1.0 - p));
+}
+
 void reset_variants_info(std::vector<variant> &variants){
   //reset cluster assignments and probabilities prior to rerunning another model
   for(auto &var : variants){
@@ -26,15 +34,15 @@ arma::mat subsample_with_replacement(
     std::size_t n_subsample,
     const std::vector<uint32_t>& position,
     std::vector<variant> &subsampled_variants,
-    const std::vector<variant> variants) {
+    const std::vector<variant> variants,
+    bool error) {
 
-    // --- Group variants by position ---
     std::unordered_map<uint32_t, std::vector<std::size_t>> groups;
     for (std::size_t i = 0; i < position.size(); ++i) {
         groups[position[i]].push_back(i);
+        //groups[i].push_back(i);
     }
 
-    // --- Collect group IDs and weights (total_depth per position) ---
     std::vector<uint32_t> group_ids;
     std::vector<double> group_weights;
     group_ids.reserve(groups.size());
@@ -43,6 +51,7 @@ arma::mat subsample_with_replacement(
     for (const auto& kv : groups) {
         group_ids.push_back(kv.first);
         group_weights.push_back(variants[kv.second[0]].total_depth);
+        //group_weights.push_back(1);
     }
 
     std::random_device rd;
@@ -66,6 +75,7 @@ arma::mat subsample_with_replacement(
         variant_weights.reserve(cols.size());
         for (auto c : cols) {
             variant_weights.push_back(variants[c].gapped_depth);
+            //variant_weights.push_back(1);
         }
 
         std::discrete_distribution<std::size_t> variant_dist(variant_weights.begin(), variant_weights.end());
@@ -426,22 +436,19 @@ gaussian_mixture_model retrain_model(uint32_t n,
   gmodel.lower_n = lower_n;
   arma::gmm_diag model;
 
-  //std::cerr << "var floor " << var_floor << std::endl;
   bool status = model.learn(data, n, arma::eucl_dist, arma::static_spread, 10, 10, var_floor, false);
   if(!status){
-    //std::cerr << "GMM failed to converge" << std::endl;
     clustering_failed = true;
     return(gmodel);
   }
   std::vector<double> means;
-  
   for(auto h: model.hefts){
     double heft = (double)h;
     gmodel.hefts.push_back(heft);
   }
 
   for(auto d : model.dcovs){
-    gmodel.dcovs.push_back(std::sqrt((double)d));
+    gmodel.dcovs.push_back((double)d);
   }
 
   std::vector<std::vector<double>> prob_matrix;
@@ -455,7 +462,8 @@ gaussian_mixture_model retrain_model(uint32_t n,
     prob_matrix.push_back(tmp);
   }
   for(uint32_t i=0; i < model.means.size(); i++){
-    double m = (double)model.means[i];
+    double m = inv_logit((double)model.means[i]);
+    //double m = (double)model.means[i];
     means.push_back(m);
   }
 
@@ -472,6 +480,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
   std::vector<std::vector<double>> clusters = form_clusters(n, variants);
   gmodel.clusters = clusters;
   means.clear();
+
   //set means
   arma::mat mean_fill2 (1, n, arma::fill::zeros);
   for(uint32_t i=0; i < clusters.size(); i++){
@@ -482,8 +491,13 @@ gaussian_mixture_model retrain_model(uint32_t n,
     means.push_back(rounded);
 
   }
+  std::vector<double> hefts;
+  for(auto h : model.hefts){
+    hefts.push_back((double) h);
+  }
+  gmodel.hefts = hefts;
   model.set_means(mean_fill2);
-  gmodel.means = means;
+
   double k = (2 * n) + (n-1);
   double bic = calculate_BIC(k, gmodel.model.sum_log_p(data), (int) data.n_cols);
   gmodel.bic = bic;
@@ -666,7 +680,6 @@ void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, do
   }
 }
 
-
 /**
  * @brief Parses an internally formatted variant file and populates a vector of variant objects.
  *
@@ -716,6 +729,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     tmp.qual = std::stod(row_values[9]);
     if(row_values.size() > 20){
       tmp.gapped_freq = round(std::stod(row_values[20]) * multiplier) / multiplier;
+      tmp.logit = logit(tmp.gapped_freq);
       tmp.gapped_depth = std::stoi(row_values[21]);
       tmp.amplicon_flux = to_bool(row_values[22]);
       tmp.amplicon_masked = to_bool(row_values[23]);
@@ -793,6 +807,7 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
   }
 }
 
+
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, std::vector<double> &std_devs, \
                               std::string ref, double default_threshold, double &error_rate){
@@ -800,6 +815,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     std::cerr << "Please provide a reference sequence." << std::endl;
     exit(1);
   }
+
   uint32_t n=10;
   uint32_t round_val = 4;
   bool development_mode=true;
@@ -810,6 +826,13 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   cluster_error(base_variants, min_qual, min_depth, error_rate);
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
+
+  //TEST LINES
+  /*std::ofstream out( output_prefix + "_error.tsv", std::ios::app);
+  out << "lower_bound\tupper_bound\n";
+  out << std::to_string(lower_bound) << "\t" << std::to_string(upper_bound) << "\n";
+  out.close();
+  exit(0); */
 
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
   set_deletion_flags(base_variants, lower_bound);
@@ -873,13 +896,14 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //(rows, cols) where each columns is a sample
   std::vector<uint32_t> subsample_position;
   for(uint32_t i = 0; i < variants.size(); i++){
-    double tmp = static_cast<double>(variants[i].gapped_freq);
+    //double tmp = static_cast<double>(variants[i].gapped_freq);
+    double tmp = static_cast<double>(variants[i].logit); 
     subsample_position.push_back(variants[i].position);
     data.col(i) = tmp;
   }
   std::cerr << "useful var " << useful_var << std::endl;
 
-  std::unordered_map<uint32_t, uint32_t> model_counter; 
+  std::unordered_map<uint32_t, std::unordered_map<float, uint32_t>> model_counter; 
 
   bool empty_cluster = false;
   std::vector<std::vector<double>> solution_sets;
@@ -887,124 +911,138 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t counter = 1;
   bool clustering_failed =false;
   std::vector<variant> subsampled_variants;
-  uint32_t bootstrap_reps = 1000;
+  uint32_t bootstrap_reps = 10;
   uint32_t final_n=0;
-  double var_floor;
-  std::vector<double> all_var_floors = {0.005}; 
+  double var_floor = 0.000001;
 
   std::vector<double> track_var_floors;
   std::vector<double> track_bics;
   std::vector<std::vector<double>> track_means;
-  std::vector<std::vector<double>> track_std_devs;
+  std::vector<std::vector<double>> track_weights;
   std::vector<uint32_t> track_ns;
   std::vector<uint32_t> track_bootstraps;
+  std::vector<std::vector<double>> track_stds;
+  gaussian_mixture_model retrained;
+  double dcov_threshold = 0.30;
+  double dcov_threshold_1 = 0.05;
 
-  for(uint32_t i =0; i < bootstrap_reps; i++){
-    empty_cluster = false;
-    subsampled_variants.clear();
-    arma::mat subsample = subsample_with_replacement(data, data.size(), subsample_position, subsampled_variants, variants);
-    counter = 1;
-    std::vector<double> all_bics;
-    for(uint32_t j=0; j < all_var_floors.size(); j++){
-      counter = 1;
-      while(counter <= n && !empty_cluster){ 
-          clustering_failed = false;
-          reset_variants_info(subsampled_variants);
-          reset_variants_info(variants);
-          var_floor = all_var_floors[j];
-          gaussian_mixture_model retrained = retrain_model(counter, subsample, subsampled_variants, lower_n, var_floor, clustering_failed);
-          if(clustering_failed){
-            all_bics.push_back(std::numeric_limits<double>::max());
-            counter++;
-            continue;  
-          }
-          track_ns.push_back(counter);
-          track_var_floors.push_back(var_floor);
-          track_means.push_back(retrained.means);
-          track_std_devs.push_back(retrained.dcovs);
-          track_bics.push_back(retrained.bic);
-          track_bootstraps.push_back(i+1);
-          /*std::cerr << "bootstrap rep " << i << " bic " << retrained.bic << " n " << counter << "  var floor " << var_floor << std::endl;
-          for(auto m : retrained.means){
-            std::cerr << m << " ";
-          }
-          std::cerr << "\n";*/
-          double bic = retrained.bic;
-          all_bics.push_back(bic);
-          counter++;
-        }
-    }
-    double lowest = std::numeric_limits<double>::max(); 
-    uint32_t winner;
-    for(uint32_t i=0; i < all_bics.size(); i++){
-      if(all_bics[i] < lowest){
-        lowest = all_bics[i];
-        winner = i+1;
+  while(counter <= n){
+    clustering_failed = false;
+    bool meets_threshold = true;
+    reset_variants_info(variants);
+    std::cerr << "n " << counter << std::endl;
+    retrained = retrain_model(counter, data, variants, lower_n, var_floor, clustering_failed); 
+    calculate_cluster_deviations(retrained);
+    /*for(auto cluster : retrained.clusters){
+      std::cerr << cluster.size() << std::endl;
+    }*/
+
+    //we require the variance to be smaller for one cluster
+    if(counter == 1){
+      if(retrained.dcovs[0] > dcov_threshold_1){
+        meets_threshold = false;
       }
     }
-    model_counter[winner] += 1;
-  }
-
-  uint32_t highest = 0;
-  for (const auto& [key, value] : model_counter) {
-    if(value >= 900){
-      final_n = key;
-      highest = value;
+    for(auto d : retrained.dcovs){
+      std::cerr << d << " ";
+      if(d > dcov_threshold){
+        meets_threshold = false;
+      }
     }
-    std::cerr << key << " : " << value << '\n';
+    std::cerr << "\n";
+    for(auto d : retrained.means){
+      std::cerr << d << " ";
+    }
+    std::cerr << "\n";
+    track_ns.push_back(counter);
+    track_means.push_back(retrained.means);
+    track_stds.push_back(retrained.dcovs);
+    track_weights.push_back(retrained.hefts);
+
+
+    if(meets_threshold){
+      final_n = counter;
+      break;
+    } 
+    counter++;
   }
-  gaussian_mixture_model best_model; 
   std::cerr << "final n " << final_n << std::endl;
+
+  std::ofstream out_again(output_prefix + "_track_stats.tsv", std::ios::app);
+  out_again << "n\tvar_floor\tmeans\tdcovs\tweights\tbic\n";
+  for(uint32_t i=0; i < track_ns.size(); i++){
+    out_again << std::to_string(track_ns[i]) << "\t";
+    out_again << std::to_string(var_floor) << "\t";
+    out_again << vec_to_pylist(track_means[i]) << "\t";
+    out_again << vec_to_pylist(track_stds[i]) << "\t";
+    out_again << vec_to_pylist(track_weights[i]) << "\n";
+  }
+  out_again.close();
+  //exit(0);
+
   if(final_n ==0){
     std::cerr << output_prefix << " no solution found" << std::endl;
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
     exit(1);
   }
 
-  std::cerr << "new final n " << final_n << std::endl;
 
-
-  clustering_failed = false;
-  reset_variants_info(variants);
-  best_model= retrain_model(final_n, data, variants, lower_n, var_floor, clustering_failed); 
-  calculate_cluster_deviations(best_model);
-  
-  for(auto m : best_model.means){
-    std::cerr << "mean " << m << std::endl;  
+  //show the bootstrap support for this
+  for(uint32_t i =0; i < bootstrap_reps; i++){
+    empty_cluster = false;
+    subsampled_variants.clear();
+    arma::mat subsample = subsample_with_replacement(data, data.size(), subsample_position, subsampled_variants, variants, false);
+    clustering_failed = false;
+    reset_variants_info(subsampled_variants);
+    gaussian_mixture_model retrained = retrain_model(final_n, subsample, subsampled_variants, lower_n, var_floor, clustering_failed);
+    
+    if(clustering_failed){
+      continue;  
+    }
+    track_ns.push_back(counter);
+    track_var_floors.push_back(var_floor);
+    track_means.push_back(retrained.means);
+    track_stds.push_back(retrained.dcovs);
+    track_weights.push_back(retrained.hefts);
+    track_bics.push_back(retrained.bic);
+    track_bootstraps.push_back(i+1);
   }
 
-  //n, means, output_prefix, bic, var_floor, widths 
-  /*std::ofstream out("bootstrap_stats_0.005_0.90.tsv", std::ios::app);
-  for(uint32_t i=0; i < track_bics.size(); i++){
-    out << track_ns[i] << "\t"
-        << vec_to_pylist(track_means[i]) << "\t"
-        << output_prefix << "\t"
-        << std::to_string(track_bics[i]) << "\t"
-        << std::to_string(track_var_floors[i]) << "\t"
-        << vec_to_pylist(track_std_devs[i]) << "\t"
-        << std::to_string(track_bootstraps[i]) << "\n";
+  //TEST LINES
+  /*
+  std::ofstream out_again(output_prefix + "_track_stats.tsv", std::ios::app);
+  out_again << "n\tvar_floor\tmeans\tdcovs\tweights\tbic\n";
+  for(uint32_t i=0; i < track_ns.size(); i++){
+    out_again << std::to_string(track_ns[i]) << "\t";
+    out_again << std::to_string(track_var_floors[i]) << "\t";
+    out_again << vec_to_pylist(track_means[i]) << "\t";
+    out_again << vec_to_pylist(track_stds[i]) << "\t";
+    out_again << vec_to_pylist(track_weights[i]) << "\t";
+    out_again << std::to_string(track_bics[i]) << "\n";
   }
-  out.close();*/
+  out_again.close();
+  exit(0);*/
   
   std::ofstream file;
   if(development_mode){
     //write means to string
     file.open(output_prefix + ".txt", std::ios::trunc);
     std::string means_string = "[";
-    for(uint32_t j=0; j < best_model.means.size(); j++){
+    for(uint32_t j=0; j < retrained.means.size(); j++){
       if(j != 0){
         means_string += ",";
       }
-      means_string += std::to_string(best_model.means[j]);
+      means_string += std::to_string(retrained.means[j]);
     }
     means_string += "]";
     file << "means\n";
     file << means_string << "\n";
     file.close();
   }
-  assign_all_variants(variants, base_variants, best_model, lower_bound, upper_bound);
+
+  assign_all_variants(variants, base_variants, retrained, lower_bound, upper_bound);
   add_noise_variants(variants, base_variants);
-  solve_clusters(variants, best_model, lower_bound, solution, output_prefix, default_threshold, min_depth);
-  means = best_model.means;
+  solve_clusters(variants, retrained, lower_bound, solution, output_prefix, default_threshold, min_depth);
+  means = retrained.means;
   return(variants);
 }

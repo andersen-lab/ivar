@@ -53,74 +53,58 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
   uint32_t count_original=0;
   for(uint32_t i = 0; i < variants_original.size(); i++){
-    double tmp = static_cast<double>(variants_original[i].gapped_freq);
+    //double tmp = static_cast<double>(variants_original[i].gapped_freq);
+    double tmp = logit(variants_original[i].gapped_freq);
     data_original.col(count_original) = tmp;
     count_original += 1;
   }
 
   uint32_t chosen_peak = 0;
-  double var_floor = 0.0001;
+  double var_floor = 0.00001;
   bool clustering_failed = false;
-  std::vector<double> all_bics;
-  uint32_t bootstrap_reps = 1000;
   uint32_t i = 1;
-  std::vector<variant> subsampled_variants;
-  std::unordered_map<uint32_t, uint32_t> model_counter; 
-  while(i <= bootstrap_reps){
-    uint32_t n = 1;
-    subsampled_variants.clear();
+  uint32_t optimal_n = 1;
+  uint32_t n = 1;
+  double dcov_threshold = 0.70;
+  double dcov_threshold_1 = 0.05;
+  bool done_clustering = true;
+  while(n <= 5){
     clustering_failed = false;
-    all_bics.clear();
-    arma::mat subsample = subsample_with_replacement(data_original, data_original.size(), subsample_position, subsampled_variants, variants_original);
-    while(n <= 5){
-      reset_variants_info(subsampled_variants);
-      gaussian_mixture_model model = retrain_model(n, subsample, subsampled_variants, 2, var_floor, clustering_failed);
-      for(auto cluster : model.clusters){
-        if(cluster.size() == 0){
-          clustering_failed = true;
-        }
+    done_clustering = true;
+    reset_variants_info(variants_original);
+    std::cerr << "n " << n << std::endl;
+    gaussian_mixture_model model = retrain_model(n, data_original, variants_original, 2, var_floor, clustering_failed);
+    for(auto d : model.dcovs){
+      if(d > dcov_threshold && n != 1){
+        done_clustering = false;
+        break;
       }
-      if(!clustering_failed){
-        all_bics.push_back(model.bic);
-      } else {
-        all_bics.push_back(std::numeric_limits<double>::max());
+      if(d > dcov_threshold_1 && n == 1){
+        done_clustering = false;
+        break;
       }
-      n++;
+      std::cerr << d << " ";
     }
-    double lowest = std::numeric_limits<double>::max(); 
-    uint32_t winner;
-    for(uint32_t i=0; i < all_bics.size(); i++){
-      if(all_bics[i] < lowest){
-        lowest = all_bics[i];
-        winner = i+1;
-      }
+    std::cerr << "\n";
+    if(done_clustering){
+      optimal_n = n;
+      break;
     }
-    model_counter[winner] += 1;
-    i++;
+    n++;
   }
-
-  uint32_t optimal_n;
-  uint32_t highest = 0;
-  for (const auto& [key, value] : model_counter) {
-    if(value >= highest){
-      optimal_n = key;
-      highest = value;
-    }
-    std::cerr << key << " : " << value << '\n';
-  }
-
+  std::cerr << "optimal n: " << optimal_n << std::endl;
   gaussian_mixture_model model = retrain_model(optimal_n, data_original, variants_original, 2, var_floor, clustering_failed);
   std::vector<double> means = model.means;
   for(auto m : means){
     std::cerr << "mean " << m << std::endl;
   }
+
   chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
   std::vector<double> cleaned_cluster;
   std::vector<uint32_t> outliers;
 
   //for each cluster this describes the points which are outliers
   if(optimal_n > 1){
-    //outliers = determine_outlier_points(model.clusters[chosen_peak], 2.5);
     std::vector<double> universal_cluster = model.clusters[chosen_peak];
     for(uint32_t i=0; i < universal_cluster.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);

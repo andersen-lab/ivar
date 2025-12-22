@@ -11,6 +11,7 @@
 #include <numeric>
 
 void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth){
+  std::cerr << "in majority consensus call" << std::endl;
   uint32_t max_position=0;
   uint32_t min_position = 4294967295U;
   for(auto x : variants){
@@ -40,7 +41,6 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
       }
     }
     if(freqs.size() == 0) continue;
-
     //find the largest frequency
     uint32_t index = std::distance(freqs.begin(), std::max_element(freqs.begin(), freqs.end()));
     if(default_threshold > 0){
@@ -51,6 +51,7 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
       tmp[i-1] = nucs[index];
     }
   }
+  std::cerr << "tmp length " << tmp.size() << std::endl;
   std::string consensus_string = std::accumulate(tmp.begin(), tmp.end(), std::string(""));
   //std::string trimmed_consensus = trim_trailing_ambiguities(consensus_string, max_position);
   std::string next_trimmed_consensus = trim_leading_ambiguities(consensus_string, min_position);
