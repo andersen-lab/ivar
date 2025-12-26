@@ -118,6 +118,10 @@ add_executable(check_site_state_aggregator_stats
         test_site_state_aggregator_stats.cpp ../src/site_state_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/site_state.cpp
 )
 
+add_executable(check_gmm_1d
+        test_gmm_1d.cpp ../src/gmm_1d.cpp
+)
+
 set(ALL_TEST_EXECUTABLES check_primer_trim
         check_trim
         check_quality_trim
@@ -145,6 +149,7 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_site_aggregator
         check_site_amplicon_aggregator_stats
         check_site_state_aggregator_stats
+        check_gmm_1d
 )
 
 if(HTSLIB_PREFIX)
