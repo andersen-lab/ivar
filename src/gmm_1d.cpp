@@ -164,13 +164,13 @@ void gmm_1d::m_step_1d(const std::vector<double> &x, const std::vector<std::vect
   this->means.assign(G, 0.0);
   this->vars.assign(G, 0.0);
 
-  // Precompute resp.sum(axis=1) for resurrection logic
+  // Precompute for resurrection of components with no weight
   std::vector<double> row_sums(N, 0.0);
   for (size_t i = 0; i < N; ++i) {
     row_sums[i] = std::accumulate(resp[i].begin(), resp[i].end(), 0.0);
   }
 
-  // Precompute global variance np.var(x)
+  // Precompute global variance
   double mean_x = std::accumulate(x.begin(), x.end(), 0.0) / N;
   double var_x = 0.0;
   for (size_t i = 0; i < N; ++i) {
@@ -182,9 +182,7 @@ void gmm_1d::m_step_1d(const std::vector<double> &x, const std::vector<std::vect
   for (size_t g = 0; g < G; ++g) {
     if (L[g] == 0.0) {
       // Reinitialize component if likelihood is 0.
-      size_t idx =
-          std::distance(row_sums.begin(),
-                        std::max_element(row_sums.begin(), row_sums.end()));
+      size_t idx = std::distance(row_sums.begin(), std::max_element(row_sums.begin(), row_sums.end()));
 
       this->means[g] = x[idx];
       this->vars[g] = var_x;
@@ -267,7 +265,7 @@ void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, int n_it
   this->means = centers;
 }
 
-bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, std::vector<double>& logL_history, int n_iter, unsigned int seed) {
+bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, std::vector<double>& logL_history, int n_iter,  double tolerance, unsigned int seed) {
   const size_t N = x.size();
   if (sites.size() != N) {
     throw std::runtime_error("em_gmm_1d: x and sites size mismatch");
@@ -288,6 +286,16 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, st
 
   logL_history.reserve(n_iter);
 
+  // Count unique sites
+  std::vector<int> unique_sites = sites;
+  std::sort(unique_sites.begin(), unique_sites.end());
+  auto sites_end = std::unique(unique_sites.begin(), unique_sites.end());
+  const int n_unique_sites = std::distance(unique_sites.begin(), sites_end);
+
+  // Set convergence tolerance
+  const double conv_tol = (tolerance < 0.0) ? std::numeric_limits<double>::epsilon() : tolerance;
+  double old_avg_logL = -std::numeric_limits<double>::infinity();
+
   // EM loop
   for (size_t it = 0; it < n_iter; ++it) {
 
@@ -299,13 +307,41 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, st
     // M-step
     m_step_1d(x, resp);
 
+    // Average log-likelihood per site to check for convergence
+    const double avg_logL = logL / static_cast<double>(n_unique_sites);
+
+    // Check for non-finite log-likelihood
+    if (std::isfinite(avg_logL) == false) {
+      std::cerr << "ERROR: Non-finite log-likelihood at iteration " << it << "\n";
+      return false;
+    }
+
+    // Check for convergence
+    if (it > 0) {
+      const double delta = std::abs(old_avg_logL - avg_logL);
+
+      if (delta <= conv_tol) {
+        std::cerr << "Converged at iteration " << it
+                  << "  avg_logL=" << avg_logL
+                  << "  delta=" << delta << "\n";
+        logL_history.push_back(logL);
+        break;
+      }
+    }
+
+    old_avg_logL = avg_logL;
+
     logL_history.push_back(logL);
 
     // Logging
     std::cerr
         << "iter " << it
         << "  logL=" << logL
-        << "  weights=";
+        << "  avg_logL=" << avg_logL;
+    if (it > 0) {
+      std::cerr << "  delta=" << std::abs(old_avg_logL - avg_logL);
+    }
+    std::cerr << "  weights=";
     for (double v : this->weights) std::cerr << v << " ";
     std::cerr << " mus=";
     for (double v : this->means) std::cerr << v << " ";
@@ -418,7 +454,7 @@ double gmm_1d::get_bic(const std::vector<double> &x, const std::vector<int> &sit
   auto it = std::unique(unique_sites.begin(), unique_sites.end());
   const int n_unique_sites = std::distance(unique_sites.begin(), it);
 
-  const double n = static_cast<double>(sites.size());
+  const double n = static_cast<double>(n_unique_sites);
   if (n <= 1)
     throw std::runtime_error("bic(): need at least 2 sites for BIC");
 
@@ -460,63 +496,104 @@ double gmm_1d::calculate_bhattacharyya_distance_1d(double mu1, double v1, double
 
 // Based on Hennig et al. 2010
 // https://doi.org/10.1007/s11634-010-0058-3
-int gmm_1d::get_distinct_components_counts(const std::vector<int>& sites){
-  const int G = this->n_components;
+int gmm_1d::get_distinct_components_count(const std::vector<int>& sites) const {
+  const int G = n_components;
   if (G <= 0) return 0;
 
+  // Get minimum number of components from site constraint
   int m_max = 0;
   {
     std::vector<int> s = sites;
     std::sort(s.begin(), s.end());
     int run = 0;
     for (size_t i = 0; i < s.size(); ++i) {
-      if (i == 0 || s[i] == s[i-1]) run++;
-      else { m_max = std::max(m_max, run); run = 1; }
+      if (i == 0 || s[i] == s[i - 1]) {
+        run++;
+      } else {
+        m_max = std::max(m_max, run);
+        run = 1;
+      }
     }
-    if (!s.empty()) m_max = std::max(m_max, run);
+    if (!s.empty())
+      m_max = std::max(m_max, run);
   }
 
   std::vector<int> active;
   active.reserve(G);
-  for (int g = 0; g < G; ++g)
-    if (this->weights[g] > gmm_1d::DEFAULT_WEIGHT_FLOOR)
+  for (int g = 0; g < G; ++g) {
+    if (weights[g] > DEFAULT_WEIGHT_FLOOR)
       active.push_back(g);
+  }
 
   if (active.empty())
     return m_max;
 
-  std::sort(active.begin(), active.end(),
-            [&](int a, int b) { return weights[a] > weights[b]; });
+  std::vector<std::vector<int>> clusters;
+  clusters.reserve(active.size());
+  for (int g : active)
+    clusters.push_back({g});
 
-  std::vector<int> reps;
-  reps.reserve(active.size());
+  // Merge clusters until all BD > threshold for all clusters
+  bool merged;
+  do {
+    merged = false;
 
-  for (int g : active) {
-    bool is_new = true;
-    for (int r : reps) {
-      double d = calculate_bhattacharyya_distance_1d(
-          means[g], vars[g],
-          means[r], vars[r]
-      );
-      if (d <= MIN_BD_THRESHOLD) {
-        is_new = false;
-        break;
+    // Compare clusters pairwise
+    for (int i = 0; i < clusters.size() && !merged; ++i) {
+      for (int j = i + 1; j < clusters.size() && !merged; ++j) {
+
+        bool can_merge = true;
+
+        for (int gi : clusters[i]) {
+          for (int gj : clusters[j]) {
+            double d = calculate_bhattacharyya_distance_1d(means[gi], vars[gi], means[gj], vars[gj]);
+            if (d > MIN_BD_THRESHOLD) {
+              can_merge = false;
+              break;
+            }
+          }
+          if (!can_merge)
+            break;
+        }
+
+        if (can_merge) {
+          // Merge clusters
+          clusters[i].insert(
+              clusters[i].end(),
+              clusters[j].begin(),
+              clusters[j].end()
+          );
+          clusters.erase(clusters.begin() + j);
+          merged = true;
+        }
       }
     }
-    if (is_new)
-      reps.push_back(g);
+  } while (merged);
+
+  std::vector<double> m_sigmoid(means.size());
+  sigmoid_transform(means, m_sigmoid);
+
+  for (int c = 0; c < clusters.size(); ++c) {
+
+    int rep = clusters[c][0];
+    double max_w = weights[rep];
+
+    for (int g : clusters[c]) {
+      if (weights[g] > max_w) {
+        max_w = weights[g];
+        rep = g;
+      }
+    }
+
+    std::cerr << "distinct cluster " << c
+              << ": mean=" << means[rep]
+              << " mean in frequency space=" << m_sigmoid[rep]
+              << " var=" << vars[rep]
+              << " weight=" << weights[rep]
+              << "\n";
   }
 
-  std::cout << "\n\n";
-
-  for(int r: reps){
-    std::cout << "distinct component: mean=" << means[r]
-              << " var=" << vars[r]
-              << " weight=" << weights[r] << "\n";
-  }
-
-  int g_unique = (int)reps.size();
-
+  int g_unique = static_cast<int>(clusters.size());
   if (g_unique < m_max)
     g_unique = m_max;
 

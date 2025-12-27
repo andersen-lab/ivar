@@ -41,6 +41,33 @@ void read_in_variants(std::string fname, std::vector<double>& frequencies, std::
   }
 }
 
+void read_in_simulated_data(std::string fname, std::vector<double>& frequencies, std::vector<int>& sites) {
+  std::ifstream infile(fname);
+  std::string line;
+
+  while (std::getline(infile, line)) {
+    std::istringstream ss(line);
+    std::string cell;
+    std::vector<std::string> row;
+
+    while (std::getline(ss, cell, '\t')) {
+      row.push_back(cell);
+    }
+
+    if(row.at(1).compare("freqs") == 0)
+      continue;
+    double alt_freq = std::stod(row.at(1));
+
+    float invariant_threshold = 0.95;
+
+    if(alt_freq < invariant_threshold && alt_freq > (1 - invariant_threshold)) {
+      frequencies.push_back(alt_freq);
+      sites.push_back(std::stoi(row.at(2)));
+    }
+
+  }
+}
+
 int main() {
 
 //  double x[] = {-107498545664.81509, -9363075829.8171787};
@@ -87,11 +114,11 @@ int main() {
 
   std::vector<double> x;
   std::vector<int> sites;
-  int N = 4;
+  int N = 5;
 
 //  read_in_variants("/Users/karthik/tmp/ivar_chronic_paper/lineages_three_populations/var/triple_mix_2.txt", x, sites);
-  read_in_variants("/Users/karthik/tmp/ivar_chronic_paper/variants/SRR23446131_var.txt", x, sites);
-
+//  read_in_variants("/Users/karthik/tmp/ivar_chronic_paper/variants/SRR23446131_var.txt", x, sites);
+  read_in_simulated_data("/Users/karthik/tmp/ivar_chronic_paper/simulated_data/simulated_[0.2, 0.3, 0.5].tsv", x, sites);
 
   // Logit transform
   std::vector<double> x_logit;
@@ -104,7 +131,9 @@ int main() {
   model.fit(
       x_logit,
       sites,
-      logL_history
+      logL_history,
+      20,
+      1e-6
   );
 
   // Print results (logit space)
@@ -127,7 +156,7 @@ int main() {
         << "\n";
   }
 
-  std::cout << "Unique components: " << model.get_distinct_components_counts(sites) << "\n";
+  std::cout << "Unique components: " << model.get_distinct_components_count(sites) << "\n";
 
   std::vector<int> assigned_components;
   std::vector<std::vector<double>> marginal_posterior_probabilities;
