@@ -65,27 +65,25 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   uint32_t i = 1;
   uint32_t optimal_n = 1;
   uint32_t n = 1;
-  double dcov_threshold = 0.70;
-  double dcov_threshold_1 = 0.05;
+  double dcov_threshold = 0.20;
   bool done_clustering = true;
+
   while(n <= 5){
     clustering_failed = false;
     done_clustering = true;
     reset_variants_info(variants_original);
     std::cerr << "n " << n << std::endl;
-    gaussian_mixture_model model = retrain_model(n, data_original, variants_original, 2, var_floor, clustering_failed);
-    for(auto d : model.dcovs){
-      if(d > dcov_threshold && n != 1){
-        done_clustering = false;
-        break;
-      }
-      if(d > dcov_threshold_1 && n == 1){
-        done_clustering = false;
-        break;
-      }
-      std::cerr << d << " ";
+    gaussian_mixture_model model = retrain_model(n, data_original, variants_original, 2, var_floor, clustering_failed, false);
+    uint32_t largest_idx = std::distance(model.means.begin(), std::max_element(model.means.begin(), model.means.end()));
+
+    double target_dcov = model.dcovs[largest_idx];
+    std::cerr << "target " << target_dcov << std::endl;
+    if(target_dcov > dcov_threshold){
+      done_clustering = false;
     }
-    std::cerr << "\n";
+    for(uint32_t i=0; i < model.means.size(); i++){
+      std::cerr << "means " << model.means[i] << " dcovs " << model.dcovs[i] << std::endl;
+    }
     if(done_clustering){
       optimal_n = n;
       break;
@@ -93,11 +91,18 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     n++;
   }
   std::cerr << "optimal n: " << optimal_n << std::endl;
-  gaussian_mixture_model model = retrain_model(optimal_n, data_original, variants_original, 2, var_floor, clustering_failed);
+  gaussian_mixture_model model = retrain_model(optimal_n, data_original, variants_original, 2, var_floor, clustering_failed, true);
   std::vector<double> means = model.means;
   for(auto m : means){
     std::cerr << "mean " << m << std::endl;
   }
+  /*for(uint32_t i=0; i < variants_original.size(); i++){
+    std::cerr << variants_original[i].position << " " << variants_original[i].gapped_freq << " ";
+    for(auto p : variants_original[i].probabilities){
+      std::cerr << p << " ";
+    }
+    std::cerr << "\n";
+  }*/
 
   chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
   std::vector<double> cleaned_cluster;
@@ -106,6 +111,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   //for each cluster this describes the points which are outliers
   if(optimal_n > 1){
     std::vector<double> universal_cluster = model.clusters[chosen_peak];
+    //outliers = determine_outlier_points(universal_cluster, 2.5);
     for(uint32_t i=0; i < universal_cluster.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
       if(it == outliers.end()){

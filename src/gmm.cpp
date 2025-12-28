@@ -415,7 +415,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
                                     std::vector<variant> &variants, 
                                     uint32_t lower_n, 
                                     double &var_floor, 
-                                    bool &clustering_failed){
+                                    bool &clustering_failed, bool error_model){
 
    //this is used in the variant assignement portion of the code
   std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
@@ -436,7 +436,7 @@ gaussian_mixture_model retrain_model(uint32_t n,
   gmodel.lower_n = lower_n;
   arma::gmm_diag model;
 
-  bool status = model.learn(data, n, arma::eucl_dist, arma::static_spread, 10, 10, var_floor, false);
+  bool status = model.learn(data, n, arma::eucl_dist, arma::static_spread, 10, 15, var_floor, false);
   if(!status){
     clustering_failed = true;
     return(gmodel);
@@ -462,8 +462,12 @@ gaussian_mixture_model retrain_model(uint32_t n,
     prob_matrix.push_back(tmp);
   }
   for(uint32_t i=0; i < model.means.size(); i++){
-    double m = inv_logit((double)model.means[i]);
-    //double m = (double)model.means[i];
+    double m;
+    if(!error_model){
+      m = inv_logit((double)model.means[i]);
+    } else {
+      m = (double)model.means[i];
+    }
     means.push_back(m);
   }
 
@@ -931,11 +935,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     bool meets_threshold = true;
     reset_variants_info(variants);
     std::cerr << "n " << counter << std::endl;
-    retrained = retrain_model(counter, data, variants, lower_n, var_floor, clustering_failed); 
+    retrained = retrain_model(counter, data, variants, lower_n, var_floor, clustering_failed, false); 
     calculate_cluster_deviations(retrained);
-    /*for(auto cluster : retrained.clusters){
-      std::cerr << cluster.size() << std::endl;
-    }*/
 
     //we require the variance to be smaller for one cluster
     if(counter == 1){
@@ -943,22 +944,22 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         meets_threshold = false;
       }
     }
+
     for(auto d : retrained.dcovs){
-      std::cerr << d << " ";
+      std::cerr << "dcov " << d << " ";
       if(d > dcov_threshold){
         meets_threshold = false;
       }
     }
     std::cerr << "\n";
     for(auto d : retrained.means){
-      std::cerr << d << " ";
+      std::cerr << "mean " << d << " ";
     }
     std::cerr << "\n";
     track_ns.push_back(counter);
     track_means.push_back(retrained.means);
     track_stds.push_back(retrained.dcovs);
     track_weights.push_back(retrained.hefts);
-
 
     if(meets_threshold){
       final_n = counter;
@@ -994,7 +995,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     arma::mat subsample = subsample_with_replacement(data, data.size(), subsample_position, subsampled_variants, variants, false);
     clustering_failed = false;
     reset_variants_info(subsampled_variants);
-    gaussian_mixture_model retrained = retrain_model(final_n, subsample, subsampled_variants, lower_n, var_floor, clustering_failed);
+    gaussian_mixture_model retrained = retrain_model(final_n, subsample, subsampled_variants, lower_n, var_floor, clustering_failed, false);
     
     if(clustering_failed){
       continue;  
