@@ -496,7 +496,7 @@ double gmm_1d::calculate_bhattacharyya_distance_1d(double mu1, double v1, double
 
 // Based on Hennig et al. 2010
 // https://doi.org/10.1007/s11634-010-0058-3
-int gmm_1d::get_distinct_components_count(const std::vector<int>& sites) const {
+int gmm_1d::get_distinct_components_count(const std::vector<int>& sites) {
   const int G = n_components;
   if (G <= 0) return 0;
 
@@ -584,6 +584,9 @@ int gmm_1d::get_distinct_components_count(const std::vector<int>& sites) const {
         rep = g;
       }
     }
+    merged_means.push_back(m_sigmoid[rep]);
+    merged_vars.push_back(vars[rep]);
+    merged_weights.push_back(weights[rep]);
 
     std::cerr << "distinct cluster " << c
               << ": mean=" << means[rep]

@@ -43,7 +43,7 @@ class gmm_1d {
   static void logit_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static void sigmoid_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static double calculate_bhattacharyya_distance_1d(double mu1, double v1, double mu2, double v2);
-  int get_distinct_components_count(const std::vector<int>& sites) const;
+  int get_distinct_components_count(const std::vector<int>& sites);
 
   bool fit(const std::vector<double>& x, const std::vector<int>& sites, std::vector<double>& logL_history, int n_iter = 20, double tolerance = -1.0, unsigned int seed = 112358);
   bool predict(const std::vector<double>& x, const std::vector<int>& sites, std::vector<int>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const;
@@ -56,6 +56,11 @@ class gmm_1d {
 
   void set_var_floor(double val) { var_floor = val; }
   void set_weight_floor(double val) { weight_floor = val; }
+
+  //store the cluster infor post-merging
+  std::vector<double> merged_means;
+  std::vector<double> merged_vars;
+  std::vector<double> merged_weights; 
 };
 
 #endif
