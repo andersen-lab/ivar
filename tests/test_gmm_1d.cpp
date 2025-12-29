@@ -28,7 +28,9 @@ void read_in_variants(std::string fname, std::vector<double>& frequencies, std::
 
     if(row.at(10).compare("ALT_FREQ") == 0)
       continue;
+    std::cerr << "a" << std::endl;
     double alt_freq = std::stod(row.at(10));
+    std::cerr << "b" << std::endl;
     int total_dp = std::stoi(row.at(11));
 
     float invariant_threshold = 0.95;
@@ -44,8 +46,12 @@ void read_in_variants(std::string fname, std::vector<double>& frequencies, std::
 void read_in_simulated_data(std::string fname, std::vector<double>& frequencies, std::vector<int>& sites) {
   std::ifstream infile(fname);
   std::string line;
-
+  uint32_t i=0;
   while (std::getline(infile, line)) {
+    if(i ==0){
+      i++;
+      continue;
+    }
     std::istringstream ss(line);
     std::string cell;
     std::vector<std::string> row;
@@ -54,21 +60,21 @@ void read_in_simulated_data(std::string fname, std::vector<double>& frequencies,
       row.push_back(cell);
     }
 
-    if(row.at(1).compare("freqs") == 0)
-      continue;
-    double alt_freq = std::stod(row.at(1));
+    double alt_freq = std::stod(row.at(20));
 
     float invariant_threshold = 0.95;
+    double total_dp = std::stod(row.at(11));
+    double alt_qual = std::stod(row.at(9));
 
-    if(alt_freq < invariant_threshold && alt_freq > (1 - invariant_threshold)) {
+    if(alt_freq < invariant_threshold && alt_freq > (1 - invariant_threshold) && total_dp >= 10 && alt_qual >= 20) {
       frequencies.push_back(alt_freq);
-      sites.push_back(std::stoi(row.at(2)));
+      sites.push_back(std::stoi(row.at(1)));
     }
 
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
 
 //  double x[] = {-107498545664.81509, -9363075829.8171787};
 //  double y = gmm_1d::log_sum_exp(x, 2);
@@ -115,10 +121,10 @@ int main() {
   std::vector<double> x;
   std::vector<int> sites;
   int N = 5;
+  std::string input = argv[1];
+  std::string prefix = argv[2];
 
-//  read_in_variants("/Users/karthik/tmp/ivar_chronic_paper/lineages_three_populations/var/triple_mix_2.txt", x, sites);
-//  read_in_variants("/Users/karthik/tmp/ivar_chronic_paper/variants/SRR23446131_var.txt", x, sites);
-  read_in_simulated_data("/Users/karthik/tmp/ivar_chronic_paper/simulated_data/simulated_[0.2, 0.3, 0.5].tsv", x, sites);
+  read_in_simulated_data(input, x, sites);
 
   // Logit transform
   std::vector<double> x_logit;
@@ -141,12 +147,12 @@ int main() {
   const auto& m = model.get_means();
   const auto& v = model.get_vars();
 
-  std::cout << "\nFitted GMM:\n";
 
   std::vector<double> m_sigmoid;
   gmm_1d::sigmoid_transform(m, m_sigmoid, eps);
+  model.get_distinct_components_count(sites);
 
-  for (size_t g = 0; g < N; ++g) {
+  /*for (size_t g = 0; g < N; ++g) {
     std::cout
         << "Component " << g
         << "  mean=" << m[g]
@@ -154,9 +160,17 @@ int main() {
         << "  weight=" << w[g]
         << "  var=" << v[g]
         << "\n";
+  }*/
+  std::cerr << "Merged components: " << model.merged_means.size() << "\n";
+  std::ofstream mean_out(prefix + ".txt");
+  mean_out << "mean\tweight\tvar\n";
+  for(uint32_t i=0; i < model.merged_means.size(); i++){
+    mean_out << std::to_string(model.merged_means[i]) << "\t";
+    mean_out << std::to_string(model.merged_weights[i]) << "\t";
+    mean_out << std::to_string(model.merged_vars[i]) << "\n";
   }
-
-  std::cout << "Unique components: " << model.get_distinct_components_count(sites) << "\n";
+  mean_out.close();
+  exit(0);
 
   std::vector<int> assigned_components;
   std::vector<std::vector<double>> marginal_posterior_probabilities;
@@ -168,7 +182,7 @@ int main() {
   );
   std::cerr << "BIC: "<< model.get_bic(x_logit, sites) << "\n";
 
-  std::ofstream out("/Users/karthik/Documents/code/saga/output_x.tsv");
+  std::ofstream out("./output_x.tsv");
   out << "data" << "\t" << "site" << "\t";
   for (int i = 0; i < N; ++i) {
     out << "comp_" << i;
