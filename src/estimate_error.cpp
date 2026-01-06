@@ -24,6 +24,8 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster, doubl
     }
     return(removal_points);
 }
+
+
 void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold, uint32_t depth_cutoff, double &error_rate){
   double lower_bound = 0.50;
   double upper_bound = 0.99;
@@ -82,7 +84,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
       done_clustering = false;
     }
     for(uint32_t i=0; i < model.means.size(); i++){
-      std::cerr << "means " << model.means[i] << " dcovs " << model.dcovs[i] << std::endl;
+      std::cerr << "  means " << model.means[i] << " dcovs " << model.dcovs[i] << std::endl;
     }
     if(done_clustering){
       optimal_n = n;
@@ -91,18 +93,28 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     n++;
   }
   std::cerr << "optimal n: " << optimal_n << std::endl;
-  gaussian_mixture_model model = retrain_model(optimal_n, data_original, variants_original, 2, var_floor, clustering_failed, true);
+  gaussian_mixture_model model = retrain_model(optimal_n, data_original, variants_original, 2, var_floor, clustering_failed, false);
   std::vector<double> means = model.means;
   for(auto m : means){
     std::cerr << "mean " << m << std::endl;
   }
-  /*for(uint32_t i=0; i < variants_original.size(); i++){
-    std::cerr << variants_original[i].position << " " << variants_original[i].gapped_freq << " ";
-    for(auto p : variants_original[i].probabilities){
-      std::cerr << p << " ";
+  std::vector<std::vector<double>> clusters(optimal_n);
+  for(uint32_t i=0; i < variants_original.size(); i++){
+    double freq = variants_original[i].gapped_freq;
+    std::size_t best_idx = 0;
+    double best_dist = std::numeric_limits<double>::max();
+    for (std::size_t j = 0; j < means.size(); ++j) {
+        double dist = std::abs(freq - means[j]);
+        if (dist < best_dist) {
+            best_dist = dist;
+            best_idx = j;
+        }
     }
-    std::cerr << "\n";
-  }*/
+    clusters[best_idx].push_back(freq);
+    //std::cerr << freq << " " << means[best_idx] << std::endl;
+    //exit(0);
+  }
+  
 
   chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
   std::vector<double> cleaned_cluster;
@@ -110,7 +122,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
   //for each cluster this describes the points which are outliers
   if(optimal_n > 1){
-    std::vector<double> universal_cluster = model.clusters[chosen_peak];
+    std::vector<double> universal_cluster = clusters[chosen_peak];
     //outliers = determine_outlier_points(universal_cluster, 2.5);
     for(uint32_t i=0; i < universal_cluster.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);

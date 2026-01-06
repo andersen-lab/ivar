@@ -832,11 +832,11 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   double upper_bound = error_rate-0.0001;
 
   //TEST LINES
-  /*std::ofstream out( output_prefix + "_error.tsv", std::ios::app);
+  std::ofstream out( output_prefix + "_error.tsv", std::ios::app);
   out << "lower_bound\tupper_bound\n";
   out << std::to_string(lower_bound) << "\t" << std::to_string(upper_bound) << "\n";
   out.close();
-  exit(0); */
+  //exit(0);
 
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
   set_deletion_flags(base_variants, lower_bound);
@@ -927,7 +927,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<uint32_t> track_bootstraps;
   std::vector<std::vector<double>> track_stds;
   gaussian_mixture_model retrained;
-  double dcov_threshold = 0.30;
+  double dcov_threshold = 0.40;
   double dcov_threshold_1 = 0.05;
 
   while(counter <= n){
