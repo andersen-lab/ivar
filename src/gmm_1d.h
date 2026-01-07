@@ -11,8 +11,8 @@ class gmm_1d {
   // From https://learn.microsoft.com/en-us/cpp/c-runtime-library/math-constants
   static constexpr double PI =	3.14159265358979323846;
   static constexpr double DEFAULT_VAR_FLOOR = 1e-3;
-  static constexpr double DEFAULT_WEIGHT_FLOOR = 1e-10;
-  static constexpr double MIN_BD_THRESHOLD = 2.3025850929940455; // -log(d*) roughly based on Hennig et al. 2010s
+  static constexpr double DEFAULT_WEIGHT_FLOOR = 1e-3;
+  static constexpr double MIN_BD_THRESHOLD = 7.3025850929940455; // -log(d*) roughly based on Hennig et al. 2010s
 
   static double log_normal_1d(double x, double mu, double var);
 

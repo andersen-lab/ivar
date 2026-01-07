@@ -67,6 +67,8 @@ struct variant {
   std::vector<double> probabilities;
 
 };
+
+double calculate_BIC(double k, double logL, int N);
 double elbow_method(std::vector<double> ics, std::vector<double> ns, std::vector<bool> exclude_ns);
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations);
 void split(std::string &s, char delim, std::vector<std::string> &elems);
@@ -84,6 +86,5 @@ void add_noise_variants(std::vector<variant> &variants, std::vector<variant> bas
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound);
 double calculate_mad(const std::vector<double>& data, double mean);
 void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample);
-double empirical_misclassification_probability(const std::vector<variant>& all_variants);
 void reset_variants_info(std::vector<variant> &variants);
 #endif
