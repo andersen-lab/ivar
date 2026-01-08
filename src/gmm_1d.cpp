@@ -265,17 +265,15 @@ void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, int n_it
   this->means = centers;
 }
 
-bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, std::vector<double>& logL_history, int n_iter,  double tolerance, unsigned int seed) {
+bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, std::vector<double>& logL_history, int n_iter,  double tolerance, bool adaptive, unsigned int seed) {
   const size_t N = x.size();
   if (sites.size() != N) {
     throw std::runtime_error("em_gmm_1d: x and sites size mismatch");
   }
   const int G = this->n_components;
-
   initialize_k_means_1d(x, G, 10, seed);
   this->vars.assign(G, this->var_floor);
   this->weights.assign(G, 1.0 / static_cast<double>(G));
-
   std::cerr << "k-means init\nmeans: ";
   for (double v : this->means) std::cerr << v << " ";
   std::cerr << "\nvars: ";
@@ -307,6 +305,10 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, st
     // M-step
     m_step_1d(x, resp);
 
+    //TESTLINES
+    if(adaptive){
+      this->vars.assign(G, 0.05); 
+    }
     // Average log-likelihood per site to check for convergence
     const double avg_logL = logL / static_cast<double>(n_unique_sites);
 
@@ -496,7 +498,7 @@ double gmm_1d::calculate_bhattacharyya_distance_1d(double mu1, double v1, double
 
 // Based on Hennig et al. 2010
 // https://doi.org/10.1007/s11634-010-0058-3
-int gmm_1d::get_distinct_components_count(const std::vector<int>& sites) {
+int gmm_1d::get_distinct_components_count(const std::vector<int>& sites, double min_bd_threshold) {
   const int G = n_components;
   if (G <= 0) return 0;
 
@@ -547,7 +549,7 @@ int gmm_1d::get_distinct_components_count(const std::vector<int>& sites) {
         for (int gi : clusters[i]) {
           for (int gj : clusters[j]) {
             double d = calculate_bhattacharyya_distance_1d(means[gi], vars[gi], means[gj], vars[gj]);
-            if (d > MIN_BD_THRESHOLD) {
+            if (d > min_bd_threshold) {
               can_merge = false;
               break;
             }

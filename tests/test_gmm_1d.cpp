@@ -2,6 +2,7 @@
 #include "../src/include/armadillo"
 #include <random>
 #include <iostream>
+#include <unordered_map>
 #include <cmath>
 #include <fstream>
 #include <sstream>
@@ -12,11 +13,6 @@ double log_sum_exp_naive(const double* x, int n) {
     sum += std::exp(x[i]);
   }
   return std::log(sum);
-}
-double calculate_BIC(double k, double logL, int N) {
-    if (N == 0) return std::numeric_limits<double>::infinity();
-    double bic = -2.0 * logL + k * std::log(N);
-    return bic;
 }
 
 void read_in_simulated_data(std::string fname, std::vector<double>& frequencies, std::vector<int>& sites, float invariant_threshold) {
@@ -95,20 +91,6 @@ std::vector<double> z_score(std::vector<double> data, double mean) {
     return z_scores;
 }
 
-std::vector<uint32_t>determine_outlier_points(std::vector<double> &cluster, double threshold, double &mean){
-    std::vector<uint32_t> removal_points;
-    std::vector<double> z_scores = z_score(cluster, mean);
-
-    for(uint32_t i=0; i < z_scores.size(); i++){
-      double abs = std::abs(z_scores[i]);
-      if(abs >= threshold){
-        std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
-        removal_points.push_back(i);
-      }
-    }
-    return(removal_points);
-}
-
 double find_adaptive_threshold(const std::vector<double>& frequencies, const double eps, std::vector<int> sites){
   std::vector<double> x_logit;
   gmm_1d::logit_transform(frequencies, x_logit, eps);
@@ -122,7 +104,8 @@ double find_adaptive_threshold(const std::vector<double>& frequencies, const dou
       sites,
       logL_history,
       20,
-      1e-6
+      1e-6,
+      true
   );
 
   // Print results (logit space)
@@ -135,7 +118,7 @@ double find_adaptive_threshold(const std::vector<double>& frequencies, const dou
   model.get_distinct_components_count(sites);
 
   std::cerr << "Merged components: " << model.merged_means.size() << "\n";
-
+  
   //extra check to make sure that the model means aren't super close together...
   int final_N = model.merged_means.size();
   gmm_1d model2(final_N);
@@ -144,7 +127,8 @@ double find_adaptive_threshold(const std::vector<double>& frequencies, const dou
       sites,
       logL_history,
       20,
-      1e-6
+      1e-6,
+      true
   );
   const auto& m2 = model2.get_means();
   std::vector<double> m_sigmoid2;
@@ -170,20 +154,15 @@ double find_adaptive_threshold(const std::vector<double>& frequencies, const dou
   std::vector<double> largest_cluster_snps;
   for(uint32_t i =0; i < frequencies.size(); i++){
     if(assigned_components[i] == largest_idx){
+      if(marginal_posterior_probabilities[i][largest_idx] < 0.50){
+        std::cerr << "freq " << frequencies[i] << " " << marginal_posterior_probabilities[i][largest_idx] << "\n";
+      }
       largest_cluster_snps.push_back(frequencies[i]);
     }
   }
 
-  std::vector<uint32_t> removal_points;
-  if(final_N == 1){
-    removal_points = determine_outlier_points(largest_cluster_snps, 2.5, largest_mean);
-  }
   double smallest_cluster_snp = 1.0;
   for(uint32_t k=0; k < largest_cluster_snps.size(); k++){
-    auto it = std::find(removal_points.begin(), removal_points.end(), k);
-    if(it != removal_points.end()){
-      continue;
-    }
     if(largest_cluster_snps[k] < smallest_cluster_snp){
       smallest_cluster_snp = largest_cluster_snps[k];
     }
@@ -242,12 +221,12 @@ int main(int argc, char* argv[]) {
   std::string input = argv[1];
   std::string prefix = argv[2];
 
-  std::vector<double> y;
-  //here we find the largest 
-
+  //determine the adaptive threshold
+  std::vector<double> y; 
   read_in_universal_data(input, y, sites);
   double largest_mean = find_adaptive_threshold(y, eps, sites);
   std::cerr << "Adaptive threshold: " << largest_mean << "\n";
+  //exit(0);
   sites.clear();
   read_in_simulated_data(input, x, sites, largest_mean);
 
@@ -271,22 +250,12 @@ int main(int argc, char* argv[]) {
   const auto& m = model.get_means();
   const auto& v = model.get_vars();
 
-
   std::vector<double> m_sigmoid;
   gmm_1d::sigmoid_transform(m, m_sigmoid, eps);
   model.get_distinct_components_count(sites);
-
-  /*for (size_t g = 0; g < N; ++g) {
-    std::cout
-        << "Component " << g
-        << "  mean=" << m[g]
-        << "  mean in frequency space=" << m_sigmoid[g]
-        << "  weight=" << w[g]
-        << "  var=" << v[g]
-        << "\n";
-  }*/
   std::cerr << "Merged components: " << model.merged_means.size() << "\n";
   int final_n = model.merged_means.size();
+
   gmm_1d model2(final_n);
   model2.fit(
       x_logit,

@@ -12,7 +12,7 @@ class gmm_1d {
   static constexpr double PI =	3.14159265358979323846;
   static constexpr double DEFAULT_VAR_FLOOR = 1e-3;
   static constexpr double DEFAULT_WEIGHT_FLOOR = 1e-3;
-  static constexpr double MIN_BD_THRESHOLD = 7.3025850929940455; // -log(d*) roughly based on Hennig et al. 2010s
+  static constexpr double MIN_BD_THRESHOLD = 10.3025850929940455; // -log(d*) roughly based on Hennig et al. 2010s
 
   static double log_normal_1d(double x, double mu, double var);
 
@@ -43,9 +43,9 @@ class gmm_1d {
   static void logit_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static void sigmoid_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static double calculate_bhattacharyya_distance_1d(double mu1, double v1, double mu2, double v2);
-  int get_distinct_components_count(const std::vector<int>& sites);
+  int get_distinct_components_count(const std::vector<int>& sites, double min_bd_threshold = MIN_BD_THRESHOLD);
 
-  bool fit(const std::vector<double>& x, const std::vector<int>& sites, std::vector<double>& logL_history, int n_iter = 20, double tolerance = -1.0, unsigned int seed = 112358);
+  bool fit(const std::vector<double>& x, const std::vector<int>& sites, std::vector<double>& logL_history, int n_iter = 20, double tolerance = -1.0, bool adaptive = false, unsigned int seed = 112358);
   bool predict(const std::vector<double>& x, const std::vector<int>& sites, std::vector<int>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const;
 
   std::vector<double> get_weights() const { return weights; }
