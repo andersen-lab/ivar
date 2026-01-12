@@ -1,6 +1,5 @@
 #include <vector>
 #include <fstream>
-#include "./include/armadillo"
 #ifndef gmm
 #define gmm
 
@@ -14,7 +13,6 @@ struct gaussian_mixture_model {
   std::vector<double> means;
   std::vector<double> hefts;
   std::vector<double> dcovs;
-  arma::gmm_diag model;
   std::vector<std::vector<double>> clusters;
   std::vector<double> cluster_std_devs;
   std::vector<double> cluster_probabilities;
@@ -60,23 +58,17 @@ struct variant {
 
 };
 
-
-double logit(double p);
-double calculate_BIC(double k, double logL, int N);
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations);
 void split(std::string &s, char delim, std::vector<std::string> &elems);
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::vector<double> &std_devs, std::string ref, double default_threshold, double &error_rate);
 void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold);
 uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
-gaussian_mixture_model retrain_model(uint32_t n, arma::mat data, std::vector<variant> &variants, uint32_t lower_n, double &var_floor, bool &clustering_failed, bool error_model);
 double calculate_mean(const std::vector<double>& data);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
 void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel, double lower_bound, double upper_bound);
 void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants);
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound);
-double calculate_mad(const std::vector<double>& data, double mean);
 void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample);
 void reset_variants_info(std::vector<variant> &variants);
-arma::mat subsample_with_replacement(const arma::mat& data, std::size_t n_subsample, const std::vector<uint32_t>& position, std::vector<variant> &subsampled_variants, std::vector<variant> variants, bool error);
 #endif

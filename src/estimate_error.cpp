@@ -2,7 +2,7 @@
 #include "gmm.h"
 #include "saga.h"
 #include "gmm_1d.h"
-
+#include <numeric>
 std::vector<double> z_score(std::vector<double> data) {
     double mean = calculate_mean(data);
     double sq_sum = std::inner_product(data.begin(), data.end(), data.begin(), 0.0);

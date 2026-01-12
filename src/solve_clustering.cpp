@@ -9,6 +9,8 @@
 #include <string>
 #include <algorithm>
 #include <numeric>
+#include <limits> 
+#include <cmath>
 
 void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth){
   std::cerr << "in majority consensus call" << std::endl;
@@ -150,18 +152,9 @@ void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gaussi
     if(variants[i].freq_numbers.size() < 2) continue;
     if(variants[i].std_dev == 0) continue;
     if(!variants[i].amplicon_flux && !variants[i].amplicon_masked) continue;
-    arma::mat final_data = arma::conv_to<arma::rowvec>::from(variants[i].freq_numbers);
-    final_data.reshape(1, variants[i].freq_numbers.size());
-    tmp.clear();
-    prob_matrix.clear();
-    for(uint32_t j=0; j < model.n; j++){
-      arma::rowvec set_likelihood = model.model.log_p(final_data, j);
-      tmp.clear();
-      for(uint32_t k=0; k < final_data.n_cols; k++){
-        tmp.push_back((double)set_likelihood[k]);
-      }
-      prob_matrix.push_back(tmp);
-    }
+
+    //HERE SET THE PROB MATRIX FOR EACH AMPLICON FREQUENCY
+
     std::vector<std::vector<double>> inverse = transpose_vector(prob_matrix);
     for(uint32_t j=0; j < variants[i].freq_numbers.size(); j++){
       auto max_it = std::max_element(inverse[j].begin(), inverse[j].end());
