@@ -13,34 +13,21 @@ bool node_compare(ITNode *node1, ITNode *node2){
   return(found);
 }
 
-void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes, uint32_t &amp_dist) {
+void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes) {
   if (root == NULL) return;
 
   //check if current node's interval fully contains [lower, upper]
   if ((uint32_t)root->data->low <= lower && upper <= (uint32_t)root->data->high) {
-    uint32_t amp_length = (uint32_t)root->data->high - (uint32_t)root->data->low;
-    //if(amp_dist > 0){
-    //  node = NULL;
-    //  return;
-    //}
-    //std::cerr << "fits\t" << root->data->low << "\t" << root->data->high << std::endl;
-    //if (amp_length > amp_dist) {
-      //std::cerr << "larger amp\t" << root->data->low << "\t" << root->data->high << std::endl;
-      //amp_dist = amp_length;
-      //node = root;
-    //}
     nodes.push_back(root);
-    //std::cerr << nodes.size() << std::endl;
   }
 
   //traverse left if there's any chance of finding a containing interval
-  if (root->left) {
-    find_read_amplicon(root->left, lower, upper, nodes, amp_dist);
-  }
+  if (root->left && root->left->max >= upper)
+    find_read_amplicon(root->left, lower, upper, nodes);
 
-  if (root->right) {
-    find_read_amplicon(root->right, lower, upper, nodes, amp_dist);
-  }
+  //traverse right if there's any chance of finding a containing interval
+  if (root->right && root->right->min <= lower)
+    find_read_amplicon(root->right, lower, upper, nodes);
 }
 
 
@@ -155,7 +142,8 @@ void IntervalTree::inOrder(ITNode *root) {
 std::string IntervalTree::pre_order_with_level(ITNode *root,  int level) {
   if (root == nullptr) return "";
   std::string pre_order_str;
-  pre_order_str = "[" + std::to_string(root->data->low) + "," + std::to_string(root->data->high) + "]";
+  pre_order_str = "[(" + std::to_string(root->data->low) + "," + std::to_string(root->data->high) + ")";
+  pre_order_str += "(" + std::to_string(root->min) + "," +  std::to_string(root->max) +")]";
   pre_order_str += "(" + std::to_string(level) + "), ";
   pre_order_str += pre_order_with_level(root->left, level + 1);
   pre_order_str += pre_order_with_level(root->right, level + 1);
@@ -200,6 +188,8 @@ ITNode* IntervalTree::left_rotate(ITNode *node) {
   right->update_height();
   node->update_max();
   right->update_max();
+  node->update_min();
+  right->update_min();
 
   // New root of subtree
   return right;
@@ -218,6 +208,8 @@ ITNode* IntervalTree::right_rotate(ITNode *node) {
   left->update_height();
   node->update_max();
   left->update_max();
+  node->update_min();
+  left->update_min();
 
   // New root of subtree
   return left;
@@ -234,6 +226,7 @@ ITNode* IntervalTree::insert_node_balanced(ITNode *node, Interval data) {
 
   node->update_height();
   node->update_max();
+  node->update_min();
 
   int balance = node->get_balance();
 

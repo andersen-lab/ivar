@@ -65,6 +65,15 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
   file.close();
 }
 
+double calculate_standard_deviation(std::vector<double> data) {
+  double sum = 0, mean;
+  mean = std::accumulate(data.begin(), data.end(), 0.0f) / data.size();
+  for (double val : data) {
+    sum += std::pow(val - mean, 2);
+  }
+  return std::sqrt(sum / data.size());
+}
+
 void calculate_cluster_deviations(gaussian_mixture_model &model){
   //here we calculate the standard deviation of each cluster
   std::vector<double> std_devs;

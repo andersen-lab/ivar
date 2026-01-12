@@ -18,8 +18,13 @@ add_executable(ivar
         parse_gff.cpp
         ref_seq.cpp
         interval_tree.cpp
-        genomic_position.cpp
         saga.cpp
+        variant_caller.cpp
+        site_state.cpp
+        site_aggregator.cpp
+        site_aggregator_stats.cpp
+        site_state_aggregator_stats.cpp
+        site_amplicon_aggregator_stats.cpp
         estimate_error.cpp
         gmm.cpp
         call_consensus_clustering.cpp
