@@ -70,5 +70,4 @@ void assign_all_variants(std::vector<variant> &variants, std::vector<variant> ba
 void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants);
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound);
 void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample);
-void reset_variants_info(std::vector<variant> &variants);
 #endif

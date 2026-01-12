@@ -14,14 +14,6 @@
 #include <limits>
 #include <unordered_map>
 
-void reset_variants_info(std::vector<variant> &variants){
-  //reset cluster assignments and probabilities prior to rerunning another model
-  for(auto &var : variants){
-    var.cluster_assigned = -1;
-    var.probabilities.clear();
-  }
-}
-
 std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> variants){
   std::vector<std::vector<double>> clusters(n);
   for(uint32_t i=0; i < variants.size(); i++){
