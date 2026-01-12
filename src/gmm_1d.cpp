@@ -93,7 +93,7 @@ std::pair<std::vector<std::vector<double>>, double> gmm_1d::site_resp_constraine
   return {resp, log_Z};
 }
 
-double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<int> &site_id, std::vector<std::vector<double>> &resp) const {
+double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<uint32_t> &site_id, std::vector<std::vector<double>> &resp) const {
   const int N = x.size();
   const int G = this->n_components;
 
@@ -111,7 +111,7 @@ double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<int> &s
   }
 
   // Group indices by site
-  std::unordered_map<int, std::vector<int>> sites;
+  std::unordered_map<int, std::vector<uint32_t>> sites;
   for (int i = 0; i < N; ++i) {
     sites[site_id[i]].push_back(i);
   }
@@ -120,7 +120,7 @@ double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<int> &s
 
   // Process each site independently
   for (const auto& kv : sites) {
-    const std::vector<int>& idxs = kv.second;
+    const std::vector<uint32_t>& idxs = kv.second;
     const int m = idxs.size();
 
     std::vector<std::vector<double>> site_logA(m, std::vector<double>(G));
@@ -220,7 +220,7 @@ void gmm_1d::m_step_1d(const std::vector<double> &x, const std::vector<std::vect
   }
 }
 
-void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, int n_iter, int seed) {
+void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, uint32_t K, uint32_t n_iter, uint32_t seed) {
   const size_t N = x.size();
   std::mt19937 rng(seed);
   std::uniform_int_distribution<size_t> uni(0, N - 1);
@@ -265,7 +265,7 @@ void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, int n_it
   this->means = centers;
 }
 
-bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, std::vector<double>& logL_history, int n_iter,  double tolerance, bool adaptive, unsigned int seed) {
+bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &sites, std::vector<double>& logL_history, int n_iter,  double tolerance, bool adaptive, unsigned int seed) {
   const size_t N = x.size();
   if (sites.size() != N) {
     throw std::runtime_error("em_gmm_1d: x and sites size mismatch");
@@ -285,7 +285,7 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, st
   logL_history.reserve(n_iter);
 
   // Count unique sites
-  std::vector<int> unique_sites = sites;
+  std::vector<uint32_t> unique_sites = sites;
   std::sort(unique_sites.begin(), unique_sites.end());
   auto sites_end = std::unique(unique_sites.begin(), unique_sites.end());
   const int n_unique_sites = std::distance(unique_sites.begin(), sites_end);
@@ -354,7 +354,7 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, st
   return true;
 }
 
-bool gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& sites, std::vector<int>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const {
+bool gmm_1d::predict(const std::vector<double>& x, const std::vector<uint32_t>& sites, std::vector<uint32_t>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const {
   const int N = (int)x.size();
   const int G = this->n_components;
 
@@ -377,7 +377,7 @@ bool gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& sites
   }
 
   // Group variants by site
-  std::unordered_map<int, std::vector<int>> sites_variants;
+  std::unordered_map<uint32_t, std::vector<int>> sites_variants;
   for (int i = 0; i < N; ++i)
     sites_variants[sites[i]].push_back(i);
 
@@ -429,7 +429,7 @@ bool gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& sites
   return true;
 }
 
-double gmm_1d::get_log_likelihood(const std::vector<double> &x, const std::vector<int> &sites) const {
+double gmm_1d::get_log_likelihood(const std::vector<double> &x, const std::vector<uint32_t> &sites) const {
   if (x.size() != sites.size())
     throw std::runtime_error("log_likelihood(): size mismatch");
 
@@ -443,7 +443,7 @@ double gmm_1d::get_log_likelihood(const std::vector<double> &x, const std::vecto
   return ll;
 }
 
-double gmm_1d::get_bic(const std::vector<double> &x, const std::vector<int> &sites) const {
+double gmm_1d::get_bic(const std::vector<double> &x, const std::vector<uint32_t> &sites) const {
   if (x.size() != sites.size())
     throw std::runtime_error("bic(): size mismatch");
 
@@ -451,10 +451,10 @@ double gmm_1d::get_bic(const std::vector<double> &x, const std::vector<int> &sit
   if (G <= 0) throw std::runtime_error("bic(): invalid n_components");
 
   // Calcualte N = number of independent sites
-  std::vector<int> unique_sites = sites;     // copy
+  std::vector<uint32_t> unique_sites = sites;     // copy
   std::sort(unique_sites.begin(), unique_sites.end());
   auto it = std::unique(unique_sites.begin(), unique_sites.end());
-  const int n_unique_sites = std::distance(unique_sites.begin(), it);
+  const uint32_t n_unique_sites = std::distance(unique_sites.begin(), it);
 
   const double n = static_cast<double>(n_unique_sites);
   if (n <= 1)
@@ -498,14 +498,14 @@ double gmm_1d::calculate_bhattacharyya_distance_1d(double mu1, double v1, double
 
 // Based on Hennig et al. 2010
 // https://doi.org/10.1007/s11634-010-0058-3
-int gmm_1d::get_distinct_components_count(const std::vector<int>& sites, double min_bd_threshold) {
-  const int G = n_components;
+uint32_t gmm_1d::get_distinct_components_count(const std::vector<uint32_t>& sites, double min_bd_threshold) {
+  const uint32_t G = n_components;
   if (G <= 0) return 0;
 
   // Get minimum number of components from site constraint
   int m_max = 0;
   {
-    std::vector<int> s = sites;
+    std::vector<uint32_t> s = sites;
     std::sort(s.begin(), s.end());
     int run = 0;
     for (size_t i = 0; i < s.size(); ++i) {
@@ -520,9 +520,9 @@ int gmm_1d::get_distinct_components_count(const std::vector<int>& sites, double 
       m_max = std::max(m_max, run);
   }
 
-  std::vector<int> active;
+  std::vector<uint32_t> active;
   active.reserve(G);
-  for (int g = 0; g < G; ++g) {
+  for (uint32_t g = 0; g < G; ++g) {
     if (weights[g] > DEFAULT_WEIGHT_FLOOR)
       active.push_back(g);
   }
@@ -530,9 +530,9 @@ int gmm_1d::get_distinct_components_count(const std::vector<int>& sites, double 
   if (active.empty())
     return m_max;
 
-  std::vector<std::vector<int>> clusters;
+  std::vector<std::vector<uint32_t>> clusters;
   clusters.reserve(active.size());
-  for (int g : active)
+  for (uint32_t g : active)
     clusters.push_back({g});
 
   // Merge clusters until all BD > threshold for all clusters
@@ -598,7 +598,7 @@ int gmm_1d::get_distinct_components_count(const std::vector<int>& sites, double 
               << "\n";
   }
 
-  int g_unique = static_cast<int>(clusters.size());
+  uint32_t g_unique = static_cast<uint32_t>(clusters.size());
   if (g_unique < m_max)
     g_unique = m_max;
 

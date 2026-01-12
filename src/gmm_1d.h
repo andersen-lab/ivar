@@ -1,5 +1,6 @@
 #ifndef IVAR_GMM_1D_H
 #define IVAR_GMM_1D_H
+#include <cstdint>
 #include <cmath>
 #include <vector>
 
@@ -33,26 +34,26 @@ class gmm_1d {
 
   std::pair<std::vector<std::vector<double>>, double> site_resp_constrained_by_site(const std::vector<std::vector<double>>& logA) const;
 
-  double e_step_1d(const std::vector<double>& x, const std::vector<int>& site_id, std::vector<std::vector<double>>& resp) const;
+  double e_step_1d(const std::vector<double>& x, const std::vector<uint32_t>& site_id, std::vector<std::vector<double>>& resp) const;
   void m_step_1d(const std::vector<double>& x, const std::vector<std::vector<double>>& resp);
-  void initialize_k_means_1d(const std::vector<double>& x, int K, int n_iter = 10, int seed = 112358);
+  void initialize_k_means_1d(const std::vector<double>& x, uint32_t K, uint32_t n_iter = 10, uint32_t seed = 112358);
 
  public:
 
-  explicit gmm_1d(int n_components = 2) : n_components(n_components) {}
+  explicit gmm_1d(uint32_t n_components = 2) : n_components(n_components) {}
   static void logit_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static void sigmoid_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static double calculate_bhattacharyya_distance_1d(double mu1, double v1, double mu2, double v2);
-  int get_distinct_components_count(const std::vector<int>& sites, double min_bd_threshold = MIN_BD_THRESHOLD);
+  uint32_t get_distinct_components_count(const std::vector<uint32_t>& sites, double min_bd_threshold = MIN_BD_THRESHOLD);
 
-  bool fit(const std::vector<double>& x, const std::vector<int>& sites, std::vector<double>& logL_history, int n_iter = 20, double tolerance = -1.0, bool adaptive = false, unsigned int seed = 112358);
-  bool predict(const std::vector<double>& x, const std::vector<int>& sites, std::vector<int>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const;
+  bool fit(const std::vector<double>& x, const std::vector<uint32_t>& sites, std::vector<double>& logL_history, int n_iter = 20, double tolerance = -1.0, bool adaptive = false, unsigned int seed = 112358);
+  bool predict(const std::vector<double>& x, const std::vector<uint32_t>& sites, std::vector<uint32_t>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const;
 
   std::vector<double> get_weights() const { return weights; }
   std::vector<double> get_means() const { return means; }
   std::vector<double> get_vars() const { return vars; }
-  double get_log_likelihood(const std::vector<double>& x, const std::vector<int>& sites) const;
-  double get_bic(const std::vector<double>& x, const std::vector<int>& sites) const;
+  double get_log_likelihood(const std::vector<double>& x, const std::vector<uint32_t>& sites) const;
+  double get_bic(const std::vector<double>& x, const std::vector<uint32_t>& sites) const;
 
   void set_var_floor(double val) { var_floor = val; }
   void set_weight_floor(double val) { weight_floor = val; }

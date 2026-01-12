@@ -15,7 +15,7 @@ double log_sum_exp_naive(const double* x, int n) {
   return std::log(sum);
 }
 
-void read_in_simulated_data(std::string fname, std::vector<double>& frequencies, std::vector<int>& sites, float invariant_threshold) {
+void read_in_simulated_data(std::string fname, std::vector<double>& frequencies, std::vector<uint32_t>& sites, float invariant_threshold) {
   std::ifstream infile(fname);
   std::string line;
   uint32_t i=0;
@@ -44,7 +44,7 @@ void read_in_simulated_data(std::string fname, std::vector<double>& frequencies,
 
   }
 }
-void read_in_universal_data(std::string fname, std::vector<double>& frequencies, std::vector<int> &sites) {
+void read_in_universal_data(std::string fname, std::vector<double>& frequencies, std::vector<uint32_t> &sites) {
   std::ifstream infile(fname);
   std::string line;
   uint32_t i=0;
@@ -91,10 +91,10 @@ std::vector<double> z_score(std::vector<double> data, double mean) {
     return z_scores;
 }
 
-double find_adaptive_threshold(const std::vector<double>& frequencies, const double eps, std::vector<int> sites){
+double find_adaptive_threshold(const std::vector<double>& frequencies, const double eps, std::vector<uint32_t> sites){
   std::vector<double> x_logit;
   gmm_1d::logit_transform(frequencies, x_logit, eps);
-  int N = 5;
+  uint32_t N = 5;
 
   // Fit GMM
   std::vector<double> logL_history;
@@ -120,7 +120,7 @@ double find_adaptive_threshold(const std::vector<double>& frequencies, const dou
   std::cerr << "Merged components: " << model.merged_means.size() << "\n";
   
   //extra check to make sure that the model means aren't super close together...
-  int final_N = model.merged_means.size();
+  uint32_t final_N = model.merged_means.size();
   gmm_1d model2(final_N);
   model2.fit(
       x_logit,
@@ -142,7 +142,7 @@ double find_adaptive_threshold(const std::vector<double>& frequencies, const dou
       largest_idx = m;
     }
   }
-  std::vector<int> assigned_components;
+  std::vector<uint32_t> assigned_components;
   std::vector<std::vector<double>> marginal_posterior_probabilities;
   model2.predict(
       x_logit,
@@ -172,51 +172,10 @@ double find_adaptive_threshold(const std::vector<double>& frequencies, const dou
 }
 
 int main(int argc, char* argv[]) {
-
-//  double x[] = {-107498545664.81509, -9363075829.8171787};
-//  double y = gmm_1d::log_sum_exp(x, 2);
-//  double y_expected = log_sum_exp_naive(x, 2);
-
-//  std::cerr << y << " " <<  y_expected << std::endl;
-
-//  const std::vector<double> means = {0.2, 0.4, 0.6, 0.8};
-//  const std::vector<double> sds = {0.05, 0.1, 0.1, 0.05};
-//  const std::vector<int> points_per_cluster = {20, 10, 10, 10};
-//  std::vector<double> x;
-//  std::vector<int> sites;
-//  std::mt19937 rng(112358);
-//
-//  const int total_points = std::accumulate(points_per_cluster.begin(), points_per_cluster.end(), 0);
-//  x.resize(total_points);
-//  sites.resize(total_points);
-//
-//  int offset = 0;
-//  for (int k = 0; k < means.size(); ++k) {
-//    std::normal_distribution<double> dist(means[k], sds[k]);
-//
-//    for (int i = 0; i < points_per_cluster[k]; ++i) {
-//      x[offset] = dist(rng);
-//      sites[offset] = i;
-//      ++offset;
-//    }
-//  }
-//
-//  // Clip to (0,1) to avoid logit issues
   const double eps = 1e-6;
-//  for (double& v : x) {
-//    if (v <= eps) v = eps;
-//    if (v >= 1.0 - eps) v = 1.0 - eps;
-//  }
-//
-//  std::ofstream out("/Users/karthik/Documents/code/saga/output_x.tsv");
-//  out << "data" << '\n';
-//  for (double v : x) {
-//    out << v << '\n';
-//  }
-//  out.close();
 
   std::vector<double> x;
-  std::vector<int> sites;
+  std::vector<uint32_t> sites;
   std::string input = argv[1];
   std::string prefix = argv[2];
 
@@ -225,7 +184,7 @@ int main(int argc, char* argv[]) {
   read_in_universal_data(input, y, sites);
   double largest_mean = find_adaptive_threshold(y, eps, sites);
   std::cerr << "Adaptive threshold: " << largest_mean << "\n";
-
+  exit(0);
   sites.clear();
   read_in_simulated_data(input, x, sites, largest_mean);
 
@@ -325,7 +284,7 @@ int main(int argc, char* argv[]) {
   mean_out.close();
   exit(0);
 
-  std::vector<int> assigned_components;
+  std::vector<uint32_t> assigned_components;
   std::vector<std::vector<double>> marginal_posterior_probabilities;
   model.predict(
       x_logit,
@@ -333,7 +292,6 @@ int main(int argc, char* argv[]) {
       assigned_components,
       marginal_posterior_probabilities
   );
-  std::cerr << "BIC: "<< model.get_bic(x_logit, sites) << "\n";
 
   std::ofstream out("./output_x.tsv");
   out << "data" << "\t" << "site" << "\t";

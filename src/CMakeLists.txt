@@ -27,6 +27,7 @@ add_executable(ivar
         site_amplicon_aggregator_stats.cpp
         estimate_error.cpp
         gmm.cpp
+        gmm_1d.cpp
         call_consensus_clustering.cpp
         solve_clustering.cpp
         ${armadillo_src}
