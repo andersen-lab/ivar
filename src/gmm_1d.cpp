@@ -520,57 +520,60 @@ int gmm_1d::get_distinct_components_count(const std::vector<int>& sites, double 
       m_max = std::max(m_max, run);
   }
 
-  std::vector<int> active;
-  active.reserve(G);
-  for (int g = 0; g < G; ++g) {
-    if (weights[g] > DEFAULT_WEIGHT_FLOOR)
-      active.push_back(g);
+  std::vector<std::vector<int>> clusters(G);
+  for (int g = 0; g < G; ++g)
+    clusters[g].push_back(g);
+
+  // BD distance matrix
+  std::vector<std::vector<double>> dist_matrix(G, std::vector<double>(G));
+  for (int i = 0; i < G; ++i) {
+    for (int j = 0; j < G; ++j) {
+      if (i == j) {
+        dist_matrix[i][j] = 0.0;
+      } else {
+        dist_matrix[i][j] = calculate_bhattacharyya_distance_1d(
+            means[i], vars[i], means[j], vars[j]
+        );
+      }
+    }
   }
 
-  if (active.empty())
-    return m_max;
+  // Agglomerative clustering but merge closest clusters first
+  while (clusters.size() > 1) {
+    double min_dist = std::numeric_limits<double>::infinity();
+    int merge_i = -1, merge_j = -1;
 
-  std::vector<std::vector<int>> clusters;
-  clusters.reserve(active.size());
-  for (int g : active)
-    clusters.push_back({g});
-
-  // Merge clusters until all BD > threshold for all clusters
-  bool merged;
-  do {
-    merged = false;
-
-    // Compare clusters pairwise
-    for (int i = 0; i < clusters.size() && !merged; ++i) {
-      for (int j = i + 1; j < clusters.size() && !merged; ++j) {
-
-        bool can_merge = true;
-
-        for (int gi : clusters[i]) {
-          for (int gj : clusters[j]) {
-            double d = calculate_bhattacharyya_distance_1d(means[gi], vars[gi], means[gj], vars[gj]);
-            if (d > min_bd_threshold) {
-              can_merge = false;
-              break;
-            }
+    for (int i = 0; i < clusters.size(); ++i) {
+      for (int j = i + 1; j < clusters.size(); ++j) {
+        double cluster_dist = std::numeric_limits<double>::infinity();
+        for (int ci : clusters[i]) {
+          for (int cj : clusters[j]) {
+            cluster_dist = std::min(cluster_dist, dist_matrix[ci][cj]);
           }
-          if (!can_merge)
-            break;
         }
 
-        if (can_merge) {
-          // Merge clusters
-          clusters[i].insert(
-              clusters[i].end(),
-              clusters[j].begin(),
-              clusters[j].end()
-          );
-          clusters.erase(clusters.begin() + j);
-          merged = true;
+        if (cluster_dist < min_dist) {
+          min_dist = cluster_dist;
+          merge_i = i;
+          merge_j = j;
         }
       }
     }
-  } while (merged);
+
+    // Stop if minimum distance across all clusters exceeds threshold
+    if (min_dist >= MIN_BD_THRESHOLD) {
+      break;
+    }
+
+    // Merge cluster j into cluster i
+    clusters[merge_i].insert(
+        clusters[merge_i].end(),
+        clusters[merge_j].begin(),
+        clusters[merge_j].end()
+    );
+
+    clusters.erase(clusters.begin() + merge_j);
+  }
 
   std::vector<double> m_sigmoid(means.size());
   sigmoid_transform(means, m_sigmoid);
