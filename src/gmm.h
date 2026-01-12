@@ -60,6 +60,8 @@ struct variant {
 
 };
 
+
+double logit(double p);
 double calculate_BIC(double k, double logL, int N);
 double elbow_method(std::vector<double> ics, std::vector<double> ns, std::vector<bool> exclude_ns);
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations);
