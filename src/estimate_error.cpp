@@ -19,9 +19,6 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster, doubl
 //    double std = calculate_standard_deviation(cluster);
     for(uint32_t i=0; i < z_scores.size(); i++){
       double abs = std::abs(z_scores[i]);
-      if(abs > 1){
-        std::cerr << abs << " " << cluster[i] << std::endl; 
-      } 
       if(abs >= threshold){
         std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
         removal_points.push_back(i);
@@ -29,6 +26,7 @@ std::vector<uint32_t>determine_outlier_points(std::vector<double> cluster, doubl
     }
     return(removal_points);
 }
+
 
 void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold, uint32_t depth_cutoff, double &error_rate){
   double lower_bound = 0.50;
@@ -38,6 +36,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   std::vector<variant> variants_original;
   uint32_t useful_count_original = 0;
   std::vector<double> frequencies;
+  std::vector<uint32_t> subsample_position;
 
   for(uint32_t i=0; i < base_variants.size(); i++){
     if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && \
@@ -46,6 +45,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
       useful_count_original++;
       variants_original.push_back(base_variants[i]);
       frequencies.push_back(base_variants[i].gapped_freq);
+      subsample_position.push_back(base_variants[i].position);
     }
   }
 
@@ -53,74 +53,79 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     error_rate = 1;
     return;
   }
-
+  std::cerr << "error estimate useful var " << useful_count_original << std::endl;
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
   uint32_t count_original=0;
   for(uint32_t i = 0; i < variants_original.size(); i++){
-    double tmp = static_cast<double>(variants_original[i].gapped_freq);
+    //double tmp = static_cast<double>(variants_original[i].gapped_freq);
+    double tmp = logit(variants_original[i].gapped_freq);
     data_original.col(count_original) = tmp;
     count_original += 1;
   }
 
-  uint32_t n = 1;
   uint32_t chosen_peak = 0;
-  double var_floor;
+  double var_floor = 0.00001;
   bool clustering_failed = false;
-  uint32_t optimal_n=0;
-  std::vector<double> all_bics;
+  uint32_t i = 1;
+  uint32_t optimal_n = 1;
+  uint32_t n = 1;
+  double dcov_threshold = 0.20;
+  bool done_clustering = true;
 
   while(n <= 5){
+    clustering_failed = false;
+    done_clustering = true;
     reset_variants_info(variants_original);
-    std::cerr << "error estimate " << n << std::endl;
-    gaussian_mixture_model model = retrain_model(n, data_original, variants_original, 2, var_floor, clustering_failed, true);
-    for(auto cluster : model.clusters){
-      if(cluster.size() == 0){
-        clustering_failed = true;
-      }
+    std::cerr << "n " << n << std::endl;
+    gaussian_mixture_model model = retrain_model(n, data_original, variants_original, 2, var_floor, clustering_failed, false);
+    uint32_t largest_idx = std::distance(model.means.begin(), std::max_element(model.means.begin(), model.means.end()));
+
+    double target_dcov = model.dcovs[largest_idx];
+    std::cerr << "target " << target_dcov << std::endl;
+    if(target_dcov > dcov_threshold){
+      done_clustering = false;
     }
-    if(clustering_failed) {
-      n++;
-      all_bics.push_back(std::numeric_limits<double>::infinity());  
-      continue;
+    for(uint32_t i=0; i < model.means.size(); i++){
+      std::cerr << "  means " << model.means[i] << " dcovs " << model.dcovs[i] << std::endl;
     }
-    if(n == 1){
-      double std = calculate_mad(model.clusters[0], model.means[0]);
-      std::cerr << std << std::endl;
-      all_bics.push_back(model.bic);
-      if(std < 0.03){
-        optimal_n = 1;
-        break;
-      } else {
-        n++;
-        continue;
-      }
+    if(done_clustering){
+      optimal_n = n;
+      break;
     }
-    all_bics.push_back(model.bic);
     n++;
   }
-
-  if(optimal_n == 0){
-    double lowest = std::numeric_limits<double>::infinity();
-    for(uint32_t i=0; i < all_bics.size(); i++){
-      if(all_bics[i] < lowest){
-        lowest = all_bics[i];
-        optimal_n = i+1;
-      }
-      std::cerr << i+1 << " " << all_bics[i] << "\n";
-    } 
-  }
-  std::cerr << "optimal n " << optimal_n << std::endl;
-  gaussian_mixture_model model = retrain_model(optimal_n, data_original, variants_original, 2, var_floor, clustering_failed, true);
+  std::cerr << "optimal n: " << optimal_n << std::endl;
+  gaussian_mixture_model model = retrain_model(optimal_n, data_original, variants_original, 2, var_floor, clustering_failed, false);
   std::vector<double> means = model.means;
+  for(auto m : means){
+    std::cerr << "mean " << m << std::endl;
+  }
+  std::vector<std::vector<double>> clusters(optimal_n);
+  for(uint32_t i=0; i < variants_original.size(); i++){
+    double freq = variants_original[i].gapped_freq;
+    std::size_t best_idx = 0;
+    double best_dist = std::numeric_limits<double>::max();
+    for (std::size_t j = 0; j < means.size(); ++j) {
+        double dist = std::abs(freq - means[j]);
+        if (dist < best_dist) {
+            best_dist = dist;
+            best_idx = j;
+        }
+    }
+    clusters[best_idx].push_back(freq);
+    //std::cerr << freq << " " << means[best_idx] << std::endl;
+    //exit(0);
+  }
+  
+
   chosen_peak = std::distance(means.begin(), std::max_element(means.begin(), means.end()));
-  std::cerr << "chosen peak " << chosen_peak << std::endl;
   std::vector<double> cleaned_cluster;
   std::vector<uint32_t> outliers;
 
   //for each cluster this describes the points which are outliers
   if(optimal_n > 1){
-    //outliers = determine_outlier_points(model.clusters[chosen_peak], 2.5);
-    std::vector<double> universal_cluster = model.clusters[chosen_peak];
+    std::vector<double> universal_cluster = clusters[chosen_peak];
+    //outliers = determine_outlier_points(universal_cluster, 2.5);
     for(uint32_t i=0; i < universal_cluster.size(); i++){
       auto it = std::find(outliers.begin(), outliers.end(), i);
       if(it == outliers.end()){
