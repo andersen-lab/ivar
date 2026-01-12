@@ -217,7 +217,6 @@ int main(int argc, char* argv[]) {
 
   std::vector<double> x;
   std::vector<int> sites;
-  int N = 5;
   std::string input = argv[1];
   std::string prefix = argv[2];
 
@@ -226,9 +225,42 @@ int main(int argc, char* argv[]) {
   read_in_universal_data(input, y, sites);
   double largest_mean = find_adaptive_threshold(y, eps, sites);
   std::cerr << "Adaptive threshold: " << largest_mean << "\n";
-  //exit(0);
+
   sites.clear();
   read_in_simulated_data(input, x, sites, largest_mean);
+
+  int n_min = 0;
+  std::unordered_map<int, int> counts;
+  for (int v : sites) {
+      ++counts[v];
+  }
+
+  std::unordered_map<int, int>::const_iterator it =
+      std::max_element(
+          counts.begin(), counts.end(),
+          [](const std::pair<const int, int>& a,
+            const std::pair<const int, int>& b) {
+              return a.second < b.second;
+          }
+      );
+
+  if (it != counts.end()) {
+      n_min = it->second;
+  }
+  int N = 0;
+  std::cerr << "min n " << n_min << "\n";
+  if (n_min == 3){
+    N = 7;
+  } else if (n_min == 4) {
+    N = 9;
+  } else if (n_min == 2){
+    N = 5;
+  } else {
+    std::cerr << "Insufficient data to fit GMM\n";
+    exit(0);
+  }
+  std::cerr << "Fitting GMM with " << N << " components\n";
+  //exit(0);
 
   // Logit transform
   std::vector<double> x_logit;
@@ -254,6 +286,15 @@ int main(int argc, char* argv[]) {
   gmm_1d::sigmoid_transform(m, m_sigmoid, eps);
   model.get_distinct_components_count(sites);
   std::cerr << "Merged components: " << model.merged_means.size() << "\n";
+
+  //logging for number of components versus number of merged components
+  std::ofstream merge_out(prefix + "_merged.txt");
+  merge_out << "original_N\tmerged_N\n";
+  merge_out << std::to_string(N) << "\t";
+  merge_out << std::to_string(model.merged_means.size()) << "\n";
+  merge_out.close();
+  exit(0);
+
   int final_n = model.merged_means.size();
 
   gmm_1d model2(final_n);
