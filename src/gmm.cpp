@@ -69,35 +69,13 @@ void generate_ordered(const std::vector<uint32_t>& elements,
     backtrack();
 }
 
-std::vector<double> loglikelihoods_to_posteriors(const std::vector<double>& loglikes){
-    const size_t K = loglikes.size();
-    if (K == 0) return {};
-    // 1. Find max for numerical stability
-    double m = *std::max_element(loglikes.begin(), loglikes.end());
-    // 2. Exponentiate shifted log-likelihoods
-    std::vector<double> exps(K);
-    double sum_exp = 0.0;
-    for (size_t k = 0; k < K; ++k) {
-        exps[k] = std::exp(loglikes[k] - m);
-        sum_exp += exps[k];
-    }
-    // 3. Normalize
-    for (size_t k = 0; k < K; ++k) {
-        exps[k] /= sum_exp;
-    }
-    return exps;
-}
-
 std::vector<uint32_t> compare_cluster_assignment(std::vector<std::vector<double>> prob_matrix, std::vector<uint32_t> assigned){
   double threshold = 2;
   std::vector<uint32_t> flagged_idx;
 
   for(uint32_t i=0; i < prob_matrix.size(); i++){
-    std::vector<double> probs = loglikelihoods_to_posteriors(prob_matrix[i]);
-    /*for(auto p : probs){
-      std::cerr << p << " ";
-    }
-    std::cerr << "\n";*/
+    //HERE FILL IN PROB MATRIX
+    std::vector<double> probs;
     double assigned_prob = prob_matrix[i][assigned[i]];
     std::vector<double> tmp = prob_matrix[i];
     tmp.erase(tmp.begin() + assigned[i]);
