@@ -567,14 +567,12 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   //check to make sure the cluster assignment is clear
   compare_component_assigments(base_variants);
  
-  /*cluster_consensus(base_variants, clustering_file, \
-                      double default_threshold, \
-                      uint32_t min_depth, \
-                      uint8_t min_qual, \
-                      std::vector<double> solution, \
-                      std::vector<double> means, \
-                      std::vector<double> std_devs, \
-                      std::string ref, \
-                      double error_rate)*/
+  cluster_consensus(base_variants, output_prefix, \
+                      default_threshold, \
+                      min_depth, \
+                      min_qual, \
+                      solution, \
+                      means, 
+                      ref, error_rate);
   return 0;
 }

@@ -15,6 +15,45 @@ std::string trim_leading_ambiguities(std::string sequence, uint32_t min_position
   return(result);
 }
 
+void write_consensus_string(std::string clustering_file, \
+  std::vector<std::string> all_sequences, \
+  std::vector<double> means, \
+  std::vector<double> solution, \
+  uint32_t min_position){
+  //write the consensus string to file
+  std::string consensus_filename = clustering_file + ".fa";
+  std::ofstream file(consensus_filename);
+
+  std::vector<uint32_t> indices(all_sequences.size());
+  for (uint32_t i = 0; i < indices.size(); ++i) {
+    indices[i] = i;
+  }
+
+  // Sort indices based on double values (descending)
+  std::sort(indices.begin(), indices.end(), [&](uint32_t i, uint32_t j) {return means[i] > means[j];});
+
+  // Apply sorted order
+  std::vector<std::string> sorted_strings;
+  std::vector<double> sorted_values;
+  for (auto i : indices) {
+    sorted_strings.push_back(all_sequences[i]);
+    sorted_values.push_back(means[i]);
+  }
+
+  for(uint32_t i=0; i < sorted_strings.size(); i++){
+    double tmp_mean = sorted_values[i];
+    auto it = std::find(solution.begin(), solution.end(), tmp_mean);
+    if(it == solution.end()){
+      continue;
+    }
+    //std::string trimmed_sequence = trim_trailing_ambiguities(sorted_strings[i], max_position);
+    std::string next_trimmed_sequence = trim_leading_ambiguities(sorted_strings[i], min_position);
+    file << ">"+clustering_file+"_cluster_"+ std::to_string(tmp_mean) << "\n";
+    file << next_trimmed_sequence << "\n";
+  }
+  file.close();
+}
+
 void cluster_consensus(std::vector<variant> variants, \
                       std::string clustering_file, \
                       double default_threshold, \
@@ -22,15 +61,14 @@ void cluster_consensus(std::vector<variant> variants, \
                       uint8_t min_qual, \
                       std::vector<double> solution, \
                       std::vector<double> means, \
-                      std::vector<double> std_devs, \
                       std::string ref, \
                       double error_rate){
-  std::cerr << "calling consensus" << std::endl;
+  std::cerr << "calling consensus " << variants.size() << std::endl;
   if(variants.size() == 0) return;
 
   double max_mean=0;
-  double freq_lower_bound = 1-error_rate+0.0001;
-  double freq_upper_bound = error_rate-0.0001;
+  double freq_lower_bound = 1-error_rate;
+  double freq_upper_bound = error_rate;
   set_freq_range_flags(variants, freq_lower_bound, freq_upper_bound, true);
   //find the largest position in the variants file
   uint32_t max_position = 0;
@@ -60,7 +98,7 @@ void cluster_consensus(std::vector<variant> variants, \
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 24507){
+    if(variants[i].position == 0){
       print = true;
       //std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_component_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -175,41 +213,11 @@ void cluster_consensus(std::vector<variant> variants, \
 
   std::vector<std::string> all_sequences;
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
-    std::cerr << all_consensus_seqs[i][11210] << std::endl;
     std::string tmp = std::accumulate(all_consensus_seqs[i].begin(), all_consensus_seqs[i].end(), std::string(""));
     tmp.erase(std::remove(tmp.begin(), tmp.end(), '-'), tmp.end());
     all_sequences.push_back(tmp);
   }
-  //write the consensus string to file
-  std::string consensus_filename = clustering_file + ".fa";
-  std::ofstream file(consensus_filename);
 
-  std::vector<uint32_t> indices(all_sequences.size());
-  for (uint32_t i = 0; i < indices.size(); ++i) {
-    indices[i] = i;
-  }
+  write_consensus_string(clustering_file, all_sequences, means, solution, min_position);
 
-  // Sort indices based on double values (descending)
-  std::sort(indices.begin(), indices.end(), [&](uint32_t i, uint32_t j) {return means[i] > means[j];});
-
-  // Apply sorted order
-  std::vector<std::string> sorted_strings;
-  std::vector<double> sorted_values;
-  for (auto i : indices) {
-    sorted_strings.push_back(all_sequences[i]);
-    sorted_values.push_back(means[i]);
-  }
-
-  for(uint32_t i=0; i < sorted_strings.size(); i++){
-    double tmp_mean = sorted_values[i];
-    auto it = std::find(solution.begin(), solution.end(), tmp_mean);
-    if(it == solution.end()){
-      continue;
-    }
-    //std::string trimmed_sequence = trim_trailing_ambiguities(sorted_strings[i], max_position);
-    std::string next_trimmed_sequence = trim_leading_ambiguities(sorted_strings[i], min_position);
-    file << ">"+clustering_file+"_cluster_"+ std::to_string(tmp_mean) << "\n";
-    file << next_trimmed_sequence << "\n";
-  }
-  file.close();
 }
