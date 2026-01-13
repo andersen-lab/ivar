@@ -18,8 +18,10 @@ void compare_component_assigments(std::vector<variant> &base_variants, const dou
   for(uint32_t i=0; i < base_variants.size(); i++){
     variant &var = base_variants[i];
     std::vector<double> tmp = var.marginal_posterior_probabilities;
+    if(tmp.size() == 0) continue;
+
     std::sort(tmp.begin(), tmp.end(), std::greater<double>());
-    double ratio = tmp.front() / tmp[1];
+    double ratio = tmp[0] / tmp[1];
     if(ratio < threshold){
       var.vague_component_assignment = true;
     }
@@ -353,12 +355,14 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
 }
 
 int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
-                              std::vector<double> &solution, std::vector<double> &means, std::vector<double> &std_devs, \
-                              std::string ref, double default_threshold, double &error_rate){
+                              std::string ref, double default_threshold){
   if(ref.empty()){
     std::cerr << "Please provide a reference sequence." << std::endl;
     exit(1);
   }
+  double error_rate;
+  std::vector<double> solution;
+  std::vector<double> means;
 
   uint32_t round_val = 4;
   bool development_mode=true;
@@ -562,6 +566,15 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
 
   //check to make sure the cluster assignment is clear
   compare_component_assigments(base_variants);
-
+ 
+  /*cluster_consensus(base_variants, clustering_file, \
+                      double default_threshold, \
+                      uint32_t min_depth, \
+                      uint8_t min_qual, \
+                      std::vector<double> solution, \
+                      std::vector<double> means, \
+                      std::vector<double> std_devs, \
+                      std::string ref, \
+                      double error_rate)*/
   return 0;
 }

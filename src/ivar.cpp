@@ -363,11 +363,7 @@ int main(int argc, char *argv[]) {
       opt = getopt(argc, argv, contam_opt_str);
     }
     if (!g_args.variants.empty() && !g_args.prefix.empty()) {
-      std::vector<double> solution;
-      std::vector<double> means;
-      std::vector<double> std_devs;
-      double error_rate;
-      res = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, std_devs, g_args.ref, g_args.min_threshold, error_rate);
+      res = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, g_args.ref, g_args.min_threshold);
     }
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
   }
