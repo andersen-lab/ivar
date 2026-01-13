@@ -63,7 +63,7 @@ void cluster_consensus(std::vector<variant> variants, \
     if(variants[i].position == 24507){
       print = true;
       //std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
-      std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
+      std::cerr << "vague assignment " << variants[i].vague_component_assignment << " depth flag " << variants[i].depth_flag << std::endl;
       std::cerr << "amplicon masked " << variants[i].amplicon_masked << " amp flux pos " << variants[i].amplicon_flux << std::endl;
     }else{
       print = false;
@@ -94,7 +94,7 @@ void cluster_consensus(std::vector<variant> variants, \
     }
 
     uint32_t position = variants[i].position;
-    if(variants[i].vague_assignment && variants[i].freq < freq_upper_bound && variants[i].freq < max_mean){
+    if(variants[i].vague_component_assignment && variants[i].freq < freq_upper_bound && variants[i].freq < max_mean){
        if(print){
           std::cerr << "d" << std::endl;
           for(auto a : variants[i].marginal_posterior_probabilities){

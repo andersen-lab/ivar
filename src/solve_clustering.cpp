@@ -350,15 +350,50 @@ std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<double> so
       if(count > 1) unresolved.push_back(means[i]);
     }
   }
-  /*for(uint32_t i=0; i < cluster_indexes.size(); i++){
-    for(uint32_t j=0; j < cluster_indexes[i].size(); j++){
-      std::cerr << cluster_indexes[i][j] << " ";
-    }
-    std::cerr << "\n";
-  }*/
-  //for(auto u : unresolved) std::cerr << u << std::endl;
   return(cluster_indexes);
 }
+
+void solve_additive_peaks(std::vector<double> solution, std::vector<double> means, std::unordered_map<uint32_t, std::vector<std::vector<uint32_t>>> &mapping_combinations){
+  double error = 0.05;
+  //determine which cluster means are not in the solution
+  std::vector<double> non_solution_means;
+  for(uint32_t i=0; i < means.size(); i++){
+    auto it = std::find(solution.begin(), solution.end(), means[i]);
+    if(it == solution.end()){
+      non_solution_means.push_back(means[i]);
+    } else {
+      mapping_combinations[i].push_back({i});
+    }
+  }
+  
+  //for each non solution mean find if it can be constructed from the solution set
+  for(uint32_t i=0; i < non_solution_means.size(); i++){
+    double target_mean = non_solution_means[i];
+    uint32_t target_index = std::find(means.begin(), means.end(), target_mean) - means.begin(); 
+    std::vector<std::vector<double>> subsets = find_subsets_with_error(solution, target_mean, error);
+
+    for(auto sub :  subsets){
+      std::vector<uint32_t> idx_mapped;
+      for(auto s : sub){
+        uint32_t index = std::find(means.begin(), means.end(), s) - means.begin();
+        idx_mapped.push_back(index);
+      }
+      mapping_combinations[target_index].push_back(idx_mapped);
+    }
+  }
+  //TODO: for non solution means with two possible combinations 
+
+}
+
+void assign_consensus_numbers(std::vector<variant> &base_variants, std::unordered_map<uint32_t, std::vector<std::vector<uint32_t>>> mapping_combinations){
+  for(uint32_t i=0; i < base_variants.size(); i++){
+    if(base_variants[i].assigned_component == -1) continue;
+    variant &var = base_variants[i];
+    std::vector<uint32_t> tmp = mapping_combinations[var.assigned_component][0];
+    var.consensus_numbers = tmp;
+  }
+}
+
 
 std::vector<std::vector<double>> deduplicate_solutions(std::vector<std::vector<double>> vectors){
   std::vector<std::vector<double>> solutions;
@@ -480,39 +515,6 @@ void solve_clusters(std::vector<variant> &variants,
     }
   }
 
-  //check if the variant corresponds to an unresolved cluster
-  for(uint32_t i=0; i < variants.size(); i++){
-    auto it = std::find(unresolved.begin(), unresolved.end(), means[variants[i].assigned_component]);
-    if(it != unresolved.end()){
-      variants[i].resolved = false;
-    }
-  }
-
-  //for 100% cases assign all consensus genomes to the variant
-  std::vector<uint32_t> all_genomes;
-  for(uint32_t i=0; i < solution.size(); i++){
-    all_genomes.push_back(i);
-  }
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].gapped_freq >= 1-estimated_error && variants[i].assigned_component == -1){
-      variants[i].consensus_numbers = all_genomes;
-    }
-  }
-
-  //assign the number of the consensus genome
-  for(uint32_t i=0; i < variants.size(); i++){
-    for(uint32_t j=0; j < inverse_groups.size(); j++){
-      //check to make sure you're lookin at a group that's part of the solution
-      auto mit = std::find(solution.begin(), solution.end(), means[j]);
-      if(mit == solution.end()) continue;
-
-      //assign the point to all applicable groups
-      auto it = std::find(inverse_groups[j].begin(), inverse_groups[j].end(), variants[i].assigned_component);
-      if(it != inverse_groups[j].end()){
-        variants[i].consensus_numbers.push_back(j);
-      }
-    }
-  }
   amplicon_specific_cluster_assignment(variants, model);
   rewrite_position_masking(variants);
   std::vector<uint32_t> amplicons_to_mask;

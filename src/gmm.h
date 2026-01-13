@@ -42,13 +42,12 @@ struct variant {
   bool resolved=true;
 
   //for these true means flagged as problematic
-  bool vague_assignment=false; //cannot be distinguished between two groups
+  bool vague_component_assignment=false; //variant cannot be distinguished between two components
   bool amplicon_flux=false; //fluctuation frequency across amplicons
   bool amplicon_masked=false; //masked due to another variant experiencing flux
   bool depth_flag=false; //depth is below the threshold
   bool qual_flag=false; //quality is below threshold
   bool outside_freq_range=false; //outside of useful frequency range for model
-  bool cluster_outlier=false; //is an outlier for the cluster assigned
   bool include_clustering=true; //here we flag the later positions of deletions
 
   std::vector<double> marginal_posterior_probabilities;

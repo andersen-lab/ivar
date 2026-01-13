@@ -14,6 +14,18 @@
 #include <limits>
 #include <unordered_map>
 
+void compare_component_assigments(std::vector<variant> &base_variants, const double threshold=1.25){
+  for(uint32_t i=0; i < base_variants.size(); i++){
+    variant &var = base_variants[i];
+    std::vector<double> tmp = var.marginal_posterior_probabilities;
+    std::sort(tmp.begin(), tmp.end(), std::greater<double>());
+    double ratio = tmp.front() / tmp[1];
+    if(ratio < threshold){
+      var.vague_component_assignment = true;
+    }
+  }
+}
+
 double calculate_mean(const std::vector<double>& data) {
     if (data.empty()) {
         return 0.0f;
@@ -45,68 +57,6 @@ void generate_ordered(const std::vector<uint32_t>& elements,
     };
 
     backtrack();
-}
-
-std::vector<uint32_t> compare_cluster_assignment(std::vector<std::vector<double>> prob_matrix, std::vector<uint32_t> assigned){
-  double threshold = 2;
-  std::vector<uint32_t> flagged_idx;
-
-  for(uint32_t i=0; i < prob_matrix.size(); i++){
-    //HERE FILL IN PROB MATRIX
-    std::vector<double> probs;
-    double assigned_prob = prob_matrix[i][assigned[i]];
-    std::vector<double> tmp = prob_matrix[i];
-    tmp.erase(tmp.begin() + assigned[i]);
-    std::sort(tmp.begin(), tmp.end(), std::greater<double>());
-    for(uint32_t j=0; j < tmp.size(); j++){
-      if(exp(tmp[j]) * threshold > exp(assigned_prob)){
-        flagged_idx.push_back(i);
-      }
-      break;
-    }
-  }
-  return(flagged_idx);
-}
-
-/**
- * @brief Selects the permutation of assignments that maximizes the joint probability.
- *
- * This function evaluates a set of possible assignments (permutations) and computes the
- * total joint probability score for each, using the provided probability matrix.
- * It returns the permutation that yields the highest score.
- *
- * @param prob_matrix A 2D vector of probabilities, sized [n_variants][n_clusters].
- * @param permutations A vector of permutations to evaluate, each representing a possible assignment.
- *                     Each permutation must have a size equal to the number of clusters.
- * @return The permutation (as a vector of cluster indices) with the highest joint probability.
- */
-std::vector<uint32_t> calculate_joint_probabilities(const std::vector<std::vector<double>>  &prob_matrix, const std::vector<std::vector<uint32_t>> &permutations) {
-  if (permutations.empty() || prob_matrix.empty()) {
-    return {};
-  }
-  size_t n_clusters = prob_matrix.size();
-  double best_score = -std::numeric_limits<double>::infinity();
-  size_t best_index = 0;
-  for (size_t i = 0; i < permutations.size(); ++i) {
-    const auto& perm = permutations[i];
-    if (perm.size() != n_clusters) {
-        continue;
-    }
-    double score = 0.0;
-    for (size_t j = 0; j < n_clusters; ++j) {
-      // Guard against invalid index in permutation
-      if (perm[j] >= prob_matrix[j].size()) {
-        score = -std::numeric_limits<double>::infinity();
-        break;
-      }
-      score += prob_matrix[j][perm[j]];
-    }
-    if (score > best_score) {
-      best_score = score;
-      best_index = i;
-    }
-  }
-  return permutations[best_index];
 }
 
 //test function
@@ -242,7 +192,6 @@ std::vector<double> split_csv_double(const std::string& input) {
     }
     return result;
 }
-
 
 std::vector<uint32_t> split_csv(const std::string& input) {
     std::vector<uint32_t> result;
@@ -403,7 +352,6 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
   }
 }
 
-
 int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, std::vector<double> &std_devs, \
                               std::string ref, double default_threshold, double &error_rate){
@@ -476,8 +424,6 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
     exit(0);
   }
 
-
-  bool empty_cluster = false;
   std::vector<std::vector<double>> track_means;
   std::vector<std::vector<double>> track_weights;
   std::vector<uint32_t> track_ns;
@@ -608,5 +554,14 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
     var.assigned_component = assigned_components[j];
     j++;
   }
+
+  //use the solution set to assign consensus numbers
+  std::unordered_map<uint32_t, std::vector<std::vector<uint32_t>>> mapping_combinations;
+  solve_additive_peaks(solution, means, mapping_combinations);
+  assign_consensus_numbers(base_variants, mapping_combinations); 
+
+  //check to make sure the cluster assignment is clear
+  compare_component_assigments(base_variants);
+
   return 0;
 }
