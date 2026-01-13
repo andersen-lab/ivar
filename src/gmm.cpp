@@ -14,16 +14,6 @@
 #include <limits>
 #include <unordered_map>
 
-std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> variants){
-  std::vector<std::vector<double>> clusters(n);
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].cluster_assigned != -1){
-      clusters[variants[i].cluster_assigned].push_back(variants[i].gapped_freq);
-    }
-  }
-  return(clusters);
-}
-
 double calculate_mean(const std::vector<double>& data) {
     if (data.empty()) {
         return 0.0f;
@@ -117,140 +107,6 @@ std::vector<uint32_t> calculate_joint_probabilities(const std::vector<std::vecto
     }
   }
   return permutations[best_index];
-}
-
-void assign_variants_simple(std::vector<variant> &variants, 
-                            const std::vector<std::vector<double>> &prob_matrix, 
-                            bool insertions, 
-                            bool &clustering_failed, 
-                            const std::vector<std::vector<uint32_t>> &possible_permutations,
-                            const std::vector<uint32_t> &unique_pos, 
-                            std::unordered_map<uint32_t, std::vector<uint32_t>> &pos_to_variant_indices) {
-  uint32_t n = prob_matrix.size();
-
-  //assignment by position
-  for (uint32_t pos : unique_pos) {
-    std::vector<uint32_t> pos_idxs;
-    std::vector<std::vector<double>> tmp_prob;
-    for (uint32_t variant_idx : pos_to_variant_indices[pos]) {
-      auto& var = variants[variant_idx];
-      if ((var.nuc.find('+') != std::string::npos && !insertions)|| var.depth_flag)
-        continue;
-      else if ((var.nuc.find('+') == std::string::npos && insertions)|| var.depth_flag)
-        continue;
-      pos_idxs.push_back(variant_idx);
-      std::vector<double> prob_column;
-      prob_column.reserve(n);
-      for (uint32_t row = 0; row < n; ++row)
-        prob_column.push_back(prob_matrix[row][variant_idx]);
-      tmp_prob.push_back(std::move(prob_column));
-    }
-
-    if (pos_idxs.empty())
-      continue;
-    std::vector<uint32_t> assigned = calculate_joint_probabilities(tmp_prob, possible_permutations);
-    if (assigned.empty())
-      continue;
-
-    //here we have more variants trying to assign than clusters
-    if(tmp_prob.size() > assigned.size()) {
-      clustering_failed = true;
-      continue;
-    }
-
-    std::vector<uint32_t> assignment_flagged = compare_cluster_assignment(tmp_prob, assigned);
-    for (uint32_t i = 0; i < pos_idxs.size(); ++i) {
-      uint32_t v_idx = pos_idxs[i];
-      if (std::find(assignment_flagged.begin(), assignment_flagged.end(), i) != assignment_flagged.end()) {
-        variants[v_idx].vague_assignment = true;
-      }
-      variants[v_idx].cluster_assigned = assigned[i];
-    }
-  }
-}
-
-void assign_clusters(std::vector<variant> &variants, 
-                    gaussian_mixture_model gmodel, 
-                    bool &clustering_failed, 
-                    std::vector<std::vector<uint32_t>> possible_permutations,
-                    std::vector<uint32_t> unique_pos,
-                    std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices
-                    ){
-
-  std::vector<std::vector<double>> tv = transpose_vector(gmodel.prob_matrix);
-  uint32_t j = 0;
-  for(uint32_t i=0; i < variants.size(); i++){
-    variants[i].probabilities = tv[j];
-    j++;
-  }
-
-  uint32_t index = smallest_value_index(gmodel.means);
-  //generate all permutations up to lower_n
-  noise_resampler(gmodel.n, index, possible_permutations, 6);
-
-  //handle everything but insertions
-  assign_variants_simple(variants, gmodel.prob_matrix, false, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
-  //handle insertions
-  assign_variants_simple(variants, gmodel.prob_matrix, true, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
-}
-
-void assign_all_variants(std::vector<variant> &variants, 
-                        std::vector<variant> base_variants, 
-                        gaussian_mixture_model &gmodel, 
-                        double lower_bound, 
-                        double upper_bound) {
-  std::vector<variant> tmp_var;
-  uint32_t count = 0;
-
-  for(uint32_t i = 0; i < base_variants.size(); i++){
-    //previously not assigned due to possible amplicon flux
-    if(base_variants[i].qual_flag) continue;
-    if((!base_variants[i].outside_freq_range && (base_variants[i].amplicon_flux || base_variants[i].amplicon_masked || base_variants[i].imbalance || !base_variants[i].include_clustering)) || (base_variants[i].outside_freq_range && base_variants[i].gapped_freq >= lower_bound && base_variants[i].gapped_freq <= upper_bound)){
-      count++;
-      tmp_var.push_back(base_variants[i]);
-      variants.push_back(base_variants[i]);
-    }
-  }
-  std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
-  std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices;
-  for (uint32_t i = 0; i < variants.size(); ++i) {
-    uint32_t pos = variants[i].position;
-    all_nts[pos].push_back(variants[i].nuc);
-    pos_to_variant_indices[pos].push_back(i);
-  }
-
-  std::vector<uint32_t> unique_pos;
-  for (const auto& kv : all_nts)
-    unique_pos.push_back(kv.first);
-
-  //recalculate the prob matrix based on the new dataset
-  std::vector<std::vector<double>> prob_matrix;
-  std::vector<double> tmp;
-
-  //HERE FILL IN PROB MATRIX
-
-  std::vector<std::vector<double>> stacked_matrix;
-  for (size_t i = 0; i < gmodel.prob_matrix.size(); ++i) {
-    std::vector<double> row = gmodel.prob_matrix[i];
-    row.insert(row.end(), prob_matrix[i].begin(), prob_matrix[i].end());
-    stacked_matrix.push_back(row);
-  }
-  gmodel.prob_matrix = stacked_matrix;
-  bool clustering_failed = false;
-  std::vector<std::vector<uint32_t>> possible_permutations;
-  for (uint32_t i = 1; i <= gmodel.lower_n; ++i) {
-    perm_generator(gmodel.n, i, possible_permutations);
-  }
-  assign_clusters(variants, gmodel, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
-}
-
-void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants){
-  //lets add back in the 100% variants
-  for(uint32_t i=0; i < base_variants.size(); i++){
-    if(base_variants[i].outside_freq_range){
-      variants.push_back(base_variants[i]);
-    }
-  }
 }
 
 //test function
@@ -441,36 +297,16 @@ void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, do
   }
 }
 
-/**
- * @brief Parses an internally formatted variant file and populates a vector of variant objects.
- *
- * This function reads a tab-delimited file line-by-line (skipping the header),
- * extracts relevant variant information, and fills a vector of `variant` structs.
- * It supports both version 1 and newer variant file formats with additional metadata.
- *
- * @param filename           Path to the tab-delimited variant file.
- * @param variants           Reference to a vector where parsed variant entries will be stored.
- * @param depth_cutoff       Minimum depth threshold (currently unused in this function).
- * @param round_val          Number of decimal places to round frequencies to.
- * @param quality_threshold  Minimum quality score threshold (currently unused in this function).
- *
- * @note The function assumes a specific column structure in the input file.
- *       It handles both older (≤20 columns) and newer (>20 columns) variant formats.
- *       Insertions and deletions may be represented with special notations in the input.
- *
- * @warning Malformed or incomplete lines (with <12 columns) are silently skipped.
- *
- * @see variant
- */
-
 void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold){
   std::ifstream infile(filename);
   std::string line;
+
   uint32_t count = 0;
   double multiplier = pow(10, round_val);
   double compare_quality = static_cast<double>(quality_threshold);
 
   auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "1";};
+
   //track which ref alleles we've already added
   while (std::getline(infile, line)) {
     if(count++ == 0) continue;
@@ -488,6 +324,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     tmp.total_depth = std::stoi(row_values[11]);
     tmp.freq = std::round(std::stof(row_values[10]) * multiplier) / multiplier;
     tmp.qual = std::stod(row_values[9]);
+
     if(row_values.size() > 20){
       tmp.gapped_freq = round(std::stod(row_values[20]) * multiplier) / multiplier;
       tmp.gapped_depth = std::stoi(row_values[21]);
@@ -505,7 +342,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       tmp.gapped_freq = 0.0;
       tmp.amplicon_flux = false;
       tmp.amplicon_masked = false;
-      tmp.primer_masked = false;
       tmp.std_dev = 0;
       tmp.version_1_var = true;
     }
@@ -576,7 +412,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     exit(1);
   }
 
-  uint32_t n=10;
   uint32_t round_val = 4;
   bool development_mode=true;
   std::vector<variant> base_variants;
@@ -590,12 +425,10 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   std::cerr << "upper bound " << upper_bound << " lower bound " << lower_bound << std::endl;
 
-  //TEST LINES
   std::ofstream out( output_prefix + "_error.tsv", std::ios::app);
   out << "lower_bound\tupper_bound\n";
   out << std::to_string(lower_bound) << "\t" << std::to_string(upper_bound) << "\n";
   out.close();
-  //exit(0);
 
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
   set_deletion_flags(base_variants, lower_bound);
@@ -603,7 +436,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::cerr << "filename: " << output_prefix << std::endl;
   std::cerr << "lower bound " << lower_bound <<  " upper bound " << upper_bound << std::endl;
 
-  std::vector<variant> variants;
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
 
   std::vector<double> frequencies;
@@ -611,14 +443,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<uint32_t> sites;
 
   for(uint32_t i=0; i < base_variants.size(); i++){
-    if(base_variants[i].gapped_freq > lower_bound && base_variants[i].gapped_freq < upper_bound && !base_variants[i].depth_flag && !base_variants[i].qual_flag){
-    //if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
-      variants.push_back(base_variants[i]);
+    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
       frequencies.push_back(base_variants[i].gapped_freq);
       sites.push_back(base_variants[i].position);
-      //std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " total_depth " << base_variants[i].total_depth << std::endl;
     }
   }
+
   //handle the case of no variants less than the universal cluster
   if(frequencies.size() < 1){
     std::ofstream file;
@@ -641,17 +471,14 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
     }
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
-    return(variants);
+    exit(0);
   }
 
 
   bool empty_cluster = false;
-  std::vector<std::vector<double>> solution_sets;
   std::vector<std::vector<double>> track_means;
   std::vector<std::vector<double>> track_weights;
   std::vector<uint32_t> track_ns;
-  std::vector<uint32_t> track_bootstraps;
-  std::vector<std::vector<double>> track_stds;
 
   int n_min = 0;
   std::unordered_map<int, int> counts;
@@ -700,8 +527,13 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   );
   model.get_distinct_components_count(sites);
   uint32_t final_N = model.merged_means.size();
+  if(final_N ==0){
+    std::cerr << output_prefix << " no solution found" << std::endl;
+    call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
+    exit(1);
+  }
+
   std::cerr << "Final number of components after merging: " << final_N << std::endl;
-  exit(0);
   //fit the model a second time
   logL_history.clear();
   gmm_1d model2(final_N);
@@ -711,54 +543,71 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       logL_history,
       20,
       1e-6,
-      true,
+      false,
       false
   );
 
   const auto& m2 = model2.get_means();
   gmm_1d::sigmoid_transform(m2, means, eps);
-  
+
   for(auto m : means){
     std::cerr << "mean " << m << std::endl;
   }
-  exit(0);
 
+  //HERE CHANGE THIS TO BE MODEL OUTPUTS
   std::ofstream out_again(output_prefix + "_track_stats.tsv", std::ios::app);
-  out_again << "n\tmeans\tdcovs\tweights\tbic\n";
+  out_again << "n\tmeans\tdcovs\tweights\n";
   for(uint32_t i=0; i < track_ns.size(); i++){
     out_again << std::to_string(track_ns[i]) << "\t";
     out_again << vec_to_pylist(track_means[i]) << "\t";
-    out_again << vec_to_pylist(track_stds[i]) << "\t";
     out_again << vec_to_pylist(track_weights[i]) << "\n";
   }
   out_again.close();
 
-  if(final_N ==0){
-    std::cerr << output_prefix << " no solution found" << std::endl;
-    call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
-    exit(1);
+  //attempt to solve the subset sum issue
+  std::vector<std::vector<double>> solution_sets;
+  bool solved = subset_sum(means, solution_sets); 
+  if(!solved){
+    std::cerr << "Could not solve unit sum problem for model means." << std::endl;
+    call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
+    exit(0);
+  }
+  if(solution_sets.size() > 1){
+    std::cerr << "Multiple solutions found for unit sum problem." << std::endl;
+    call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
+    exit(0);
+  }
+  solution = solution_sets[0];
+  
+  //predict on all signals
+  frequencies.clear();
+  sites.clear();
+  x_logit.clear();
+  for(auto var : base_variants){
+    if(var.depth_flag) continue;
+    if(var.outside_freq_range) continue;
+    if(var.qual_flag) continue;
+    frequencies.push_back(var.gapped_freq);
+    sites.push_back(var.position);
   }
 
-
-  std::ofstream file;
-  if(development_mode){
-    //write means to string
-    file.open(output_prefix + ".txt", std::ios::trunc);
-    std::string means_string = "[";
-    for(uint32_t j=0; j < means.size(); j++){
-      if(j != 0){
-        means_string += ",";
-      }
-      means_string += std::to_string(means[j]);
-    }
-    means_string += "]";
-    file << "means\n";
-    file << means_string << "\n";
-    file.close();
+  gmm_1d::logit_transform(frequencies, x_logit, eps);
+  std::vector<uint32_t> assigned_components;
+  std::vector<std::vector<double>> marginal_posterior_probabilities;
+  model.predict(
+      x_logit,
+      sites,
+      assigned_components,
+      marginal_posterior_probabilities
+  );
+  //add the assigments into the variants object
+  for(uint32_t i=0; i < base_variants.size(); i++){
+    variant &var = base_variants[i];
+    if(var.depth_flag) continue;
+    if(var.outside_freq_range) continue;
+    if(var.qual_flag) continue;
+    var.marginal_posterior_probabilities = marginal_posterior_probabilities[i];
+    var.assigned_component = assigned_components[i];
   }
-
-  //assign_all_variants(variants, base_variants, model, lower_bound, upper_bound);
-  //add_noise_variants(variants, base_variants);
-  //solve_clusters(variants, model, lower_bound, solution, output_prefix, default_threshold, min_depth);
-  return(variants);
+  return(base_variants);
 }

@@ -26,9 +26,7 @@ struct variant {
   uint32_t gapped_depth;
   double qual;
   double freq;
-  double gapped_freq = 0;
-  double logit = 0;
-  int cluster_assigned = -1;
+  double gapped_freq;
   bool version_1_var=false;
   double std_dev;
 
@@ -47,15 +45,14 @@ struct variant {
   bool vague_assignment=false; //cannot be distinguished between two groups
   bool amplicon_flux=false; //fluctuation frequency across amplicons
   bool amplicon_masked=false; //masked due to another variant experiencing flux
-  bool primer_masked=false; //mutation in primer binding region of overlapped amplicon
   bool depth_flag=false; //depth is below the threshold
   bool qual_flag=false; //quality is below threshold
   bool outside_freq_range=false; //outside of useful frequency range for model
   bool cluster_outlier=false; //is an outlier for the cluster assigned
   bool include_clustering=true; //here we flag the later positions of deletions
-  bool imbalance=false;
-  std::vector<double> probabilities;
 
+  std::vector<double> marginal_posterior_probabilities;
+  int assigned_component = -1;
 };
 
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations);
@@ -66,8 +63,6 @@ uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
 double calculate_mean(const std::vector<double>& data);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
-void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel, double lower_bound, double upper_bound);
-void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants);
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound);
 void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample);
 #endif
