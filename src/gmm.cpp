@@ -566,13 +566,14 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
 
   //check to make sure the cluster assignment is clear
   compare_component_assigments(base_variants);
- 
+
+  //place the universal cluster values in every consensus
+  assign_universal_components(base_variants, upper_bound, means.size());
+  
   cluster_consensus(base_variants, output_prefix, \
                       default_threshold, \
-                      min_depth, \
-                      min_qual, \
-                      solution, \
-                      means, 
+                      min_depth, min_qual, \
+                      solution, means, 
                       ref, error_rate);
   return 0;
 }

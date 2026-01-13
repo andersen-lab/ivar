@@ -385,6 +385,19 @@ void solve_additive_peaks(std::vector<double> solution, std::vector<double> mean
 
 }
 
+void assign_universal_components(std::vector<variant> &base_variants, double upper_bound, uint32_t n){
+  std::vector<uint32_t> arr(n + 1);
+  for (uint32_t i = 0; i <= n; i++) {
+    arr[i] = i;
+  } 
+  for(auto var : base_variants){
+    if(var.assigned_component == -1 && var.gapped_freq > upper_bound){
+      var.consensus_numbers = arr;
+      var.assigned_component == 1;
+    }
+  }
+}
+
 void assign_consensus_numbers(std::vector<variant> &base_variants, std::unordered_map<uint32_t, std::vector<std::vector<uint32_t>>> mapping_combinations){
   for(uint32_t i=0; i < base_variants.size(); i++){
     if(base_variants[i].assigned_component == -1) continue;

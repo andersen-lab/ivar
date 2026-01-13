@@ -97,26 +97,24 @@ void cluster_consensus(std::vector<variant> variants, \
 
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
+    variant &var = variants[i];
     //TESTLINES
-    if(variants[i].position == 0){
-      print = true;
-      //std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
+    if(var.position == 0){
+      print = true; 
       std::cerr << "vague assignment " << variants[i].vague_component_assignment << " depth flag " << variants[i].depth_flag << std::endl;
       std::cerr << "amplicon masked " << variants[i].amplicon_masked << " amp flux pos " << variants[i].amplicon_flux << std::endl;
     }else{
       print = false;
     }
-    double freq = variants[i].gapped_freq;
-    double qual = variants[i].qual;
-    uint32_t depth = variants[i].gapped_depth;
-    //depth, quality, and low frequency bypass
-    if(freq < freq_lower_bound || qual < (double)min_qual || depth < min_depth){
-      if(print) std::cerr << "min qual, freq, or depth issue " << qual << " " << freq << " " << depth << " flb " << freq_lower_bound << " mq " << (double)min_qual << " md " << min_depth << std::endl;
-      continue;
-    }
+    if(var.depth_flag) continue;
+    if(var.qual_flag) continue;
+
+    double freq = var.gapped_freq;
+    double qual = var.qual;
+    uint32_t depth = var.gapped_depth;
  
     //if this amplicon is experiencing fluctuation across amplicons, call ambiguity
-    if(variants[i].amplicon_masked && variants[i].freq < freq_upper_bound){
+    if(var.amplicon_masked && variants[i].freq < freq_upper_bound){
       if(print){
         std::cerr << "amplicon is experiencing fluctuation" << std::endl;
       }
@@ -142,14 +140,14 @@ void cluster_consensus(std::vector<variant> variants, \
        }
        continue;
     }
-
-     bool del = variants[i].nuc.find('-') != std::string::npos;
+    
+     bool del = var.nuc.find('-') != std::string::npos;
      //handle all the cases where you never assigned anything, assign to all if it's over the upper bound
-     if(variants[i].assigned_component == -1){
-      if(variants[i].gapped_freq < freq_upper_bound) continue;
+     if(var.assigned_component == -1 && var.gapped_freq >= freq_upper_bound){
       if(print) std::cerr << "not assigned anything" << std::endl;
       for(uint32_t j=0; j < all_consensus_seqs.size(); j++){
         uint32_t adjusted_pos = position-1;
+
         if(variants[i].nuc.find('+') != std::string::npos){
           std::string nuc = variants[i].nuc;
           nuc.erase(std::remove(nuc.begin(), nuc.end(), '+'), nuc.end());

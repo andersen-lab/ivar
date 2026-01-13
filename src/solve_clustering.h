@@ -13,6 +13,7 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
 
 void calculate_cluster_deviations(gaussian_mixture_model &model);
 
+void assign_universal_components(std::vector<variant> &base_variants, double upper_bound, uint32_t n);
 void assign_consensus_numbers(std::vector<variant> &base_variants, std::unordered_map<uint32_t, std::vector<std::vector<uint32_t>>> mapping_combinations);
 void solve_additive_peaks(std::vector<double> solution, std::vector<double> means, std::unordered_map<uint32_t, std::vector<std::vector<uint32_t>>> &mapping_combinations);
 bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &solution_sets, const double error=0.05);
