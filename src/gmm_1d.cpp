@@ -265,7 +265,7 @@ void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, uint32_t K, uin
   this->means = centers;
 }
 
-bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &sites, std::vector<double>& logL_history, int n_iter,  double tolerance, bool adaptive, unsigned int seed) {
+bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &sites, std::vector<double>& logL_history, int n_iter,  double tolerance, bool adaptive, bool logging, unsigned int seed) {
   const size_t N = x.size();
   if (sites.size() != N) {
     throw std::runtime_error("em_gmm_1d: x and sites size mismatch");
@@ -335,21 +335,23 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &site
 
     logL_history.push_back(logL);
 
-    // Logging
-    std::cerr
-        << "iter " << it
-        << "  logL=" << logL
-        << "  avg_logL=" << avg_logL;
-    if (it > 0) {
-      std::cerr << "  delta=" << std::abs(old_avg_logL - avg_logL);
+    //logging
+    if(logging){
+      std::cerr
+          << "iter " << it
+          << "  logL=" << logL
+          << "  avg_logL=" << avg_logL;
+      if (it > 0) {
+        std::cerr << "  delta=" << std::abs(old_avg_logL - avg_logL);
+      }
+      std::cerr << "  weights=";
+      for (double v : this->weights) std::cerr << v << " ";
+      std::cerr << " mus=";
+      for (double v : this->means) std::cerr << v << " ";
+      std::cerr << " vars=";
+      for (double v : this->vars) std::cerr << v << " ";
+      std::cerr << "\n";
     }
-    std::cerr << "  weights=";
-    for (double v : this->weights) std::cerr << v << " ";
-    std::cerr << " mus=";
-    for (double v : this->means) std::cerr << v << " ";
-    std::cerr << " vars=";
-    for (double v : this->vars) std::cerr << v << " ";
-    std::cerr << "\n";
   }
   return true;
 }
