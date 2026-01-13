@@ -105,7 +105,8 @@ double find_adaptive_threshold(const std::vector<double>& frequencies, const dou
       logL_history,
       20,
       1e-6,
-      true
+      true,
+      false
   );
 
   // Print results (logit space)
@@ -128,7 +129,8 @@ double find_adaptive_threshold(const std::vector<double>& frequencies, const dou
       logL_history,
       20,
       1e-6,
-      true
+      true,
+      false
   );
   const auto& m2 = model2.get_means();
   std::vector<double> m_sigmoid2;
@@ -184,7 +186,7 @@ int main(int argc, char* argv[]) {
   read_in_universal_data(input, y, sites);
   double largest_mean = find_adaptive_threshold(y, eps, sites);
   std::cerr << "Adaptive threshold: " << largest_mean << "\n";
-  exit(0);
+  
   sites.clear();
   read_in_simulated_data(input, x, sites, largest_mean);
 
@@ -226,6 +228,7 @@ int main(int argc, char* argv[]) {
   gmm_1d::logit_transform(x, x_logit, eps);
 
   // Fit GMM
+  std::cerr << sites.size() << " variants to cluster." << std::endl;
   std::vector<double> logL_history;
   gmm_1d model(N);
   model.fit(
@@ -233,7 +236,9 @@ int main(int argc, char* argv[]) {
       sites,
       logL_history,
       20,
-      1e-6
+      1e-6,
+      false,
+      true
   );
 
   // Print results (logit space)
@@ -252,7 +257,6 @@ int main(int argc, char* argv[]) {
   merge_out << std::to_string(N) << "\t";
   merge_out << std::to_string(model.merged_means.size()) << "\n";
   merge_out.close();
-  exit(0);
 
   int final_n = model.merged_means.size();
 

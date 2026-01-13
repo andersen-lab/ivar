@@ -60,7 +60,8 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
       logL_history,
       20,
       1e-6,
-      true
+      true,
+      false
   );
 
   model.get_distinct_components_count(sites);

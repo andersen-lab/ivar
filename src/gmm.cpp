@@ -32,18 +32,6 @@ double calculate_mean(const std::vector<double>& data) {
     return sum / data.size();
 }
 
-uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
-  std::unordered_map<uint32_t, uint32_t> frequency_map;
-  uint32_t max_count = 0;
-  for (const auto& num : nums) {
-      frequency_map[num]++;
-      if (frequency_map[num] > max_count) {
-          max_count = frequency_map[num];
-      }
-  }
-  return max_count;
-}
-
 void generate_ordered(const std::vector<uint32_t>& elements,
                       uint32_t n,
                       uint32_t target,
@@ -597,8 +585,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   set_deletion_flags(base_variants, 0.001);
 
   cluster_error(base_variants, min_qual, min_depth, error_rate);
-  double lower_bound = 1-error_rate+0.0001;
-  double upper_bound = error_rate-0.0001;
+  double lower_bound = 1-error_rate;
+  double upper_bound = error_rate;
 
   std::cerr << "upper bound " << upper_bound << " lower bound " << lower_bound << std::endl;
 
@@ -623,11 +611,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<uint32_t> sites;
 
   for(uint32_t i=0; i < base_variants.size(); i++){
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
+    if(base_variants[i].gapped_freq > lower_bound && base_variants[i].gapped_freq < upper_bound && !base_variants[i].depth_flag && !base_variants[i].qual_flag){
+    //if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
       variants.push_back(base_variants[i]);
       frequencies.push_back(base_variants[i].gapped_freq);
       sites.push_back(base_variants[i].position);
-      std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " total_depth " << base_variants[i].total_depth << std::endl;
+      //std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " total_depth " << base_variants[i].total_depth << std::endl;
     }
   }
   //handle the case of no variants less than the universal cluster
@@ -658,16 +647,43 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   bool empty_cluster = false;
   std::vector<std::vector<double>> solution_sets;
-  std::vector<double> track_var_floors;
-  std::vector<double> track_bics;
   std::vector<std::vector<double>> track_means;
   std::vector<std::vector<double>> track_weights;
   std::vector<uint32_t> track_ns;
   std::vector<uint32_t> track_bootstraps;
   std::vector<std::vector<double>> track_stds;
 
-  uint32_t N = 8;
-  uint32_t final_n = 0;
+  int n_min = 0;
+  std::unordered_map<int, int> counts;
+  for (int v : sites) {
+      ++counts[v];
+  }
+
+  std::unordered_map<int, int>::const_iterator it =
+      std::max_element(
+          counts.begin(), counts.end(),
+          [](const std::pair<const int, int>& a,
+            const std::pair<const int, int>& b) {
+              return a.second < b.second;
+          }
+      );
+
+  if (it != counts.end()) {
+      n_min = it->second;
+  }
+  uint32_t N;
+  if (n_min == 3){
+    N = 7;
+  } else if (n_min == 4) {
+    N = 9;
+  } else if (n_min == 2){
+    N = 5;
+  } else {
+    std::cerr << "Insufficient data to fit GMM\n";
+    exit(0);
+  }
+  std::cerr << frequencies.size() << " variants to cluster." << std::endl;
+  std::cerr << "Fitting " << N << " components to data." << std::endl;
   const double eps = 1e-6;
   std::vector<double> logL_history;
   gmm_1d::logit_transform(frequencies, x_logit, eps);
@@ -679,8 +695,32 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       logL_history,
       20,
       1e-6,
-      true
+      false,
+      false
   );
+  model.get_distinct_components_count(sites);
+  uint32_t final_N = model.merged_means.size();
+  std::cerr << "Final number of components after merging: " << final_N << std::endl;
+  exit(0);
+  //fit the model a second time
+  logL_history.clear();
+  gmm_1d model2(final_N);
+  model2.fit(
+      x_logit,
+      sites,
+      logL_history,
+      20,
+      1e-6,
+      true,
+      false
+  );
+
+  const auto& m2 = model2.get_means();
+  gmm_1d::sigmoid_transform(m2, means, eps);
+  
+  for(auto m : means){
+    std::cerr << "mean " << m << std::endl;
+  }
   exit(0);
 
   std::ofstream out_again(output_prefix + "_track_stats.tsv", std::ios::app);
@@ -693,13 +733,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   out_again.close();
 
-  if(final_n ==0){
+  if(final_N ==0){
     std::cerr << output_prefix << " no solution found" << std::endl;
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
     exit(1);
   }
 
-  means = model.get_means();
 
   std::ofstream file;
   if(development_mode){

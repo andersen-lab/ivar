@@ -127,7 +127,6 @@ double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<uint32_
     for (int j = 0; j < m; ++j) {
       site_logA[j] = logA[idxs[j]];
     }
-
     auto result = site_resp_constrained_by_site(site_logA);
     std::vector<std::vector<double>> site_resp = result.first;
     double site_logZ = result.second;
