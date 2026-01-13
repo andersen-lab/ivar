@@ -367,10 +367,8 @@ int main(int argc, char *argv[]) {
       std::vector<double> means;
       std::vector<double> std_devs;
       double error_rate;
-      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, std_devs, g_args.ref, g_args.min_threshold, error_rate);
-      cluster_consensus(variants, g_args.prefix, g_args.min_threshold, g_args.min_depth, g_args.min_qual, solution, means, std_devs, g_args.ref, error_rate);
+      res = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, std_devs, g_args.ref, g_args.min_threshold, error_rate);
     }
-    res = 0;
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
   }
 

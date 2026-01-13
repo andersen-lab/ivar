@@ -404,7 +404,7 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
 }
 
 
-std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
+int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, std::vector<double> &std_devs, \
                               std::string ref, double default_threshold, double &error_rate){
   if(ref.empty()){
@@ -443,10 +443,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<uint32_t> sites;
 
   for(uint32_t i=0; i < base_variants.size(); i++){
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
+    if(base_variants[i].depth_flag) continue;
+    if(base_variants[i].outside_freq_range) continue;
+    if(base_variants[i].qual_flag) continue;
+    //if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
       frequencies.push_back(base_variants[i].gapped_freq);
       sites.push_back(base_variants[i].position);
-    }
   }
 
   //handle the case of no variants less than the universal cluster
@@ -527,11 +529,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   );
   model.get_distinct_components_count(sites);
   uint32_t final_N = model.merged_means.size();
-  if(final_N ==0){
-    std::cerr << output_prefix << " no solution found" << std::endl;
-    call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
-    exit(1);
-  }
 
   std::cerr << "Final number of components after merging: " << final_N << std::endl;
   //fit the model a second time
@@ -590,7 +587,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     frequencies.push_back(var.gapped_freq);
     sites.push_back(var.position);
   }
-
+  
   gmm_1d::logit_transform(frequencies, x_logit, eps);
   std::vector<uint32_t> assigned_components;
   std::vector<std::vector<double>> marginal_posterior_probabilities;
@@ -601,13 +598,15 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       marginal_posterior_probabilities
   );
   //add the assigments into the variants object
+  uint32_t j = 0;
   for(uint32_t i=0; i < base_variants.size(); i++){
     variant &var = base_variants[i];
     if(var.depth_flag) continue;
     if(var.outside_freq_range) continue;
     if(var.qual_flag) continue;
-    var.marginal_posterior_probabilities = marginal_posterior_probabilities[i];
-    var.assigned_component = assigned_components[i];
+    var.marginal_posterior_probabilities = marginal_posterior_probabilities[j];
+    var.assigned_component = assigned_components[j];
+    j++;
   }
-  return(base_variants);
+  return 0;
 }
