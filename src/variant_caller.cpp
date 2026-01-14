@@ -265,11 +265,18 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
           file << ",";
         file << av_data.frequencies[i]; // AMP FREQ
       }
+      if(av_data.frequencies.size() == 0){
+        file << "0";
+      }
+
       file << DELIMITER;
       for(int i = 0; i < av_data.amplicons.size(); i++){
         if(i > 0)
           file << ",";
         file << av_data.amplicons[i]->to_string(); // AMP NUMBERS
+      }
+      if(av_data.amplicons.size() == 0){
+        file << "0-0";
       }
       file << "\n";
     }
