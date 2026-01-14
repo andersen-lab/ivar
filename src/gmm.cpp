@@ -209,7 +209,6 @@ std::vector<uint32_t> split_csv(const std::string& input) {
     std::vector<uint32_t> result;
     std::stringstream ss(input);
     std::string token;
-
     while (std::getline(ss, token, ',')) {
       result.push_back(std::stoi(token));
     }
@@ -288,6 +287,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
 
     if(row_values.size() > 20){
       tmp.gapped_freq = round(std::stod(row_values[20]) * multiplier) / multiplier;
+
       tmp.gapped_depth = std::stoi(row_values[21]);
       tmp.amplicon_flux = to_bool(row_values[22]);
       tmp.amplicon_masked = to_bool(row_values[23]);
@@ -425,7 +425,6 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
-
   set_deletion_flags(base_variants, 0.001);
 
   cluster_error(base_variants, min_qual, min_depth, error_rate);
@@ -482,7 +481,7 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   }
   uint32_t N;
   if (n_min == 3){
-    N = 7;
+    N = 6;
   } else if (n_min == 4) {
     N = 9;
   } else if (n_min == 2){

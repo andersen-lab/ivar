@@ -5,8 +5,10 @@
 #include <numeric>
 std::vector<double> z_score(std::vector<double> data) {
     double mean = calculate_mean(data);
-    double sq_sum = std::inner_product(data.begin(), data.end(), data.begin(), 0.0);
-    double stddev = std::sqrt(sq_sum / data.size() - mean * mean);
+    double sq_sum = 0.0;
+    for(double x : data)
+      sq_sum += (x - mean) * (x - mean);
+    double stddev = std::sqrt(sq_sum / data.size());
     std::vector<double> z_scores;
     for (double x : data)
         z_scores.push_back((x - mean) / stddev);
@@ -49,7 +51,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
   std::vector<double> x_logit;
   gmm_1d::logit_transform(frequencies, x_logit, eps);
-  int N = 5;
+  int N = 3;
 
   // Fit GMM
   std::vector<double> logL_history;
@@ -101,8 +103,14 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
       marginal_posterior_probabilities
   );
 
+  std::vector<uint32_t> removal_points;
+  if(final_N == 1){
+    determine_outlier_points(frequencies, 3, removal_points);
+  }
+
   std::vector<double> largest_cluster_snps;
   for(uint32_t i =0; i < frequencies.size(); i++){
+    if(std::find(removal_points.begin(), removal_points.end(), i) != removal_points.end()) continue;
     if(assigned_components[i] == largest_idx){
       largest_cluster_snps.push_back(frequencies[i]);
     }
@@ -114,5 +122,6 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
       smallest_cluster_snp = largest_cluster_snps[k];
     }
   }
+
   error_rate = smallest_cluster_snp;
 }
