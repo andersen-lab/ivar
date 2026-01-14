@@ -53,7 +53,6 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
       tmp[i-1] = nucs[index];
     }
   }
-  std::cerr << "tmp length " << tmp.size() << std::endl;
   std::string consensus_string = std::accumulate(tmp.begin(), tmp.end(), std::string(""));
   //std::string trimmed_consensus = trim_trailing_ambiguities(consensus_string, max_position);
   std::string next_trimmed_consensus = trim_leading_ambiguities(consensus_string, min_position);
@@ -74,16 +73,6 @@ double calculate_standard_deviation(std::vector<double> data) {
     sum += std::pow(val - mean, 2);
   }
   return std::sqrt(sum / data.size());
-}
-
-void calculate_cluster_deviations(gaussian_mixture_model &model){
-  //here we calculate the standard deviation of each cluster
-  std::vector<double> std_devs;
-  for(uint32_t i=0; i < model.clusters.size(); i++){
-    double std_dev = calculate_standard_deviation(model.clusters[i]);
-    std_devs.push_back(std_dev);
-  }
-  model.cluster_std_devs = std_devs;
 }
 
 std::vector<uint32_t> find_missing_indexes(const std::vector<uint32_t>& tmp, const std::vector<uint32_t>& amplicons_to_mask) {
@@ -407,7 +396,6 @@ void assign_consensus_numbers(std::vector<variant> &base_variants, std::unordere
   }
 }
 
-
 std::vector<std::vector<double>> deduplicate_solutions(std::vector<std::vector<double>> vectors){
   std::vector<std::vector<double>> solutions;
   for(uint32_t i=0; i < vectors.size(); i++){
@@ -481,56 +469,10 @@ void solve_clusters(std::vector<variant> &variants,
                     double default_threshold, 
                     uint32_t min_depth){
 
-  double error = 0.05;
-  std::vector<double> means = model.means;
-  std::vector<std::vector<double>> solution_sets;
-
-  std::vector<double> unresolved;
-  std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
-  std::vector<std::vector<uint32_t>> inverse_groups(means.size());
-  for(uint32_t i=0; i < cluster_groups.size(); i++){
-    for(uint32_t j=0; j < cluster_groups[i].size(); j++){
-      inverse_groups[cluster_groups[i][j]].push_back(i);
-    }
-  }
-
-  double largest = *std::max_element(solution.begin(), solution.end());
-  //define the clusters which contain the majority population
-  std::vector<std::vector<double>> possible_clusters;
-  std::vector<double> current;
-  find_combinations(solution, 0, current, possible_clusters, 0);
-  std::vector<double> expected_clusters;
-  for(uint32_t i=0; i < possible_clusters.size(); i++){
-    bool keep = false;
-    for(uint32_t j=0; j < possible_clusters[i].size(); j++){
-      if(possible_clusters[i][j] == largest){
-        keep = true;
-        break;
-      }
-    }
-    if(keep){
-      double sum = std::accumulate(possible_clusters[i].begin(), possible_clusters[i].end(), 0.0f);
-      expected_clusters.push_back(sum);
-    }
-  }
-  //a list of cluster assignments that we assign to consensus
-  std::vector<int> major_indexes;
-  //index of the "100%" cluster
-  for(uint32_t j=0; j < means.size(); j++){
-    double tmp = means[j];
-    auto closest = *std::min_element(expected_clusters.begin(), expected_clusters.end(), [tmp](double a, double b) {
-      return std::abs(a - tmp) < std::abs(b - tmp);
-    });
-    double diff = std::abs(closest - tmp);
-    auto it = std::find(solution.begin(), solution.end(), tmp);
-    if((diff < error && it == solution.end()) || tmp == largest){
-      major_indexes.push_back((int)j);
-    }
-  }
-
   amplicon_specific_cluster_assignment(variants, model);
   rewrite_position_masking(variants);
   std::vector<uint32_t> amplicons_to_mask;
+  std::vector<double> means;
   if(means.size() > 1){
     amplicons_to_mask = rewrite_amplicon_masking(variants, means);
   }
