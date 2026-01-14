@@ -61,7 +61,17 @@ void generate_ordered(const std::vector<uint32_t>& elements,
     backtrack();
 }
 
-//test function
+std::string vec_to_pylist(const std::vector<uint32_t>& v){
+    std::ostringstream ss;
+    ss << "[";
+    for (size_t i = 0; i < v.size(); ++i) {
+        ss << v[i];
+        if (i + 1 < v.size()) ss << ", ";
+    }
+    ss << "]";
+    return ss.str();
+}
+
 std::string vec_to_pylist(const std::vector<double>& v){
     std::ostringstream ss;
     ss << "[";
@@ -354,6 +364,54 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
   }
 }
 
+void write_solution_status(std::string prefix, std::string solution_status){
+  std::ofstream out(prefix + "_solution_status.tsv", std::ios::app);
+  out << "solution_status\n";
+  out << solution_status << "\n";
+  out.close();
+}
+
+void write_variant_assignments(std::string prefix, std::vector<variant> variants){
+  std::ofstream out(prefix + "_variant_assignments.tsv", std::ios::app);
+  out << "POS\tNUC\tGAPPED_FREQ\tPOSTERIOR_PROB\tCOMPONENT_ASSIGMENT\tCONSENSUS_ASSIGNMENT\n";
+  for(auto var : variants){
+    if(var.assigned_component == -1) continue;
+    out << std::to_string(var.position) << "\t";
+    out << var.nuc << "\t";
+    out << std::to_string(var.gapped_freq) << "\t";
+    out << vec_to_pylist(var.marginal_posterior_probabilities) << "\t";
+    out << std::to_string(var.assigned_component) << "\t";
+    out << vec_to_pylist(var.consensus_numbers) << "\n";
+  }
+  out.close();
+  
+}
+
+void write_solutions(std::string prefix, std::vector<std::vector<double>> solutions){
+  std::ofstream out(prefix + "_solutions.tsv", std::ios::app);
+  out << "solutions\n";
+  for(auto solution : solutions){
+    out << vec_to_pylist(solution) << "\n";
+  }
+  out.close(); 
+}
+
+void write_means(std::string prefix, std::vector<double> means){
+  std::ofstream out(prefix + "_means.tsv", std::ios::app);
+  out << "n\tmeans\n";
+  out << std::to_string(means.size()) << "\t";
+  out << vec_to_pylist(means) << "\n";
+  out.close(); 
+}
+
+void write_error_limits(std::string prefix, double lower_bound, double upper_bound){
+  std::ofstream out(prefix + "_error_limits.tsv", std::ios::app);
+  out << "lower_error_bound\tupper_error_bound\n";
+  out << std::to_string(lower_bound) << "\t";
+  out << std::to_string(upper_bound) << "\n";
+  out.close(); 
+}
+
 int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::string ref, double default_threshold){
   if(ref.empty()){
@@ -365,7 +423,6 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   std::vector<double> means;
 
   uint32_t round_val = 4;
-  bool development_mode=true;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
 
@@ -374,13 +431,8 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   cluster_error(base_variants, min_qual, min_depth, error_rate);
   double lower_bound = 1-error_rate;
   double upper_bound = error_rate;
-
+  write_error_limits(output_prefix, lower_bound, upper_bound);
   std::cerr << "upper bound " << upper_bound << " lower bound " << lower_bound << std::endl;
-
-  std::ofstream out( output_prefix + "_error.tsv", std::ios::app);
-  out << "lower_bound\tupper_bound\n";
-  out << std::to_string(lower_bound) << "\t" << std::to_string(upper_bound) << "\n";
-  out.close();
 
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
   set_deletion_flags(base_variants, lower_bound);
@@ -405,32 +457,10 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
 
   //handle the case of no variants less than the universal cluster
   if(frequencies.size() < 1){
-    std::ofstream file;
-    if(development_mode){
-      //write means to string
-      file.open(output_prefix + ".txt", std::ios::trunc);
-      std::string means_string = "[[";
-      means_string += "0.99";
-      means_string += "]]";
-      file << "means\n";
-      file << means_string << "\n";
-      file.close();
-
-      std::string solution_string = "[0.99]";
-      std::string solution_filename = output_prefix + "_solution.txt";
-      std::ofstream file_sol(solution_filename);
-      file_sol << "means\n";
-      file_sol << solution_string << "\n";
-      file_sol.close();
-
-    }
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
+    write_solution_status(output_prefix, "no solution:insufficient data to fit model");
     exit(0);
   }
-
-  std::vector<std::vector<double>> track_means;
-  std::vector<std::vector<double>> track_weights;
-  std::vector<uint32_t> track_ns;
 
   int n_min = 0;
   std::unordered_map<int, int> counts;
@@ -459,6 +489,7 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
     N = 5;
   } else {
     std::cerr << "Insufficient data to fit GMM\n";
+    write_solution_status(output_prefix, "no solution:insufficient data to fit model");
     exit(0);
   }
   std::cerr << frequencies.size() << " variants to cluster." << std::endl;
@@ -501,15 +532,7 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
     std::cerr << "mean " << m << std::endl;
   }
 
-  //HERE CHANGE THIS TO BE MODEL OUTPUTS
-  std::ofstream out_again(output_prefix + "_track_stats.tsv", std::ios::app);
-  out_again << "n\tmeans\tdcovs\tweights\n";
-  for(uint32_t i=0; i < track_ns.size(); i++){
-    out_again << std::to_string(track_ns[i]) << "\t";
-    out_again << vec_to_pylist(track_means[i]) << "\t";
-    out_again << vec_to_pylist(track_weights[i]) << "\n";
-  }
-  out_again.close();
+  write_means(output_prefix, means);
 
   //attempt to solve the subset sum issue
   std::vector<std::vector<double>> solution_sets;
@@ -517,11 +540,14 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   if(!solved){
     std::cerr << "Could not solve unit sum problem for model means." << std::endl;
     call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
+    write_solution_status(output_prefix, "no solution:unit-sum failed");
     exit(0);
   }
   if(solution_sets.size() > 1){
     std::cerr << "Multiple solutions found for unit sum problem." << std::endl;
     call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
+    write_solution_status(output_prefix, "no solution:multiple possible solutions");
+    write_solutions(output_prefix, solution_sets);
     exit(0);
   }
   solution = solution_sets[0];
@@ -537,11 +563,10 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
     frequencies.push_back(var.gapped_freq);
     sites.push_back(var.position);
   }
-  
   gmm_1d::logit_transform(frequencies, x_logit, eps);
   std::vector<uint32_t> assigned_components;
   std::vector<std::vector<double>> marginal_posterior_probabilities;
-  model.predict(
+  model2.predict(
       x_logit,
       sites,
       assigned_components,
@@ -562,18 +587,23 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   //use the solution set to assign consensus numbers
   std::unordered_map<uint32_t, std::vector<std::vector<uint32_t>>> mapping_combinations;
   solve_additive_peaks(solution, means, mapping_combinations);
-  assign_consensus_numbers(base_variants, mapping_combinations); 
 
+  assign_consensus_numbers(base_variants, mapping_combinations); 
   //check to make sure the cluster assignment is clear
   compare_component_assigments(base_variants);
 
   //place the universal cluster values in every consensus
   assign_universal_components(base_variants, upper_bound, means.size());
-  
-  cluster_consensus(base_variants, output_prefix, \
-                      default_threshold, \
-                      min_depth, min_qual, \
-                      solution, means, 
-                      ref, error_rate);
+ 
+  cluster_consensus(base_variants, 
+                    output_prefix, 
+                    default_threshold,
+                    min_depth, min_qual,
+                    solution, means, 
+                    ref, error_rate);
+  write_solution_status(output_prefix, "solution");
+  write_solutions(output_prefix, solution_sets);
+  write_variant_assignments(output_prefix, base_variants);
+
   return 0;
 }
