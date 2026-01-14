@@ -416,7 +416,7 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
                               std::string ref, double default_threshold){
   if(ref.empty()){
     std::cerr << "Please provide a reference sequence." << std::endl;
-    exit(1);
+    return(1);
   }
   double error_rate;
   std::vector<double> solution;
@@ -459,7 +459,7 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   if(frequencies.size() < 1){
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
     write_solution_status(output_prefix, "no solution:insufficient data to fit model");
-    exit(0);
+    return(0);
   }
 
   int n_min = 0;
@@ -486,11 +486,11 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   } else if (n_min == 4) {
     N = 9;
   } else if (n_min == 2){
-    N = 5;
+    N = 4;
   } else {
     std::cerr << "Insufficient data to fit GMM\n";
     write_solution_status(output_prefix, "no solution:insufficient data to fit model");
-    exit(0);
+    return(1);
   }
   std::cerr << frequencies.size() << " variants to cluster." << std::endl;
   std::cerr << "Fitting " << N << " components to data." << std::endl;
@@ -541,14 +541,14 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
     std::cerr << "Could not solve unit sum problem for model means." << std::endl;
     call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
     write_solution_status(output_prefix, "no solution:unit-sum failed");
-    exit(0);
+    return(1);
   }
   if(solution_sets.size() > 1){
     std::cerr << "Multiple solutions found for unit sum problem." << std::endl;
     call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
     write_solution_status(output_prefix, "no solution:multiple possible solutions");
     write_solutions(output_prefix, solution_sets);
-    exit(0);
+    return(1);
   }
   solution = solution_sets[0];
   
