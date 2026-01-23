@@ -36,7 +36,7 @@ class gmm_1d {
 
   double e_step_1d(const std::vector<double>& x, const std::vector<uint32_t>& site_id, std::vector<std::vector<double>>& resp) const;
   void m_step_1d(const std::vector<double>& x, const std::vector<std::vector<double>>& resp);
-  void initialize_k_means_1d(const std::vector<double>& x, uint32_t K, uint32_t n_iter = 10, uint32_t seed = 112358);
+  void initialize_k_means_1d(const std::vector<double>& x, uint32_t K, bool adaptive, uint32_t n_iter = 10, uint32_t seed = 112358);
 
  public:
 
@@ -46,7 +46,7 @@ class gmm_1d {
   static double calculate_bhattacharyya_distance_1d(double mu1, double v1, double mu2, double v2);
   uint32_t get_distinct_components_count(const std::vector<uint32_t>& sites, double min_bd_threshold = MIN_BD_THRESHOLD);
 
-  bool fit(const std::vector<double>& x, const std::vector<uint32_t>& sites, std::vector<double>& logL_history, int n_iter = 20, double tolerance = -1.0, bool adaptive = false, bool logging = true, unsigned int seed = 112358);
+  int fit(const std::vector<double>& x, const std::vector<uint32_t>& sites, std::vector<double>& logL_history, int n_iter = 20, double tolerance = -1.0, bool adaptive = false, bool logging = true, unsigned int seed = 112358);
   bool predict(const std::vector<double>& x, const std::vector<uint32_t>& sites, std::vector<uint32_t>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const;
 
   std::vector<double> get_weights() const { return weights; }

@@ -343,7 +343,7 @@ std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<double> so
 }
 
 void solve_additive_peaks(std::vector<double> solution, std::vector<double> means, std::unordered_map<uint32_t, std::vector<std::vector<uint32_t>>> &mapping_combinations){
-  double error = 0.05;
+  double error = 0.10;
   //determine which cluster means are not in the solution
   std::vector<double> non_solution_means;
   for(uint32_t i=0; i < means.size(); i++){
@@ -360,7 +360,6 @@ void solve_additive_peaks(std::vector<double> solution, std::vector<double> mean
     double target_mean = non_solution_means[i];
     uint32_t target_index = std::find(means.begin(), means.end(), target_mean) - means.begin(); 
     std::vector<std::vector<double>> subsets = find_subsets_with_error(solution, target_mean, error);
-
     for(auto sub :  subsets){
       std::vector<uint32_t> idx_mapped;
       for(auto s : sub){
@@ -371,18 +370,19 @@ void solve_additive_peaks(std::vector<double> solution, std::vector<double> mean
     }
   }
   //TODO: for non solution means with two possible combinations 
-
+  //TODO: what if we can't find the things they add up to?
 }
 
 void assign_universal_components(std::vector<variant> &base_variants, double upper_bound, uint32_t n){
   std::vector<uint32_t> arr(n + 1);
-  for (uint32_t i = 0; i <= n; i++) {
+  for (uint32_t i = 0; i < n; i++) {
     arr[i] = i;
   } 
-  for(auto var : base_variants){
+
+  for(auto &var : base_variants){
     if(var.assigned_component == -1 && var.gapped_freq > upper_bound){
       var.consensus_numbers = arr;
-      var.assigned_component == 1;
+      var.assigned_component = 1;
     }
   }
 }

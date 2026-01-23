@@ -414,6 +414,7 @@ void write_error_limits(std::string prefix, double lower_bound, double upper_bou
 
 int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::string ref, double default_threshold){
+  min_qual = 9;
   if(ref.empty()){
     std::cerr << "Please provide a reference sequence." << std::endl;
     return(1);
@@ -428,11 +429,10 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   set_deletion_flags(base_variants, 0.001);
 
   cluster_error(base_variants, min_qual, min_depth, error_rate);
-  double lower_bound = 1-error_rate;
-  double upper_bound = error_rate;
+  double lower_bound = 1-error_rate+0.0001;
+  double upper_bound = error_rate-0.0001;
   write_error_limits(output_prefix, lower_bound, upper_bound);
   std::cerr << "upper bound " << upper_bound << " lower bound " << lower_bound << std::endl;
-
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
   set_deletion_flags(base_variants, lower_bound);
   set_insertion_flags(base_variants);
@@ -449,6 +449,7 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
     if(base_variants[i].depth_flag) continue;
     if(base_variants[i].outside_freq_range) continue;
     if(base_variants[i].qual_flag) continue;
+    std::cerr << base_variants[i].gapped_freq << " " << base_variants[i].position << " " << base_variants[i].qual << " " << base_variants[i].gapped_depth << std::endl;
     //if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
       frequencies.push_back(base_variants[i].gapped_freq);
       sites.push_back(base_variants[i].position);
@@ -498,7 +499,7 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   gmm_1d::logit_transform(frequencies, x_logit, eps);
   //fit the model
   gmm_1d model(N);
-  model.fit(
+  int return_code = model.fit(
       x_logit,
       sites,
       logL_history,
@@ -510,11 +511,19 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   model.get_distinct_components_count(sites);
   uint32_t final_N = model.merged_means.size();
 
+  //TESTLINES PRINTING
+  const auto& m = model.get_means();
+  gmm_1d::sigmoid_transform(m, means, eps);
+
+  for(auto m : means){
+    std::cerr << "mean " << m << std::endl;
+  }
+
   std::cerr << "Final number of components after merging: " << final_N << std::endl;
   //fit the model a second time
   logL_history.clear();
   gmm_1d model2(final_N);
-  model2.fit(
+  int return_code2 = model2.fit(
       x_logit,
       sites,
       logL_history,
@@ -524,6 +533,21 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
       false
   );
 
+  if(return_code2 == 1){
+    final_N++;
+    gmm_1d model2(final_N);
+    int return_code2 = model2.fit(
+        x_logit,
+        sites,
+        logL_history,
+        20,
+        1e-6,
+        false,
+        false
+    );
+  }
+
+  means.clear();
   const auto& m2 = model2.get_means();
   gmm_1d::sigmoid_transform(m2, means, eps);
 
@@ -538,13 +562,13 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   bool solved = subset_sum(means, solution_sets); 
   if(!solved){
     std::cerr << "Could not solve unit sum problem for model means." << std::endl;
-    call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
+    call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
     write_solution_status(output_prefix, "no solution:unit-sum failed");
     return(1);
   }
   if(solution_sets.size() > 1){
     std::cerr << "Multiple solutions found for unit sum problem." << std::endl;
-    call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
+    call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
     write_solution_status(output_prefix, "no solution:multiple possible solutions");
     write_solutions(output_prefix, solution_sets);
     return(1);
@@ -586,14 +610,11 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   //use the solution set to assign consensus numbers
   std::unordered_map<uint32_t, std::vector<std::vector<uint32_t>>> mapping_combinations;
   solve_additive_peaks(solution, means, mapping_combinations);
-
   assign_consensus_numbers(base_variants, mapping_combinations); 
   //check to make sure the cluster assignment is clear
   compare_component_assigments(base_variants);
-
   //place the universal cluster values in every consensus
   assign_universal_components(base_variants, upper_bound, means.size());
- 
   cluster_consensus(base_variants, 
                     output_prefix, 
                     default_threshold,

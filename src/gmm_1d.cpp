@@ -52,7 +52,11 @@ std::pair<std::vector<std::vector<double>>, double> gmm_1d::site_resp_constraine
   const int G = logA[0].size();
 
   if (m > G)
+    //std::cerr << "Site has more variants than components" << std::endl;
     throw std::runtime_error("Site has more variants than components");
+    //std::vector<std::vector<double>> tmp;
+    //double tmp_zero = 0;
+    //return {tmp, tmp_zero};
 
   // Generate assignments of G components to m variants
   std::vector<std::vector<int>> assignments;
@@ -129,6 +133,9 @@ double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<uint32_
     }
     auto result = site_resp_constrained_by_site(site_logA);
     std::vector<std::vector<double>> site_resp = result.first;
+    /*if (site_resp.size() == 0){
+      return(-1);
+    }*/
     double site_logZ = result.second;
 
     for (int j = 0; j < m; ++j) {
@@ -219,16 +226,83 @@ void gmm_1d::m_step_1d(const std::vector<double> &x, const std::vector<std::vect
   }
 }
 
-void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, uint32_t K, uint32_t n_iter, uint32_t seed) {
+std::vector<double> kmeans_max_spread(uint32_t N, uint32_t K, uint32_t seed, std::vector<double> x){
+  std::mt19937 rng(seed);
+  std::uniform_int_distribution<size_t> uni(0, N - 1);
+
+  std::vector<double> centers;
+  centers.reserve(K);
+
+  // pick first center randomly
+  centers.push_back(x[uni(rng)]);
+
+  // track cluster sizes
+  std::vector<size_t> cluster_sizes(1, 0);
+
+  // temporary storage for each point: nearest center index and distance
+  std::vector<size_t> nearest_idx(N, 0);
+  std::vector<double> nearest_dist(N, 0.0);
+
+  for (size_t i = 0; i < N; ++i) {
+      nearest_idx[i] = 0;
+      nearest_dist[i] = std::abs(x[i] - centers[0]);
+      cluster_sizes[0] += 1;
+  }
+
+  for (size_t k = 1; k < K; ++k) {
+      // compute weighted score for each point
+      double max_score = -1.0;
+      size_t next_idx = 0;
+
+      for (size_t i = 0; i < N; ++i) {
+          double score = nearest_dist[i] / (cluster_sizes[nearest_idx[i]] + 1);
+          if (score > max_score) {
+              max_score = score;
+              next_idx = i;
+          }
+      }
+
+      // pick this point as next center
+      centers.push_back(x[next_idx]);
+
+      // add new cluster
+      cluster_sizes.push_back(0);
+      size_t new_center_idx = centers.size() - 1;
+
+      // update nearest distances and cluster assignment
+      for (size_t i = 0; i < N; ++i) {
+          double d = std::abs(x[i] - x[next_idx]);
+          if (d < nearest_dist[i]) {
+              nearest_dist[i] = d;
+              nearest_idx[i] = new_center_idx;
+          }
+      }
+
+      // update cluster sizes
+      std::fill(cluster_sizes.begin(), cluster_sizes.end(), 0);
+      for (size_t i = 0; i < N; ++i) {
+          cluster_sizes[nearest_idx[i]] += 1;
+      }
+  }
+  return(centers);
+}
+
+void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, uint32_t K, bool adaptive, uint32_t n_iter, uint32_t seed) {
   const size_t N = x.size();
   std::mt19937 rng(seed);
   std::uniform_int_distribution<size_t> uni(0, N - 1);
 
-  std::vector<double> centers(K);
-  for (size_t k = 0; k < K; ++k) {
-    centers[k] = x[uni(rng)];
+  std::vector<double> centers;
+  if(adaptive){
+    centers = kmeans_max_spread(N, K, seed, x); 
+  } else {
+    centers.reserve(K);
+    for (size_t k = 0; k < K; ++k) {
+      centers[k] = x[uni(rng)];
+    }
   }
-
+  
+ 
   std::vector<size_t> labels(N);
 
   for (size_t it = 0; it < n_iter; ++it) {
@@ -257,22 +331,29 @@ void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, uint32_t K, uin
     for (size_t k = 0; k < K; ++k) {
       if (count[k] > 0) {
         centers[k] = sum[k] / count[k];
+        //std::cerr << centers[k] << " ";
       }
     }
+    //std::cerr << "\n";
   }
 
   this->means = centers;
 }
 
-bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &sites, std::vector<double>& logL_history, int n_iter,  double tolerance, bool adaptive, bool logging, unsigned int seed) {
+int gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &sites, std::vector<double>& logL_history, int n_iter,  double tolerance, bool adaptive, bool logging, unsigned int seed) {
   const size_t N = x.size();
   if (sites.size() != N) {
     throw std::runtime_error("em_gmm_1d: x and sites size mismatch");
   }
   const int G = this->n_components;
-  initialize_k_means_1d(x, G, 10, seed);
+  if(adaptive){
+    initialize_k_means_1d(x, G, 10, seed, true);
+  } else {
+    initialize_k_means_1d(x, G, 10, seed, false);
+  }
   this->vars.assign(G, this->var_floor);
   this->weights.assign(G, 1.0 / static_cast<double>(G));
+
   std::cerr << "k-means init\nmeans: ";
   for (double v : this->means) std::cerr << v << " ";
   std::cerr << "\nvars: ";
@@ -295,26 +376,23 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &site
 
   // EM loop
   for (size_t it = 0; it < n_iter; ++it) {
-
     std::vector<std::vector<double>> resp;
 
     // E-step
     double logL = e_step_1d(x, sites, resp);
-
+    /*if(logL == -1 && !adaptive){
+      return 1;
+    }*/
     // M-step
     m_step_1d(x, resp);
 
-    //TESTLINES
-    if(adaptive){
-      this->vars.assign(G, 0.05); 
-    }
     // Average log-likelihood per site to check for convergence
     const double avg_logL = logL / static_cast<double>(n_unique_sites);
 
     // Check for non-finite log-likelihood
     if (std::isfinite(avg_logL) == false) {
       std::cerr << "ERROR: Non-finite log-likelihood at iteration " << it << "\n";
-      return false;
+      return -1;
     }
 
     // Check for convergence
@@ -352,7 +430,7 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &site
       std::cerr << "\n";
     }
   }
-  return true;
+  return 0;
 }
 
 bool gmm_1d::predict(const std::vector<double>& x, const std::vector<uint32_t>& sites, std::vector<uint32_t>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const {

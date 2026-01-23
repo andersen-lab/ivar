@@ -20,7 +20,7 @@ void determine_outlier_points(std::vector<double> cluster, double threshold, std
   for(uint32_t i=0; i < z_scores.size(); i++){
     double abs = std::abs(z_scores[i]);
     if(abs >= threshold){
-      std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
+      //std::cerr << "remove " << abs << " " << cluster[i] << std::endl;
       removal_points.push_back(i);
     }
   }
@@ -28,7 +28,7 @@ void determine_outlier_points(std::vector<double> cluster, double threshold, std
 
 void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold, uint32_t depth_cutoff, double &error_rate){
   double lower_bound = 0.50;
-  double upper_bound = 0.99;
+  double upper_bound = 1.01;
   const double eps = 1e-6;
   set_freq_range_flags(base_variants, lower_bound, upper_bound, false);
 
@@ -36,35 +36,36 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   std::vector<uint32_t> sites;
 
   for(uint32_t i=0; i < base_variants.size(); i++){
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && \
+    if(base_variants[i].depth_flag) continue;
+    if(base_variants[i].qual_flag) continue;
+    if(base_variants[i].outside_freq_range) continue;
+    /*if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && \
       !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && \
-      !base_variants[i].amplicon_masked){
+      !base_variants[i].amplicon_masked)*/
       frequencies.push_back(base_variants[i].gapped_freq);
       sites.push_back(base_variants[i].position);
-    }
   }
-
+  std::cerr << "frequencies size " << frequencies.size() << std::endl;
   if(frequencies.empty()){
     error_rate = 0.01;
     return;
   }
 
   std::vector<double> x_logit;
-  gmm_1d::logit_transform(frequencies, x_logit, eps);
+  //gmm_1d::logit_transform(frequencies, x_logit, eps);
   int N = 3;
 
   // Fit GMM
   std::vector<double> logL_history;
   gmm_1d model(N);
   model.fit(
-      x_logit,
+      frequencies,
       sites,
       logL_history,
       20,
       1e-6,
       true,
-      false
-  );
+      true);
 
   model.get_distinct_components_count(sites);
 
@@ -73,18 +74,17 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   uint32_t final_N = model.merged_means.size();
   gmm_1d model2(final_N);
   model2.fit(
-      x_logit,
+      frequencies,
       sites,
       logL_history,
       20,
       1e-6,
       true,
-      false
+      true
   );
   const auto& m2 = model2.get_means();
-  std::vector<double> m_sigmoid2;
-
-  gmm_1d::sigmoid_transform(m2, m_sigmoid2, eps);
+  std::vector<double> m_sigmoid2 = m2;
+  //gmm_1d::sigmoid_transform(m2, m_sigmoid2, eps);
   double largest_mean = 0.0;
   uint32_t largest_idx = 0;
   for(uint32_t m=0; m < m_sigmoid2.size(); ++m){
@@ -97,7 +97,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   std::vector<uint32_t> assigned_components;
   std::vector<std::vector<double>> marginal_posterior_probabilities;
   model2.predict(
-      x_logit,
+      frequencies,
       sites,
       assigned_components,
       marginal_posterior_probabilities
@@ -105,7 +105,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
 
   std::vector<uint32_t> removal_points;
   if(final_N == 1){
-    determine_outlier_points(frequencies, 3, removal_points);
+    determine_outlier_points(frequencies, 5, removal_points);
   }
 
   std::vector<double> largest_cluster_snps;

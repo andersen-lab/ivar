@@ -176,12 +176,12 @@ void cluster_consensus(std::vector<variant> variants, \
       }
       continue;
     }
-
-    for(uint32_t j=0; j < variants[i].consensus_numbers.size(); j++){
-        uint32_t k = variants[i].consensus_numbers[j];
+  
+    for(uint32_t j=0; j < var.consensus_numbers.size(); j++){
+        uint32_t k = var.consensus_numbers[j];
         bool found_del = std::find(deletions[k].begin(), deletions[k].end(), variants[i].position) != deletions[k].end();
         if(found_del) continue; //already assigned a deletion to this position
-
+        //insertion
         if(variants[i].nuc.find('+') != std::string::npos){
           std::string nuc = variants[i].nuc;
           nuc.erase(std::remove(nuc.begin(), nuc.end(), '+'), nuc.end());
@@ -192,10 +192,10 @@ void cluster_consensus(std::vector<variant> variants, \
           }
           last_adjustment[k] = position;
         } else if (variants[i].position == last_adjustment[k] && !del){
-          all_consensus_seqs[k][position-1].insert(0, variants[i].nuc);
+          all_consensus_seqs[k][position-1].insert(0, var.nuc);
         } else {
           if(!del){
-            all_consensus_seqs[k][position-1] = variants[i].nuc;
+            all_consensus_seqs[k][position-1] = var.nuc;
             last_adjustment[k] = position;
           } else {
             std::string nuc = variants[i].nuc;
@@ -215,7 +215,6 @@ void cluster_consensus(std::vector<variant> variants, \
     tmp.erase(std::remove(tmp.begin(), tmp.end(), '-'), tmp.end());
     all_sequences.push_back(tmp);
   }
-
   write_consensus_string(clustering_file, all_sequences, means, solution, min_position);
 
 }
