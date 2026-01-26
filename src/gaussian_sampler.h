@@ -12,7 +12,7 @@ class gaussian_sampler: public distribution_sampler {
   std::normal_distribution<double> dist;
 
  public:
-  gaussian_sampler(double mean, double stddev, uint32_t seed = 112358): mean(mean), stddev(stddev), rng(seed), dist(mean, stddev) {};
+  gaussian_sampler(double mean, double stddev, uint32_t seed = std::random_device{}()): mean(mean), stddev(stddev), rng(seed), dist(mean, stddev) {};
 
   int sample() override;
   void sample(std::vector<double> &out, uint32_t n) override;
