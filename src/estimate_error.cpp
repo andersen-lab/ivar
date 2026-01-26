@@ -39,6 +39,11 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
     if(base_variants[i].depth_flag) continue;
     if(base_variants[i].qual_flag) continue;
     if(base_variants[i].outside_freq_range) continue;
+    bool found = base_variants[i].nuc.find('+') != std::string::npos;
+    if(found) continue;
+    found = base_variants[i].nuc.find('-') != std::string::npos;
+    if(found) continue;
+
     /*if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && \
       !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && \
       !base_variants[i].amplicon_masked)*/
@@ -70,7 +75,7 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   model.get_distinct_components_count(sites);
 
   std::cerr << "Merged components: " << model.merged_means.size() << "\n";
-  
+ 
   uint32_t final_N = model.merged_means.size();
   gmm_1d model2(final_N);
   model2.fit(

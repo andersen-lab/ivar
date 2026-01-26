@@ -444,15 +444,23 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   std::vector<double> frequencies;
   std::vector<double> x_logit;
   std::vector<uint32_t> sites;
-
+  std::vector<uint32_t> noindel_sites;
   for(uint32_t i=0; i < base_variants.size(); i++){
     if(base_variants[i].depth_flag) continue;
     if(base_variants[i].outside_freq_range) continue;
     if(base_variants[i].qual_flag) continue;
-    std::cerr << base_variants[i].gapped_freq << " " << base_variants[i].position << " " << base_variants[i].qual << " " << base_variants[i].gapped_depth << std::endl;
+    //std::cerr << base_variants[i].gapped_freq << " " << base_variants[i].position << " " << base_variants[i].qual << " " << base_variants[i].gapped_depth << std::endl;
     //if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
       frequencies.push_back(base_variants[i].gapped_freq);
       sites.push_back(base_variants[i].position);
+
+    //this could be an issue if the only site that separates two genomes is a deletion
+    bool found = base_variants[i].nuc.find('+') != std::string::npos;
+    if(found) continue;
+    found = base_variants[i].nuc.find('-') != std::string::npos;
+    if(found) continue;
+    noindel_sites.push_back(base_variants[i].position);
+    //std::cerr << base_variants[i].position << std::endl;
   }
 
   //handle the case of no variants less than the universal cluster
@@ -464,7 +472,7 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
 
   int n_min = 0;
   std::unordered_map<int, int> counts;
-  for (int v : sites) {
+  for (int v : noindel_sites) {
       ++counts[v];
   }
 
@@ -482,11 +490,11 @@ int gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth,
   }
   uint32_t N;
   if (n_min == 3){
-    N = 6;
+    N = 8;
   } else if (n_min == 4) {
     N = 9;
   } else if (n_min == 2){
-    N = 4;
+    N = 6;
   } else {
     std::cerr << "Insufficient data to fit GMM\n";
     write_solution_status(output_prefix, "no solution:insufficient data to fit model");
