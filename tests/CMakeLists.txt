@@ -126,6 +126,10 @@ add_executable(check_gaussian_sampler
         test_gaussian_sampler.cpp ../src/gaussian_sampler.cpp
 )
 
+add_executable(check_multinomial_sampler
+        test_multinomial_sampler.cpp ../src/multinomial_sampler.cpp
+)
+
 add_executable(check_bd_threshold
         test_bd_threshold.cpp ../src/gmm_1d.cpp ../src/gaussian_sampler.cpp
 )
@@ -159,6 +163,7 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_site_state_aggregator_stats
         check_gmm_1d
         check_gaussian_sampler
+        check_multinomial_sampler
         check_bd_threshold
 )
 
