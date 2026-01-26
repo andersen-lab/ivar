@@ -279,9 +279,20 @@ void gmm_1d::m_step_1d(const std::vector<double> &x, const std::vector<std::vect
       // Reinitialize component if likelihood is 0.
       size_t idx = std::distance(row_sums.begin(), std::max_element(row_sums.begin(), row_sums.end()));
 
-      this->means[g] = x[idx];
-      this->vars[g] = var_x;
-      weights[g] = this->weight_floor;
+      if(this->component_types[g] == HALF_NORMAL_LEFT) {
+        this->means[g] = 0;
+        this->vars[g] = this->var_floor;
+        weights[g] = this->weight_floor;
+      } else if (this->component_types[g] == HALF_NORMAL_RIGHT) {
+        this->means[g] = 1;
+        this->vars[g] = this->var_floor;
+        weights[g] = this->weight_floor;
+      } else {
+        this->means[g] = x[idx];
+        this->vars[g] = var_x;
+        weights[g] = this->weight_floor;
+      }
+
     } else {
       weights[g] = L[g] / W_total;
 
@@ -321,24 +332,49 @@ void gmm_1d::m_step_1d(const std::vector<double> &x, const std::vector<std::vect
 }
 
 void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, std::vector<double> &centers, int n_iter) {
-  const size_t N = x.size();
+  std::vector<double> x_filtered;
+  x_filtered.reserve(x.size());
+
+  for (double v : x) {
+    if (v >= this->HALF_NORMAL_LEFT_THRESHOLD && v <= this->HALF_NORMAL_RIGHT_THRESHOLD) {
+      x_filtered.push_back(v);
+    }
+  }
+  const size_t N = x_filtered.size();
   std::uniform_int_distribution<size_t> uni(0, N - 1);
 
   centers.clear();
   centers.resize(K);
-  for (size_t k = 0; k < K - 2; ++k) {
-    centers[k] = x[uni(this->rng)];
+
+  // Initialize centers using kmeans++
+  std::vector<double> min_dist_sq(N, std::numeric_limits<double>::infinity());
+  centers.push_back(x_filtered[uni(this->rng)]);
+
+  for (int k = 1; k < K; k++) {
+    const double new_center = centers[k - 1];
+    for (int i = 0; i < N; ++i) {
+      double d = x_filtered[i] - new_center;
+      double dist_sq = d * d;
+      if (dist_sq < min_dist_sq[i]) {
+        min_dist_sq[i] = dist_sq;
+      }
+    }
+    // Choose next center weighted by dist^2
+    std::discrete_distribution<int> weighted(min_dist_sq.begin(), min_dist_sq.end());
+    int next_idx = weighted(this->rng);
+    centers.push_back(x_filtered[next_idx]);
   }
 
-  std::vector<size_t> labels(N);
+  // Lloyd's iterations
+  std::vector<int> labels(N);
 
-  for (size_t it = 0; it < n_iter; ++it) {
+  for (int it = 0; it < n_iter; ++it) {
     // assignment
-    for (size_t i = 0; i < N; ++i) {
+    for (int i = 0; i < N; ++i) {
       double best = std::numeric_limits<double>::infinity();
-      size_t best_k = 0;
-      for (size_t k = 0; k < K; ++k) {
-        double d = x[i] - centers[k];
+      int best_k = 0;
+      for (int k = 0; k < K; ++k) {
+        double d = x_filtered[i] - centers[k];
         double dist = d * d;
         if (dist < best) {
           best = dist;
@@ -350,14 +386,27 @@ void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, std::vec
 
     // update
     std::vector<double> sum(K, 0.0);
-    std::vector<size_t> count(K, 0);
-    for (size_t i = 0; i < N; ++i) {
-      sum[labels[i]] += x[i];
+    std::vector<int> count(K, 0);
+    for (int i = 0; i < N; ++i) {
+      sum[labels[i]] += x_filtered[i];
       count[labels[i]]++;
     }
-    for (size_t k = 0; k < K; ++k) {
+    for (int k = 0; k < K; ++k) {
       if (count[k] > 0) {
         centers[k] = sum[k] / count[k];
+      } else {
+        // If empty cluster reinitialize to furthest point
+        int furthest = 0;
+        double max_dist = 0.0;
+        for (int i = 0; i < N; ++i) {
+          double d = x_filtered[i] - centers[labels[i]];
+          double dist = d * d;
+          if (dist > max_dist) {
+            max_dist = dist;
+            furthest = i;
+          }
+        }
+        centers[k] = x_filtered[furthest];
       }
     }
   }

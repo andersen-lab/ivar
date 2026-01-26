@@ -50,7 +50,7 @@ class gmm_1d {
 
   double e_step_1d(const std::vector<double>& x, const std::vector<int>& site_id, std::vector<std::vector<double>>& resp) const;
   void m_step_1d(const std::vector<double>& x, const std::vector<std::vector<double>>& resp);
-  void initialize_k_means_1d(const std::vector<double>& x, int K, std::vector<double>& centers, int n_iter = 10);
+  void initialize_k_means_1d(const std::vector<double>& x_filtered, int K, std::vector<double>& centers, int n_iter = 10);
   void compute_data_weights(const std::vector<uint32_t>& depths);
 
  public:
