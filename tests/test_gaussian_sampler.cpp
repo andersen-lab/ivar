@@ -15,9 +15,5 @@ int main() {
   if (samples.size() != 1000)
     return -1;
 
-  std::cerr << "Samples: ";
-  for (double s : samples)
-    std::cerr << s << ", ";
-
   return 0;
 }
