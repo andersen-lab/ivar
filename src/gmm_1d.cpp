@@ -18,6 +18,15 @@ double gmm_1d::log_normal_1d(double x, double mu, double var) {
   return -0.5 * (std::log(2 * PI * var) + std::pow(x - mu, 2) / var);
 }
 
+double gmm_1d::log_half_normal_1d(double x, double mu, double var, bool left_tail) {
+  if(left_tail && x < mu)
+    return -std::numeric_limits<double>::infinity();
+  if (!left_tail && x > mu)
+    return -std::numeric_limits<double>::infinity();
+
+  return std::log(2.0) + log_normal_1d(x, mu, var);
+}
+
 // Additional information at https://gregorygundersen.com/blog/2020/02/09/log-sum-exp/
 double gmm_1d::log_sum_exp(const double *x, size_t n) {
   double max_val = -std::numeric_limits<double>::infinity();
@@ -38,21 +47,53 @@ double gmm_1d::log_sum_exp(const double *x, size_t n) {
   return max_val + std::log(sum);
 }
 
-// Assign G components to m variants per site under the constraint that m < G
-void gmm_1d::generate_assignments(int G, int m, std::vector<std::vector<int>> &assignments) {
-  std::vector<int> perm(G);
-  for (int i = 0; i < G; ++i) perm[i] = i;
-  do {
-    assignments.emplace_back(perm.begin(), perm.begin() + m);
-  } while (std::next_permutation(perm.begin(), perm.end()));
+void gmm_1d::backtrack_assignments(int G, int m, std::vector<std::vector<int>>& assignments, std::vector<int>& current, std::vector<bool>& used) {
+  // If we've chosen m components, record this permutation prefix.
+  if ((int)current.size() == m) {
+    assignments.push_back(current);
+    return;
+  }
+
+  // Try every possible next component.
+  for (int i = 0; i < G; ++i) {
+    if (used[i]) continue;
+
+    used[i] = true;
+    current.push_back(i);
+
+    backtrack_assignments(G, m, assignments, current, used);
+
+    current.pop_back();
+    used[i] = false;
+  }
 }
 
-std::pair<std::vector<std::vector<double>>, double> gmm_1d::site_resp_constrained_by_site(const std::vector<std::vector<double>> &logA) const {
+// Assign G components to m variants per site under the constraint that m < G
+void gmm_1d::generate_assignments(int G, int m, std::vector<std::vector<int>> &assignments) {
+  assignments.clear();
+
+  // Reserve number of outputs
+  // P (G, m) = G! / (G - m)!
+  int count = 1;
+  for (int k = 0; k < m; ++k) {
+    count *= (G - k);
+  }
+  assignments.reserve(count);
+
+  std::vector<int> current;
+  current.reserve(m);
+
+  std::vector<bool> used(G, false);
+
+  backtrack_assignments(G, m, assignments, current, used);
+}
+
+std::pair<std::vector<std::vector<double>>, double> gmm_1d::site_resp_constrained_by_site(const std::vector<std::vector<double>> &logA, const std::vector<double> &site_weights) {
   const int m = logA.size();
   const int G = logA[0].size();
 
   if (m > G)
-    throw std::runtime_error("Site has more variants than components");
+    throw std::runtime_error("gmm1d::site_resp_constrained_by_site: Site has more variants than components");
 
   // Generate assignments of G components to m variants
   std::vector<std::vector<int>> assignments;
@@ -66,7 +107,7 @@ std::pair<std::vector<std::vector<double>>, double> gmm_1d::site_resp_constraine
   for (int a = 0; a < A; ++a) {
     double s = 0.0;
     for (int j = 0; j < m; ++j) {
-      s += logA[j][assignments[a][j]];
+      s += site_weights[j] * logA[j][assignments[a][j]];
     }
     log_w[a] = s;
   }
@@ -97,16 +138,40 @@ double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<int> &s
   const int N = x.size();
   const int G = this->n_components;
 
+  bool use_weighted_likelihood = !this->data_weights.empty();
+  if(use_weighted_likelihood && this->data_weights.size() != N){
+    throw std::runtime_error("gmm_1d::e_step_1d: x and data_weights size mismatch");
+  }
+
+  resp.clear();
+  resp.resize(N);
   resp.assign(N, std::vector<double>(G, 0.0));
 
   // Compute logA
   std::vector<std::vector<double>> logA(N, std::vector<double>(G));
 
+
   for (int i = 0; i < N; ++i) {
     for (int g = 0; g < G; ++g) {
-      logA[i][g] =
-          std::log(std::max(this->weights[g], 1e-300)) + // avoid log(0) for weights
-          log_normal_1d(x[i], this->means[g], this->vars[g]);
+      double log_weight = std::log(std::max(this->weights[g], 1e-300)); // avoid log(0) for weights
+
+      if(this->component_types[g] == HALF_NORMAL_LEFT) {
+        if(x[i] <= this->HALF_NORMAL_LEFT_THRESHOLD) {
+          logA[i][g] = log_weight + log_half_normal_1d(x[i], this->means[g], this->vars[g], true);
+        } else {
+          logA[i][g] = -std::numeric_limits<double>::infinity();
+        }
+
+      } else if (this->component_types[g] == HALF_NORMAL_RIGHT) {
+        if(x[i] >= this->HALF_NORMAL_RIGHT_THRESHOLD) {
+          logA[i][g] = log_weight + log_half_normal_1d(x[i], this->means[g], this->vars[g], false);
+        } else {
+          logA[i][g] = -std::numeric_limits<double>::infinity();
+        }
+      } else {
+        // Full gaussian component
+        logA[i][g] = log_weight + log_normal_1d(x[i], this->means[g], this->vars[g]);
+      }
     }
   }
 
@@ -124,18 +189,20 @@ double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<int> &s
     const int m = idxs.size();
 
     std::vector<std::vector<double>> site_logA(m, std::vector<double>(G));
+    std::vector<double> site_weights(m, 1.0);
+
     for (int j = 0; j < m; ++j) {
       site_logA[j] = logA[idxs[j]];
+      site_weights[j] = use_weighted_likelihood ? this->data_weights[idxs[j]] : 1.0;
     }
 
-    auto result = site_resp_constrained_by_site(site_logA);
+    auto result = gmm_1d::site_resp_constrained_by_site(site_logA, site_weights);
     std::vector<std::vector<double>> site_resp = result.first;
     double site_logZ = result.second;
 
     for (int j = 0; j < m; ++j) {
       resp[idxs[j]] = site_resp[j];
     }
-
     logL += site_logZ;
   }
 
@@ -149,35 +216,63 @@ void gmm_1d::m_step_1d(const std::vector<double> &x, const std::vector<std::vect
   }
   const size_t G = resp[0].size();
 
+  const bool use_weighted_likelihood = !this->data_weights.empty();
+  if(use_weighted_likelihood && this->data_weights.size() != N){
+    throw std::runtime_error("gmm_1d::m_step_1d: x and data_weights size mismatch");
+  }
+
+  std::vector<double> depth_weights(N, 1.0);
+  if(use_weighted_likelihood)
+    depth_weights = this->data_weights;
+
   // L = resp.sum(axis=0)
   std::vector<double> L(G, 0.0);
+  double W_total = 0;
+
   for (size_t i = 0; i < N; ++i) {
     if (resp[i].size() != G) {
       throw std::runtime_error("m_step_1d: inconsistent resp dimensions");
     }
+    double w_i = depth_weights[i];
+    W_total += w_i;
     for (size_t g = 0; g < G; ++g) {
-      L[g] += resp[i][g];
+      L[g] += w_i * resp[i][g];
     }
   }
 
+  if(this->use_half_normal_for_noise) {
+    for(int g = 2; g < G; g++){
+      this->means[g] = 0.0;
+    }
+  } else {
+    this->means.assign(G, 0.0);
+  }
+
   this->weights.assign(G, 0.0);
-  this->means.assign(G, 0.0);
   this->vars.assign(G, 0.0);
 
   // Precompute for resurrection of components with no weight
   std::vector<double> row_sums(N, 0.0);
   for (size_t i = 0; i < N; ++i) {
-    row_sums[i] = std::accumulate(resp[i].begin(), resp[i].end(), 0.0);
+    double w_i = use_weighted_likelihood ? this->data_weights[i] : 1.0;
+    row_sums[i] = w_i * std::accumulate(resp[i].begin(), resp[i].end(), 0.0);
   }
 
   // Precompute global variance
-  double mean_x = std::accumulate(x.begin(), x.end(), 0.0) / N;
+  double weighted_sum_x = 0.0;
+  for (size_t i = 0; i < N; ++i) {
+    double w_i = use_weighted_likelihood ? this->data_weights[i] : 1.0;
+    weighted_sum_x += w_i * x[i];
+  }
+  double mean_x = weighted_sum_x / W_total;
+
   double var_x = 0.0;
   for (size_t i = 0; i < N; ++i) {
+    double w_i = use_weighted_likelihood ? this->data_weights[i] : 1.0;
     double d = x[i] - mean_x;
-    var_x += d * d;
+    var_x += w_i * d * d;
   }
-  var_x /= N;
+  var_x /= W_total;
 
   for (size_t g = 0; g < G; ++g) {
     if (L[g] == 0.0) {
@@ -188,19 +283,24 @@ void gmm_1d::m_step_1d(const std::vector<double> &x, const std::vector<std::vect
       this->vars[g] = var_x;
       weights[g] = this->weight_floor;
     } else {
-      weights[g] = L[g] / static_cast<double>(N);
+      weights[g] = L[g] / W_total;
 
       double mu = 0.0;
-      for (size_t i = 0; i < N; ++i) {
-        mu += resp[i][g] * x[i];
+      // For half normal components, we fix means at 0 and 1.
+      if (this->component_types[g] == GAUSSIAN) {
+        for (size_t i = 0; i < N; ++i) {
+          double w_i = use_weighted_likelihood ? this->data_weights[i] : 1.0;
+          mu += w_i * resp[i][g] * x[i];
+        }
+        mu /= L[g];
+        this->means[g] = mu;
       }
-      mu /= L[g];
-      this->means[g] = mu;
 
       double var = 0.0;
       for (size_t i = 0; i < N; ++i) {
-        double d = x[i] - mu;
-        var += resp[i][g] * d * d;
+        double w_i = use_weighted_likelihood ? this->data_weights[i] : 1.0;
+        double d = x[i] - this->means[g];
+        var += w_i * resp[i][g] * d * d;
       }
       var /= L[g];
       this->vars[g] = var;
@@ -220,14 +320,14 @@ void gmm_1d::m_step_1d(const std::vector<double> &x, const std::vector<std::vect
   }
 }
 
-void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, int n_iter, int seed) {
+void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, std::vector<double> &centers, int n_iter) {
   const size_t N = x.size();
-  std::mt19937 rng(seed);
   std::uniform_int_distribution<size_t> uni(0, N - 1);
 
-  std::vector<double> centers(K);
-  for (size_t k = 0; k < K; ++k) {
-    centers[k] = x[uni(rng)];
+  centers.clear();
+  centers.resize(K);
+  for (size_t k = 0; k < K - 2; ++k) {
+    centers[k] = x[uni(this->rng)];
   }
 
   std::vector<size_t> labels(N);
@@ -261,19 +361,69 @@ void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, int n_it
       }
     }
   }
-
-  this->means = centers;
 }
 
-bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, std::vector<double>& logL_history, int n_iter,  double tolerance, bool adaptive, unsigned int seed) {
+void gmm_1d::compute_data_weights(const std::vector<uint32_t> &depths) {
+  this->data_weights.clear();
+  const int N = depths.size();
+  this->data_weights.resize(N);
+  for(int i = 0; i < N; i++) {
+    this->data_weights[i] =  std::log(std::max(depths[i], uint32_t{2}));
+  }
+}
+
+bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, std::vector<double>& logL_history, const std::vector<uint32_t> &depths, int n_iter,  double tolerance, bool adaptive) {
   const size_t N = x.size();
   if (sites.size() != N) {
-    throw std::runtime_error("em_gmm_1d: x and sites size mismatch");
+    throw std::runtime_error("gmm_1d::fit: x and sites size mismatch");
   }
+
+  if (!depths.empty()) {
+    if (depths.size() != N) {
+      throw std::runtime_error("gmm_1d::fit: x and depths size mismatch");
+    }
+    compute_data_weights(depths);
+  }
+
   const int G = this->n_components;
-  initialize_k_means_1d(x, G, 10, seed);
+
+  this->component_types.clear();
+  this->means.clear();
+  this->weights.clear();
+  this->vars.clear();
+
+  this->component_types.resize(G);
+  this->means.resize(G);
+  this->weights.resize(G);
+  this->vars.resize(G);
+
+  if(this->use_half_normal_for_noise) {
+    this->component_types[0] = HALF_NORMAL_LEFT;
+    this->component_types[1] = HALF_NORMAL_RIGHT;
+    for(int i = 2; i < G; i++) {
+      this->component_types[i] = GAUSSIAN;
+    }
+  } else {
+    this->component_types.assign(G, GAUSSIAN);
+  }
+
+
+  std::vector<double> kmeans_centers;
+
+  if(this->use_half_normal_for_noise) {
+    initialize_k_means_1d(x, G - 2, kmeans_centers, 10);
+    this->means[0] = 0;
+    this->means[1] = 1;
+    for(int i = 0 ; i < G-2; i++)
+      this->means[i+2] = kmeans_centers[i];
+  } else {
+    initialize_k_means_1d(x, G, kmeans_centers, 10);
+    this->means = kmeans_centers;
+  }
+
   this->vars.assign(G, this->var_floor);
   this->weights.assign(G, 1.0 / static_cast<double>(G));
+
   std::cerr << "k-means init\nmeans: ";
   for (double v : this->means) std::cerr << v << " ";
   std::cerr << "\nvars: ";
@@ -361,6 +511,11 @@ bool gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& sites
   if (sites.size() != N)
     throw std::runtime_error("predict(): size mismatch");
 
+  const bool use_weighted_likelihood = !this->data_weights.empty();
+  if (use_weighted_likelihood && this->data_weights.size() != static_cast<size_t>(N)) {
+    throw std::runtime_error("predict(): x and data_weights size mismatch");
+  }
+
   assigned_components.resize(N);
   marginal_posterior_probabilities.resize(N);
   marginal_posterior_probabilities.assign(N, std::vector<double>(G, 0.0));
@@ -370,9 +525,24 @@ bool gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& sites
 
   for (int i = 0; i < N; ++i) {
     for (int g = 0; g < G; ++g) {
-      logA[i][g] =
-          std::log(std::max(weights[g], 1e-300)) +
-          log_normal_1d(x[i], means[g], vars[g]);
+      double log_weight = std::log(std::max(weights[g], 1e-300)); // avoid log(0)
+      if(this->component_types[g] == HALF_NORMAL_LEFT) {
+        if(x[i] <= this->HALF_NORMAL_LEFT_THRESHOLD) {
+          logA[i][g] = log_weight + log_half_normal_1d(x[i], means[g], vars[g], true);
+        } else {
+          logA[i][g] = -std::numeric_limits<double>::infinity();
+        }
+
+      } else if (this->component_types[g] == HALF_NORMAL_RIGHT) {
+        if(x[i] >= this->HALF_NORMAL_RIGHT_THRESHOLD) {
+          logA[i][g] = log_weight + log_half_normal_1d(x[i], means[g], vars[g], false);
+        } else {
+          logA[i][g] = -std::numeric_limits<double>::infinity();
+        }
+      } else {
+        // Full gaussian component
+        logA[i][g] = log_weight + log_normal_1d(x[i], means[g], vars[g]);
+      }
     }
   }
 
@@ -391,9 +561,13 @@ bool gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& sites
     // site_logA[j][g]
     std::vector<std::vector<double>> site_logA(
         m, std::vector<double>(G));
+    std::vector<double> site_weights(m, 1.0);
 
-    for (int j = 0; j < m; ++j)
+    for (int j = 0; j < m; ++j) {
       site_logA[j] = logA[idxs[j]];
+      if (use_weighted_likelihood)
+        site_weights[j] = this->data_weights[idxs[j]];
+    }
 
     std::vector<std::vector<int>> assignments;
     generate_assignments(G, m, assignments);
@@ -405,7 +579,7 @@ bool gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& sites
     for (int k = 0; k < K; ++k) {
       double s = 0.0;
       for (int j = 0; j < m; ++j)
-        s += site_logA[j][assignments[k][j]];
+        s += site_weights[j] * site_logA[j][assignments[k][j]];
       loglik[k] = s;
     }
 
@@ -460,7 +634,12 @@ double gmm_1d::get_bic(const std::vector<double> &x, const std::vector<int> &sit
   if (n <= 1)
     throw std::runtime_error("bic(): need at least 2 sites for BIC");
 
-  const double k = static_cast<double>(3 * G - 1);
+  double k;
+  if (this->component_types[0] == HALF_NORMAL_LEFT && this->component_types[1] == HALF_NORMAL_RIGHT) {
+    k = static_cast<double>(3 * G - 3); // means for half normals are fixed
+  } else {
+    k = static_cast<double>(3 * G - 1);
+  }
 
   const double logL = this->get_log_likelihood(x, sites);
 
@@ -561,7 +740,7 @@ int gmm_1d::get_distinct_components_count(const std::vector<int>& sites, double 
     }
 
     // Stop if minimum distance across all clusters exceeds threshold
-    if (min_dist >= MIN_BD_THRESHOLD) {
+    if (min_dist >= min_bd_threshold) {
       break;
     }
 
@@ -593,17 +772,17 @@ int gmm_1d::get_distinct_components_count(const std::vector<int>& sites, double 
     merged_vars.push_back(vars[rep]);
     merged_weights.push_back(weights[rep]);
 
-    std::cerr << "distinct cluster " << c
-              << ": mean=" << means[rep]
-              << " mean in frequency space=" << m_sigmoid[rep]
-              << " var=" << vars[rep]
-              << " weight=" << weights[rep]
-              << "\n";
+//    std::cerr << "distinct cluster " << c
+//              << ": mean=" << means[rep]
+//              << " mean in frequency space=" << m_sigmoid[rep]
+//              << " var=" << vars[rep]
+//              << " weight=" << weights[rep]
+//              << "\n";
   }
 
   int g_unique = static_cast<int>(clusters.size());
-  if (g_unique < m_max)
-    g_unique = m_max;
+//  if (g_unique < m_max)
+//    g_unique = m_max;
 
   return g_unique;
 }
