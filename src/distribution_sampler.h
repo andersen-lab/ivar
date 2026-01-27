@@ -10,6 +10,7 @@ class distribution_sampler {
 
   virtual int sample() = 0;
   virtual void sample(std::vector<double> &out, uint32_t n) = 0;
+  virtual void sample(std::vector<uint32_t> &out, uint32_t n) = 0;
   virtual void set_seed(uint32_t seed) = 0;
 };
 

@@ -1,5 +1,6 @@
 #include "distribution_sampler.h"
 #include <random>
+#include <stdexcept>
 
 #ifndef IVAR_GAUSSIAN_SAMPLER_H
 #define IVAR_GAUSSIAN_SAMPLER_H
@@ -16,6 +17,9 @@ class gaussian_sampler: public distribution_sampler {
 
   int sample() override;
   void sample(std::vector<double> &out, uint32_t n) override;
+  void sample(std::vector<uint32_t> &out, uint32_t n) override {
+    throw std::runtime_error("gaussian_sampler::sample: not implemented for uint32_t");
+  }
   void set_seed(uint32_t seed) override;
 };
 
