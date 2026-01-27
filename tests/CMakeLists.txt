@@ -119,7 +119,7 @@ add_executable(check_site_state_aggregator_stats
 )
 
 add_executable(check_gmm_1d
-        test_gmm_1d.cpp ../src/gmm_1d.cpp
+        test_gmm_1d.cpp ../src/gmm_1d.cpp ../src/bootstrap_variants.cpp ../src/multinomial_sampler.cpp
 )
 
 add_executable(check_gaussian_sampler
@@ -128,6 +128,10 @@ add_executable(check_gaussian_sampler
 
 add_executable(check_multinomial_sampler
         test_multinomial_sampler.cpp ../src/multinomial_sampler.cpp
+)
+
+add_executable(check_bootstrap_variants
+        test_bootstrap_variants.cpp ../src/bootstrap_variants.cpp ../src/multinomial_sampler.cpp
 )
 
 add_executable(check_bd_threshold
@@ -164,6 +168,7 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_gmm_1d
         check_gaussian_sampler
         check_multinomial_sampler
+        check_bootstrap_variants
         check_bd_threshold
 )
 
