@@ -88,12 +88,18 @@ void gmm_1d::generate_assignments(int G, int m, std::vector<std::vector<int>> &a
   backtrack_assignments(G, m, assignments, current, used);
 }
 
-std::pair<std::vector<std::vector<double>>, double> gmm_1d::site_resp_constrained_by_site(const std::vector<std::vector<double>> &logA, const std::vector<double> &site_weights) {
+std::pair<std::vector<std::vector<double>>, double> gmm_1d::site_resp_constrained_by_site(const std::vector<std::vector<double>> &logA, const std::vector<double> &site_weights) const {
   const int m = logA.size();
   const int G = logA[0].size();
 
-  if (m > G)
-    throw std::runtime_error("gmm1d::site_resp_constrained_by_site: Site has more variants than components");
+  if(this->use_half_normal_for_noise) {
+    if (m > G - 2)
+      throw std::runtime_error("gmm1d::site_resp_constrained_by_site: Site has more variants than components");
+  } else {
+    if (m > G)
+      throw std::runtime_error("gmm1d::site_resp_constrained_by_site: Site has more variants than components");
+  }
+
 
   // Generate assignments of G components to m variants
   std::vector<std::vector<int>> assignments;
@@ -134,7 +140,7 @@ std::pair<std::vector<std::vector<double>>, double> gmm_1d::site_resp_constraine
   return {resp, log_Z};
 }
 
-double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<int> &site_id, std::vector<std::vector<double>> &resp) const {
+double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<uint32_t> &site_id, std::vector<std::vector<double>> &resp) const {
   const int N = x.size();
   const int G = this->n_components;
 
@@ -196,7 +202,7 @@ double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<int> &s
       site_weights[j] = use_weighted_likelihood ? this->data_weights[idxs[j]] : 1.0;
     }
 
-    auto result = gmm_1d::site_resp_constrained_by_site(site_logA, site_weights);
+    auto result = site_resp_constrained_by_site(site_logA, site_weights);
     std::vector<std::vector<double>> site_resp = result.first;
     double site_logZ = result.second;
 
@@ -344,7 +350,7 @@ void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, std::vec
   std::uniform_int_distribution<size_t> uni(0, N - 1);
 
   centers.clear();
-  centers.resize(K);
+  centers.reserve(K);
 
   // Initialize centers using kmeans++
   std::vector<double> min_dist_sq(N, std::numeric_limits<double>::infinity());
@@ -421,7 +427,7 @@ void gmm_1d::compute_data_weights(const std::vector<uint32_t> &depths) {
   }
 }
 
-bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, std::vector<double>& logL_history, const std::vector<uint32_t> &depths, int n_iter,  double tolerance, bool adaptive) {
+bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &sites, std::vector<double>& logL_history, const std::vector<uint32_t> &depths, int n_iter,  double tolerance, bool adaptive) {
   const size_t N = x.size();
   if (sites.size() != N) {
     throw std::runtime_error("gmm_1d::fit: x and sites size mismatch");
@@ -484,7 +490,7 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, st
   logL_history.reserve(n_iter);
 
   // Count unique sites
-  std::vector<int> unique_sites = sites;
+  std::vector<uint32_t> unique_sites = sites;
   std::sort(unique_sites.begin(), unique_sites.end());
   auto sites_end = std::unique(unique_sites.begin(), unique_sites.end());
   const int n_unique_sites = std::distance(unique_sites.begin(), sites_end);
@@ -553,7 +559,7 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<int> &sites, st
   return true;
 }
 
-bool gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& sites, std::vector<int>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const {
+bool gmm_1d::predict(const std::vector<double>& x, const std::vector<uint32_t>& sites, std::vector<int>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const {
   const int N = (int)x.size();
   const int G = this->n_components;
 
@@ -604,8 +610,14 @@ bool gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& sites
     const std::vector<int>& idxs = kv.second;
     const int m = (int)idxs.size();
 
-    if (m > G)
-      throw std::runtime_error("predict(): site size > #components");
+    if(this->use_half_normal_for_noise) {
+      if (m > G - 2)
+        throw std::runtime_error("predict(): site size > #components");
+    } else {
+      if (m > G)
+        throw std::runtime_error("predict(): site size > #components");
+    }
+
 
     // site_logA[j][g]
     std::vector<std::vector<double>> site_logA(
@@ -652,7 +664,7 @@ bool gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& sites
   return true;
 }
 
-double gmm_1d::get_log_likelihood(const std::vector<double> &x, const std::vector<int> &sites) const {
+double gmm_1d::get_log_likelihood(const std::vector<double> &x, const std::vector<uint32_t> &sites) const {
   if (x.size() != sites.size())
     throw std::runtime_error("log_likelihood(): size mismatch");
 
@@ -666,7 +678,7 @@ double gmm_1d::get_log_likelihood(const std::vector<double> &x, const std::vecto
   return ll;
 }
 
-double gmm_1d::get_bic(const std::vector<double> &x, const std::vector<int> &sites) const {
+double gmm_1d::get_bic(const std::vector<double> &x, const std::vector<uint32_t> &sites) const {
   if (x.size() != sites.size())
     throw std::runtime_error("bic(): size mismatch");
 
@@ -674,7 +686,7 @@ double gmm_1d::get_bic(const std::vector<double> &x, const std::vector<int> &sit
   if (G <= 0) throw std::runtime_error("bic(): invalid n_components");
 
   // Calcualte N = number of independent sites
-  std::vector<int> unique_sites = sites;     // copy
+  std::vector<uint32_t> unique_sites = sites;     // copy
   std::sort(unique_sites.begin(), unique_sites.end());
   auto it = std::unique(unique_sites.begin(), unique_sites.end());
   const int n_unique_sites = std::distance(unique_sites.begin(), it);
@@ -726,14 +738,14 @@ double gmm_1d::calculate_bhattacharyya_distance_1d(double mu1, double v1, double
 
 // Based on Hennig et al. 2010
 // https://doi.org/10.1007/s11634-010-0058-3
-int gmm_1d::get_distinct_components_count(const std::vector<int>& sites, double min_bd_threshold) {
+int gmm_1d::get_distinct_components_count(const std::vector<uint32_t>& sites, double min_bd_threshold) {
   const int G = n_components;
   if (G <= 0) return 0;
 
   // Get minimum number of components from site constraint
   int m_max = 0;
   {
-    std::vector<int> s = sites;
+    std::vector<uint32_t> s = sites;
     std::sort(s.begin(), s.end());
     int run = 0;
     for (size_t i = 0; i < s.size(); ++i) {

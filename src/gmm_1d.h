@@ -46,9 +46,9 @@ class gmm_1d {
   enum ComponentType { GAUSSIAN, HALF_NORMAL_LEFT, HALF_NORMAL_RIGHT };
   std::vector<ComponentType> component_types;
 
-  static std::pair<std::vector<std::vector<double>>, double> site_resp_constrained_by_site(const std::vector<std::vector<double>>& logA, const std::vector<double>& site_weights);
+  std::pair<std::vector<std::vector<double>>, double> site_resp_constrained_by_site(const std::vector<std::vector<double>>& logA, const std::vector<double>& site_weights) const;
 
-  double e_step_1d(const std::vector<double>& x, const std::vector<int>& site_id, std::vector<std::vector<double>>& resp) const;
+  double e_step_1d(const std::vector<double>& x, const std::vector<uint32_t>& site_id, std::vector<std::vector<double>>& resp) const;
   void m_step_1d(const std::vector<double>& x, const std::vector<std::vector<double>>& resp);
   void initialize_k_means_1d(const std::vector<double>& x_filtered, int K, std::vector<double>& centers, int n_iter = 10);
   void compute_data_weights(const std::vector<uint32_t>& depths);
@@ -59,16 +59,16 @@ class gmm_1d {
   static void logit_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static void sigmoid_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static double calculate_bhattacharyya_distance_1d(double mu1, double v1, double mu2, double v2);
-  int get_distinct_components_count(const std::vector<int>& sites, double min_bd_threshold = MIN_BD_THRESHOLD);
+  int get_distinct_components_count(const std::vector<uint32_t>& sites, double min_bd_threshold = MIN_BD_THRESHOLD);
 
-  bool fit(const std::vector<double>& x, const std::vector<int>& sites, std::vector<double>& logL_history, const std::vector<uint32_t>& depths = {}, int n_iter = 20, double tolerance = -1.0, bool adaptive = false);
-  bool predict(const std::vector<double>& x, const std::vector<int>& sites, std::vector<int>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const;
+  bool fit(const std::vector<double>& x, const std::vector<uint32_t>& sites, std::vector<double>& logL_history, const std::vector<uint32_t>& depths = {}, int n_iter = 20, double tolerance = -1.0, bool adaptive = false);
+  bool predict(const std::vector<double>& x, const std::vector<uint32_t>& sites, std::vector<int>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const;
 
   std::vector<double> get_weights() const { return weights; }
   std::vector<double> get_means() const { return means; }
   std::vector<double> get_vars() const { return vars; }
-  double get_log_likelihood(const std::vector<double>& x, const std::vector<int>& sites) const;
-  double get_bic(const std::vector<double>& x, const std::vector<int>& sites) const;
+  double get_log_likelihood(const std::vector<double>& x, const std::vector<uint32_t>& sites) const;
+  double get_bic(const std::vector<double>& x, const std::vector<uint32_t>& sites) const;
 
   void set_var_floor(double val) { var_floor = val; }
   void set_weight_floor(double val) { weight_floor = val; }
@@ -76,6 +76,13 @@ class gmm_1d {
   void set_half_normal_thresholds(double left_threshold, double right_threshold) {
       HALF_NORMAL_LEFT_THRESHOLD = left_threshold;
       HALF_NORMAL_RIGHT_THRESHOLD = right_threshold;
+  }
+  void set_seed(unsigned int s) {
+      seed = s;
+      rng.seed(seed);
+  }
+  unsigned int get_seed() const {
+      return seed;
   }
 
   //store the cluster infor post-merging
