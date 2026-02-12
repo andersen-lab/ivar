@@ -15,6 +15,8 @@ add_executable(ivar
         allele_functions.cpp
         get_masked_amplicons.cpp
         get_common_variants.cpp
+        genomic_position.cpp
+        variant_caller.cpp
         parse_gff.cpp
         ref_seq.cpp
         interval_tree.cpp

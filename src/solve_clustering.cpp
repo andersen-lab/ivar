@@ -66,16 +66,6 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
   file.close();
 }
 
-void calculate_cluster_deviations(gaussian_mixture_model &model){
-  //here we calculate the standard deviation of each cluster
-  std::vector<double> std_devs;
-  for(uint32_t i=0; i < model.clusters.size(); i++){
-    double std_dev = calculate_standard_deviation(model.clusters[i]);
-    std_devs.push_back(std_dev);
-  }
-  model.cluster_std_devs = std_devs;
-}
-
 std::vector<uint32_t> find_missing_indexes(const std::vector<uint32_t>& tmp, const std::vector<uint32_t>& amplicons_to_mask) {
   std::unordered_set<uint32_t> mask_set(amplicons_to_mask.begin(), amplicons_to_mask.end());
   std::vector<uint32_t> missing_indexes;
