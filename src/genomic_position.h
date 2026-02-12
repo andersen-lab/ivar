@@ -30,6 +30,7 @@ class genomic_position {
 
 };
 
+double calculate_standard_deviation(std::vector<double> data);
 void combine_haplotypes(std::vector<genomic_position> &global_positions);
 void populate_positions(std::vector<genomic_position> &positions, uint32_t max_position);
 int check_position_exists(uint32_t p, std::vector<genomic_position> positions);

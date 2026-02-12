@@ -1,5 +1,6 @@
 #include "solve_clustering.h"
 #include "call_consensus_clustering.h"
+#include "genomic_position.h"
 #include "saga.h"
 #include <ostream>
 #include <unordered_set>
@@ -63,15 +64,6 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
   file << name << "\n";
   file << next_trimmed_consensus << "\n";
   file.close();
-}
-
-double calculate_standard_deviation(std::vector<double> data) {
-  double sum = 0, mean;
-  mean = std::accumulate(data.begin(), data.end(), 0.0f) / data.size();
-  for (double val : data) {
-    sum += std::pow(val - mean, 2);
-  }
-  return std::sqrt(sum / data.size());
 }
 
 void calculate_cluster_deviations(gaussian_mixture_model &model){

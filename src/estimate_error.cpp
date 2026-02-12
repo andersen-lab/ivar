@@ -57,8 +57,8 @@ void cluster_error(std::vector<variant> base_variants, uint8_t quality_threshold
   arma::mat data_original(1, useful_count_original, arma::fill::zeros);
   uint32_t count_original=0;
   for(uint32_t i = 0; i < variants_original.size(); i++){
-    //double tmp = static_cast<double>(variants_original[i].gapped_freq);
-    double tmp = logit(variants_original[i].gapped_freq);
+    double tmp = static_cast<double>(variants_original[i].gapped_freq);
+    //double tmp = logit(variants_original[i].gapped_freq);
     data_original.col(count_original) = tmp;
     count_original += 1;
   }
