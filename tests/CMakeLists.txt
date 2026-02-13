@@ -119,7 +119,7 @@ add_executable(check_site_state_aggregator_stats
 )
 
 add_executable(check_gmm_1d
-        test_gmm_1d.cpp ../src/gmm_1d.cpp ../src/bootstrap_variants.cpp ../src/multinomial_sampler.cpp
+        test_gmm_1d.cpp ../src/gmm_1d.cpp ../src/bootstrap_variants.cpp ../src/multinomial_sampler.cpp ../src/solve_clustering.cpp ../src/gmm.cpp ../src/call_consensus_clustering.cpp ../src/estimate_error.cpp ../src/genomic_position.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp
 )
 
 add_executable(check_gaussian_sampler
