@@ -93,7 +93,7 @@ std::pair<std::vector<std::vector<double>>, double> gmm_1d::site_resp_constraine
   const int G = logA[0].size();
 
   if(this->use_half_normal_for_noise) {
-    if (m > G-2)
+    if (m > G)
       throw std::runtime_error("gmm1d::site_resp_constrained_by_site: Site has more variants than components");
   } else {
     if (m > G)
@@ -156,7 +156,6 @@ double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<uint32_
   // Compute logA
   std::vector<std::vector<double>> logA(N, std::vector<double>(G));
 
-
   for (int i = 0; i < N; ++i) {
     for (int g = 0; g < G; ++g) {
       double log_weight = std::log(std::max(this->weights[g], 1e-300)); // avoid log(0) for weights
@@ -196,7 +195,6 @@ double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<uint32_
 
     std::vector<std::vector<double>> site_logA(m, std::vector<double>(G));
     std::vector<double> site_weights(m, 1.0);
-
     for (int j = 0; j < m; ++j) {
       site_logA[j] = logA[idxs[j]];
       site_weights[j] = use_weighted_likelihood ? this->data_weights[idxs[j]] : 1.0;
@@ -205,7 +203,6 @@ double gmm_1d::e_step_1d(const std::vector<double> &x, const std::vector<uint32_
     auto result = site_resp_constrained_by_site(site_logA, site_weights);
     std::vector<std::vector<double>> site_resp = result.first;
     double site_logZ = result.second;
-
     for (int j = 0; j < m; ++j) {
       resp[idxs[j]] = site_resp[j];
     }
@@ -541,7 +538,7 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &site
     logL_history.push_back(logL);
 
     // Logging
-    std::cerr
+    /*std::cerr
         << "iter " << it
         << "  logL=" << logL
         << "  avg_logL=" << avg_logL;
@@ -554,7 +551,7 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &site
     for (double v : this->means) std::cerr << v << " ";
     std::cerr << " vars=";
     for (double v : this->vars) std::cerr << v << " ";
-    std::cerr << "\n";
+    std::cerr << "\n";*/
   }
   return true;
 }
@@ -771,14 +768,9 @@ int gmm_1d::get_distinct_components_count(const std::vector<uint32_t>& sites, do
       if (i == j) {
         dist_matrix[i][j] = 0.0;
       } else {
-        //don't merge the universal and noise clusters
-        if(means[i] == 0 || means[j] == 0 || means[i] == 1 || means[j] == 1) {
-          dist_matrix[i][j] = std::numeric_limits<double>::infinity();
-        } else {
           dist_matrix[i][j] = calculate_bhattacharyya_distance_1d(
           means[i], vars[i], means[j], vars[j]
           );
-        }
       }
     }
   }
