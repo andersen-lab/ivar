@@ -93,7 +93,7 @@ std::pair<std::vector<std::vector<double>>, double> gmm_1d::site_resp_constraine
   const int G = logA[0].size();
 
   if(this->use_half_normal_for_noise) {
-    if (m > G - 2)
+    if (m > G-2)
       throw std::runtime_error("gmm1d::site_resp_constrained_by_site: Site has more variants than components");
   } else {
     if (m > G)
@@ -672,9 +672,9 @@ double gmm_1d::get_log_likelihood(const std::vector<double> &x, const std::vecto
   std::vector<std::vector<double>> resp;
   const double ll = this->e_step_1d(x, sites, resp);
 
-  if (!std::isfinite(ll))
+  if (!std::isfinite(ll)){
     throw std::runtime_error("log_likelihood(): non-finite log-likelihood");
-
+  }
   return ll;
 }
 
@@ -771,9 +771,14 @@ int gmm_1d::get_distinct_components_count(const std::vector<uint32_t>& sites, do
       if (i == j) {
         dist_matrix[i][j] = 0.0;
       } else {
-        dist_matrix[i][j] = calculate_bhattacharyya_distance_1d(
-            means[i], vars[i], means[j], vars[j]
-        );
+        //don't merge the universal and noise clusters
+        if(means[i] == 0 || means[j] == 0 || means[i] == 1 || means[j] == 1) {
+          dist_matrix[i][j] = std::numeric_limits<double>::infinity();
+        } else {
+          dist_matrix[i][j] = calculate_bhattacharyya_distance_1d(
+          means[i], vars[i], means[j], vars[j]
+          );
+        }
       }
     }
   }
