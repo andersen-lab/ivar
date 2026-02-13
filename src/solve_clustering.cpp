@@ -1,6 +1,7 @@
 #include "solve_clustering.h"
 #include "call_consensus_clustering.h"
 #include "genomic_position.h"
+#include "gmm.h"
 #include "saga.h"
 #include <ostream>
 #include <unordered_set>
@@ -411,6 +412,49 @@ std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, dou
     }
   }
   return(noise_indices);
+}
+
+bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &solution_sets, const double error){
+  //gives all solutions that sum to 1
+  std::vector<std::vector<double>> solutions = find_solutions(means, error);
+  if(solutions.size() == 0){
+    return(false);
+  }
+
+  std::vector<double> non_subset_means;
+  for(uint32_t i=0; i < means.size(); i++){
+    std::vector<std::vector<double>> tmp = find_subsets_with_error(means, means[i], error);
+    if(tmp.size() <= 1){
+      non_subset_means.push_back(means[i]);
+    }
+  }
+
+  //reduce solution space to things that contain the non subset peaks
+  std::vector<std::vector<double>> realistic_solutions;
+  for(uint32_t i=0; i < solutions.size(); i++){
+      std::vector<double> tmp = solutions[i];
+      bool found = std::all_of(non_subset_means.begin(), non_subset_means.end(), [&tmp](double value) {return std::find(tmp.begin(), tmp.end(), value) != tmp.end();});
+      if(found){
+        realistic_solutions.push_back(solutions[i]);
+      }
+  }
+
+  if(realistic_solutions.size() == 0){
+    return(false);
+  }
+
+  for(uint32_t i=0; i < realistic_solutions.size(); i++){
+    bool keep = account_peaks(realistic_solutions[i], means, 1, error);
+    if(keep){
+      solution_sets.push_back(realistic_solutions[i]);
+    }
+  }
+  if(solution_sets.size() == 0){
+    return(false);
+  } else {
+    return(true);
+  }
+
 }
 
 std::vector<std::vector<double>> subset_sum(gaussian_mixture_model model, double estimated_error){

@@ -1,6 +1,7 @@
 #include "gmm.h"
 #ifndef solve_clustering
 #define solve_clustering
+bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &solution_sets, const double error);
 double find_neighboring_cluster(double freq, uint32_t cluster_assigned, std::vector<double> means);
 void find_combinations(std::vector<double> means, uint32_t index, std::vector<double> &current, std::vector<std::vector<double>> &results, double error);
 bool test_cluster_deviation(double nearest_cluster, double variant_cluster, double std_dev);
