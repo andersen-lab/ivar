@@ -93,9 +93,9 @@ int main(int argc, char* argv[]) {
   uint32_t largest_passing_n = std::numeric_limits<uint32_t>::min();
  
   for(uint32_t i=N_min+2; i < N_min+2+4; i++){
-    std::cerr << "\n"; 
+    std::cerr << "i: " << i << "\n"; 
     std::vector<double> logL_history;
-    gmm_1d model(i, 0);
+    gmm_1d model(i);
     model.set_use_half_normal_for_noise(true);
     model.fit(
         x,
@@ -105,7 +105,6 @@ int main(int argc, char* argv[]) {
         20,
         1e-6
     );
-
     std::cerr << "Original components: " << i << " Distinct components: " << model.get_distinct_components_count(sites) << "\n";
     std::vector<double> logL_history2;
     gmm_1d model2(model.get_distinct_components_count(sites), 0);

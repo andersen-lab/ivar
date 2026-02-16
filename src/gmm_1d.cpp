@@ -767,9 +767,9 @@ int gmm_1d::get_distinct_components_count(const std::vector<uint32_t>& sites, do
     for (int j = 0; j < G; ++j) {
       if (i == j) {
         dist_matrix[i][j] = 0.0;
-      //} else if(i == 0 || i == 1 || j == 0 || j == 1) {
+      } else if(i == 0 || i == 1 || j == 0 || j == 1) {
         // If either component is half normal, use a large distance
-      //  dist_matrix[i][j] = std::numeric_limits<double>::infinity();
+        dist_matrix[i][j] = std::numeric_limits<double>::infinity();
       } else {
           dist_matrix[i][j] = calculate_bhattacharyya_distance_1d(
           means[i], vars[i], means[j], vars[j]
