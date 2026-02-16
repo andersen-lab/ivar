@@ -39,8 +39,8 @@ class gmm_1d {
   double weight_floor = DEFAULT_WEIGHT_FLOOR;
   bool use_half_normal_for_noise = true;
 
-  double HALF_NORMAL_LEFT_THRESHOLD = 0.05;
-  double HALF_NORMAL_RIGHT_THRESHOLD = 0.95;
+  double HALF_NORMAL_LEFT_THRESHOLD = 0.01;
+  double HALF_NORMAL_RIGHT_THRESHOLD = 0.99;
 
 
   enum ComponentType { GAUSSIAN, HALF_NORMAL_LEFT, HALF_NORMAL_RIGHT };

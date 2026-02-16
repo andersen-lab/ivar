@@ -345,12 +345,13 @@ void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, std::vec
   }
   const size_t N = x_filtered.size();
   std::uniform_int_distribution<size_t> uni(0, N - 1);
-
   centers.clear();
   centers.reserve(K);
-
   // Initialize centers using kmeans++
   std::vector<double> min_dist_sq(N, std::numeric_limits<double>::infinity());
+  if(x_filtered.size() < 0) {
+    throw std::runtime_error("initialize_k_means_1d: not enough data points to initialize k-means");
+  }
   centers.push_back(x_filtered[uni(this->rng)]);
 
   for (int k = 1; k < K; k++) {
@@ -438,7 +439,6 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &site
   }
 
   const int G = this->n_components;
-
   this->component_types.clear();
   this->means.clear();
   this->weights.clear();
@@ -458,7 +458,6 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &site
   } else {
     this->component_types.assign(G, GAUSSIAN);
   }
-
 
   std::vector<double> kmeans_centers;
 
@@ -495,6 +494,7 @@ bool gmm_1d::fit(const std::vector<double> &x, const std::vector<uint32_t> &site
   // Set convergence tolerance
   const double conv_tol = (tolerance < 0.0) ? std::numeric_limits<double>::epsilon() : tolerance;
   double old_avg_logL = -std::numeric_limits<double>::infinity();
+
 
   // EM loop
   for (size_t it = 0; it < n_iter; ++it) {
@@ -767,6 +767,9 @@ int gmm_1d::get_distinct_components_count(const std::vector<uint32_t>& sites, do
     for (int j = 0; j < G; ++j) {
       if (i == j) {
         dist_matrix[i][j] = 0.0;
+      //} else if(i == 0 || i == 1 || j == 0 || j == 1) {
+        // If either component is half normal, use a large distance
+      //  dist_matrix[i][j] = std::numeric_limits<double>::infinity();
       } else {
           dist_matrix[i][j] = calculate_bhattacharyya_distance_1d(
           means[i], vars[i], means[j], vars[j]
