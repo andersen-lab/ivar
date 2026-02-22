@@ -51,7 +51,7 @@ add_executable(check_variants
 )
 
 add_executable(check_variants_2
-        test_new_variants.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/gmm.cpp ../src/solve_clustering.cpp ../src/estimate_error.cpp ../src/call_variants.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp ../src/genomic_position.cpp ../src/call_consensus_clustering.cpp
+        test_new_variants.cpp ../src/saga.cpp ../src/site_state.cpp ../src/site_aggregator.cpp ../src/site_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/site_state_aggregator_stats.cpp ../src/variant_caller.cpp ../src/interval_tree.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/gmm.cpp ../src/solve_clustering.cpp ../src/estimate_error.cpp ../src/call_variants.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp ../src/genomic_position.cpp ../src/call_consensus_clustering.cpp
 )
 
 add_executable(check_common_variants
@@ -63,15 +63,15 @@ add_executable(check_primer_bed
 )
 
 add_executable(check_clustering_consensus
-        test_clustering_consensus.cpp ../src/gmm.cpp ../src/call_consensus_clustering.cpp ../src/estimate_error.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
+        test_clustering_consensus.cpp ../src/gmm.cpp ../src/variant_caller.cpp ../src/site_aggregator.cpp ../src/site_aggregator_stats.cpp ../src/site_state.cpp ../src/site_state_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/call_consensus_clustering.cpp ../src/estimate_error.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
 )
 
 add_executable(check_clustering_majority
-        test_clustering_majority.cpp ../src/gmm.cpp ../src/call_consensus_clustering.cpp ../src/estimate_error.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
+        test_clustering_majority.cpp ../src/gmm.cpp ../src/variant_caller.cpp ../src/site_aggregator.cpp ../src/site_aggregator_stats.cpp ../src/site_state.cpp ../src/site_state_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/call_consensus_clustering.cpp ../src/estimate_error.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
 )
 
 add_executable(check_unit_consensus
-        test_unit_new_consensus.cpp ../src/gmm.cpp ../src/call_consensus_clustering.cpp ../src/estimate_error.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
+        test_unit_new_consensus.cpp ../src/gmm.cpp ../src/variant_caller.cpp ../src/site_aggregator.cpp ../src/site_aggregator_stats.cpp ../src/site_state.cpp ../src/site_state_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/call_consensus_clustering.cpp ../src/estimate_error.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
 )
 
 add_executable(check_getmasked
@@ -119,7 +119,7 @@ add_executable(check_site_state_aggregator_stats
 )
 
 add_executable(check_gmm_1d
-        test_gmm_1d.cpp ../src/gmm_1d.cpp ../src/bootstrap_variants.cpp ../src/multinomial_sampler.cpp
+        test_gmm_1d.cpp ../src/gmm_1d.cpp ../src/bootstrap_variants.cpp ../src/multinomial_sampler.cpp ../src/solve_clustering.cpp ../src/gmm.cpp ../src/call_consensus_clustering.cpp ../src/estimate_error.cpp ../src/genomic_position.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp
 )
 
 add_executable(check_gaussian_sampler

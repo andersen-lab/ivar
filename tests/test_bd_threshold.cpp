@@ -27,7 +27,7 @@ int main() {
 
   for(int nsamples: n_samples) {
     // Set number of sites
-    std::vector<int> sites;
+    std::vector<uint32_t> sites;
     for(int j = 0;j < 2; j++)
       for(int i = 0;i < nsamples; i++)
         sites.push_back(i);
@@ -127,8 +127,8 @@ int main() {
 //                     << m_sigmoid[1] << "\t"
                      << v[0] << "\t"
                      << v[1] << "\t"
-                     << gmm_1d::calculate_bhattacharyya_distance_1d(m[0], v[0], m[1], v[1]) << "\t"
-                     << model.get_distinct_components_count(sites, 1.0) << "\n";
+                     << gmm_1d::calculate_bhattacharyya_distance_1d(m[0], v[0], m[1], v[1]) << "\t";
+                     //<< model.get_distinct_components_count(sites, 1.0) << "\n";
           }
         }
       }

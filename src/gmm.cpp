@@ -1,5 +1,6 @@
 #include "./include/armadillo"
 #include "solve_clustering.h"
+#include "genomic_position.h"
 #include "gmm.h"
 #include "saga.h"
 #include "call_consensus_clustering.h"
@@ -936,7 +937,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     reset_variants_info(variants);
     std::cerr << "n " << counter << std::endl;
     retrained = retrain_model(counter, data, variants, lower_n, var_floor, clustering_failed, false); 
-    calculate_cluster_deviations(retrained);
+    //calculate_cluster_deviations(retrained.clusters);
 
     //we require the variance to be smaller for one cluster
     if(counter == 1){

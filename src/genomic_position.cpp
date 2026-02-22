@@ -313,7 +313,6 @@ void populate_positions(std::vector<genomic_position> &positions, uint32_t max_p
   }
 }
 
-
 double calculate_standard_deviation(std::vector<double> data) {
   double sum = 0, mean;
   mean = std::accumulate(data.begin(), data.end(), 0.0f) / data.size();
