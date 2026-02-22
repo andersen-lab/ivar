@@ -12,83 +12,96 @@ class gmm_1d {
   // From https://learn.microsoft.com/en-us/cpp/c-runtime-library/math-constants
   static constexpr double PI =	3.14159265358979323846;
   static constexpr double DEFAULT_VAR_FLOOR = 1e-3;
-  static constexpr double DEFAULT_WEIGHT_FLOOR = 1e-3;
-  static constexpr double MIN_BD_THRESHOLD = 1; // -log(d*) roughly based on Hennig et al. 2010s
+  static constexpr double MIN_BD_THRESHOLD = 1.0; // -log(d*) roughly based on Hennig et al. 2010s
+  static constexpr double TOLERANCE = 1e-6;
+  static constexpr double REG_TERM = 1e-6;
+  static constexpr int MAX_ITER = 200;
 
-  static double log_normal_1d(double x, double mu, double var);
-  static double log_half_normal_1d(double x, double mu, double var, bool left_tail);
-
-  static double log_sum_exp(const double* x, size_t n);
-  static double log_sum_exp(std::vector<double> x) {
-    return log_sum_exp(x.data(), x.size());
-  }
-
-
-  static void generate_assignments(int G, int m, std::vector<std::vector<int>>& assignments);
-  static void backtrack_assignments(int G, int m, std::vector<std::vector<int>>& assignments, std::vector<int>& current, std::vector<bool>& used);
-
-  std::vector<double> means;
-  std::vector<double> vars;
-  std::vector<double> weights;
-  std::vector<double> data_weights;
+  int n_components;
   unsigned int seed;
   std::mt19937 rng;
 
-  int n_components;
-  double var_floor = DEFAULT_VAR_FLOOR;
-  double weight_floor = DEFAULT_WEIGHT_FLOOR;
-  bool use_half_normal_for_noise = true;
+  // Priors
+  double weight_concentration_prior_;
+  double mean_precision_prior_;
+  double mean_prior_;
+  double degrees_of_freedom_prior_;
+  double covariance_prior_;
 
-  double HALF_NORMAL_LEFT_THRESHOLD = 0.05;
-  double HALF_NORMAL_RIGHT_THRESHOLD = 0.95;
+  // Model parameters
+  std::vector<double> stick_beta_a_, stick_beta_b_;
+  std::vector<double> mean_precision_;
+  std::vector<double> means_;
+  std::vector<double> degrees_of_freedom_;
+  std::vector<double> variances_;
+  std::vector<double> inv_std_devs_;
 
+  // Computed parameters
+  std::vector<double> weights_;
+  std::vector<double> elbo_history;
+  bool converged = false;
+  int n_iter = 0;
+  std::vector<int> labels_;
 
-  enum ComponentType { GAUSSIAN, HALF_NORMAL_LEFT, HALF_NORMAL_RIGHT };
-  std::vector<ComponentType> component_types;
+  // Helpers
+  static double digamma(double x);
+  static double log_sum_exp(const std::vector<double> &v);
+  static double log_normal_1d(double x, double mu, double var);
+  static double log_half_normal_1d(double x, double mu, double var, bool left_tail);
+  void initialize_k_means_1d(const std::vector<double>& x, int K, std::vector<int>& indices);
 
-  std::pair<std::vector<std::vector<double>>, double> site_resp_constrained_by_site(const std::vector<std::vector<double>>& logA, const std::vector<double>& site_weights) const;
+  // E-step
+  using Matrix = std::vector<std::vector<double>>;
+  Matrix estimate_log_gaussian_prob(const std::vector<double>& x, const std::vector<double>& means, const std::vector<double>& inv_std_devs) const;
+  Matrix estimate_log_prob(const std::vector<double>& x) const;
+  std::vector<double> estimate_log_weights() const;
+  Matrix estimate_weighted_log_prob(const std::vector<double>& x) const;
+  void e_step(const std::vector<double>& x, std::vector<double>& log_prob_norm, Matrix& log_resp) const;
 
-  double e_step_1d(const std::vector<double>& x, const std::vector<uint32_t>& site_id, std::vector<std::vector<double>>& resp) const;
-  void m_step_1d(const std::vector<double>& x, const std::vector<std::vector<double>>& resp);
-  void initialize_k_means_1d(const std::vector<double>& x_filtered, int K, std::vector<double>& centers, int n_iter = 10);
-  void compute_data_weights(const std::vector<uint32_t>& depths);
+  // M-step components
+  void estimate_gaussian_parameters(const std::vector<double>& x, const Matrix& resp, std::vector<double>& nk, std::vector<double>& means, std::vector<double>& variances) const;
+  void estimate_weights(const std::vector<double>& nk);
+  void estimate_means(const std::vector<double>& nk, const std::vector<double>& xk);
+  void estimate_precisions(const std::vector<double>& nk, const std::vector<double>& xk, const std::vector<double>& sk);
+  void m_step(const std::vector<double>& x, const Matrix& log_resp);
+
+  double compute_lower_bound(const Matrix& log_resp) const;
+  void initialize_parameters(const std::vector<double>& x);
+  void initialize(const std::vector<double>& x, const Matrix& resp);
+  void compute_final_weights();
 
  public:
 
   explicit gmm_1d(int n_components = 2, unsigned int seed = std::random_device{}()) : seed(seed), rng(seed), n_components(n_components) {}
+  bool fit(const std::vector<double>& x);
+  std::vector<int> predict(const std::vector<double> &x) const;
+
   static void logit_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static void sigmoid_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static double calculate_bhattacharyya_distance_1d(double mu1, double v1, double mu2, double v2);
-  int get_distinct_components_count(const std::vector<uint32_t>& sites, double min_bd_threshold = MIN_BD_THRESHOLD);
+  int get_distinct_components_count(const std::vector<uint32_t>& sites, double min_bd_threshold);
 
-  bool fit(const std::vector<double>& x, const std::vector<uint32_t>& sites, std::vector<double>& logL_history, const std::vector<uint32_t>& depths = {}, int n_iter = 20, double tolerance = -1.0, bool adaptive = false);
-  bool predict(const std::vector<double>& x, const std::vector<uint32_t>& sites, std::vector<int>& assigned_components, std::vector<std::vector<double>>& marginal_posterior_probabilities) const;
+  std::vector<double> get_weights() const { return weights_; }
+  std::vector<double> get_means() const { return means_; }
+  std::vector<double> get_variances() const { return variances_; }
 
-  std::vector<double> get_weights() const { return weights; }
-  std::vector<double> get_means() const { return means; }
-  std::vector<double> get_vars() const { return vars; }
-  double get_log_likelihood(const std::vector<double>& x, const std::vector<uint32_t>& sites) const;
-  double get_bic(const std::vector<double>& x, const std::vector<uint32_t>& sites) const;
+  std::vector<int> get_effective_components(std::vector<int> labels) const;
+  std::vector<double> get_effective_means(std::vector<int> labels) const;
+  std::vector<double> get_effective_vars(std::vector<int> labels) const;
+  std::vector<double> get_effective_weights(std::vector<int> labels) const;
 
-  void set_var_floor(double val) { var_floor = val; }
-  void set_weight_floor(double val) { weight_floor = val; }
-  void set_use_half_normal_for_noise(bool val) { use_half_normal_for_noise = val; }
-  void set_half_normal_thresholds(double left_threshold, double right_threshold) {
-      HALF_NORMAL_LEFT_THRESHOLD = left_threshold;
-      HALF_NORMAL_RIGHT_THRESHOLD = right_threshold;
-  }
+  std::vector<double> get_elbo_history() const { return elbo_history; }
+  bool is_converged() const { return converged; }
+  int get_n_iter() const { return n_iter; }
+
   void set_seed(unsigned int s) {
       seed = s;
       rng.seed(seed);
   }
+
   unsigned int get_seed() const {
       return seed;
   }
-
-  //store the cluster infor post-merging
-  std::vector<double> merged_means;
-  std::vector<double> merged_vars;
-  std::vector<double> merged_weights;
 };
 
 #endif

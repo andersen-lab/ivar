@@ -1,10 +1,12 @@
-#include "../src/gmm_1d.h"
-#include "../src/bootstrap_variants.h"
-#include <random>
-#include <iostream>
-#include <unordered_map>
+#include <algorithm>
 #include <fstream>
+#include <iostream>
+#include <random>
 #include <sstream>
+#include <unordered_map>
+
+#include "../src/bootstrap_variants.h"
+#include "../src/gmm_1d.h"
 
 void read_in_simulated_data(std::string fname, std::vector<double>& frequencies, std::vector<uint32_t>& sites, std::vector<uint32_t> &depths, std::vector<uint32_t> &total_depths, float invariant_threshold) {
   std::ifstream infile(fname);
@@ -54,7 +56,6 @@ int get_max_variants_per_site(const std::vector<uint32_t> &sites) {
 int main(int argc, char* argv[]) {
 
   std::vector<double> x;
-  std::vector<uint32_t> sites;
   std::vector<uint32_t> depths;
   std::vector<uint32_t> total_depths;
   std::string input = argv[1];
@@ -63,105 +64,82 @@ int main(int argc, char* argv[]) {
 
   std::vector<double> y;
 
-  sites.clear();
+  std::vector<uint32_t> sites;
   read_in_simulated_data(input, x, sites, depths, total_depths, 0.97);
-
-
-  int N_min = get_max_variants_per_site(sites);
-
-  // Hacky way to get unique number of sites
-  std::unordered_map<uint32_t, int> counts;
-  for (uint32_t v : sites) {
-    counts[v]++;
-  }
-
-  // Logit transform
-//  std::vector<double> x_logit;
-//  gmm_1d::logit_transform(x, x_logit, eps);
 
   std::ofstream out(prefix + "_gmm_1d_results.txt");
 
   out << "Replicate\tComponents\tBIC\tDistinct_Components\tMeans\tVariances\tWeights\n";
   // Fit GMM
-  for(int b = 0; b < 100; b++) {
-    bootstrap_variants bootstrap(sites, depths, total_depths);
+  for(int b = 0; b < 1; b++) {
+//    bootstrap_variants bootstrap(sites, depths, total_depths);
 
-    std::vector<uint32_t> sampled_sites;
-    std::vector<uint32_t> sampled_depths;
-    std::vector<double> sampled_frequencies;
+//    std::vector<uint32_t> sampled_sites;
+//    std::vector<uint32_t> sampled_depths;
+//    std::vector<double> sampled_frequencies;
 
-    bootstrap.sample(sampled_sites, sampled_depths, sampled_frequencies, counts.size());
+//    bootstrap.sample(sampled_sites, sampled_depths, sampled_frequencies, counts.size());
 
-    std::cerr << "Sampled sites size: " << sampled_sites.size() << std::endl;
-    std::cerr << "Sampled depths size: " << sampled_depths.size() << std::endl;
+    gmm_1d model(12, 42);  // seed matches bootstrap replicate
 
-    N_min = get_max_variants_per_site(sampled_sites);
-    N_min = std::max(N_min, 2);
+    model.fit(x);
+    std::vector<int> labels = model.predict(x);
 
-    for(int i = N_min + 2; i < N_min + 6; i++)  {
+    std::vector<int> component_indices = model.get_effective_components(labels);
+    std::cerr << "VB effective components: " << component_indices.size() << "\n";
 
-      std::vector<double> logL_history;
-      gmm_1d model(i, b);
-      std::cerr << "Seed: " << model.get_seed() << std::endl;
-      std::cerr << "Number of components: " << N_min << std::endl;
-
-//      model.set_use_half_normal_for_noise(false);
-      model.fit(
-          sampled_frequencies,
-          sampled_sites,
-          logL_history,
-          sampled_depths,
-          20,
-          1e-6
-      );
-
-      std::cerr << "Distinct components: " << i << " " << model.get_distinct_components_count(sampled_sites) << "\n";
-
-//      std::vector<double> m_sigmoid;
-      std::vector<double> means = model.get_means();
-      std::vector<double> vars = model.get_vars();
-      std::vector<double> weights = model.get_weights();
-
-//      gmm_1d::sigmoid_transform(means, m_sigmoid, eps);
-
-      out << b << "\t"
-          << i << "\t"
-          << model.get_bic(sampled_frequencies, sampled_sites) << "\t"
-          << model.get_distinct_components_count(sampled_sites) << "\t";
-
-      for(int j = 0; j < means.size(); j++){
-        out << means[j];
-        if (j < means.size() - 1){
-          out << ",";
-        }
-      }
-      out << "\t";
-
-      for(int j = 0; j < vars.size(); j++) {
-        out << vars[j];
-        if (j < vars.size() - 1) {
-          out << ",";
-        }
-      }
-      out << "\t";
-
-      for(int j = 0; j < weights.size(); j++) {
-        out << weights[j];
-        if (j < weights.size() - 1) {
-          out << ",";
-        }
-      }
-      out << "\n";
-//
-//      for(int j = 0; j < m_sigmoid.size(); j++) {
-//        out << m_sigmoid[j];
-//        if (j < m_sigmoid.size() - 1) {
-//          out << ",";
-//        }
-//      }
-//      out << "\n";
-
+    std::cerr << "VB effective means: ";
+    std::vector<double> eff_means = model.get_effective_means(component_indices);
+    for(int i = 0; i < eff_means.size(); i++) {
+      std::cerr << eff_means[i] << " ";
     }
+    std::cerr << "\n";
+
+    std::cerr << "VB effective vars: ";
+    std::vector<double> eff_vars = model.get_effective_vars(component_indices);
+    for(int i = 0; i < eff_vars.size(); i++) {
+      std::cerr << eff_vars[i] << " ";
+    }
+    std::cerr << "\n";
+
+    std::cerr << "VB effective weights: ";
+    std::vector<double> eff_weights = model.get_effective_weights(component_indices);
+    for(int i = 0; i < eff_weights.size(); i++) {
+      std::cerr << eff_weights[i] << " ";
+    }
+    std::cerr << "\n";
+
+    std::cerr << "ELBO history: ";
+    for(int i = 0; i < model.get_elbo_history().size(); i++) {
+      std::cerr << model.get_elbo_history()[i] << ", ";
+    }
+
+    std::vector<double> means   = model.get_means();
+    std::vector<double> vars    = model.get_variances();
+    std::vector<double> weights = model.get_weights();
+
+    out << b << "\t"
+        << "VB\t"
+        << "NA\t"  // no BIC for VB
+        << component_indices.size() << "\t";
+
+    for (size_t j = 0; j < means.size(); j++) {
+      out << means[j];
+      if (j < means.size() - 1) out << ",";
+    }
+    out << "\t";
+
+    for (size_t j = 0; j < vars.size(); j++) {
+      out << vars[j];
+      if (j < vars.size() - 1) out << ",";
+    }
+    out << "\t";
+
+    for (size_t j = 0; j < weights.size(); j++) {
+      out << weights[j];
+      if (j < weights.size() - 1) out << ",";
+    }
+    out << "\n";
   }
 
   out.close();
