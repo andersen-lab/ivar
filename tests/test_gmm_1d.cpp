@@ -67,6 +67,44 @@ int main(int argc, char* argv[]) {
   std::vector<uint32_t> sites;
   read_in_simulated_data(input, x, sites, depths, total_depths, 0.97);
 
+//  std::mt19937 rng(112358);
+//
+//  const int n_gauss = 1000;
+//  const int n_half = 500;
+//
+//  const double sigma_gauss = 0.001;
+//
+//  const double sigma_half = std::sqrt(0.0001);
+//
+//  std::normal_distribution<double> gauss1(0.2, sigma_gauss);
+//  std::normal_distribution<double> gauss2(0.6, sigma_gauss);
+//  std::normal_distribution<double> base_half(0.0, sigma_half);
+//
+//  x.clear();
+//  x.reserve(2 * n_gauss + 2 * n_half);
+//  for (int i = 0; i < n_gauss; ++i) {
+//    x.push_back(gauss1(rng));
+//    x.push_back(gauss2(rng));
+//  }
+//
+//  // Left half normal
+//  for (int i = 0; i < n_half; ++i) {
+//    double z = base_half(rng);
+//    x.push_back(std::abs(z));
+//  }
+//
+//  // Right half normal
+//  for (int i = 0; i < n_half; ++i) {
+//    double z = base_half(rng);
+//    x.push_back(1.0 - std::abs(z));
+//  }
+//
+//  std::ofstream debug_out("data.txt");
+//  for(int i = 0; i < x.size(); i++) {
+//    debug_out << x[i] << ", ";
+//  }
+//  debug_out.close();
+
   std::ofstream out(prefix + "_gmm_1d_results.txt");
 
   out << "Replicate\tComponents\tBIC\tDistinct_Components\tMeans\tVariances\tWeights\n";
@@ -81,6 +119,7 @@ int main(int argc, char* argv[]) {
 //    bootstrap.sample(sampled_sites, sampled_depths, sampled_frequencies, counts.size());
 
     gmm_1d model(12, 42);  // seed matches bootstrap replicate
+    model.set_use_half_normal_for_noise(true);
 
     model.fit(x);
     std::vector<int> labels = model.predict(x);
