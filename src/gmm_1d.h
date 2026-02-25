@@ -48,7 +48,7 @@ class gmm_1d {
   static double log_sum_exp(const std::vector<double> &v);
   static double log_normal_1d(double x, double mu, double var);
   static double log_half_normal_1d(double x, double mu, double var, bool left_tail);
-  void initialize_k_means_1d(const std::vector<double>& x, int K, std::vector<int>& indices);
+  void initialize_k_means_1d(const std::vector<double>& x, int K, std::vector<int>& indices, int n_local_trials = -1, int n_init = 10);
 
   // E-step
   using Matrix = std::vector<std::vector<double>>;

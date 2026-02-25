@@ -53,7 +53,7 @@ double gmm_1d::log_sum_exp(const std::vector<double> &v) {
   return mx + std::log(s);
 }
 
-void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, std::vector<int> &indices) {
+void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, std::vector<int> &indices, int n_local_trials, int n_init) {
   const size_t N = x.size();
   if (N == 0) {
     throw std::runtime_error("initialize_k_means_1d: no data available for k-means initialization");
@@ -65,27 +65,75 @@ void gmm_1d::initialize_k_means_1d(const std::vector<double> &x, int K, std::vec
     throw std::runtime_error("initialize_k_means_1d: number of indices cannot exceed number of samples");
   }
 
-  indices.clear();
-  indices.reserve(K);
+  if (n_local_trials < 0) {
+    n_local_trials = 2 + static_cast<int>(std::log(static_cast<double>(K)));
+  }
+  if (n_init < 1) {
+    n_init = 1;
+  }
+
+  double best_total_inertia = std::numeric_limits<double>::max();
+  std::vector<int> best_indices;
 
   std::uniform_int_distribution<int> uniform(0, N - 1);
-  indices.push_back(uniform(rng));
 
-  std::vector<double> dist(N);
-  for (int c = 1; c < K; c++) {
-    // Squared distance to nearest chosen center
-    for (int i = 0; i < N; i++) {
-      double min_d = std::numeric_limits<double>::max();
-      for (int j : indices) {
-        double d = (x[i] - x[j]) * (x[i] - x[j]);
-        if (d < min_d) min_d = d;
-      }
-      dist[i] = min_d;
+  for (int init = 0; init < n_init; init++) {
+    std::vector<int> candidate_indices;
+    candidate_indices.reserve(K);
+
+    candidate_indices.push_back(uniform(rng));
+
+    std::vector<double> min_dist(N);
+    for (size_t i = 0; i < N; i++) {
+      double d = x[i] - x[candidate_indices[0]];
+      min_dist[i] = d * d;
     }
-    // Sample proportional to squared distance
-    std::discrete_distribution<int> weighted(dist.begin(), dist.end());
-    indices.push_back(weighted(rng));
+
+    for (int c = 1; c < K; c++) {
+      std::discrete_distribution<int> weighted(min_dist.begin(), min_dist.end());
+
+      int best_candidate = -1;
+      double best_inertia = std::numeric_limits<double>::max();
+
+      for (int trial = 0; trial < n_local_trials; trial++) {
+        int candidate = weighted(rng);
+
+        double inertia = 0.0;
+        for (size_t i = 0; i < N; i++) {
+          double d = x[i] - x[candidate];
+          double d2 = d * d;
+          inertia += std::min(min_dist[i], d2);
+        }
+
+        if (inertia < best_inertia) {
+          best_inertia = inertia;
+          best_candidate = candidate;
+        }
+      }
+
+      candidate_indices.push_back(best_candidate);
+
+      for (size_t i = 0; i < N; i++) {
+        double d = x[i] - x[best_candidate];
+        double d2 = d * d;
+        if (d2 < min_dist[i]) {
+          min_dist[i] = d2;
+        }
+      }
+    }
+
+    double total_inertia = 0.0;
+    for (size_t i = 0; i < N; i++) {
+      total_inertia += min_dist[i];
+    }
+
+    if (total_inertia < best_total_inertia) {
+      best_total_inertia = total_inertia;
+      best_indices = std::move(candidate_indices);
+    }
   }
+
+  indices = std::move(best_indices);
 }
 
 gmm_1d::Matrix gmm_1d::estimate_log_gaussian_prob(const std::vector<double>&x, const std::vector<double>& means, const std::vector<double>& inv_std_devs) const {
@@ -340,6 +388,11 @@ bool gmm_1d::fit(const std::vector<double>& x) {
 
   std::vector<int> seed_indices;
   initialize_k_means_1d(x, this->n_components, seed_indices);
+  std::cerr << "Kmeans: ";
+  for(int i: seed_indices){
+    std::cerr << x[i] << ", ";
+  }
+  std::cerr << std::endl;
 
   Matrix resp(N, std::vector<double>(this->n_components, 0.0));
   for (int comp = 0; comp < this->n_components; comp++)
