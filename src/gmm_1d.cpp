@@ -6,8 +6,6 @@
 #include <numeric>
 #include <random>
 #include <iostream>
-#include <algorithm>
-#include <iterator>
 
 constexpr double gmm_1d::PI;
 constexpr double gmm_1d::DEFAULT_VAR_FLOOR;
@@ -24,6 +22,36 @@ double gmm_1d::log_half_normal_1d(double x, double mu, double var, bool left_tai
     return -std::numeric_limits<double>::infinity();
 
   return std::log(2.0) + log_normal_1d(x, mu, var);
+}
+
+void gmm_1d::initialize_component_types() {
+  component_types_.assign(this->n_components, ComponentType::GAUSSIAN);
+  if (!use_half_normal_for_noise_) {
+    return;
+  }
+  if (this->n_components < 2) {
+    throw std::runtime_error("gmm_1d::initialize_component_types: half-normal noise requires at least 2 components");
+  }
+
+  component_types_[this->n_components - 2] = ComponentType::HALF_NORMAL_LEFT;   // support [0, +inf), fixed mean 0
+  component_types_[this->n_components - 1] = ComponentType::HALF_NORMAL_RIGHT;  // support (-inf, 1], fixed mean 1
+}
+
+bool gmm_1d::is_half_normal_component(int k) const {
+  if (!use_half_normal_for_noise_) return false;
+  if (k < 0 || k >= static_cast<int>(component_types_.size())) return false;
+  return component_types_[k] == ComponentType::HALF_NORMAL_LEFT
+      || component_types_[k] == ComponentType::HALF_NORMAL_RIGHT;
+}
+
+double gmm_1d::fixed_mean_for_component(int k) const {
+  if (!is_half_normal_component(k)) {
+    throw std::runtime_error("gmm_1d::fixed_mean_for_component called for non-half-normal component");
+  }
+  if (component_types_[k] == ComponentType::HALF_NORMAL_LEFT) {
+    return 0.0;
+  }
+  return 1.0;
 }
 
 // Using https://en.wikipedia.org/wiki/Digamma_function#Computation_and_approximation
@@ -169,6 +197,17 @@ gmm_1d::Matrix gmm_1d::estimate_log_prob(const std::vector<double>&x) const {
   for (int i = 0; i < N; i++) {
     for (int k = 0; k < this->n_components; k++) {
       result[i][k] = log_gauss[i][k] - 0.5 * std::log(degrees_of_freedom_[k]) + 0.5 * (log_lambda[k] - 1.0 / mean_precision_[k]);
+
+      if (!is_half_normal_component(k)) {
+        continue;
+      }
+
+      result[i][k] += std::log(2.0) + 0.5 / mean_precision_[k];
+      if (component_types_[k] == ComponentType::HALF_NORMAL_LEFT && x[i] < 0.0) {
+        result[i][k] = -std::numeric_limits<double>::infinity();
+      } else if (component_types_[k] == ComponentType::HALF_NORMAL_RIGHT && x[i] > 1.0) {
+        result[i][k] = -std::numeric_limits<double>::infinity();
+      }
     }
   }
   return result;
@@ -232,9 +271,15 @@ void gmm_1d::estimate_gaussian_parameters(const std::vector<double>&x, const Mat
       means[k] += resp[i][k] * x[i];
       avg_X2[k] += resp[i][k] * x[i] * x[i];
     }
+
     means[k] /= nk[k];
     avg_X2[k] /= nk[k];
-    covariances[k] = avg_X2[k] - means[k] * means[k] + gmm_1d::REG_TERM;
+    if (is_half_normal_component(k)) {
+      const double mu_fixed = fixed_mean_for_component(k);
+      covariances[k] = avg_X2[k] - 2.0 * mu_fixed * means[k] + mu_fixed * mu_fixed + gmm_1d::REG_TERM;
+    } else {
+      covariances[k] = avg_X2[k] - means[k] * means[k] + gmm_1d::REG_TERM;
+    }
   }
 }
 
@@ -256,7 +301,11 @@ void gmm_1d::estimate_means(const std::vector<double>& nk, const std::vector<dou
   means_.resize(this->n_components);
   for (int k = 0; k < this->n_components; k++) {
     mean_precision_[k] = mean_precision_prior_ + nk[k];
-    means_[k] = (mean_precision_prior_ * mean_prior_ + nk[k] * xk[k]) / mean_precision_[k];
+    if (is_half_normal_component(k)) {
+      means_[k] = fixed_mean_for_component(k);
+    } else {
+      means_[k] = (mean_precision_prior_ * mean_prior_ + nk[k] * xk[k]) / mean_precision_[k];
+    }
   }
 }
 
@@ -266,11 +315,46 @@ void gmm_1d::estimate_precisions(const std::vector<double>& nk,
   degrees_of_freedom_.resize(this->n_components);
   variances_.resize(this->n_components);
   inv_std_devs_.resize(this->n_components);
+
+  const bool use_shared_half_normal_variance =
+      use_half_normal_for_noise_ &&
+      this->n_components >= 2 &&
+      is_half_normal_component(this->n_components - 2) &&
+      is_half_normal_component(this->n_components - 1);
+
+  double shared_half_nk = 0.0;
+  double shared_half_q = 0.0;
+  double shared_half_nu = 0.0;
+  double shared_half_var = 0.0;
+  double shared_half_inv_std = 0.0;
+  if (use_shared_half_normal_variance) {
+    for (int k = 0; k < this->n_components; k++) {
+      if (!is_half_normal_component(k)) continue;
+      shared_half_nk += nk[k];
+      shared_half_q += nk[k] * sk[k];
+    }
+    shared_half_nu = degrees_of_freedom_prior_ + shared_half_nk;
+    shared_half_var = (covariance_prior_ + shared_half_q) / shared_half_nu;
+    shared_half_inv_std = 1.0 / std::sqrt(shared_half_var);
+  }
+
   for (int k = 0; k < this->n_components; k++) {
+    if (is_half_normal_component(k) && use_shared_half_normal_variance) {
+      degrees_of_freedom_[k] = shared_half_nu;
+      variances_[k] = shared_half_var;
+      inv_std_devs_[k] = shared_half_inv_std;
+      continue;
+    }
+
     degrees_of_freedom_[k] = degrees_of_freedom_prior_ + nk[k];
-    double diff = xk[k] - mean_prior_;
-    variances_[k] = covariance_prior_ + nk[k] * (sk[k] + (mean_precision_prior_ / mean_precision_[k]) * diff * diff);
-    variances_[k] /= degrees_of_freedom_[k];
+    if (is_half_normal_component(k)) {
+      variances_[k] = covariance_prior_ + nk[k] * sk[k];
+      variances_[k] /= degrees_of_freedom_[k];
+    } else {
+      double diff = xk[k] - mean_prior_;
+      variances_[k] = covariance_prior_ + nk[k] * (sk[k] + (mean_precision_prior_ / mean_precision_[k]) * diff * diff);
+      variances_[k] /= degrees_of_freedom_[k];
+    }
     inv_std_devs_[k] = 1.0 / std::sqrt(variances_[k]);
   }
 }
@@ -294,7 +378,15 @@ double gmm_1d::compute_lower_bound(const Matrix& log_resp) const {
 
   // log_wishart_norm for n_features = 1
   double log_wishart = 0.0;
+  bool half_normal_precision_accounted = false;
   for (int k = 0; k < this->n_components; k++) {
+    if (is_half_normal_component(k)) {
+      // Half normals share variance
+      if (half_normal_precision_accounted) {
+        continue;
+      }
+      half_normal_precision_accounted = true;
+    }
     double ld = std::log(inv_std_devs_[k]) - 0.5 * std::log(degrees_of_freedom_[k]);
     log_wishart += -(degrees_of_freedom_[k] * ld + degrees_of_freedom_[k] * 0.5 * std::log(2.0) + std::lgamma(0.5 * degrees_of_freedom_[k]));
   }
@@ -309,8 +401,12 @@ double gmm_1d::compute_lower_bound(const Matrix& log_resp) const {
       entropy -= std::exp(log_resp[i][k]) * log_resp[i][k];
 
   double sum_log_mp = 0.0;
-  for (int k = 0; k < this->n_components; k++)
+  for (int k = 0; k < this->n_components; k++) {
+    if (is_half_normal_component(k)) {
+      continue;
+    }
     sum_log_mp += std::log(mean_precision_[k]);
+  }
 
   return entropy - log_wishart - log_norm_weight - 0.5 * sum_log_mp;
 }
@@ -383,6 +479,20 @@ void gmm_1d::compute_final_weights() {
 }
 
 bool gmm_1d::fit(const std::vector<double>& x) {
+  converged = false;
+  n_iter = 0;
+  elbo_history.clear();
+  labels_.clear();
+  initialize_component_types();
+
+  if (use_half_normal_for_noise_) {
+    for (double xi : x) {
+      if (xi < 0.0 || xi > 1.0) {
+        throw std::runtime_error("gmm_1d::fit: half-normal noise mode expects x in [0, 1]");
+      }
+    }
+  }
+
   int N = x.size();
   initialize_parameters(x);
 

@@ -20,6 +20,14 @@ class gmm_1d {
   int n_components;
   unsigned int seed;
   std::mt19937 rng;
+  bool use_half_normal_for_noise_ = false;
+
+  enum class ComponentType {
+    GAUSSIAN,
+    HALF_NORMAL_LEFT,
+    HALF_NORMAL_RIGHT
+  };
+  std::vector<ComponentType> component_types_;
 
   // Priors
   double weight_concentration_prior_;
@@ -48,6 +56,9 @@ class gmm_1d {
   static double log_sum_exp(const std::vector<double> &v);
   static double log_normal_1d(double x, double mu, double var);
   static double log_half_normal_1d(double x, double mu, double var, bool left_tail);
+  void initialize_component_types();
+  bool is_half_normal_component(int k) const;
+  double fixed_mean_for_component(int k) const;
   void initialize_k_means_1d(const std::vector<double>& x, int K, std::vector<int>& indices, int n_local_trials = -1, int n_init = 10);
 
   // E-step
@@ -72,9 +83,11 @@ class gmm_1d {
 
  public:
 
-  explicit gmm_1d(int n_components = 2, unsigned int seed = std::random_device{}()) : seed(seed), rng(seed), n_components(n_components) {}
+  explicit gmm_1d(int n_components = 2, unsigned int seed = std::random_device{}()) : n_components(n_components), seed(seed), rng(seed) {}
   bool fit(const std::vector<double>& x);
   std::vector<int> predict(const std::vector<double> &x) const;
+  void set_use_half_normal_for_noise(bool use_half_normal_for_noise) { use_half_normal_for_noise_ = use_half_normal_for_noise; }
+  bool get_use_half_normal_for_noise() const { return use_half_normal_for_noise_; }
 
   static void logit_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static void sigmoid_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
