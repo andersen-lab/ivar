@@ -272,6 +272,7 @@ void gmm_1d::estimate_gaussian_parameters(const std::vector<double>&x, const Mat
       avg_X2[k] += resp[i][k] * x[i] * x[i];
     }
 
+    nk[k] = std::max(nk[k], std::pow(gmm_1d::REG_TERM, 2)); // To deal with very low covariance_prior_ values
     means[k] /= nk[k];
     avg_X2[k] /= nk[k];
     if (is_half_normal_component(k)) {
@@ -419,8 +420,8 @@ void gmm_1d::initialize_parameters(const std::vector<double> &x) {
   const int N = x.size();
 
   weight_concentration_prior_ = 1.0 / this->n_components;
-  mean_precision_prior_ = 1.0;
-
+  if (mean_precision_prior_ == 0.0)
+    mean_precision_prior_ = 1.0;
   double s = 0.0;
   for (double x_ : x)
     s += x_;
@@ -428,12 +429,15 @@ void gmm_1d::initialize_parameters(const std::vector<double> &x) {
 
   degrees_of_freedom_prior_ = 1.0;   // n_features = 1
 
-  double var_sum = 0.0;
-  for (double x_ : x) {
-    double d = x_ - mean_prior_;
-    var_sum += d * d;
+  if (covariance_prior_ == 0.0) {
+    double var_sum = 0.0;
+    for (double x_ : x) {
+      double d = x_ - mean_prior_;
+      var_sum += d * d;
+    }
+    covariance_prior_ = var_sum / (N - 1);
   }
-  covariance_prior_ = var_sum / (N - 1);
+
 }
 
 void gmm_1d::initialize(const std::vector<double>& x, const Matrix& resp) {
