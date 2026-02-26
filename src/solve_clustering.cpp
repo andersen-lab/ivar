@@ -457,31 +457,16 @@ bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &sol
 
 }
 
-std::vector<std::vector<double>> subset_sum(gaussian_mixture_model model, double estimated_error){
+std::vector<std::vector<double>> subset_sum(std::vector<double> means){
   double error = 0.05;
   double solution_error = 0.05;
-  std::vector<double> means = model.means;
 
   //determine if any clusters are possible noise
   std::vector<uint32_t> noise_indices;
-  if(means.size() > 2){
-    noise_indices = noise_cluster_calculator(model, estimated_error);
-  }
+ 
   //filter peaks from means by index
-  std::vector<double> filtered_means;
+  std::vector<double> filtered_means = means;
   std::vector<double> std_devs;
-
-  for(uint32_t i=0; i < means.size(); i++){
-    auto it = std::find(noise_indices.begin(), noise_indices.end(), i);
-    if(it == noise_indices.end()){
-      filtered_means.push_back(means[i]);
-      if(model.clusters[i].size() > 1){
-        std_devs.push_back(model.cluster_std_devs[i]);
-      } else {
-        std_devs.push_back(0.05);
-      }
-    }
-  }
 
   std::vector<std::vector<double>> solutions = find_solutions(filtered_means, error);
   //std::cerr << "solution size " << solutions.size() << std::endl;
@@ -526,7 +511,7 @@ void solve_clusters(std::vector<variant> &variants,
   double error = 0.05;
   std::vector<double> means = model.means;
   std::cerr << "estimated error " << estimated_error << std::endl;
-  std::vector<std::vector<double>> solution_sets = subset_sum(model, estimated_error);
+  std::vector<std::vector<double>> solution_sets;
   for(auto sol : solution_sets){
     for(auto s : sol){
       std::cerr << s << " ";
