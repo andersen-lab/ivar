@@ -97,20 +97,21 @@ int main() {
             // Fit GMM
             std::vector<double> logL_history;
             gmm_1d model(2);
-            model.set_use_half_normal_for_noise(false);
-            model.fit(
+            
+            
+            /*model.fit(
                 samples,
                 sites,
                 logL_history,
                 {},
                 20,
                 1e-6
-            );
+            );*/
 
             // Print results (logit space)
             const auto& w = model.get_weights();
             const auto& m = model.get_means();
-            const auto& v = model.get_vars();
+            //const auto& v = model.get_vars();
 
             std::vector<double> m_sigmoid;
 
@@ -121,13 +122,12 @@ int main() {
                      << stdev1 << "\t"
                      << stdev2 << "\t"
                      << nsamples << "\t"
-                     << m[0] << "\t"
-                     << m[1] << "\t"
+                     << m[0] << "\t";
 //                     << m_sigmoid[0] << "\t"
 //                     << m_sigmoid[1] << "\t"
-                     << v[0] << "\t"
-                     << v[1] << "\t"
-                     << gmm_1d::calculate_bhattacharyya_distance_1d(m[0], v[0], m[1], v[1]) << "\t";
+                     //<< v[0] << "\t"
+                     //<< v[1] << "\t"
+                     //<< gmm_1d::calculate_bhattacharyya_distance_1d(m[0], v[0], m[1], v[1]) << "\t";
                      //<< model.get_distinct_components_count(sites, 1.0) << "\n";
           }
         }
