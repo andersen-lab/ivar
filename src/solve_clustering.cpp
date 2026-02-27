@@ -415,9 +415,11 @@ std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, dou
 }
 
 bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &solution_sets, const double error){
+  std::cerr << "in subset sum" << std::endl;
   //gives all solutions that sum to 1
   std::vector<std::vector<double>> solutions = find_solutions(means, error);
   if(solutions.size() == 0){
+    std::cerr << "no solutions found" << std::endl;
     return(false);
   }
 
@@ -440,16 +442,23 @@ bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &sol
   }
 
   if(realistic_solutions.size() == 0){
+    std::cerr << "no realistic solutions found" << std::endl;
     return(false);
   }
 
   for(uint32_t i=0; i < realistic_solutions.size(); i++){
     bool keep = account_peaks(realistic_solutions[i], means, 1, error);
+    std::cerr << "keep " << keep << std::endl;
+    for(auto s : realistic_solutions[i]){
+      std::cerr << s << " ";
+    }
+    std::cerr << "\n";
     if(keep){
       solution_sets.push_back(realistic_solutions[i]);
     }
   }
   if(solution_sets.size() == 0){
+    std::cerr << "final no solution sets found" << std::endl;
     return(false);
   } else {
     return(true);

@@ -5,6 +5,7 @@
 #include <sstream>
 #include <unordered_map>
 
+#include "../src/solve_clustering.h"
 #include "../src/bootstrap_variants.h"
 #include "../src/gmm_1d.h"
 
@@ -65,7 +66,7 @@ int main(int argc, char* argv[]) {
   std::vector<double> y;
 
   std::vector<uint32_t> sites;
-  read_in_simulated_data(input, x, sites, depths, total_depths, 0.97);
+  read_in_simulated_data(input, x, sites, depths, total_depths, 0.99);
 
 //  std::mt19937 rng(112358);
 //
@@ -107,7 +108,7 @@ int main(int argc, char* argv[]) {
 
   std::ofstream out(prefix + "_gmm_1d_results.txt");
 
-  out << "Replicate\tComponents\tBIC\tDistinct_Components\tMeans\tVariances\tWeights\n";
+  out << "Replicate\tComponents\tDistinct_Components\tMeans\tVariances\tWeights\tEffective_Means\tEffective_Variances\tEffective_Weights\tSolution_Sets\n";
   // Fit GMM
   for(int b = 0; b < 1; b++) {
 //    bootstrap_variants bootstrap(sites, depths, total_depths);
@@ -120,9 +121,10 @@ int main(int argc, char* argv[]) {
 
     gmm_1d model(12, 42);  // seed matches bootstrap replicate
     model.set_use_half_normal_for_noise(true);
-    model.set_covariance_prior(1e-3);
-    model.set_mean_precision_prior(1e-2);
+    //model.set_covariance_prior(1e-3);
+    //model.set_mean_precision_prior(1e-2);
 
+    
     model.fit(x);
     std::vector<int> labels = model.predict(x);
 
@@ -159,27 +161,80 @@ int main(int argc, char* argv[]) {
     std::vector<double> vars    = model.get_variances();
     std::vector<double> weights = model.get_weights();
 
+    std::vector<std::vector<double>> solutions_sets;
+    bool solved = subset_sum(eff_means, solutions_sets, 0.05);
+    std::cerr << "solution status: " << solved << "\n";
+    for(auto sol : solutions_sets){
+      for(auto s : sol){
+        std::cerr << s << " ";
+      }
+      std::cerr << "\n";
+    } 
+
     out << b << "\t"
         << "VB\t"
-        << "NA\t"  // no BIC for VB
         << component_indices.size() << "\t";
 
+    out << "[";
     for (size_t j = 0; j < means.size(); j++) {
       out << means[j];
       if (j < means.size() - 1) out << ",";
     }
+    out << "]";
     out << "\t";
 
+    out << "[";
     for (size_t j = 0; j < vars.size(); j++) {
       out << vars[j];
       if (j < vars.size() - 1) out << ",";
     }
+    out << "]";
     out << "\t";
 
+    out << "[";
     for (size_t j = 0; j < weights.size(); j++) {
       out << weights[j];
       if (j < weights.size() - 1) out << ",";
     }
+    out << "]";
+    out << "\t";
+
+    out << "[";
+    for (size_t j = 0; j < eff_means.size(); j++) {
+      out << eff_means[j];
+      if (j < eff_means.size() - 1) out << ",";
+    }
+    out << "]";
+    out << "\t";
+
+
+    out << "[";
+    for (size_t j = 0; j < eff_vars.size(); j++) {
+      out << eff_vars[j];
+      if (j < eff_vars.size() - 1) out << ",";
+    }
+    out << "]";
+    out << "\t";
+
+    out << "[";
+    for (size_t j = 0; j < eff_weights.size(); j++) {
+      out << eff_weights[j];
+      if (j < eff_weights.size() - 1) out << ",";
+    }
+    out << "]";
+    out << "\t";
+    out << "[";
+    for(auto sol : solutions_sets){
+      out << "[";
+      for(uint32_t s=0; s < sol.size(); s++){
+        if(s != 0){
+          out << ",";
+        }
+        out << sol[s];
+      }
+      out << "]";
+    }
+    out << "]";
     out << "\n";
   }
 
