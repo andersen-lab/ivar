@@ -121,6 +121,7 @@ int main(int argc, char* argv[]) {
 
     gmm_1d model(12, 42);  // seed matches bootstrap replicate
     model.set_use_half_normal_for_noise(true);
+    
     //model.set_covariance_prior(1e-3);
     //model.set_mean_precision_prior(1e-2);
 
