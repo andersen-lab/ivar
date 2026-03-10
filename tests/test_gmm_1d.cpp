@@ -122,9 +122,12 @@ int main(int argc, char* argv[]) {
     gmm_1d model(12, 42);  // seed matches bootstrap replicate
     model.set_use_half_normal_for_noise(true);
     
-    //model.set_covariance_prior(1e-3);
-    //model.set_mean_precision_prior(1e-2);
+    //simulated priors
+    model.set_covariance_prior(1e-3);
+    model.set_mean_precision_prior(1e-2);
 
+    //model.set_covariance_prior(0.05); //currently starts at 0.18
+    //model.set_mean_precision_prior(0.05); //currently starts at 1
     
     model.fit(x);
     std::vector<int> labels = model.predict(x);
@@ -225,7 +228,9 @@ int main(int argc, char* argv[]) {
     out << "]";
     out << "\t";
     out << "[";
-    for(auto sol : solutions_sets){
+    for(uint32_t t=0; t < solutions_sets.size(); t++){
+      auto sol = solutions_sets[t];
+      if(t != 0) out << ",";
       out << "[";
       for(uint32_t s=0; s < sol.size(); s++){
         if(s != 0){
