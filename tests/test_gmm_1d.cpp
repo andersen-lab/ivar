@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
 //    bootstrap.sample(sampled_sites, sampled_depths, sampled_frequencies, counts.size());
 
     gmm_1d model(12, 42);  // seed matches bootstrap replicate
-    model.set_use_half_normal_for_noise(true);
+    model.set_use_half_normal_for_noise(true, 0.99);
     
     //simulated priors
     model.set_covariance_prior(1e-3);
