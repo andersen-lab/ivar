@@ -35,6 +35,7 @@ class gmm_1d {
   double mean_prior_;
   double degrees_of_freedom_prior_;
   double covariance_prior_ = 0.0;
+  double invariant_threshold_ = 0.97;
 
   // Model parameters
   std::vector<double> stick_beta_a_, stick_beta_b_;
@@ -86,7 +87,7 @@ class gmm_1d {
   explicit gmm_1d(int n_components = 2, unsigned int seed = std::random_device{}()) : n_components(n_components), seed(seed), rng(seed) {}
   bool fit(const std::vector<double>& x);
   std::vector<int> predict(const std::vector<double> &x) const;
-  void set_use_half_normal_for_noise(bool use_half_normal_for_noise) { use_half_normal_for_noise_ = use_half_normal_for_noise; }
+  void set_use_half_normal_for_noise(bool use_half_normal_for_noise, double invariant_threshold = 0.97) { use_half_normal_for_noise_ = use_half_normal_for_noise; invariant_threshold_ = invariant_threshold; }
   bool get_use_half_normal_for_noise() const { return use_half_normal_for_noise_; }
   void set_mean_precision_prior(double v) { mean_precision_prior_ = v; }
   void set_covariance_prior(double v) { covariance_prior_ = v; }

@@ -49,9 +49,9 @@ double gmm_1d::fixed_mean_for_component(int k) const {
     throw std::runtime_error("gmm_1d::fixed_mean_for_component called for non-half-normal component");
   }
   if (component_types_[k] == ComponentType::HALF_NORMAL_LEFT) {
-    return 0.0;
+    return 1 - invariant_threshold_;
   }
-  return 1.0;
+  return invariant_threshold_;
 }
 
 // Using https://en.wikipedia.org/wiki/Digamma_function#Computation_and_approximation
@@ -203,9 +203,9 @@ gmm_1d::Matrix gmm_1d::estimate_log_prob(const std::vector<double>&x) const {
       }
 
       result[i][k] += std::log(2.0) + 0.5 / mean_precision_[k];
-      if (component_types_[k] == ComponentType::HALF_NORMAL_LEFT && x[i] < 0.0) {
+      if (component_types_[k] == ComponentType::HALF_NORMAL_LEFT && x[i] < 1 - invariant_threshold_) {
         result[i][k] = -std::numeric_limits<double>::infinity();
-      } else if (component_types_[k] == ComponentType::HALF_NORMAL_RIGHT && x[i] > 1.0) {
+      } else if (component_types_[k] == ComponentType::HALF_NORMAL_RIGHT && x[i] > invariant_threshold_) {
         result[i][k] = -std::numeric_limits<double>::infinity();
       }
     }
@@ -317,36 +317,7 @@ void gmm_1d::estimate_precisions(const std::vector<double>& nk,
   variances_.resize(this->n_components);
   inv_std_devs_.resize(this->n_components);
 
-  const bool use_shared_half_normal_variance =
-      use_half_normal_for_noise_ &&
-      this->n_components >= 2 &&
-      is_half_normal_component(this->n_components - 2) &&
-      is_half_normal_component(this->n_components - 1);
-
-  double shared_half_nk = 0.0;
-  double shared_half_q = 0.0;
-  double shared_half_nu = 0.0;
-  double shared_half_var = 0.0;
-  double shared_half_inv_std = 0.0;
-  if (use_shared_half_normal_variance) {
-    for (int k = 0; k < this->n_components; k++) {
-      if (!is_half_normal_component(k)) continue;
-      shared_half_nk += nk[k];
-      shared_half_q += nk[k] * sk[k];
-    }
-    shared_half_nu = degrees_of_freedom_prior_ + shared_half_nk;
-    shared_half_var = (covariance_prior_ + shared_half_q) / shared_half_nu;
-    shared_half_inv_std = 1.0 / std::sqrt(shared_half_var);
-  }
-
   for (int k = 0; k < this->n_components; k++) {
-    if (is_half_normal_component(k) && use_shared_half_normal_variance) {
-      degrees_of_freedom_[k] = shared_half_nu;
-      variances_[k] = shared_half_var;
-      inv_std_devs_[k] = shared_half_inv_std;
-      continue;
-    }
-
     degrees_of_freedom_[k] = degrees_of_freedom_prior_ + nk[k];
     if (is_half_normal_component(k)) {
       variances_[k] = covariance_prior_ + nk[k] * sk[k];
@@ -356,6 +327,10 @@ void gmm_1d::estimate_precisions(const std::vector<double>& nk,
       variances_[k] = covariance_prior_ + nk[k] * (sk[k] + (mean_precision_prior_ / mean_precision_[k]) * diff * diff);
       variances_[k] /= degrees_of_freedom_[k];
     }
+//    double min_var = 0.01;
+//    if (variances_[k] < min_var) {
+//      variances_[k] = min_var;
+//    }
     inv_std_devs_[k] = 1.0 / std::sqrt(variances_[k]);
   }
 }
@@ -379,15 +354,7 @@ double gmm_1d::compute_lower_bound(const Matrix& log_resp) const {
 
   // log_wishart_norm for n_features = 1
   double log_wishart = 0.0;
-  bool half_normal_precision_accounted = false;
   for (int k = 0; k < this->n_components; k++) {
-    if (is_half_normal_component(k)) {
-      // Half normals share variance
-      if (half_normal_precision_accounted) {
-        continue;
-      }
-      half_normal_precision_accounted = true;
-    }
     double ld = std::log(inv_std_devs_[k]) - 0.5 * std::log(degrees_of_freedom_[k]);
     log_wishart += -(degrees_of_freedom_[k] * ld + degrees_of_freedom_[k] * 0.5 * std::log(2.0) + std::lgamma(0.5 * degrees_of_freedom_[k]));
   }
@@ -420,8 +387,7 @@ void gmm_1d::initialize_parameters(const std::vector<double> &x) {
   const int N = x.size();
 
   weight_concentration_prior_ = 1.0 / this->n_components;
-  if (mean_precision_prior_ == 0.0)
-    mean_precision_prior_ = 1.0;
+
   double s = 0.0;
   for (double x_ : x)
     s += x_;
@@ -436,6 +402,9 @@ void gmm_1d::initialize_parameters(const std::vector<double> &x) {
       var_sum += d * d;
     }
     covariance_prior_ = var_sum / (N - 1);
+  }
+  if (mean_precision_prior_ == 0.0) {
+    mean_precision_prior_ = 1.0;
   }
 
 }
