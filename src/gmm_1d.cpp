@@ -523,14 +523,64 @@ bool gmm_1d::fit(const std::vector<double>& x) {
 
 std::vector<int> gmm_1d::predict(const std::vector<double>& x) const {
   Matrix w = estimate_weighted_log_prob(x);
-  int N = static_cast<int>(x.size());
-  std::vector<int> labels(N);
-  for (int i = 0; i < N; i++) {
+  int n_data_points = x.size();
+
+  // First assignment based on max responsibility
+  std::vector<int> labels(n_data_points);
+  for (int i = 0; i < n_data_points; i++) {
     int best = 0;
     for (int k = 1; k < this->n_components; k++)
       if (w[i][k] > w[i][best]) best = k;
     labels[i] = best;
   }
+
+  if (min_cluster_fraction_ <= 0.0) return labels;
+
+  std::vector<bool> low_weight_clusters(n_components, false);
+
+  for (int iter = 0; iter < n_components; iter++) {
+
+    std::vector<int> counts(n_components, 0);
+    for (int i = 0; i < n_data_points; i++)
+      counts[labels[i]]++;
+
+    // Ban small clusters
+    bool found_new = false;
+    for (int k = 0; k < n_components; k++) {
+      if (!low_weight_clusters[k] && counts[k] > 0 && (static_cast<double>(counts[k]) / n_data_points) < min_cluster_fraction_) {
+        low_weight_clusters[k] = true;
+        found_new = true;
+      }
+    }
+    if (!found_new) break;
+
+    // Keep at least one cluster active. TODO: Needed?
+    int num_active = 0;
+    for (int k = 0; k < n_components; k++)
+      if (!low_weight_clusters[k] && counts[k] > 0) num_active++;
+    if (num_active == 0) {
+      int best_k = 0;
+      for (int k = 1; k < n_components; k++)
+        if (counts[k] > counts[best_k]) best_k = k;
+      low_weight_clusters[best_k] = false;
+    }
+
+    // Reassign low_weight_clusters points to next best component
+    for (int i = 0; i < n_data_points; i++) {
+      if (low_weight_clusters[labels[i]]) {
+        int best = -1;
+        double best_score = -std::numeric_limits<double>::infinity();
+        for (int k = 0; k < n_components; k++) {
+          if (!low_weight_clusters[k] && w[i][k] > best_score) {
+            best_score = w[i][k];
+            best = k;
+          }
+        }
+        if (best >= 0) labels[i] = best;
+      }
+    }
+  }
+
   return labels;
 }
 
@@ -667,11 +717,32 @@ std::vector<int> gmm_1d::get_effective_components(std::vector<int> labels) const
   std::vector<int> result;
   result.reserve(tmp.size());
 
-  for (double x : tmp) {
-    if (result.empty() || x != result.back()) {
-      result.push_back(x);
+  if(use_half_normal_for_noise_) {
+    int n_half_normal = 0;
+    for (int x : tmp) {
+      if (result.empty() || x != result.back()) {
+        result.push_back(x);
+        if(is_half_normal_component(x)) {
+          n_half_normal++;
+        }
+      }
+    }
+    if(result.size() >= 3 && n_half_normal > 0) {
+      for (auto it = result.begin(); it != result.end();) {
+        if (is_half_normal_component(*it))
+          it = result.erase(it);
+        else
+          ++it;
+      }
+    }
+  } else {
+    for (int x : tmp) {
+      if (result.empty() || x != result.back()) {
+        result.push_back(x);
+      }
     }
   }
+
   return result;
 }
 

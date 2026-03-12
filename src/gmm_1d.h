@@ -36,6 +36,7 @@ class gmm_1d {
   double degrees_of_freedom_prior_;
   double covariance_prior_ = 0.0;
   double invariant_threshold_ = 0.97;
+  double min_cluster_fraction_ = 0.0;
 
   // Model parameters
   std::vector<double> stick_beta_a_, stick_beta_b_;
@@ -91,6 +92,8 @@ class gmm_1d {
   bool get_use_half_normal_for_noise() const { return use_half_normal_for_noise_; }
   void set_mean_precision_prior(double v) { mean_precision_prior_ = v; }
   void set_covariance_prior(double v) { covariance_prior_ = v; }
+  void set_min_cluster_fraction(double f) { min_cluster_fraction_ = f; }
+  double get_min_cluster_fraction() const { return min_cluster_fraction_; }
 
   static void logit_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static void sigmoid_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
