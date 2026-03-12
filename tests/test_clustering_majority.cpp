@@ -8,7 +8,6 @@
 #include "../src/ref_seq.h"
 #include "../src/parse_gff.h"
 #include "../src/call_consensus_clustering.h"
-#include "../src/estimate_error.h"
 #include "../src/solve_clustering.h"
 #include "../src/interval_tree.h"
 
@@ -81,7 +80,7 @@ int main() {
 
   solve_clusters(variants, retrained, lower_bound, solution, prefix, default_threshold, min_depth);
 
-  cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, retrained.cluster_std_devs, ref, error_rate);
+  cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, retrained.cluster_std_devs, ref);
   std::vector<pair<std::string, std::string>> gt_sequences;
   read_consensus(gt_sequences, consensus_filename);
   std::string exp_sequence;

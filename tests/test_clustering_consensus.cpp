@@ -8,7 +8,6 @@
 #include "../src/ref_seq.h"
 #include "../src/parse_gff.h"
 #include "../src/call_consensus_clustering.h"
-#include "../src/estimate_error.h"
 #include "../src/solve_clustering.h"
 #include "../src/interval_tree.h"
 
@@ -54,11 +53,9 @@ int main() {
 
   parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual);
   set_deletion_flags(base_variants, 0);
-
-  double error_rate;
-  cluster_error(base_variants, min_qual, min_depth, error_rate);
-  double lower_bound = 1-error_rate+0.0001;
-  double upper_bound = error_rate-0.0001;
+  double error_rate = 0.01;
+  double lower_bound = 0.01;
+  double upper_bound = 0.99;
   std::cerr << "lower error " << lower_bound << " upper error " << upper_bound << std::endl;
   uint32_t count = 0;
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
@@ -81,9 +78,8 @@ int main() {
   gaussian_mixture_model retrained = retrain_model(n, data, variants, 2, var_floor, clustering_failed, false);
   assign_all_variants(variants, base_variants, retrained, lower_bound, upper_bound);
   add_noise_variants(variants, base_variants);
-
   solve_clusters(variants, retrained, lower_bound, solution, prefix, default_threshold, min_depth);
-  cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, retrained.cluster_std_devs, reference_file, error_rate);
+  cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, retrained.cluster_std_devs, reference_file);
   std::vector<pair<std::string, std::string>> gt_sequences;
   read_consensus(gt_sequences, consensus_filename);
   std::string exp_sequence;

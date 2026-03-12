@@ -7,7 +7,6 @@
 #include "../src/interval_tree.h"
 #include "../src/gmm.h"
 #include "../src/solve_clustering.h"
-#include "../src/estimate_error.h"
 #include "../src/call_variants.h"
 #include "../src/ref_seq.h"
 #include "../src/call_consensus_clustering.h"

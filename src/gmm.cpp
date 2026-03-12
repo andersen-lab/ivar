@@ -4,7 +4,6 @@
 #include "gmm.h"
 #include "saga.h"
 #include "call_consensus_clustering.h"
-#include "estimate_error.h"
 #include "ref_seq.h"
 #include <fstream>
 #include <cassert>
@@ -709,7 +708,7 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
 
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, std::vector<double> &std_devs, \
-                              std::string ref, double default_threshold, double &error_rate){
+                              std::string ref, double default_threshold){
   if(ref.empty()){
     std::cerr << "Please provide a reference sequence." << std::endl;
     exit(1);
@@ -721,9 +720,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
 
   set_deletion_flags(base_variants, 0.001);
-  cluster_error(base_variants, min_qual, min_depth, error_rate);
-  double lower_bound = 1-error_rate+0.0001;
-  double upper_bound = error_rate-0.0001;
+  double lower_bound = 0.01;
+  double upper_bound = 0.99;
 
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
   set_deletion_flags(base_variants, lower_bound);

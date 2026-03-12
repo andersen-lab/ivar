@@ -1,4 +1,3 @@
-#include "estimate_error.h"
 #include "call_consensus_clustering.h"
 #include "gmm.h"
 #include "saga.h"
@@ -23,14 +22,13 @@ void cluster_consensus(std::vector<variant> variants, \
                       std::vector<double> solution, \
                       std::vector<double> means, \
                       std::vector<double> std_devs, \
-                      std::string ref, \
-                      double error_rate){
+                      std::string ref){
   std::cerr << "calling consensus" << std::endl;
   if(variants.size() == 0) return;
 
   double max_mean=0;
-  double freq_lower_bound = 1-error_rate+0.0001;
-  double freq_upper_bound = error_rate-0.0001;
+  double freq_lower_bound = 0.01;
+  double freq_upper_bound = 0.99;
   set_freq_range_flags(variants, freq_lower_bound, freq_upper_bound, true);
   //find the largest position in the variants file
   uint32_t max_position = 0;
