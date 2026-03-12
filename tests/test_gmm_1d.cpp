@@ -66,7 +66,8 @@ int main(int argc, char* argv[]) {
   std::vector<double> y;
 
   std::vector<uint32_t> sites;
-  read_in_simulated_data(input, x, sites, depths, total_depths, 0.99);
+  float invariant_threshold = 0.97;
+  read_in_simulated_data(input, x, sites, depths, total_depths, invariant_threshold);
 
 //  std::mt19937 rng(112358);
 //
@@ -100,11 +101,11 @@ int main(int argc, char* argv[]) {
 //    x.push_back(1.0 - std::abs(z));
 //  }
 //
-//  std::ofstream debug_out("data.txt");
-//  for(int i = 0; i < x.size(); i++) {
-//    debug_out << x[i] << ", ";
-//  }
-//  debug_out.close();
+  std::ofstream debug_out("data.txt");
+  for(int i = 0; i < x.size(); i++) {
+    debug_out << x[i] << ", ";
+  }
+  debug_out.close();
 
   std::ofstream out(prefix + "_gmm_1d_results.txt");
 
@@ -120,16 +121,20 @@ int main(int argc, char* argv[]) {
 //    bootstrap.sample(sampled_sites, sampled_depths, sampled_frequencies, counts.size());
 
     gmm_1d model(12, 42);  // seed matches bootstrap replicate
-    model.set_use_half_normal_for_noise(true, 0.99);
-    
+    model.set_use_half_normal_for_noise(true, invariant_threshold);
+
+    // spike in priors
+    model.set_mean_precision_prior(0.5);
+
     //simulated priors
-    model.set_covariance_prior(1e-3);
-    model.set_mean_precision_prior(1e-2);
+//    model.set_covariance_prior(1e-3);
+//    model.set_mean_precision_prior(1e-2);
 
     //model.set_covariance_prior(0.05); //currently starts at 0.18
     //model.set_mean_precision_prior(0.05); //currently starts at 1
     
     model.fit(x);
+    model.set_min_cluster_fraction(0.1);
     std::vector<int> labels = model.predict(x);
 
     std::vector<int> component_indices = model.get_effective_components(labels);
