@@ -14,92 +14,12 @@
 #include <limits>
 #include <unordered_map>
 
-double inv_logit(double x) {
-  return 1.0 / (1.0 + std::exp(-x));
-}
-
-double logit(double p) {
-  return std::log(p / (1.0 - p));
-}
-
 void reset_variants_info(std::vector<variant> &variants){
   //reset cluster assignments and probabilities prior to rerunning another model
   for(auto &var : variants){
     var.cluster_assigned = -1;
     var.probabilities.clear();
   }
-}
-
-arma::mat subsample_with_replacement(
-    const arma::mat& data,
-    std::size_t n_subsample,
-    const std::vector<uint32_t>& position,
-    std::vector<variant> &subsampled_variants,
-    const std::vector<variant> variants,
-    bool error) {
-
-    std::unordered_map<uint32_t, std::vector<std::size_t>> groups;
-    for (std::size_t i = 0; i < position.size(); ++i) {
-        groups[position[i]].push_back(i);
-        //groups[i].push_back(i);
-    }
-
-    std::vector<uint32_t> group_ids;
-    std::vector<double> group_weights;
-    group_ids.reserve(groups.size());
-    group_weights.reserve(groups.size());
-
-    for (const auto& kv : groups) {
-        group_ids.push_back(kv.first);
-        group_weights.push_back(variants[kv.second[0]].total_depth);
-        //group_weights.push_back(1);
-    }
-
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::discrete_distribution<std::size_t> group_dist(group_weights.begin(), group_weights.end());
-
-    std::vector<arma::uword> chosen_cols;
-    chosen_cols.reserve(n_subsample);
-
-    uint32_t pos_counter = 0;
-    std::size_t i = 0;
-
-    while (i < n_subsample) {
-        // --- First level: choose a position ---
-        std::size_t group_idx = group_dist(gen);
-        uint32_t group = group_ids[group_idx];
-        const auto& cols = groups[group];
-
-        // --- Second level: resample variants within this position ---
-        std::vector<double> variant_weights;
-        variant_weights.reserve(cols.size());
-        for (auto c : cols) {
-            variant_weights.push_back(variants[c].gapped_depth);
-            //variant_weights.push_back(1);
-        }
-
-        std::discrete_distribution<std::size_t> variant_dist(variant_weights.begin(), variant_weights.end());
-
-        // Here we pick each variant once, could also pick multiple if you want
-        for (std::size_t k = 0; k < cols.size(); ++k) {
-            std::size_t idx = variant_dist(gen);
-            std::size_t var_idx = cols[idx];
-
-            auto var_copy = variants[var_idx];  // copy so we can modify
-            var_copy.position = pos_counter;
-            subsampled_variants.push_back(var_copy);
-            chosen_cols.push_back(var_idx);
-            i++;
-            if (i >= n_subsample)
-                break;
-        }
-
-        pos_counter++;
-    }
-
-    arma::mat subsample = data.cols(arma::uvec(chosen_cols));
-    return subsample;
 }
 
 double calculate_BIC(double k, double logL, int N) {
@@ -464,11 +384,8 @@ gaussian_mixture_model retrain_model(uint32_t n,
   }
   for(uint32_t i=0; i < model.means.size(); i++){
     double m;
-    if(!error_model){
-      m = inv_logit((double)model.means[i]);
-    } else {
-      m = (double)model.means[i];
-    }
+
+    m = (double)model.means[i];
     means.push_back(m);
   }
 
@@ -685,28 +602,6 @@ void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, do
   }
 }
 
-/**
- * @brief Parses an internally formatted variant file and populates a vector of variant objects.
- *
- * This function reads a tab-delimited file line-by-line (skipping the header),
- * extracts relevant variant information, and fills a vector of `variant` structs.
- * It supports both version 1 and newer variant file formats with additional metadata.
- *
- * @param filename           Path to the tab-delimited variant file.
- * @param variants           Reference to a vector where parsed variant entries will be stored.
- * @param depth_cutoff       Minimum depth threshold (currently unused in this function).
- * @param round_val          Number of decimal places to round frequencies to.
- * @param quality_threshold  Minimum quality score threshold (currently unused in this function).
- *
- * @note The function assumes a specific column structure in the input file.
- *       It handles both older (≤20 columns) and newer (>20 columns) variant formats.
- *       Insertions and deletions may be represented with special notations in the input.
- *
- * @warning Malformed or incomplete lines (with <12 columns) are silently skipped.
- *
- * @see variant
- */
-
 void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold){
   std::ifstream infile(filename);
   std::string line;
@@ -734,7 +629,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     tmp.qual = std::stod(row_values[9]);
     if(row_values.size() > 20){
       tmp.gapped_freq = round(std::stod(row_values[20]) * multiplier) / multiplier;
-      tmp.logit = logit(tmp.gapped_freq);
       tmp.gapped_depth = std::stoi(row_values[21]);
       tmp.amplicon_flux = to_bool(row_values[22]);
       tmp.amplicon_masked = to_bool(row_values[23]);
@@ -872,8 +766,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //(rows, cols) where each columns is a sample
   std::vector<uint32_t> subsample_position;
   for(uint32_t i = 0; i < variants.size(); i++){
-    //double tmp = static_cast<double>(variants[i].gapped_freq);
-    double tmp = static_cast<double>(variants[i].logit); 
+    double tmp = static_cast<double>(variants[i].gapped_freq);
     subsample_position.push_back(variants[i].position);
     data.col(i) = tmp;
   }
