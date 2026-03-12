@@ -823,7 +823,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   uint32_t n=10;
   uint32_t round_val = 4;
-  bool development_mode=true;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
 
@@ -832,18 +831,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   double lower_bound = 1-error_rate+0.0001;
   double upper_bound = error_rate-0.0001;
 
-  //TEST LINES
-  std::ofstream out( output_prefix + "_error.tsv", std::ios::app);
-  out << "lower_bound\tupper_bound\n";
-  out << std::to_string(lower_bound) << "\t" << std::to_string(upper_bound) << "\n";
-  out.close();
-  //exit(0);
-
   set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
   set_deletion_flags(base_variants, lower_bound);
   set_insertion_flags(base_variants);
-  std::cerr << "filename: " << output_prefix << std::endl;
-  std::cerr << "lower bound " << lower_bound <<  " upper bound " << upper_bound << std::endl;
 
   uint32_t useful_var=0;
   std::vector<variant> variants;
@@ -872,25 +862,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   //handle the case of no variants less than the universal cluster
   if(useful_var < 1){
-    std::ofstream file;
-    if(development_mode){
-      //write means to string
-      file.open(output_prefix + ".txt", std::ios::trunc);
-      std::string means_string = "[[";
-      means_string += "0.99";
-      means_string += "]]";
-      file << "means\n";
-      file << means_string << "\n";
-      file.close();
-
-      std::string solution_string = "[0.99]";
-      std::string solution_filename = output_prefix + "_solution.txt";
-      std::ofstream file_sol(solution_filename);
-      file_sol << "means\n";
-      file_sol << solution_string << "\n";
-      file_sol.close();
-
-    }
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
     return(variants);
   }
@@ -906,7 +877,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     subsample_position.push_back(variants[i].position);
     data.col(i) = tmp;
   }
-  std::cerr << "useful var " << useful_var << std::endl;
+
 
   std::unordered_map<uint32_t, std::unordered_map<float, uint32_t>> model_counter; 
 
@@ -935,11 +906,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     clustering_failed = false;
     bool meets_threshold = true;
     reset_variants_info(variants);
-    std::cerr << "n " << counter << std::endl;
-    retrained = retrain_model(counter, data, variants, lower_n, var_floor, clustering_failed, false); 
-    //calculate_cluster_deviations(retrained.clusters);
 
-    //we require the variance to be smaller for one cluster
+    retrained = retrain_model(counter, data, variants, lower_n, var_floor, clustering_failed, false); 
+
     if(counter == 1){
       if(retrained.dcovs[0] > dcov_threshold_1){
         meets_threshold = false;
@@ -968,78 +937,10 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     } 
     counter++;
   }
-  std::cerr << "final n " << final_n << std::endl;
-
-  std::ofstream out_again(output_prefix + "_track_stats.tsv", std::ios::app);
-  out_again << "n\tvar_floor\tmeans\tdcovs\tweights\tbic\n";
-  for(uint32_t i=0; i < track_ns.size(); i++){
-    out_again << std::to_string(track_ns[i]) << "\t";
-    out_again << std::to_string(var_floor) << "\t";
-    out_again << vec_to_pylist(track_means[i]) << "\t";
-    out_again << vec_to_pylist(track_stds[i]) << "\t";
-    out_again << vec_to_pylist(track_weights[i]) << "\n";
-  }
-  out_again.close();
-  //exit(0);
 
   if(final_n ==0){
-    std::cerr << output_prefix << " no solution found" << std::endl;
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
     exit(1);
-  }
-
-
-  //show the bootstrap support for this
-  for(uint32_t i =0; i < bootstrap_reps; i++){
-    empty_cluster = false;
-    subsampled_variants.clear();
-    arma::mat subsample = subsample_with_replacement(data, data.size(), subsample_position, subsampled_variants, variants, false);
-    clustering_failed = false;
-    reset_variants_info(subsampled_variants);
-    gaussian_mixture_model retrained = retrain_model(final_n, subsample, subsampled_variants, lower_n, var_floor, clustering_failed, false);
-    
-    if(clustering_failed){
-      continue;  
-    }
-    track_ns.push_back(counter);
-    track_var_floors.push_back(var_floor);
-    track_means.push_back(retrained.means);
-    track_stds.push_back(retrained.dcovs);
-    track_weights.push_back(retrained.hefts);
-    track_bics.push_back(retrained.bic);
-    track_bootstraps.push_back(i+1);
-  }
-
-  //TEST LINES
-  /*
-  std::ofstream out_again(output_prefix + "_track_stats.tsv", std::ios::app);
-  out_again << "n\tvar_floor\tmeans\tdcovs\tweights\tbic\n";
-  for(uint32_t i=0; i < track_ns.size(); i++){
-    out_again << std::to_string(track_ns[i]) << "\t";
-    out_again << std::to_string(track_var_floors[i]) << "\t";
-    out_again << vec_to_pylist(track_means[i]) << "\t";
-    out_again << vec_to_pylist(track_stds[i]) << "\t";
-    out_again << vec_to_pylist(track_weights[i]) << "\t";
-    out_again << std::to_string(track_bics[i]) << "\n";
-  }
-  out_again.close();
-  exit(0);*/
-  
-  std::ofstream file;
-  if(development_mode){
-    //write means to string
-    file.open(output_prefix + ".txt", std::ios::trunc);
-    std::string means_string = "[";
-    for(uint32_t j=0; j < retrained.means.size(); j++){
-      if(j != 0){
-        means_string += ",";
-      }
-      means_string += std::to_string(retrained.means[j]);
-    }
-    means_string += "]";
-    file << "means\n";
-    file << means_string << "\n";
-    file.close();
   }
 
   assign_all_variants(variants, base_variants, retrained, lower_bound, upper_bound);
