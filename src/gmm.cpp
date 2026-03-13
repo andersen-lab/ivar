@@ -1,4 +1,4 @@
-#include "./include/armadillo"
+#include "gmm_1d.h"
 #include "solve_clustering.h"
 #include "genomic_position.h"
 #include "gmm.h"
@@ -714,129 +714,64 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     exit(1);
   }
 
-  uint32_t n=10;
+  uint32_t n=12;
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
 
   set_deletion_flags(base_variants, 0.001);
-  double lower_bound = 0.01;
-  double upper_bound = 0.99;
+  double invariant_threshold = 0.97;
 
-  set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
-  set_deletion_flags(base_variants, lower_bound);
-  set_insertion_flags(base_variants);
-
-  uint32_t useful_var=0;
-  std::vector<variant> variants;
-  std::vector<uint32_t> count_pos; 
-  set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
-
-  std::unordered_map<uint32_t, uint32_t> position_counts;
-  // first pass: count how many times each position appears
-  for (uint32_t i=0; i < base_variants.size(); i++) {
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){ 
-      position_counts[base_variants[i].position]++;
-    }
-  }
-
-  for(uint32_t i=0; i < base_variants.size(); i++){
-    if (position_counts[base_variants[i].position] < 2) {
-      base_variants[i].imbalance = true;
-      continue;
-    }
-    if(!base_variants[i].amplicon_flux && !base_variants[i].depth_flag && !base_variants[i].outside_freq_range && !base_variants[i].qual_flag && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
-      useful_var++;
-      variants.push_back(base_variants[i]);
-      count_pos.push_back(base_variants[i].position);
-      std::cerr << "position " << base_variants[i].position << " nuc " << base_variants[i].nuc << " depth " << base_variants[i].depth << " gapped freq " << base_variants[i].gapped_freq <<  " total_depth " << base_variants[i].total_depth << std::endl;
-    }
-  }
   //handle the case of no variants less than the universal cluster
-  if(useful_var < 1){
+  if(base_variants.size() <= 1){
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
-    return(variants);
+    return(base_variants);
   }
-  uint32_t lower_n = find_max_frequency_count(count_pos);
-
-  //initialize armadillo dataset and populate with frequency data
-  arma::mat data(1, useful_var, arma::fill::zeros);
-  //(rows, cols) where each columns is a sample
-  std::vector<uint32_t> subsample_position;
-  for(uint32_t i = 0; i < variants.size(); i++){
-    double tmp = static_cast<double>(variants[i].gapped_freq);
-    subsample_position.push_back(variants[i].position);
-    data.col(i) = tmp;
+  std::vector<double> x;
+  for(uint32_t i=0; i < base_variants.size(); i++){
+    x.push_back(base_variants[i].gapped_freq);
   }
 
+  gmm_1d model(12, 42);  // seed matches bootstrap replicate
+  model.set_use_half_normal_for_noise(true, invariant_threshold);
 
-  std::unordered_map<uint32_t, std::unordered_map<float, uint32_t>> model_counter; 
+  // spike in priors
+  model.set_mean_precision_prior(0.5);
 
-  bool empty_cluster = false;
-  std::vector<std::vector<double>> solution_sets;
+  model.fit(x);
+  model.set_min_cluster_fraction(0.1);
+  std::vector<int> labels = model.predict(x);
 
-  uint32_t counter = 1;
-  bool clustering_failed =false;
-  std::vector<variant> subsampled_variants;
-  uint32_t bootstrap_reps = 10;
-  uint32_t final_n=0;
-  double var_floor = 0.000001;
-
-  std::vector<double> track_var_floors;
-  std::vector<double> track_bics;
-  std::vector<std::vector<double>> track_means;
-  std::vector<std::vector<double>> track_weights;
-  std::vector<uint32_t> track_ns;
-  std::vector<uint32_t> track_bootstraps;
-  std::vector<std::vector<double>> track_stds;
-  gaussian_mixture_model retrained;
-  double dcov_threshold = 0.40;
-  double dcov_threshold_1 = 0.05;
-
-  while(counter <= n){
-    clustering_failed = false;
-    bool meets_threshold = true;
-    reset_variants_info(variants);
-
-    retrained = retrain_model(counter, data, variants, lower_n, var_floor, clustering_failed, false); 
-
-    if(counter == 1){
-      if(retrained.dcovs[0] > dcov_threshold_1){
-        meets_threshold = false;
-      }
-    }
-
-    for(auto d : retrained.dcovs){
-      std::cerr << "dcov " << d << " ";
-      if(d > dcov_threshold){
-        meets_threshold = false;
-      }
+  std::vector<int> component_indices = model.get_effective_components(labels);
+  std::cerr << "VB effective components: " << component_indices.size() << "\n";
+  std::cerr << "VB effective means: ";
+    std::vector<double> eff_means = model.get_effective_means(component_indices);
+    for(int i = 0; i < eff_means.size(); i++) {
+      std::cerr << eff_means[i] << " ";
     }
     std::cerr << "\n";
-    for(auto d : retrained.means){
-      std::cerr << "mean " << d << " ";
+
+    std::cerr << "VB effective vars: ";
+    std::vector<double> eff_vars = model.get_effective_vars(component_indices);
+    for(int i = 0; i < eff_vars.size(); i++) {
+      std::cerr << eff_vars[i] << " ";
     }
     std::cerr << "\n";
-    track_ns.push_back(counter);
-    track_means.push_back(retrained.means);
-    track_stds.push_back(retrained.dcovs);
-    track_weights.push_back(retrained.hefts);
 
-    if(meets_threshold){
-      final_n = counter;
-      break;
-    } 
-    counter++;
-  }
+    std::cerr << "VB effective weights: ";
+    std::vector<double> eff_weights = model.get_effective_weights(component_indices);
+    for(int i = 0; i < eff_weights.size(); i++) {
+      std::cerr << eff_weights[i] << " ";
+    }
+    std::cerr << "\n";
 
-  if(final_n ==0){
-    call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
-    exit(1);
-  }
+    std::cerr << "ELBO history: ";
+    for(int i = 0; i < model.get_elbo_history().size(); i++) {
+      std::cerr << model.get_elbo_history()[i] << ", ";
+    }
 
-  assign_all_variants(variants, base_variants, retrained, lower_bound, upper_bound);
-  add_noise_variants(variants, base_variants);
-  solve_clusters(variants, retrained, lower_bound, solution, output_prefix, default_threshold, min_depth);
-  means = retrained.means;
-  return(variants);
+  std::vector<std::vector<double>> solutions_sets;
+  bool solved = subset_sum(eff_means, solutions_sets, 0.05);
+  
+  return(base_variants);
 }

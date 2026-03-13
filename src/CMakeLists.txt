@@ -27,6 +27,7 @@ add_executable(ivar
         site_aggregator_stats.cpp
         site_state_aggregator_stats.cpp
         site_amplicon_aggregator_stats.cpp
+        gmm_1d.cpp
         gmm.cpp
         call_consensus_clustering.cpp
         solve_clustering.cpp
