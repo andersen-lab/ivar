@@ -80,7 +80,7 @@ int main() {
 
   solve_clusters(variants, retrained, lower_bound, solution, prefix, default_threshold, min_depth);
 
-  cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, retrained.cluster_std_devs, ref);
+  cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, ref);
   std::vector<pair<std::string, std::string>> gt_sequences;
   read_consensus(gt_sequences, consensus_filename);
   std::string exp_sequence;

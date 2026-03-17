@@ -707,7 +707,7 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
 
 
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
-                              std::vector<double> &solution, std::vector<double> &means, std::vector<double> &std_devs, \
+                              std::vector<double> &solution, std::vector<double> &means, \
                               std::string ref, double default_threshold){
   if(ref.empty()){
     std::cerr << "Please provide a reference sequence." << std::endl;
@@ -772,6 +772,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   std::vector<std::vector<double>> solutions_sets;
   bool solved = subset_sum(eff_means, solutions_sets, 0.05);
-  
+   
   return(base_variants);
 }

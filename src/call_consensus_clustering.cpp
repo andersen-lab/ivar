@@ -21,7 +21,6 @@ void cluster_consensus(std::vector<variant> variants, \
                       uint8_t min_qual, \
                       std::vector<double> solution, \
                       std::vector<double> means, \
-                      std::vector<double> std_devs, \
                       std::string ref){
   std::cerr << "calling consensus" << std::endl;
   if(variants.size() == 0) return;
