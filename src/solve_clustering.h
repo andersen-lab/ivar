@@ -10,5 +10,6 @@ std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, st
 void rewrite_position_masking(std::vector<variant> &variants);
 void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gaussian_mixture_model model);
 void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth);
+void assign_variants_solution(std::vector<double> solution, std::vector<variant> &variants);
 std::vector<std::vector<double>> subset_sum(std::vector<double> means);
 #endif

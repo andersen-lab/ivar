@@ -770,8 +770,16 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       std::cerr << model.get_elbo_history()[i] << ", ";
     }
 
-  std::vector<std::vector<double>> solutions_sets;
-  bool solved = subset_sum(eff_means, solutions_sets, 0.05);
-   
+  std::vector<std::vector<double>> solution_sets;
+  bool solved = subset_sum(eff_means, solution_sets, 0.05);
+  if(solved){
+    if(solution_sets.size() >1){
+      call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
+    } else{
+      assign_variants_solution(solution_sets[0], base_variants);    
+    }
+  } else {
+    call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
+  }   
   return(base_variants);
 }

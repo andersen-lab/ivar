@@ -78,7 +78,7 @@ int main() {
   gaussian_mixture_model retrained = retrain_model(n, data, variants, 2, var_floor, clustering_failed, false);
   assign_all_variants(variants, base_variants, retrained, lower_bound, upper_bound);
   add_noise_variants(variants, base_variants);
-  solve_clusters(variants, retrained, lower_bound, solution, prefix, default_threshold, min_depth);
+  //solve_clusters(variants, retrained, lower_bound, solution, prefix, default_threshold, min_depth);
   cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, reference_file);
   std::vector<pair<std::string, std::string>> gt_sequences;
   read_consensus(gt_sequences, consensus_filename);

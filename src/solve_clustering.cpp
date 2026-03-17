@@ -466,81 +466,9 @@ bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &sol
 
 }
 
-std::vector<std::vector<double>> subset_sum(std::vector<double> means){
-  double error = 0.05;
-  double solution_error = 0.05;
+void assign_variants_solution(std::vector<double> solution, std::vector<variant> &variants){
 
-  //determine if any clusters are possible noise
-  std::vector<uint32_t> noise_indices;
- 
-  //filter peaks from means by index
-  std::vector<double> filtered_means = means;
-  std::vector<double> std_devs;
-
-  std::vector<std::vector<double>> solutions = find_solutions(filtered_means, error);
-  //std::cerr << "solution size " << solutions.size() << std::endl;
-  //find peaks that can't be a subset of other peaks
-  std::vector<double> non_subset_means;
-  for(uint32_t i=0; i < filtered_means.size(); i++){
-    std::vector<std::vector<double>> tmp = find_subsets_with_error(filtered_means, filtered_means[i], std_devs[i]);
-    if(tmp.size() <= 1){
-      non_subset_means.push_back(filtered_means[i]);
-    }
-  }
-  //reduce solution space to things that contain the non subset peaks
-  std::vector<std::vector<double>> realistic_solutions;
-  for(uint32_t i=0; i < solutions.size(); i++){
-      std::vector<double> tmp = solutions[i];
-      bool found = std::all_of(non_subset_means.begin(), non_subset_means.end(), [&tmp](double value) {return std::find(tmp.begin(), tmp.end(), value) != tmp.end();});
-      if(found){
-        realistic_solutions.push_back(solutions[i]);
-      }
-  }
-  //std::cerr << "realistic solutions " << realistic_solutions.size() << std::endl;
-  //check each solution that every possible peak is accounted for
-  std::vector<std::vector<double>> solution_sets;
-  for(uint32_t i=0; i < realistic_solutions.size(); i++){
-    bool keep = account_peaks(realistic_solutions[i], filtered_means, 1, solution_error);
-    if(keep){
-      solution_sets.push_back(realistic_solutions[i]);
-    }
-  }
-  //std::cerr << "solution sets " << solution_sets.size() << std::endl;
-  return(solution_sets);
-}
-
-void solve_clusters(std::vector<variant> &variants, 
-                    gaussian_mixture_model model, 
-                    double estimated_error, 
-                    std::vector<double> &solution, 
-                    std::string prefix, 
-                    double default_threshold, 
-                    uint32_t min_depth){
-
-  double error = 0.05;
-  std::vector<double> means = model.means;
-  std::cerr << "estimated error " << estimated_error << std::endl;
-  std::vector<std::vector<double>> solution_sets;
-  for(auto sol : solution_sets){
-    for(auto s : sol){
-      std::cerr << s << " ";
-    }
-    std::cerr << "\n";
-  }
-  bool traditional_majority= false; //if we can't find a solution call a traditional majority consensus
-  if(solution_sets.size() == 0){
-   std::cerr << "no solution found" << std::endl;
-   traditional_majority = true;
-  } else if(solution_sets.size() > 1){
-    std::cerr << "too many solutions" << std::endl;
-    traditional_majority = true;
-  } else{
-    solution = solution_sets[0];
-  }
-  if(traditional_majority){
-    call_majority_consensus(variants, prefix, default_threshold, min_depth);
-    exit(0);
-  }
+  /*
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
   std::vector<std::vector<uint32_t>> inverse_groups(means.size());
@@ -549,28 +477,6 @@ void solve_clusters(std::vector<variant> &variants,
       inverse_groups[cluster_groups[i][j]].push_back(i);
     }
   }
-  //TESTLINES CHANGE THIS
-  std::string solution_string = "[";
-  for(uint32_t i=0; i < solution_sets.size(); i++){
-    if(i !=0) solution_string += ",";
-    solution_string += "[";
-      for(uint32_t j=0; j < solution_sets[i].size(); j++){
-        if(j != 0){
-          solution_string += ",";
-        }
-        std::string tmp = std::to_string(solution_sets[i][j]);
-        solution_string += tmp;
-      }
-    solution_string +="]";
-  }
-
-  solution_string += "]";
-  std::string solution_filename = prefix + "_solution.txt";
-  std::ofstream file_sol(solution_filename);
-  file_sol << "means\n";
-  file_sol << solution_string << "\n";
-  file_sol.close();
-  //exit(0);
 
   double largest = *std::max_element(solution.begin(), solution.end());
   //define the clusters which contain the majority population
@@ -646,4 +552,5 @@ void solve_clusters(std::vector<variant> &variants,
     amplicons_to_mask = rewrite_amplicon_masking(variants, means);
   }
   modify_variant_masking(amplicons_to_mask, variants, means);
+  */
 }
