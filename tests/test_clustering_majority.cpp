@@ -49,8 +49,8 @@ int main() {
   std::vector<variant> base_variants;
   std::vector<variant> variants;
   uint32_t n = 4;
-
-  parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual);
+  double invariant_threshold = 0.99;
+  parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual, invariant_threshold);
   set_deletion_flags(base_variants, 0);
 
   double error_rate = 0.03;

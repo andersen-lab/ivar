@@ -470,7 +470,7 @@ void assign_variants_solution(std::vector<double> solution,
                               std::vector<variant> &variants,
                               std::vector<double> means){
   double error = 0.05;
-  /*
+  
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
   std::vector<std::vector<uint32_t>> inverse_groups(means.size());
@@ -528,7 +528,7 @@ void assign_variants_solution(std::vector<double> solution,
     all_genomes.push_back(i);
   }
   for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].gapped_freq >= 1-estimated_error && variants[i].cluster_assigned == -1){
+    if(variants[i].gapped_freq >= 1-error && variants[i].cluster_assigned == -1){
       variants[i].consensus_numbers = all_genomes;
     }
   }
@@ -547,12 +547,12 @@ void assign_variants_solution(std::vector<double> solution,
       }
     }
   }
-  amplicon_specific_cluster_assignment(variants, model);
+  
+  //amplicon_specific_cluster_assignment(variants, model);
   rewrite_position_masking(variants);
   std::vector<uint32_t> amplicons_to_mask;
   if(means.size() > 1){
     amplicons_to_mask = rewrite_amplicon_masking(variants, means);
   }
   modify_variant_masking(amplicons_to_mask, variants, means);
-  */
 }

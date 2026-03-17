@@ -42,7 +42,7 @@ int main() {
   uint32_t min_depth = 5;
   uint8_t min_qual = 20;
   double default_threshold = 0.5;
-
+  double invariant_threshold = 0.99;
   //TEST 1 - manually currated data
   std::string var_filename = "../data/version_bump_tests/vbump_consensus_var.txt";
   std::string consensus_filename = "../data/version_bump_tests/vbump_consensus_ivar.fa";
@@ -51,7 +51,7 @@ int main() {
   std::vector<variant> variants;
   uint32_t n = 2;
 
-  parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual);
+  parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual, invariant_threshold);
   set_deletion_flags(base_variants, 0);
   double error_rate = 0.01;
   double lower_bound = 0.01;

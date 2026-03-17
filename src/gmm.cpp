@@ -500,7 +500,10 @@ void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, do
   }
 }
 
-void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold){
+void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, 
+  uint32_t round_val, uint8_t quality_threshold, 
+  double invariant_threshold){
+
   std::ifstream infile(filename);
   std::string line;
   uint32_t count = 0;
@@ -521,10 +524,12 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     if(it != tmp.nuc.end()){
       tmp.position = tmp.position+1;
     }
+
     tmp.depth = std::stoi(row_values[7]);
     tmp.total_depth = std::stoi(row_values[11]);
     tmp.freq = std::round(std::stof(row_values[10]) * multiplier) / multiplier;
     tmp.qual = std::stod(row_values[9]);
+
     if(row_values.size() > 20){
       tmp.gapped_freq = round(std::stod(row_values[20]) * multiplier) / multiplier;
       tmp.gapped_depth = std::stoi(row_values[21]);
@@ -555,6 +560,11 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       tmp.qual_flag = true;
     } else {
       tmp.qual_flag = false;
+    }
+    if(tmp.gapped_freq >= invariant_threshold || tmp.gapped_freq <= (1-invariant_threshold)){
+      tmp.outside_freq_range = true;
+    } else {
+      tmp.outside_freq_range = false;
     }
     variants.push_back(std::move(tmp));
   }
@@ -604,7 +614,6 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
   }
 }
 
-
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, \
                               std::string ref, double default_threshold){
@@ -616,19 +625,27 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t n=12;
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
-  parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual);
+  double invariant_threshold = 0.99;
+  parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
 
   set_deletion_flags(base_variants, 0.001);
-  double invariant_threshold = 0.97;
 
+  std::vector<variant> model_variants;
+  std::vector<double> model_freqs;
+  std::vector<double> all_freqs;
+  for(uint32_t i=0; i < base_variants.size(); i++){
+    all_freqs.push_back(base_variants[i].gapped_freq);
+    if(!base_variants[i].depth_flag && !base_variants[i].qual_flag && !base_variants[i].outside_freq_range){
+      model_variants.push_back(base_variants[i]);
+      model_freqs.push_back(base_variants[i].gapped_freq);
+    }
+  }
+  std::cerr << "Number of frequencies used for clustering: " << model_freqs.size() << "\n";
+  exit(0);
   //handle the case of no variants less than the universal cluster
-  if(base_variants.size() <= 1){
+  if(model_variants.size() <= 1){
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
     return(base_variants);
-  }
-  std::vector<double> x;
-  for(uint32_t i=0; i < base_variants.size(); i++){
-    x.push_back(base_variants[i].gapped_freq);
   }
 
   gmm_1d model(12, 42);  // seed matches bootstrap replicate
@@ -637,9 +654,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   // spike in priors
   model.set_mean_precision_prior(0.5);
 
-  model.fit(x);
+  model.fit(model_freqs);
   model.set_min_cluster_fraction(0.1);
-  std::vector<int> labels = model.predict(x);
+  std::vector<int> labels = model.predict(model_freqs);
 
   std::vector<int> component_indices = model.get_effective_components(labels);
   std::cerr << "VB effective components: " << component_indices.size() << "\n";
@@ -669,6 +686,17 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       std::cerr << model.get_elbo_history()[i] << ", ";
     }
 
+  //predict on all the frequencies
+  std::vector<int> all_labels = model.predict(all_freqs);
+
+  //take the model labels and assign them to the variants
+  for(uint32_t i=0; i < all_labels.size(); i++){
+    if(labels[i] == 0 || all_labels[i] == 1){
+      base_variants[i].half_normal = true;
+    }
+    base_variants[i].cluster_assigned = all_labels[i];
+  }
+
   std::vector<std::vector<double>> solution_sets;
   bool solved = subset_sum(eff_means, solution_sets, 0.05);
   if(solved){
@@ -679,6 +707,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     }
   } else {
     call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
-  }   
+  }  
+  std::cerr << "HERE" << std::endl;
+  exit(0); 
   return(base_variants);
 }
