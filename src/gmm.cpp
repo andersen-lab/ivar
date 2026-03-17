@@ -21,12 +21,6 @@ void reset_variants_info(std::vector<variant> &variants){
   }
 }
 
-double calculate_BIC(double k, double logL, int N) {
-    if (N == 0) return std::numeric_limits<double>::infinity();
-    double bic = -2.0 * logL + k * std::log(N);
-    return bic;
-}
-
 std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> variants){
   std::vector<std::vector<double>> clusters(n);
   for(uint32_t i=0; i < variants.size(); i++){
@@ -328,101 +322,6 @@ std::string vec_to_pylist(const std::vector<double>& v){
     }
     ss << "]";
     return ss.str();
-}
-
-gaussian_mixture_model retrain_model(uint32_t n, 
-                                    arma::mat data,
-                                    std::vector<variant> &variants, 
-                                    uint32_t lower_n, 
-                                    double &var_floor, 
-                                    bool &clustering_failed, bool error_model){
-
-   //this is used in the variant assignement portion of the code
-  std::unordered_map<uint32_t, std::vector<std::string>> all_nts;
-  std::unordered_map<uint32_t, std::vector<uint32_t>> pos_to_variant_indices;
-  //map positions to variant indices and nucleotides
-  for (uint32_t i = 0; i < variants.size(); ++i) {
-    uint32_t pos = variants[i].position;
-    all_nts[pos].push_back(variants[i].nuc);
-    pos_to_variant_indices[pos].push_back(i);
-  }
-
-  std::vector<uint32_t> unique_pos;
-  for (const auto& kv : all_nts)
-    unique_pos.push_back(kv.first);
-
-  gaussian_mixture_model gmodel;
-  gmodel.n = n;
-  gmodel.lower_n = lower_n;
-  arma::gmm_diag model;
-
-  bool status = model.learn(data, n, arma::eucl_dist, arma::static_spread, 10, 15, var_floor, false);
-  if(!status){
-    clustering_failed = true;
-    return(gmodel);
-  }
-  std::vector<double> means;
-  for(auto h: model.hefts){
-    double heft = (double)h;
-    gmodel.hefts.push_back(heft);
-  }
-
-  for(auto d : model.dcovs){
-    gmodel.dcovs.push_back((double)d);
-  }
-
-  std::vector<std::vector<double>> prob_matrix;
-  std::vector<double> tmp;
-  for(uint32_t i=0; i < n; i++){
-    arma::rowvec set_likelihood = model.log_p(data, i);
-    tmp.clear();
-    for(uint32_t k=0; k < data.n_cols; k++){
-      tmp.push_back((double)set_likelihood[k]);
-    }
-    prob_matrix.push_back(tmp);
-  }
-  for(uint32_t i=0; i < model.means.size(); i++){
-    double m;
-
-    m = (double)model.means[i];
-    means.push_back(m);
-  }
-
-  gmodel.prob_matrix = prob_matrix;
-  gmodel.model = model;
-  gmodel.means = means;
-
-  std::vector<std::vector<uint32_t>> possible_permutations;
-  for (uint32_t i = 1; i <= gmodel.lower_n; ++i){
-    perm_generator(gmodel.n, i, possible_permutations);
-  }
-
-  assign_clusters(variants, gmodel, clustering_failed, possible_permutations, unique_pos, pos_to_variant_indices);
-  std::vector<std::vector<double>> clusters = form_clusters(n, variants);
-  gmodel.clusters = clusters;
-  means.clear();
-
-  //set means
-  arma::mat mean_fill2 (1, n, arma::fill::zeros);
-  for(uint32_t i=0; i < clusters.size(); i++){
-    double m = calculate_mean(clusters[i]);
-    double factor = std::pow(10.0, 2);
-    double rounded = std::round(m * factor) / factor;
-    mean_fill2.col(i) = rounded;
-    means.push_back(rounded);
-
-  }
-  std::vector<double> hefts;
-  for(auto h : model.hefts){
-    hefts.push_back((double) h);
-  }
-  gmodel.hefts = hefts;
-  model.set_means(mean_fill2);
-
-  double k = (2 * n) + (n-1);
-  double bic = calculate_BIC(k, gmodel.model.sum_log_p(data), (int) data.n_cols);
-  gmodel.bic = bic;
-  return(gmodel);
 }
 
 double calculate_distance(double point, double mean) {
@@ -776,7 +675,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     if(solution_sets.size() >1){
       call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
     } else{
-      assign_variants_solution(solution_sets[0], base_variants);    
+      assign_variants_solution(solution_sets[0], base_variants, eff_means);    
     }
   } else {
     call_majority_consensus(base_variants, prefix, default_threshold, min_depth);

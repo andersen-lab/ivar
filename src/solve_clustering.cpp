@@ -466,8 +466,10 @@ bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &sol
 
 }
 
-void assign_variants_solution(std::vector<double> solution, std::vector<variant> &variants){
-
+void assign_variants_solution(std::vector<double> solution, 
+                              std::vector<variant> &variants,
+                              std::vector<double> means){
+  double error = 0.05;
   /*
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
