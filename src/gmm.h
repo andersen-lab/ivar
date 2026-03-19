@@ -33,7 +33,8 @@ struct variant {
   int cluster_assigned = -1;
   bool version_1_var=false;
   double std_dev;
-  bool half_normal = false;
+  bool half_normal_upper = false;
+  bool half_normal_lower = false;
 
   //number corresponding the the amplicons covering this position
   std::vector<uint32_t> amplicon_numbers;

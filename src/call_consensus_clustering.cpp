@@ -28,7 +28,7 @@ void cluster_consensus(std::vector<variant> variants, \
   double max_mean=0;
   double freq_lower_bound = 0.01;
   double freq_upper_bound = 0.99;
-  set_freq_range_flags(variants, freq_lower_bound, freq_upper_bound, true);
+
   //find the largest position in the variants file
   uint32_t max_position = 0;
   uint32_t min_position = 4294967295U;;
@@ -53,7 +53,6 @@ void cluster_consensus(std::vector<variant> variants, \
 
   //track deletions over time
   std::vector<std::vector<uint32_t>> deletions(means.size());
-
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
@@ -69,13 +68,13 @@ void cluster_consensus(std::vector<variant> variants, \
     double qual = variants[i].qual;
     uint32_t depth = variants[i].gapped_depth;
     //depth, quality, and low frequency bypass
-    if(freq < freq_lower_bound || qual < (double)min_qual || depth < min_depth){
+    if(variants[i].half_normal_lower || qual < (double)min_qual || depth < min_depth){
       if(print) std::cerr << "min qual, freq, or depth issue " << qual << " " << freq << " " << depth << " flb " << freq_lower_bound << " mq " << (double)min_qual << " md " << min_depth << std::endl;
       continue;
     }
- 
+
     //if this amplicon is experiencing fluctuation across amplicons, call ambiguity
-    if(variants[i].amplicon_masked && variants[i].freq < freq_upper_bound){
+    if(variants[i].amplicon_masked){
       if(print){
         std::cerr << "amplicon is experiencing fluctuation" << std::endl;
       }
@@ -142,7 +141,6 @@ void cluster_consensus(std::vector<variant> variants, \
         uint32_t k = variants[i].consensus_numbers[j];
         bool found_del = std::find(deletions[k].begin(), deletions[k].end(), variants[i].position) != deletions[k].end();
         if(found_del) continue; //already assigned a deletion to this position
-
         if(variants[i].nuc.find('+') != std::string::npos){
           std::string nuc = variants[i].nuc;
           nuc.erase(std::remove(nuc.begin(), nuc.end(), '+'), nuc.end());
@@ -166,13 +164,13 @@ void cluster_consensus(std::vector<variant> variants, \
               deletions[k].push_back(position-1+z);
             }
           }
-        }
+      }
     }
   }
 
   std::vector<std::string> all_sequences;
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
-    std::cerr << all_consensus_seqs[i][11210] << std::endl;
+
     std::string tmp = std::accumulate(all_consensus_seqs[i].begin(), all_consensus_seqs[i].end(), std::string(""));
     tmp.erase(std::remove(tmp.begin(), tmp.end(), '-'), tmp.end());
     all_sequences.push_back(tmp);
@@ -203,7 +201,6 @@ void cluster_consensus(std::vector<variant> variants, \
     if(it == solution.end()){
       continue;
     }
-    //std::string trimmed_sequence = trim_trailing_ambiguities(sorted_strings[i], max_position);
     std::string next_trimmed_sequence = trim_leading_ambiguities(sorted_strings[i], min_position);
     file << ">"+clustering_file+"_cluster_"+ std::to_string(tmp_mean) << "\n";
     file << next_trimmed_sequence << "\n";

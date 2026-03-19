@@ -53,12 +53,10 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
       tmp[i-1] = nucs[index];
     }
   }
-  std::cerr << "tmp length " << tmp.size() << std::endl;
   std::string consensus_string = std::accumulate(tmp.begin(), tmp.end(), std::string(""));
   //std::string trimmed_consensus = trim_trailing_ambiguities(consensus_string, max_position);
   std::string next_trimmed_consensus = trim_leading_ambiguities(consensus_string, min_position);
   //write the consensus to file
-
   std::string consensus_filename = clustering_file + "_threshold.fa";
   std::ofstream file(consensus_filename);
   std::string name = ">"+clustering_file+"_"+std::to_string(default_threshold)+"_threshold";
@@ -469,8 +467,7 @@ bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &sol
 void assign_variants_solution(std::vector<double> solution, 
                               std::vector<variant> &variants,
                               std::vector<double> means){
-  double error = 0.05;
-  
+  double error = 0.05; 
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
   std::vector<std::vector<uint32_t>> inverse_groups(means.size());
@@ -499,20 +496,7 @@ void assign_variants_solution(std::vector<double> solution,
       expected_clusters.push_back(sum);
     }
   }
-  //a list of cluster assignments that we assign to consensus
-  std::vector<int> major_indexes;
-  //index of the "100%" cluster
-  for(uint32_t j=0; j < means.size(); j++){
-    double tmp = means[j];
-    auto closest = *std::min_element(expected_clusters.begin(), expected_clusters.end(), [tmp](double a, double b) {
-      return std::abs(a - tmp) < std::abs(b - tmp);
-    });
-    double diff = std::abs(closest - tmp);
-    auto it = std::find(solution.begin(), solution.end(), tmp);
-    if((diff < error && it == solution.end()) || tmp == largest){
-      major_indexes.push_back((int)j);
-    }
-  }
+
 
   //check if the variant corresponds to an unresolved cluster
   for(uint32_t i=0; i < variants.size(); i++){
@@ -527,8 +511,9 @@ void assign_variants_solution(std::vector<double> solution,
   for(uint32_t i=0; i < solution.size(); i++){
     all_genomes.push_back(i);
   }
+
   for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].gapped_freq >= 1-error && variants[i].cluster_assigned == -1){
+    if(variants[i].half_normal_upper){
       variants[i].consensus_numbers = all_genomes;
     }
   }
