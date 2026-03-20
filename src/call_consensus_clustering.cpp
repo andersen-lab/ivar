@@ -56,11 +56,12 @@ void cluster_consensus(std::vector<variant> variants, \
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 24507){
+    if(variants[i].position == 11000){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
       std::cerr << "amplicon masked " << variants[i].amplicon_masked << " amp flux pos " << variants[i].amplicon_flux << std::endl;
+      std::cerr << variants[i].cluster_assigned << std::endl;
     }else{
       print = false;
     }
@@ -69,7 +70,10 @@ void cluster_consensus(std::vector<variant> variants, \
     uint32_t depth = variants[i].gapped_depth;
     //depth, quality, and low frequency bypass
     if(variants[i].half_normal_lower || qual < (double)min_qual || depth < min_depth){
-      if(print) std::cerr << "min qual, freq, or depth issue " << qual << " " << freq << " " << depth << " flb " << freq_lower_bound << " mq " << (double)min_qual << " md " << min_depth << std::endl;
+      if(print) {
+        std::cerr << "half normal lower " << variants[i].half_normal_lower << std::endl;
+        std::cerr << "min qual or depth issue " << qual << " "  << depth <<  " mq " << (double)min_qual << " md " << min_depth << std::endl;
+      }
       continue;
     }
 
@@ -92,7 +96,6 @@ void cluster_consensus(std::vector<variant> variants, \
     uint32_t position = variants[i].position;
     if(variants[i].vague_assignment && variants[i].freq < freq_upper_bound && variants[i].freq < max_mean){
        if(print){
-          std::cerr << "d" << std::endl;
           for(auto a : variants[i].probabilities){
             std::cerr << a << " ";
           }
@@ -103,8 +106,7 @@ void cluster_consensus(std::vector<variant> variants, \
 
      bool del = variants[i].nuc.find('-') != std::string::npos;
      //handle all the cases where you never assigned anything, assign to all if it's over the upper bound
-     if(variants[i].cluster_assigned == -1){
-      if(variants[i].gapped_freq < freq_upper_bound) continue;
+     if(variants[i].half_normal_upper){
       if(print) std::cerr << "not assigned anything" << std::endl;
       for(uint32_t j=0; j < all_consensus_seqs.size(); j++){
         uint32_t adjusted_pos = position-1;
@@ -201,6 +203,7 @@ void cluster_consensus(std::vector<variant> variants, \
     if(it == solution.end()){
       continue;
     }
+    std::cerr << "final file nuc " << sorted_strings[i][11000-1] << std::endl;
     std::string next_trimmed_sequence = trim_leading_ambiguities(sorted_strings[i], min_position);
     file << ">"+clustering_file+"_cluster_"+ std::to_string(tmp_mean) << "\n";
     file << next_trimmed_sequence << "\n";

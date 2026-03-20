@@ -651,6 +651,11 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   // spike in priors
   model.set_mean_precision_prior(0.5);
 
+  //simulated priors
+  model.set_covariance_prior(1e-3);
+  model.set_mean_precision_prior(1e-2);
+
+
   model.fit(model_freqs);
   model.set_min_cluster_fraction(0.1);
   std::vector<int> labels = model.predict(model_freqs);
