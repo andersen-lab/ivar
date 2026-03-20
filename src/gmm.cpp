@@ -524,21 +524,19 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     if(it != tmp.nuc.end()){
       tmp.position = tmp.position+1;
     }
-
     tmp.depth = std::stoi(row_values[7]);
     tmp.total_depth = std::stoi(row_values[11]);
     tmp.freq = std::round(std::stof(row_values[10]) * multiplier) / multiplier;
     tmp.qual = std::stod(row_values[9]);
-
     if(row_values.size() > 20){
       tmp.gapped_freq = round(std::stod(row_values[20]) * multiplier) / multiplier;
       tmp.gapped_depth = std::stoi(row_values[21]);
       tmp.amplicon_flux = to_bool(row_values[22]);
       tmp.amplicon_masked = to_bool(row_values[23]);
       tmp.std_dev = std::stod(row_values[24]);
-      if(row_values[26] != "NA"){
+      if (row_values.size() >= 27){
         tmp.amplicon_numbers = split_csv(row_values[26]);
-      }
+      } 
       if(row_values[25] != "NA"){
         tmp.freq_numbers = split_csv_double(row_values[25]);
       }
@@ -627,7 +625,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<variant> base_variants;
   double invariant_threshold = 0.99;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
-
   set_deletion_flags(base_variants, 0.001);
 
   std::vector<variant> model_variants;
