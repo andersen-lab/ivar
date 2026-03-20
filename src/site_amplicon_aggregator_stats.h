@@ -7,7 +7,7 @@
 class site_amplicon_aggregator_stats {
  private:
   uint32_t count=0;
-  uint8_t mean_quality=0;
+  double mean_quality=0;
   ITNode* amplicon = nullptr;
 
  public:
@@ -27,7 +27,7 @@ class site_amplicon_aggregator_stats {
     return count;
   }
 
-  uint8_t get_mean_quality() const {
+  double get_mean_quality() const {
     return mean_quality;
   }
 

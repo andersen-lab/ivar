@@ -76,17 +76,17 @@ uint32_t site_state_aggregator_stats::get_depth() const {
 
 uint8_t site_state_aggregator_stats::get_mean_quality() const {
   uint8_t mean_quality;
-  uint32_t weighted_sum = 0;
+  double weighted_sum = 0;
   uint32_t total_depth = 0;
   for (const auto& amplicon_stats : site_state_amplicon_stats) {
     uint32_t count = amplicon_stats.get_count();
-    uint8_t amp_mean_quality = amplicon_stats.get_mean_quality();
+    double amp_mean_quality = amplicon_stats.get_mean_quality();
 
     weighted_sum += count * amp_mean_quality;
     total_depth += count;
   }
   mean_quality = static_cast<uint8_t>(
-      static_cast<double>(weighted_sum) / (total_depth)
+      weighted_sum / (total_depth)
   );
   return mean_quality;
 }
