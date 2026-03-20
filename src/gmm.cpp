@@ -682,20 +682,21 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     for(int i = 0; i < model.get_elbo_history().size(); i++) {
       std::cerr << model.get_elbo_history()[i] << ", ";
     }
+    std::cerr << "\n";
 
   //predict on all the frequencies
   std::vector<int> all_labels = model.predict(all_freqs);
 
   //take the model labels and assign them to the variants
   for(uint32_t i=0; i < all_labels.size(); i++){
-    if(all_labels[i] == 1){
+    if(all_labels[i] == 1 || base_variants[i].gapped_freq > invariant_threshold){
       base_variants[i].half_normal_upper = true;
-    } else if(all_labels[i] == 0){
+    } else if(all_labels[i] == 0 || base_variants[i].gapped_freq < 1-invariant_threshold){
       base_variants[i].half_normal_lower = true;
     }
     base_variants[i].cluster_assigned = all_labels[i];
   }
-
+  
   std::vector<std::vector<double>> solution_sets;
   bool solved = subset_sum(eff_means, solution_sets, 0.05);
   if(solved){
