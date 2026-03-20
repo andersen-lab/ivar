@@ -641,7 +641,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     }
   }
   std::cerr << "Number of frequencies used for clustering: " << model_freqs.size() << "\n";
-  exit(0);
+  
   //handle the case of no variants less than the universal cluster
   if(model_variants.size() <= 1){
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
@@ -691,8 +691,10 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   //take the model labels and assign them to the variants
   for(uint32_t i=0; i < all_labels.size(); i++){
-    if(labels[i] == 0 || all_labels[i] == 1){
-      base_variants[i].half_normal = true;
+    if(all_labels[i] == 1){
+      base_variants[i].half_normal_upper = true;
+    } else if(all_labels[i] == 0){
+      base_variants[i].half_normal_lower = true;
     }
     base_variants[i].cluster_assigned = all_labels[i];
   }
@@ -702,13 +704,15 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   if(solved){
     if(solution_sets.size() >1){
       call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
+      base_variants.clear();
     } else{
       assign_variants_solution(solution_sets[0], base_variants, eff_means);    
     }
   } else {
     call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
+    base_variants.clear();
   }  
-  std::cerr << "HERE" << std::endl;
-  exit(0); 
+  means = eff_means;
+  solution = solution_sets[0];
   return(base_variants);
 }
