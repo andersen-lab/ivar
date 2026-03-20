@@ -484,6 +484,25 @@ void set_advanced_freq_range_flags(std::vector<variant> &variants, uint32_t max_
   }
 }
 
+bool is_empty_field(const std::string& val) {
+    if (val.empty()) return true;
+
+    // check if only whitespace
+    if (val.find_first_not_of(" \t\n\r") == std::string::npos)
+        return true;
+
+    for (unsigned char c : val) {
+      if (!(std::isprint(c) || std::isspace(c))) {
+        return true;
+      }
+    }
+
+    // common missing-value markers
+    if (val == "NA" || val == "null" || val == "None")
+        return true;
+
+    return false;
+}
 
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced){
   uint32_t max_pos = 0;
@@ -506,6 +525,20 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
 
   std::ifstream infile(filename);
   std::string line;
+
+  // --- Read header ---
+  std::getline(infile, line);
+  std::stringstream ss(line);
+  std::string col;
+  std::vector<std::string> headers;
+  std::unordered_map<std::string, int> col_index;
+
+  int idx = 0;
+  while (std::getline(ss, col, '\t')) {
+    headers.push_back(col);
+    col_index[col] = idx++;
+  }
+
   uint32_t count = 0;
   double multiplier = pow(10, round_val);
   double compare_quality = static_cast<double>(quality_threshold);
@@ -515,30 +548,44 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
   while (std::getline(infile, line)) {
     if(count++ == 0) continue;
     std::vector<std::string> row_values;
-    split(line, '\t', row_values);
+    std::stringstream row_ss(line);
+    std::string value;
+    while (std::getline(row_ss, value, '\t')) {
+      row_values.push_back(value);
+    }
     variant tmp;
-    tmp.nuc = row_values[3];
-    tmp.position = std::stoi(row_values[1]);
+    tmp.nuc = row_values[col_index["ALT"]];
+    tmp.position = std::stoi(row_values[col_index["POS"]]);
     //adjust for the -1 of variant files for deletions
     auto it = std::find(tmp.nuc.begin(), tmp.nuc.end(), '-');
     if(it != tmp.nuc.end()){
       tmp.position = tmp.position+1;
     }
-    tmp.depth = std::stoi(row_values[7]);
-    tmp.total_depth = std::stoi(row_values[11]);
-    tmp.freq = std::round(std::stof(row_values[10]) * multiplier) / multiplier;
-    tmp.qual = std::stod(row_values[9]);
+    tmp.depth = std::stoi(row_values[col_index["ALT_DP"]]);
+    tmp.total_depth = std::stoi(row_values[col_index["TOTAL_DP"]]);
+    tmp.freq = std::round(std::stof(row_values[col_index["ALT_FREQ"]]) * multiplier) / multiplier;
+    tmp.qual = std::stod(row_values[col_index["ALT_QUAL"]]);
+
     if(row_values.size() > 20){
-      tmp.gapped_freq = round(std::stod(row_values[20]) * multiplier) / multiplier;
-      tmp.gapped_depth = std::stoi(row_values[21]);
-      tmp.amplicon_flux = to_bool(row_values[22]);
-      tmp.amplicon_masked = to_bool(row_values[23]);
-      tmp.std_dev = std::stod(row_values[24]);
-      if (row_values.size() >= 27){
-        tmp.amplicon_numbers = split_csv(row_values[26]);
-      } 
-      if(row_values[25] != "NA"){
-        tmp.freq_numbers = split_csv_double(row_values[25]);
+      tmp.gapped_freq = round(std::stod(row_values[col_index["GAPPED_FREQ"]]) * multiplier) / multiplier;
+      tmp.gapped_depth = std::stoi(row_values[col_index["GAPPED_DEPTH"]]);
+      tmp.amplicon_flux = to_bool(row_values[col_index["FLAGGED_POS"]]);
+      tmp.amplicon_masked = to_bool(row_values[col_index["AMP_MASKED"]]);
+
+      if(!(is_empty_field(row_values[col_index["STD_DEV"]]))){
+        tmp.std_dev = std::stod(row_values[col_index["STD_DEV"]]);
+      } else {
+        tmp.std_dev = 0;
+      }
+      if(!(is_empty_field(row_values[col_index["AMP_NUMBERS"]]))){ 
+        tmp.amplicon_numbers = split_csv(row_values[col_index["AMP_NUMBERS"]]);
+      } else {
+        tmp.amplicon_numbers = {};
+      }
+      if(!(is_empty_field(row_values[col_index["AMP_FREQ"]]))){
+        tmp.freq_numbers = split_csv_double(row_values[col_index["AMP_FREQ"]]);
+      } else {
+        tmp.freq_numbers = {};
       }
       tmp.version_1_var = false;
     } else {
@@ -546,7 +593,6 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       tmp.amplicon_flux = false;
       tmp.amplicon_masked = false;
       tmp.primer_masked = false;
-      tmp.std_dev = 0;
       tmp.version_1_var = true;
     }
     if(tmp.total_depth < depth_cutoff){
@@ -633,6 +679,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   for(uint32_t i=0; i < base_variants.size(); i++){
     all_freqs.push_back(base_variants[i].gapped_freq);
     if(!base_variants[i].depth_flag && !base_variants[i].qual_flag && !base_variants[i].outside_freq_range){
+      std::cerr << "position " << base_variants[i].position << " frequency " << base_variants[i].gapped_freq << "\n";
       model_variants.push_back(base_variants[i]);
       model_freqs.push_back(base_variants[i].gapped_freq);
     }
@@ -649,7 +696,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   model.set_use_half_normal_for_noise(true, invariant_threshold);
 
   // spike in priors
-  model.set_mean_precision_prior(0.5);
+  //model.set_mean_precision_prior(0.5);
 
   //simulated priors
   model.set_covariance_prior(1e-3);
