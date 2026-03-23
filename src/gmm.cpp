@@ -679,7 +679,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   for(uint32_t i=0; i < base_variants.size(); i++){
     all_freqs.push_back(base_variants[i].gapped_freq);
     if(!base_variants[i].depth_flag && !base_variants[i].qual_flag && !base_variants[i].outside_freq_range){
-      std::cerr << "position " << base_variants[i].position << " frequency " << base_variants[i].gapped_freq << "\n";
       model_variants.push_back(base_variants[i]);
       model_freqs.push_back(base_variants[i].gapped_freq);
     }
@@ -702,9 +701,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   model.set_covariance_prior(1e-3);
   model.set_mean_precision_prior(1e-2);
 
-
   model.fit(model_freqs);
-  model.set_min_cluster_fraction(0.1);
+  //model.set_min_cluster_fraction(0.1);
   std::vector<int> labels = model.predict(model_freqs);
 
   std::vector<int> component_indices = model.get_effective_components(labels);
@@ -738,13 +736,16 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   //predict on all the frequencies
   std::vector<int> all_labels = model.predict(all_freqs);
+  std::vector<double> model_means = model.get_means();
 
   //take the model labels and assign them to the variants
   for(uint32_t i=0; i < all_labels.size(); i++){
-    if(all_labels[i] == 1 || base_variants[i].gapped_freq > invariant_threshold){
+    if(all_labels[i] == n-1 || base_variants[i].gapped_freq > invariant_threshold){
       base_variants[i].half_normal_upper = true;
-    } else if(all_labels[i] == 0 || base_variants[i].gapped_freq < 1-invariant_threshold){
+      base_variants[i].half_normal_lower = false;
+    } else if(all_labels[i] == n-2 || base_variants[i].gapped_freq < 1-invariant_threshold){
       base_variants[i].half_normal_lower = true;
+      base_variants[i].half_normal_upper = false;
     }
     base_variants[i].cluster_assigned = all_labels[i];
   }
@@ -752,16 +753,18 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<std::vector<double>> solution_sets;
   bool solved = subset_sum(eff_means, solution_sets, 0.05);
   if(solved){
-    if(solution_sets.size() >1){
+    if(solution_sets.size() > 1){
       call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
       base_variants.clear();
     } else{
+      overwrite_cluster_assigned(base_variants, eff_means, model_means);
       assign_variants_solution(solution_sets[0], base_variants, eff_means);    
     }
   } else {
     call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
     base_variants.clear();
   }  
+
   means = eff_means;
   solution = solution_sets[0];
   return(base_variants);

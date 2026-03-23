@@ -26,7 +26,6 @@ void cluster_consensus(std::vector<variant> variants, \
   if(variants.size() == 0) return;
 
   double max_mean=0;
-  double freq_lower_bound = 0.01;
   double freq_upper_bound = 0.99;
 
   //find the largest position in the variants file
@@ -61,7 +60,11 @@ void cluster_consensus(std::vector<variant> variants, \
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
       std::cerr << "amplicon masked " << variants[i].amplicon_masked << " amp flux pos " << variants[i].amplicon_flux << std::endl;
-      std::cerr << variants[i].cluster_assigned << std::endl;
+      std::cerr << "cluster assigned " << variants[i].cluster_assigned << std::endl;
+      for(auto cc : variants[i].consensus_numbers){
+        std::cerr << "consensus number " << cc << std::endl;
+      }
+      std::cerr << "variant half normal upper " << variants[i].half_normal_upper << std::endl;
     }else{
       print = false;
     }
@@ -78,7 +81,7 @@ void cluster_consensus(std::vector<variant> variants, \
     }
 
     //if this amplicon is experiencing fluctuation across amplicons, call ambiguity
-    if(variants[i].amplicon_masked){
+    if(variants[i].amplicon_masked && !variants[i].half_normal_upper){
       if(print){
         std::cerr << "amplicon is experiencing fluctuation" << std::endl;
       }
@@ -86,7 +89,7 @@ void cluster_consensus(std::vector<variant> variants, \
     }
 
     //this variant position experiences fluctuation across amplicons
-    if(variants[i].amplicon_flux && variants[i].freq < freq_upper_bound){
+    if(variants[i].amplicon_flux && !variants[i].half_normal_upper){
       if(print){
         std::cerr << "amplicon in flux" << std::endl;
       }
@@ -94,7 +97,7 @@ void cluster_consensus(std::vector<variant> variants, \
     }
 
     uint32_t position = variants[i].position;
-    if(variants[i].vague_assignment && variants[i].freq < freq_upper_bound && variants[i].freq < max_mean){
+    if(variants[i].vague_assignment && !variants[i].half_normal_upper && variants[i].freq < max_mean){
        if(print){
           for(auto a : variants[i].probabilities){
             std::cerr << a << " ";
@@ -123,7 +126,7 @@ void cluster_consensus(std::vector<variant> variants, \
           all_consensus_seqs[j][adjusted_pos].insert(0, variants[i].nuc);
         } else {
           if(!del){
-            if(print) std::cerr << j << " " << adjusted_pos << " " << variants[i].nuc << std::endl;
+            if(print) std::cerr << "here " << j << " " << adjusted_pos << " " << variants[i].nuc << std::endl;
             all_consensus_seqs[j][adjusted_pos] = variants[i].nuc;
             last_adjustment[j] = position;
           } else {
@@ -172,7 +175,6 @@ void cluster_consensus(std::vector<variant> variants, \
 
   std::vector<std::string> all_sequences;
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
-
     std::string tmp = std::accumulate(all_consensus_seqs[i].begin(), all_consensus_seqs[i].end(), std::string(""));
     tmp.erase(std::remove(tmp.begin(), tmp.end(), '-'), tmp.end());
     all_sequences.push_back(tmp);

@@ -464,6 +464,33 @@ bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &sol
 
 }
 
+void overwrite_cluster_assigned(std::vector<variant> &variants, 
+                                std::vector<double> eff_means, 
+                                std::vector<double> means){
+
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].half_normal_upper || variants[i].half_normal_lower) continue;
+    uint32_t cluster_assigned = variants[i].cluster_assigned;
+    double mean = means[cluster_assigned];
+    auto it = std::find(eff_means.begin(), eff_means.end(), mean);
+    if(variants[i].position == 11000){
+      std::cerr << "position " << variants[i].position << " freq " << variants[i].freq << " gapped freq " << variants[i].gapped_freq << std::endl;
+      std::cerr << "base " << mean << " cluster assigned " << cluster_assigned << std::endl;
+      uint32_t index = std::distance(eff_means.begin(), it);
+      std::cerr << "eff mean index " << index << " effective mean " << eff_means[index] << std::endl;
+      for(auto h : means){
+        std::cerr << h << " ";
+      }
+      std::cerr << "\n";
+    }
+    if(it != eff_means.end()){
+      uint32_t index = std::distance(eff_means.begin(), it); 
+      variants[i].cluster_assigned = index;
+    }
+  }                                 
+
+}
+
 void assign_variants_solution(std::vector<double> solution, 
                               std::vector<variant> &variants,
                               std::vector<double> means){
@@ -505,7 +532,6 @@ void assign_variants_solution(std::vector<double> solution,
       variants[i].resolved = false;
     }
   }
-
   //for 100% cases assign all consensus genomes to the variant
   std::vector<uint32_t> all_genomes;
   for(uint32_t i=0; i < solution.size(); i++){
@@ -520,6 +546,15 @@ void assign_variants_solution(std::vector<double> solution,
 
   //assign the number of the consensus genome
   for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].position == 11000){
+      for(auto j : inverse_groups){
+        for(auto k : j){
+          std::cerr << k << " ";
+        }
+        std::cerr << "\n";
+      }
+    }
+
     for(uint32_t j=0; j < inverse_groups.size(); j++){
       //check to make sure you're lookin at a group that's part of the solution
       auto mit = std::find(solution.begin(), solution.end(), means[j]);
