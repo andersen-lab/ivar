@@ -29,7 +29,6 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
   std::vector<double> freqs;
   std::vector<std::string> tmp(max_position, "N");
 
-
   for(uint32_t i=1; i <= max_position; i++){
     freqs.clear();
     nucs.clear();
@@ -53,15 +52,15 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
       tmp[i-1] = nucs[index];
     }
   }
+
   std::string consensus_string = std::accumulate(tmp.begin(), tmp.end(), std::string(""));
-  //std::string trimmed_consensus = trim_trailing_ambiguities(consensus_string, max_position);
   std::string next_trimmed_consensus = trim_leading_ambiguities(consensus_string, min_position);
   //write the consensus to file
   std::string consensus_filename = clustering_file + "_threshold.fa";
   std::ofstream file(consensus_filename);
   std::string name = ">"+clustering_file+"_"+std::to_string(default_threshold)+"_threshold";
   file << name << "\n";
-  file << next_trimmed_consensus << "\n";
+  file << next_trimmed_consensus;
   file.close();
 }
 
@@ -456,7 +455,6 @@ bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &sol
     }
   }
   if(solution_sets.size() == 0){
-    std::cerr << "final no solution sets found" << std::endl;
     return(false);
   } else {
     return(true);

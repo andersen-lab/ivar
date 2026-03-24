@@ -755,9 +755,16 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   
   std::vector<std::vector<double>> solution_sets;
   bool solved = subset_sum(eff_means, solution_sets, 0.05);
-
+ 
+  std::cerr << "BEFORE WRITE OUT" << std::endl;
   //output the clustering information
   std::ofstream out(output_prefix + "_gmm_1d_results.txt");
+  if (!out.is_open()) {
+    std::cerr << "Failed to open output file: " << output_prefix << std::endl;
+  }
+  if (!out) {
+    std::cerr << "Stream bad immediately after open: " << output_prefix << std::endl;
+  }
   out << "Components\tDistinct_Components\tMeans\tVariances\tWeights\tEffective_Means\tEffective_Variances\tEffective_Weights\tSolution_Sets\n";
   out << std::to_string(n) << "\t";
   out << component_indices.size() << "\t";
@@ -819,21 +826,21 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   out << "]";
   out << "\n";
-
+  std::cerr << "AFTER WRITE OUT" << std::endl;
   if(solved){
     if(solution_sets.size() > 1){
-      call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
+      call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
       base_variants.clear();
     } else{
       overwrite_cluster_assigned(base_variants, eff_means, model_means);
-      assign_variants_solution(solution_sets[0], base_variants, eff_means);    
+      assign_variants_solution(solution_sets[0], base_variants, eff_means);  
+      solution = solution_sets[0];  
     }
   } else {
-    call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
+    call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
     base_variants.clear();
   }  
 
   means = eff_means;
-  solution = solution_sets[0];
   return(base_variants);
 }
