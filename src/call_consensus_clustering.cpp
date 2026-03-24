@@ -26,7 +26,6 @@ void cluster_consensus(std::vector<variant> variants, \
   if(variants.size() == 0) return;
 
   double max_mean=0;
-  double freq_upper_bound = 0.99;
 
   //find the largest position in the variants file
   uint32_t max_position = 0;
@@ -81,7 +80,7 @@ void cluster_consensus(std::vector<variant> variants, \
     }
 
     //if this amplicon is experiencing fluctuation across amplicons, call ambiguity
-    if(variants[i].amplicon_masked && !variants[i].half_normal_upper){
+    /*if(variants[i].amplicon_masked && !variants[i].half_normal_upper){
       if(print){
         std::cerr << "amplicon is experiencing fluctuation" << std::endl;
       }
@@ -94,7 +93,7 @@ void cluster_consensus(std::vector<variant> variants, \
         std::cerr << "amplicon in flux" << std::endl;
       }
       continue;
-    }
+    }*/
 
     uint32_t position = variants[i].position;
     if(variants[i].vague_assignment && !variants[i].half_normal_upper && variants[i].freq < max_mean){
