@@ -737,6 +737,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //predict on all the frequencies
   std::vector<int> all_labels = model.predict(all_freqs);
   std::vector<double> model_means = model.get_means();
+  std::vector<double> model_vars = model.get_variances();
+  std::vector<double> model_weights = model.get_weights();
+
 
   //take the model labels and assign them to the variants
   for(uint32_t i=0; i < all_labels.size(); i++){
@@ -752,6 +755,71 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   
   std::vector<std::vector<double>> solution_sets;
   bool solved = subset_sum(eff_means, solution_sets, 0.05);
+
+  //output the clustering information
+  std::ofstream out(output_prefix + "_gmm_1d_results.txt");
+  out << "Components\tDistinct_Components\tMeans\tVariances\tWeights\tEffective_Means\tEffective_Variances\tEffective_Weights\tSolution_Sets\n";
+  out << std::to_string(n) << "\t";
+  out << component_indices.size() << "\t";
+  out << "[";
+    for (size_t j = 0; j < model_means.size(); j++) {
+      out << model_means[j];
+      if (j < means.size() - 1) out << ",";
+    }
+  out << "]";
+  out << "\t";
+  out << "[";
+  for (size_t j = 0; j < model_vars.size(); j++) {
+    out << model_vars[j];
+    if (j < model_vars.size() - 1) out << ",";
+  }
+  out << "]";
+  out << "\t";
+
+  out << "[";
+  for (size_t j = 0; j < model_weights.size(); j++) {
+    out << model_weights[j];
+    if (j < model_weights.size() - 1) out << ",";
+  }
+  out << "]";
+  out << "\t";
+  out << "[";
+  for (size_t j = 0; j < eff_means.size(); j++) {
+    out << eff_means[j];
+    if (j < eff_means.size() - 1) out << ",";
+  }
+  out << "]";
+  out << "\t";
+  out << "[";
+  for (size_t j = 0; j < eff_vars.size(); j++) {
+    out << eff_vars[j];
+    if (j < eff_vars.size() - 1) out << ",";
+  }
+  out << "]";
+  out << "\t";
+
+  out << "[";
+  for (size_t j = 0; j < eff_weights.size(); j++) {
+    out << eff_weights[j];
+    if (j < eff_weights.size() - 1) out << ",";
+  }
+  out << "]";
+  out << "\t";
+  out << "[";
+
+  for(uint32_t t=0; t < solution_sets.size(); t++){
+    auto sol = solution_sets[t];
+    if(t != 0) out << ",";
+    out << "[";
+    for(uint32_t s=0; s < sol.size(); s++){
+      if(s != 0) out << ",";
+      out << std::to_string(sol[s]);
+    }
+    out << "]";
+  }
+  out << "]";
+  out << "\n";
+
   if(solved){
     if(solution_sets.size() > 1){
       call_majority_consensus(base_variants, prefix, default_threshold, min_depth);
