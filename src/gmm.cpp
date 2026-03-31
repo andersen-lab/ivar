@@ -658,6 +658,13 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
   }
 }
 
+void write_single_cluster_output(std::string output_prefix){
+  std::ofstream out(output_prefix + "_gmm_1d_results.txt");
+  out << "Components\tDistinct_Components\tMeans\tVariances\tWeights\tEffective_Means\tEffective_Variances\tEffective_Weights\tSolution_Sets\n";
+  out << "1\t1\t[]\t[]\t[]\t[0,1]\t[0,0]\t[0,0]\t[[1]]\n";
+  out.close();
+}
+
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, \
                               std::string ref, double default_threshold){
@@ -669,7 +676,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t n=12;
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
-  double invariant_threshold = 0.99;
+  double invariant_threshold = 0.97;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
   set_deletion_flags(base_variants, 0.001);
 
@@ -688,6 +695,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //handle the case of no variants less than the universal cluster
   if(model_variants.size() <= 1){
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
+    write_single_cluster_output(output_prefix);
+    base_variants.clear();
     return(base_variants);
   }
 
@@ -756,7 +765,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<std::vector<double>> solution_sets;
   bool solved = subset_sum(eff_means, solution_sets, 0.05);
  
-  std::cerr << "BEFORE WRITE OUT" << std::endl;
+
   //output the clustering information
   std::ofstream out(output_prefix + "_gmm_1d_results.txt");
   if (!out.is_open()) {

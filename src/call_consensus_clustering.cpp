@@ -23,8 +23,9 @@ void cluster_consensus(std::vector<variant> variants, \
                       std::vector<double> means, \
                       std::string ref){
   std::cerr << "calling consensus" << std::endl;
-  if(variants.size() == 0) return;
-
+  if(variants.size() == 0){
+    return;
+  }
   double max_mean=0;
 
   //find the largest position in the variants file
@@ -204,7 +205,6 @@ void cluster_consensus(std::vector<variant> variants, \
     if(it == solution.end()){
       continue;
     }
-    std::cerr << "final file nuc " << sorted_strings[i][11000-1] << std::endl;
     std::string next_trimmed_sequence = trim_leading_ambiguities(sorted_strings[i], min_position);
     file << ">"+clustering_file+"_cluster_"+ std::to_string(tmp_mean) << "\n";
     file << next_trimmed_sequence << "\n";
