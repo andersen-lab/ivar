@@ -519,8 +519,11 @@ void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, do
   }
 }
 
-void parse_internal_variants(std::string filename, std::vector<variant> &variants, uint32_t depth_cutoff, 
-  uint32_t round_val, uint8_t quality_threshold, 
+void parse_internal_variants(std::string filename, 
+  std::vector<variant> &variants, 
+  uint32_t depth_cutoff, 
+  uint32_t round_val, 
+  uint8_t quality_threshold, 
   double invariant_threshold){
 
   std::ifstream infile(filename);
@@ -561,6 +564,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
     if(it != tmp.nuc.end()){
       tmp.position = tmp.position+1;
     }
+
     tmp.depth = std::stoi(row_values[col_index["ALT_DP"]]);
     tmp.total_depth = std::stoi(row_values[col_index["TOTAL_DP"]]);
     tmp.freq = std::round(std::stof(row_values[col_index["ALT_FREQ"]]) * multiplier) / multiplier;
@@ -571,18 +575,17 @@ void parse_internal_variants(std::string filename, std::vector<variant> &variant
       tmp.gapped_depth = std::stoi(row_values[col_index["GAPPED_DEPTH"]]);
       tmp.amplicon_flux = to_bool(row_values[col_index["FLAGGED_POS"]]);
       tmp.amplicon_masked = to_bool(row_values[col_index["AMP_MASKED"]]);
-
       if(!(is_empty_field(row_values[col_index["STD_DEV"]]))){
         tmp.std_dev = std::stod(row_values[col_index["STD_DEV"]]);
       } else {
         tmp.std_dev = 0;
       }
-      if(!(is_empty_field(row_values[col_index["AMP_NUMBERS"]]))){ 
+      if(row_values.size() > 26 && !(is_empty_field(row_values[col_index["AMP_NUMBERS"]]))){ 
         tmp.amplicon_numbers = split_csv(row_values[col_index["AMP_NUMBERS"]]);
       } else {
         tmp.amplicon_numbers = {};
       }
-      if(!(is_empty_field(row_values[col_index["AMP_FREQ"]]))){
+      if(row_values.size() > 25 && !(is_empty_field(row_values[col_index["AMP_FREQ"]]))){
         tmp.freq_numbers = split_csv_double(row_values[col_index["AMP_FREQ"]]);
       } else {
         tmp.freq_numbers = {};
@@ -699,16 +702,15 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     base_variants.clear();
     return(base_variants);
   }
-
   gmm_1d model(12, 42);  // seed matches bootstrap replicate
   model.set_use_half_normal_for_noise(true, invariant_threshold);
 
   // spike in priors
-  //model.set_mean_precision_prior(0.5);
+  model.set_mean_precision_prior(0.5);
 
   //simulated priors
-  model.set_covariance_prior(1e-3);
-  model.set_mean_precision_prior(1e-2);
+  //model.set_covariance_prior(1e-3);
+  //model.set_mean_precision_prior(1e-2);
 
   model.fit(model_freqs);
   //model.set_min_cluster_fraction(0.1);
