@@ -549,7 +549,6 @@ void parse_internal_variants(std::string filename,
   auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "1";};
   //track which ref alleles we've already added
   while (std::getline(infile, line)) {
-    if(count++ == 0) continue;
     std::vector<std::string> row_values;
     std::stringstream row_ss(line);
     std::string value;
@@ -564,7 +563,6 @@ void parse_internal_variants(std::string filename,
     if(it != tmp.nuc.end()){
       tmp.position = tmp.position+1;
     }
-
     tmp.depth = std::stoi(row_values[col_index["ALT_DP"]]);
     tmp.total_depth = std::stoi(row_values[col_index["TOTAL_DP"]]);
     tmp.freq = std::round(std::stof(row_values[col_index["ALT_FREQ"]]) * multiplier) / multiplier;
@@ -691,6 +689,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     if(!base_variants[i].depth_flag && !base_variants[i].qual_flag && !base_variants[i].outside_freq_range){
       model_variants.push_back(base_variants[i]);
       model_freqs.push_back(base_variants[i].gapped_freq);
+      //std::cerr << base_variants[i].position << " " << base_variants[i].gapped_freq << "\n";
     }
   }
   std::cerr << "Number of frequencies used for clustering: " << model_freqs.size() << "\n";
@@ -702,7 +701,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     base_variants.clear();
     return(base_variants);
   }
-  gmm_1d model(12, 42);  // seed matches bootstrap replicate
+  gmm_1d model(n, 42);  // seed matches bootstrap replicate
   model.set_use_half_normal_for_noise(true, invariant_threshold);
 
   // spike in priors
@@ -713,7 +712,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //model.set_mean_precision_prior(1e-2);
 
   model.fit(model_freqs);
-  //model.set_min_cluster_fraction(0.1);
+  model.set_min_cluster_fraction(0.10);
+
   std::vector<int> labels = model.predict(model_freqs);
 
   std::vector<int> component_indices = model.get_effective_components(labels);
@@ -765,7 +765,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   
   std::vector<std::vector<double>> solution_sets;
-  bool solved = subset_sum(eff_means, solution_sets, 0.05);
+  bool solved = subset_sum(eff_means, solution_sets, 0.10);
  
 
   //output the clustering information
@@ -837,7 +837,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   out << "]";
   out << "\n";
-  std::cerr << "AFTER WRITE OUT" << std::endl;
+
   if(solved){
     if(solution_sets.size() > 1){
       call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
