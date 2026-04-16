@@ -12,6 +12,35 @@
 #include <algorithm>
 #include <limits>
 #include <unordered_map>
+#include <unordered_set>
+
+void flag_position_conflicts(std::vector<variant> &variants) {
+  std::unordered_map<uint32_t, std::unordered_map<uint32_t, uint32_t>> pos_cluster_count;
+
+  for (const auto& v : variants) {
+    if (v.half_normal_upper || v.half_normal_lower || v.depth_flag || v.qual_flag) continue;
+    /*if(v.position == 29402){
+      std::cerr << "position " << v.position << " " << v.gapped_freq << " " << v.cluster_assigned << std::endl;
+    }*/
+    pos_cluster_count[v.position][v.cluster_assigned]++;
+  }
+
+  std::unordered_set<uint32_t> conflicted;
+  for (const auto& [pos, cluster_counts] : pos_cluster_count) {
+    for (const auto& [cluster, count] : cluster_counts) {
+      if (count > 1) {
+        conflicted.insert(pos);
+        break;
+      }
+    }
+  }
+
+  for (auto& v : variants) {
+    if (conflicted.count(v.position)) {
+      v.position_conflict = true;
+    }
+  }
+}
 
 void reset_variants_info(std::vector<variant> &variants){
   //reset cluster assignments and probabilities prior to rerunning another model
@@ -745,12 +774,14 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     }
     std::cerr << "\n";
 
-  //predict on all the frequencies
+  //predict on all the frequencies - disable min_cluster_fraction here because all_freqs
+  //includes tens of thousands of reference alleles, making the 10% threshold nonsensical
+  //for the small signal clusters
+  model.set_min_cluster_fraction(0.0);
   std::vector<int> all_labels = model.predict(all_freqs);
   std::vector<double> model_means = model.get_means();
   std::vector<double> model_vars = model.get_variances();
   std::vector<double> model_weights = model.get_weights();
-
 
   //take the model labels and assign them to the variants
   for(uint32_t i=0; i < all_labels.size(); i++){
@@ -761,6 +792,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       base_variants[i].half_normal_lower = true;
       base_variants[i].half_normal_upper = false;
     }
+    if(base_variants[i].position == 210){
+      std::cerr << all_labels[i] << " " << base_variants[i].gapped_freq << "\n";
+    } 
     base_variants[i].cluster_assigned = all_labels[i];
   }
   
@@ -844,8 +878,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       base_variants.clear();
     } else{
       overwrite_cluster_assigned(base_variants, eff_means, model_means);
-      assign_variants_solution(solution_sets[0], base_variants, eff_means);  
-      solution = solution_sets[0];  
+      assign_variants_solution(solution_sets[0], base_variants, eff_means);
+      flag_position_conflicts(base_variants);
+      solution = solution_sets[0];
     }
   } else {
     call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
