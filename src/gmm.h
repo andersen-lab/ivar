@@ -58,6 +58,7 @@ struct variant {
   bool cluster_outlier=false; //is an outlier for the cluster assigned
   bool include_clustering=true; //here we flag the later positions of deletions
   bool imbalance=false;
+  bool position_conflict=false; //multiple variants at this position assigned to the same cluster
   std::vector<double> probabilities;
 
 };
@@ -77,4 +78,5 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound);
 double calculate_mad(const std::vector<double>& data, double mean);
 void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample);
 void reset_variants_info(std::vector<variant> &variants);
+void flag_position_conflicts(std::vector<variant> &variants);
 #endif
