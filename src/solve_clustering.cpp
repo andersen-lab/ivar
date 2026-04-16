@@ -470,21 +470,27 @@ void overwrite_cluster_assigned(std::vector<variant> &variants,
     if(variants[i].half_normal_upper || variants[i].half_normal_lower) continue;
     uint32_t cluster_assigned = variants[i].cluster_assigned;
     double mean = means[cluster_assigned];
-    auto it = std::find(eff_means.begin(), eff_means.end(), mean);
+    // Use nearest-match instead of exact equality to handle floating-point
+    // precision differences between model_means and eff_means.
+    uint32_t best_index = 0;
+    double best_dist = std::abs(eff_means[0] - mean);
+    for(uint32_t j = 1; j < eff_means.size(); j++){
+      double dist = std::abs(eff_means[j] - mean);
+      if(dist < best_dist){
+        best_dist = dist;
+        best_index = j;
+      }
+    }
     if(variants[i].position == 11000){
       std::cerr << "position " << variants[i].position << " freq " << variants[i].freq << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "base " << mean << " cluster assigned " << cluster_assigned << std::endl;
-      uint32_t index = std::distance(eff_means.begin(), it);
-      std::cerr << "eff mean index " << index << " effective mean " << eff_means[index] << std::endl;
+      std::cerr << "eff mean index " << best_index << " effective mean " << eff_means[best_index] << std::endl;
       for(auto h : means){
         std::cerr << h << " ";
       }
       std::cerr << "\n";
     }
-    if(it != eff_means.end()){
-      uint32_t index = std::distance(eff_means.begin(), it); 
-      variants[i].cluster_assigned = index;
-    }
+    variants[i].cluster_assigned = best_index;
   }                                 
 
 }
