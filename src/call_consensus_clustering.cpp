@@ -55,7 +55,7 @@ void cluster_consensus(std::vector<variant> variants, \
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 29737){
+    if(variants[i].position == 210){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -64,9 +64,13 @@ void cluster_consensus(std::vector<variant> variants, \
       for(auto cc : variants[i].consensus_numbers){
         std::cerr << "consensus number " << cc << std::endl;
       }
-      std::cerr << "variant half normal upper " << variants[i].half_normal_upper << std::endl;
+      std::cerr << "pos con flag " << variants[i].position_conflict << std::endl;
     }else{
       print = false;
+    }
+    if(variants[i].position_conflict){
+      if(print) std::cerr << "position conflict " << variants[i].position << std::endl;
+      continue;
     }
     double freq = variants[i].gapped_freq;
     double qual = variants[i].qual;
@@ -205,7 +209,7 @@ void cluster_consensus(std::vector<variant> variants, \
     if(it == solution.end()){
       continue;
     }
-    std::cerr << sorted_strings[i][29736] << std::endl;
+
     std::string next_trimmed_sequence = trim_leading_ambiguities(sorted_strings[i], min_position);
     file << ">"+clustering_file+"_cluster_"+ std::to_string(tmp_mean) << "\n";
     file << next_trimmed_sequence << "\n";
