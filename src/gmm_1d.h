@@ -13,9 +13,9 @@ class gmm_1d {
   static constexpr double PI =	3.14159265358979323846;
   static constexpr double DEFAULT_VAR_FLOOR = 1e-3;
   static constexpr double MIN_BD_THRESHOLD = 1.0; // -log(d*) roughly based on Hennig et al. 2010s
-  static constexpr double TOLERANCE = 1e-6;
+  static constexpr double TOLERANCE = 1e-3;
   static constexpr double REG_TERM = 1e-6;
-  static constexpr int MAX_ITER = 200;
+  static constexpr int MAX_ITER = 1000;
 
   int n_components;
   unsigned int seed;
@@ -32,9 +32,10 @@ class gmm_1d {
   // Priors
   double weight_concentration_prior_;
   double mean_precision_prior_ = 0.0;
-  double mean_prior_;
+  std::vector<double> mean_prior_;
   double degrees_of_freedom_prior_;
   double covariance_prior_ = 0.0;
+  double half_normal_covariance_prior_ = 0.0;
   double invariant_threshold_ = 0.97;
   double min_cluster_fraction_ = 0.0;
 
@@ -92,6 +93,7 @@ class gmm_1d {
   bool get_use_half_normal_for_noise() const { return use_half_normal_for_noise_; }
   void set_mean_precision_prior(double v) { mean_precision_prior_ = v; }
   void set_covariance_prior(double v) { covariance_prior_ = v; }
+  void set_half_normal_covariance_prior(double v) { half_normal_covariance_prior_ = v; }
   void set_min_cluster_fraction(double f) { min_cluster_fraction_ = f; }
   double get_min_cluster_fraction() const { return min_cluster_fraction_; }
 
@@ -108,6 +110,11 @@ class gmm_1d {
   std::vector<double> get_effective_means(std::vector<int> labels) const;
   std::vector<double> get_effective_vars(std::vector<int> labels) const;
   std::vector<double> get_effective_weights(std::vector<int> labels) const;
+
+  std::vector<int> get_invariant_components(std::vector<int> labels) const;
+  std::vector<double> get_invariant_component_variances(std::vector<int> labels) const;
+  std::vector<double> get_invariant_component_weights(std::vector<int> labels) const;
+
 
   std::vector<double> get_elbo_history() const { return elbo_history; }
   bool is_converged() const { return converged; }

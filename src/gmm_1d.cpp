@@ -305,7 +305,7 @@ void gmm_1d::estimate_means(const std::vector<double>& nk, const std::vector<dou
     if (is_half_normal_component(k)) {
       means_[k] = fixed_mean_for_component(k);
     } else {
-      means_[k] = (mean_precision_prior_ * mean_prior_ + nk[k] * xk[k]) / mean_precision_[k];
+      means_[k] = (mean_precision_prior_ * mean_prior_[k] + nk[k] * xk[k]) / mean_precision_[k];
     }
   }
 }
@@ -320,10 +320,10 @@ void gmm_1d::estimate_precisions(const std::vector<double>& nk,
   for (int k = 0; k < this->n_components; k++) {
     degrees_of_freedom_[k] = degrees_of_freedom_prior_ + nk[k];
     if (is_half_normal_component(k)) {
-      variances_[k] = covariance_prior_ + nk[k] * sk[k];
+      variances_[k] = half_normal_covariance_prior_ + nk[k] * sk[k];
       variances_[k] /= degrees_of_freedom_[k];
     } else {
-      double diff = xk[k] - mean_prior_;
+      double diff = xk[k] - mean_prior_[k];
       variances_[k] = covariance_prior_ + nk[k] * (sk[k] + (mean_precision_prior_ / mean_precision_[k]) * diff * diff);
       variances_[k] /= degrees_of_freedom_[k];
     }
@@ -391,17 +391,28 @@ void gmm_1d::initialize_parameters(const std::vector<double> &x) {
   double s = 0.0;
   for (double x_ : x)
     s += x_;
-  mean_prior_ = s / N;
+  double global_mean = s / N;
+  mean_prior_.assign(this->n_components, global_mean);
 
   degrees_of_freedom_prior_ = 1.0;   // n_features = 1
 
   if (covariance_prior_ == 0.0) {
     double var_sum = 0.0;
     for (double x_ : x) {
-      double d = x_ - mean_prior_;
+      double d = x_ - global_mean;
       var_sum += d * d;
     }
     covariance_prior_ = var_sum / (N - 1);
+    std::cerr << "Covariance prior not set, using sample variance: " << covariance_prior_ << "\n";
+  }
+  if (half_normal_covariance_prior_ == 0.0) {
+    double var_sum = 0.0;
+    for (double x_ : x) {
+      double d = x_ - global_mean;
+      var_sum += d * d;
+    }
+    half_normal_covariance_prior_ = var_sum / (N - 1);
+    std::cerr << "Half normal covariance prior not set, using sample variance: " << half_normal_covariance_prior_ << "\n";
   }
   if (mean_precision_prior_ == 0.0) {
     mean_precision_prior_ = 1.0;
@@ -456,7 +467,6 @@ bool gmm_1d::fit(const std::vector<double>& x) {
   n_iter = 0;
   elbo_history.clear();
   labels_.clear();
-  initialize_component_types();
 
   if (use_half_normal_for_noise_) {
     for (double xi : x) {
@@ -468,18 +478,47 @@ bool gmm_1d::fit(const std::vector<double>& x) {
 
   int N = x.size();
   initialize_parameters(x);
+  initialize_component_types();
+
+  int n_gaussian = this->n_components;
+  if (use_half_normal_for_noise_) {
+    n_gaussian = this->n_components - 2;
+  }
 
   std::vector<int> seed_indices;
-  initialize_k_means_1d(x, this->n_components, seed_indices);
+  initialize_k_means_1d(x, n_gaussian, seed_indices);
   std::cerr << "Kmeans: ";
   for(int i: seed_indices){
     std::cerr << x[i] << ", ";
   }
   std::cerr << std::endl;
 
+  // Set mean prior from kmeans for gaussian components
+  for (int k = 0; k < n_gaussian; k++) {
+    mean_prior_[k] = x[seed_indices[k]];
+  }
+
   Matrix resp(N, std::vector<double>(this->n_components, 0.0));
-  for (int comp = 0; comp < this->n_components; comp++)
-    resp[seed_indices[comp]][comp] = 1.0;
+  for (int k = 0; k < n_gaussian; k++) {
+    resp[seed_indices[k]][k] = 1.0;
+  }
+
+  if (use_half_normal_for_noise_) {
+    // For half normal assign data points closest to mean
+    for (int k = n_gaussian; k < this->n_components; k++) {
+      double target = fixed_mean_for_component(k);
+      int best_idx = 0;
+      double best_dist = std::abs(x[0] - target);
+      for (int i = 1; i < N; i++) {
+        double d = std::abs(x[i] - target);
+        if (d < best_dist) {
+          best_dist = d;
+          best_idx = i;
+        }
+      }
+      resp[best_idx][k] = 1.0;
+    }
+  }
 
   initialize(x, resp);
 
@@ -745,6 +784,71 @@ std::vector<int> gmm_1d::get_effective_components(std::vector<int> labels) const
 
   return result;
 }
+
+std::vector<int> gmm_1d::get_invariant_components(std::vector<int> labels) const {
+  std::vector<int> tmp = labels;
+  std::sort(tmp.begin(), tmp.end());
+
+  std::vector<int> result;
+  result.reserve(tmp.size());
+
+  if(use_half_normal_for_noise_) {
+    int n_half_normal = 0;
+    for (int x : tmp) {
+      if (result.empty() || x != result.back()) {
+        if(is_half_normal_component(x)) {
+          result.push_back(x);
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+
+std::vector<double> gmm_1d::get_invariant_component_variances(std::vector<int> labels) const {
+  std::vector<int> tmp = labels;
+  std::sort(tmp.begin(), tmp.end());
+
+  std::vector<double> result;
+  result.reserve(tmp.size());
+
+  if(use_half_normal_for_noise_) {
+    int n_half_normal = 0;
+    for (int x : tmp) {
+      if (result.empty() || x != result.back()) {
+        if(is_half_normal_component(x)) {
+          result.push_back(this->variances_[x]);
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+std::vector<double> gmm_1d::get_invariant_component_weights(std::vector<int> labels) const {
+  std::vector<int> tmp = labels;
+  std::sort(tmp.begin(), tmp.end());
+
+  std::vector<double> result;
+  result.reserve(tmp.size());
+
+  if(use_half_normal_for_noise_) {
+    int n_half_normal = 0;
+    for (int x : tmp) {
+      if (result.empty() || x != result.back()) {
+        if(is_half_normal_component(x)) {
+          result.push_back(this->weights_[x]);
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
 
 std::vector<double> gmm_1d::get_effective_means(std::vector<int> component_indices) const {
   std::vector<double> eff_means;
