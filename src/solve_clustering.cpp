@@ -61,6 +61,7 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
   std::string name = ">"+clustering_file+"_"+std::to_string(default_threshold)+"_threshold";
   file << name << "\n";
   file << next_trimmed_consensus;
+  file << "\n";
   file.close();
 }
 
