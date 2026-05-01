@@ -586,6 +586,8 @@ std::vector<int> gmm_1d::predict(const std::vector<double>& x) const {
     // Ban small clusters
     bool found_new = false;
     for (int k = 0; k < n_components; k++) {
+      if(is_half_normal_component(k))
+        continue;
       if (!low_weight_clusters[k] && counts[k] > 0 && (static_cast<double>(counts[k]) / n_data_points) < min_cluster_fraction_) {
         low_weight_clusters[k] = true;
         found_new = true;
