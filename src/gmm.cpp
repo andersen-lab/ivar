@@ -703,7 +703,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     exit(1);
   }
 
-  uint32_t n=12;
+  uint32_t n=6;
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
   double invariant_threshold = 0.97;
@@ -745,6 +745,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   std::vector<int> labels = model.predict(model_freqs);
 
+  std::cerr << "All means: ";
+  for(auto x: model.get_means()){
+    std::cerr << x << " ";
+  }
+  std::cerr << "\n";
+
   std::vector<int> component_indices = model.get_effective_components(labels);
   std::cerr << "VB effective components: " << component_indices.size() << "\n";
   std::cerr << "VB effective means: ";
@@ -767,6 +773,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       std::cerr << eff_weights[i] << " ";
     }
     std::cerr << "\n";
+
+    std::cerr << model.get_invariant_components(labels).size() << " invariant components\n";
 
     std::cerr << "ELBO history: ";
     for(int i = 0; i < model.get_elbo_history().size(); i++) {
@@ -792,7 +800,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       base_variants[i].half_normal_lower = true;
       base_variants[i].half_normal_upper = false;
     }
-    if(base_variants[i].position == 210){
+    if(base_variants[i].position == 11020){
       std::cerr << all_labels[i] << " " << base_variants[i].gapped_freq << "\n";
     } 
     base_variants[i].cluster_assigned = all_labels[i];
