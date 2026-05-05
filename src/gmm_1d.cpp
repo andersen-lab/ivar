@@ -625,6 +625,18 @@ std::vector<int> gmm_1d::predict(const std::vector<double>& x) const {
   return labels;
 }
 
+std::vector<std::vector<double>> gmm_1d::predict_proba(const std::vector<double>& x) const {
+  std::vector<double> log_prob_norm;
+  Matrix log_resp;
+  e_step(x, log_prob_norm, log_resp);
+  int N = static_cast<int>(x.size());
+  std::vector<std::vector<double>> proba(N, std::vector<double>(this->n_components));
+  for (int i = 0; i < N; i++)
+    for (int k = 0; k < this->n_components; k++)
+      proba[i][k] = std::exp(log_resp[i][k]);
+  return proba;
+}
+
 void gmm_1d::logit_transform(const std::vector<double> &x, std::vector<double> &transformed_x, double eps) {
   const size_t n = x.size();
   transformed_x.resize(n);

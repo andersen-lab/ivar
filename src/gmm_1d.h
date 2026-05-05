@@ -89,6 +89,7 @@ class gmm_1d {
   explicit gmm_1d(int n_components = 2, unsigned int seed = std::random_device{}()) : n_components(n_components), seed(seed), rng(seed) {}
   bool fit(const std::vector<double>& x);
   std::vector<int> predict(const std::vector<double> &x) const;
+  std::vector<std::vector<double>> predict_proba(const std::vector<double> &x) const;
   void set_use_half_normal_for_noise(bool use_half_normal_for_noise, double invariant_threshold = 0.97) { use_half_normal_for_noise_ = use_half_normal_for_noise; invariant_threshold_ = invariant_threshold; }
   bool get_use_half_normal_for_noise() const { return use_half_normal_for_noise_; }
   void set_mean_precision_prior(double v) { mean_precision_prior_ = v; }

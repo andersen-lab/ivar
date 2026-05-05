@@ -787,6 +787,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //for the small signal clusters
   model.set_min_cluster_fraction(0.0);
   std::vector<int> all_labels = model.predict(all_freqs);
+  //gets the posterior probability per variant
+  std::vector<std::vector<double>> proba = model.predict_proba(all_freqs);
+  
   std::vector<double> model_means = model.get_means();
   std::vector<double> model_vars = model.get_variances();
   std::vector<double> model_weights = model.get_weights();
@@ -800,10 +803,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       base_variants[i].half_normal_lower = true;
       base_variants[i].half_normal_upper = false;
     }
-    if(base_variants[i].position == 11020){
-      std::cerr << all_labels[i] << " " << base_variants[i].gapped_freq << "\n";
-    } 
     base_variants[i].cluster_assigned = all_labels[i];
+    base_variants[i].probabilities = proba[i];
   }
   
   std::vector<std::vector<double>> solution_sets;
