@@ -90,6 +90,7 @@ void modify_variant_masking(std::vector<uint32_t> amplicons_to_mask, std::vector
     } else {
       for(auto j : valid_amplicons){
         //std::cerr << variants[i].position << " " << variants[i].cluster_assigned << " " << variants[i].gapped_freq << std::endl;
+        if(j >= variants[i].consensus_numbers.size()) continue;
         variants[i].cluster_assigned = variants[i].consensus_numbers[j];
         variants[i].amplicon_masked = false;
       }
@@ -156,6 +157,7 @@ void rewrite_position_masking(std::vector<variant> &variants){
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].freq_numbers.size() < 2) continue;
     if(!variants[i].amplicon_flux) continue;
+    if(variants[i].freq_assignments.empty()) continue;
       bool all_equal = std::all_of(variants[i].freq_assignments.begin(), variants[i].freq_assignments.end(), [&](uint32_t v) {return v == variants[i].freq_assignments[0];});
       if(all_equal) variants[i].amplicon_flux = false;
       else variants[i].amplicon_flux = true;
@@ -168,7 +170,7 @@ std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, st
   std::vector<uint32_t> amplicons_to_mask;
 
   for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].amplicon_flux && !variants[i].outside_freq_range){
+    if(variants[i].amplicon_flux && !variants[i].outside_freq_range && !variants[i].half_normal_upper && !variants[i].half_normal_lower){
       //find all clusters not part of the same assignment
       std::vector<double> other_population_clusters;
       other_population_clusters.reserve(means.size());
@@ -574,10 +576,10 @@ void assign_variants_solution(std::vector<double> solution,
   }
   
   //amplicon_specific_cluster_assignment(variants, model);
-  rewrite_position_masking(variants);
+  //rewrite_position_masking(variants);
   std::vector<uint32_t> amplicons_to_mask;
-  if(means.size() > 1){
-    amplicons_to_mask = rewrite_amplicon_masking(variants, means);
-  }
-  modify_variant_masking(amplicons_to_mask, variants, means);
+  //if(means.size() > 1){
+  //  amplicons_to_mask = rewrite_amplicon_masking(variants, means);
+  //}
+  //modify_variant_masking(amplicons_to_mask, variants, means);
 }

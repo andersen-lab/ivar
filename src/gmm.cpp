@@ -460,7 +460,7 @@ void parse_internal_variants(std::string filename,
   double multiplier = pow(10, round_val);
   double compare_quality = static_cast<double>(quality_threshold);
 
-  auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "1";};
+  auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "True" || s == "1";};
   //track which ref alleles we've already added
   while (std::getline(infile, line)) {
     std::vector<std::string> row_values;

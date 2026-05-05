@@ -55,7 +55,7 @@ void cluster_consensus(std::vector<variant> variants, \
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 22917){
+    if(variants[i].position == 28881){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -71,8 +71,13 @@ void cluster_consensus(std::vector<variant> variants, \
     }else{
       print = false;
     }
+
     if(variants[i].position_conflict){
       if(print) std::cerr << "position conflict " << variants[i].position << std::endl;
+      continue;
+    }
+    if(variants[i].amplicon_flux && !variants[i].half_normal_upper){
+      if(print) std::cerr << "amplicon flux " << variants[i].amplicon_flux << std::endl;
       continue;
     }
     double freq = variants[i].gapped_freq;
@@ -95,13 +100,6 @@ void cluster_consensus(std::vector<variant> variants, \
       }
       continue;
     }
-
-    //this variant position experiences fluctuation across amplicons
-    if(variants[i].amplicon_flux && !variants[i].half_normal_upper){
-      if(print){
-        std::cerr << "amplicon in flux" << std::endl;
-      }
-      continue;
     }*/
 
     uint32_t position = variants[i].position;
