@@ -14,6 +14,24 @@
 #include <unordered_map>
 #include <unordered_set>
 
+void flag_low_posterior_variants(std::vector<variant> &base_variants){
+  for(auto &var : base_variants){
+    if(var.probabilities.empty()) continue;
+    uint32_t assigned_cluster = var.cluster_assigned;
+    double assigned_prob = var.probabilities[assigned_cluster];
+
+    double next_best = 0.0;
+    for(uint32_t k = 0; k < var.probabilities.size(); k++){
+      if(k == assigned_cluster) continue;
+      if(var.probabilities[k] > next_best) next_best = var.probabilities[k];
+    }
+    
+    if(next_best > 0.0 && (assigned_prob / next_best) < 2.0){
+      var.vague_assignment = true;
+    }
+  }
+}
+
 void flag_position_conflicts(std::vector<variant> &variants) {
   std::unordered_map<uint32_t, std::unordered_map<uint32_t, uint32_t>> pos_cluster_count;
 
@@ -887,6 +905,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       base_variants.clear();
     } else{
       overwrite_cluster_assigned(base_variants, eff_means, model_means);
+      flag_low_posterior_variants(base_variants);
       assign_variants_solution(solution_sets[0], base_variants, eff_means);
       flag_position_conflicts(base_variants);
       solution = solution_sets[0];

@@ -55,7 +55,7 @@ void cluster_consensus(std::vector<variant> variants, \
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 210){
+    if(variants[i].position == 22917){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -64,7 +64,10 @@ void cluster_consensus(std::vector<variant> variants, \
       for(auto cc : variants[i].consensus_numbers){
         std::cerr << "consensus number " << cc << std::endl;
       }
-      std::cerr << "pos con flag " << variants[i].position_conflict << std::endl;
+      for(auto a : variants[i].probabilities){
+        std::cerr << a << " ";
+      }
+      std::cerr << "\n";
     }else{
       print = false;
     }
@@ -76,10 +79,11 @@ void cluster_consensus(std::vector<variant> variants, \
     double qual = variants[i].qual;
     uint32_t depth = variants[i].gapped_depth;
     //depth, quality, and low frequency bypass
-    if(variants[i].half_normal_lower || qual < (double)min_qual || depth < min_depth){
+    if(variants[i].half_normal_lower || qual < (double)min_qual || depth < min_depth || variants[i].vague_assignment){
       if(print) {
         std::cerr << "half normal lower " << variants[i].half_normal_lower << std::endl;
         std::cerr << "min qual or depth issue " << qual << " "  << depth <<  " mq " << (double)min_qual << " md " << min_depth << std::endl;
+        std::cerr << "vague assignment " << variants[i].vague_assignment << std::endl;
       }
       continue;
     }
