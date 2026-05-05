@@ -28,6 +28,8 @@ void flag_low_posterior_variants(std::vector<variant> &base_variants){
 
     if(next_best > 0.0 && (assigned_prob / next_best) < 2.0){
       var.vague_assignment = true;
+    } else {
+      var.vague_assignment = false;
     }
   }
 }
@@ -687,7 +689,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       base_variants[i].half_normal_upper = false;
     }
     base_variants[i].cluster_assigned = all_labels[i];
-    base_variants[i].probabilities = proba[i];
+    if(!base_variants[i].half_normal_upper && !base_variants[i].half_normal_lower) {
+      base_variants[i].probabilities = proba[i];
+    }
   }
   
   std::vector<std::vector<double>> solution_sets;
@@ -770,6 +774,21 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       base_variants.clear();
     } else{
       overwrite_cluster_assigned(base_variants, eff_means, model_means);
+
+      //recalculate probabilities based on the new cluster assignments and only the effective means
+      for(auto &v : base_variants){
+        if(v.half_normal_upper || v.half_normal_lower || v.probabilities.empty()) continue;
+        std::vector<double> eff_proba;
+        double sum = 0.0;
+        for(int ci : component_indices){
+          eff_proba.push_back(v.probabilities[ci]);
+          sum += v.probabilities[ci];
+        }
+        if(sum > 0.0)
+          for(auto &p : eff_proba) p /= sum;
+        v.probabilities = eff_proba;
+      }
+      //flag low posterior variants based on the new probabilities
       flag_low_posterior_variants(base_variants);
       assign_variants_solution(solution_sets[0], base_variants, eff_means);
       flag_position_conflicts(base_variants);
