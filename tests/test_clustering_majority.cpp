@@ -75,7 +75,6 @@ int main() {
   bool clustering_failed = false;
   double var_floor;
   gaussian_mixture_model retrained;
-  assign_all_variants(variants, base_variants, retrained, lower_bound, upper_bound);
   add_noise_variants(variants, base_variants);
 
   //solve_clusters(variants, retrained, lower_bound, solution, prefix, default_threshold, min_depth);
