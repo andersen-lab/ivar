@@ -11,6 +11,7 @@
 #include <string>
 #include <algorithm>
 #include <numeric>
+#include <limits>
 
 void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth){
   std::cerr << "in majority consensus call" << std::endl;
@@ -124,6 +125,7 @@ double find_neighboring_cluster(double freq, uint32_t cluster_assigned, std::vec
   return(means[index]);
 }
 
+/*
 void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gaussian_mixture_model model){
   std::vector<std::vector<double>> prob_matrix;
   std::vector<double> tmp;
@@ -152,7 +154,7 @@ void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gaussi
     }
   }
 }
-
+*/
 void rewrite_position_masking(std::vector<variant> &variants){
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].freq_numbers.size() < 2) continue;

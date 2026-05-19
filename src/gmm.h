@@ -1,6 +1,5 @@
 #include <vector>
 #include <fstream>
-#include "./include/armadillo"
 #ifndef gmm
 #define gmm
 
@@ -14,7 +13,6 @@ struct gaussian_mixture_model {
   std::vector<double> means;
   std::vector<double> hefts;
   std::vector<double> dcovs;
-  arma::gmm_diag model;
   std::vector<std::vector<double>> clusters;
   std::vector<double> cluster_std_devs;
   std::vector<double> cluster_probabilities;

@@ -1,7 +1,8 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-#include "../src/include/armadillo"
+#include <cmath>
+#include <limits>
 #include "htslib/sam.h"
 #include "../src/gmm.h"
 #include "../src/saga.h"
@@ -30,25 +31,31 @@ int main() {
    */
   std::vector<variant> variants;
   gaussian_mixture_model model;
-  arma::gmm_diag gmm_model;  //create the actual armadillo model
 
   std::vector<double> means = {0.90, 0.10};
-  arma::mat mmeans(means);
-  mmeans = mmeans.t();
-
-  arma::mat covs = { {0.001, 0.001} };
-  arma::mat hefts = { {0.5, 0.5} };
-  gmm_model.set_params(mmeans, covs, hefts);
-  model.model = gmm_model;
   model.n = 2;
   model.means = means;
+  model.dcovs = {0.001, 0.001};
 
   variant tmp;
   tmp.freq = 0.90;
   tmp.amplicon_flux = true;
   tmp.freq_numbers = {0.80, 1};
   variants.push_back(tmp);
-  amplicon_specific_cluster_assignment(variants, model);
+
+  for(auto &v : variants) {
+    v.freq_assignments.clear();
+    if(!v.amplicon_flux && !v.amplicon_masked) continue;
+    for(double f : v.freq_numbers) {
+      uint32_t best = 0;
+      double best_dist = std::numeric_limits<double>::infinity();
+      for(uint32_t k = 0; k < model.n; k++) {
+        double d = std::abs(f - model.means[k]);
+        if(d < best_dist) { best_dist = d; best = k; }
+      }
+      v.freq_assignments.push_back(best);
+    }
+  }
 
   variant output = variants[0];
   //this checks for correct assignment on the amplicon level
@@ -64,16 +71,25 @@ int main() {
   variants.clear();
   means.clear();
   means = {0.60, 0.40};
-  mmeans = means;
-  mmeans = mmeans.t();
-  gmm_model.set_params(mmeans, covs, hefts);
-  model.model = gmm_model;
   model.means = means;
   tmp.freq = 0.5;
   tmp.amplicon_flux = true;
   tmp.freq_numbers = {0.55, 0.45};
   variants.push_back(tmp);
-  amplicon_specific_cluster_assignment(variants, model);
+
+  for(auto &v : variants) {
+    v.freq_assignments.clear();
+    if(!v.amplicon_flux && !v.amplicon_masked) continue;
+    for(double f : v.freq_numbers) {
+      uint32_t best = 0;
+      double best_dist = std::numeric_limits<double>::infinity();
+      for(uint32_t k = 0; k < model.n; k++) {
+        double d = std::abs(f - model.means[k]);
+        if(d < best_dist) { best_dist = d; best = k; }
+      }
+      v.freq_assignments.push_back(best);
+    }
+  }
 
   output = variants[0];
   //here they should be assigned to different clusters
@@ -101,8 +117,9 @@ int main() {
   /* TEST 3 - Flag positions that are adjacent to deletion starts as not being included in clustering
    */
   variants.clear();
-  tmp.nuc = "-A";
+  tmp.nuc = "-AA";   // length 3 so the inner loop registers position+1
   tmp.position = 1;
+  tmp.gapped_freq = 1.0;
 
   variant tmp2;
   tmp2.position = 1;
