@@ -396,26 +396,6 @@ std::vector<std::vector<double>> deduplicate_solutions(std::vector<std::vector<d
   return(solutions);
 }
 
-std::vector<uint32_t> noise_cluster_calculator(gaussian_mixture_model model, double estimated_error){
-  std::vector<double> means = model.means;
-  std::vector<double> std_devs = model.cluster_std_devs;
-  std::vector<uint32_t> noise_indices; 
-  for(uint32_t i=0; i < means.size(); i++){
-    //if the estimated error is below two standard deviation of the cluster mean
-    if(std_devs[i] > 0.05) continue;
-    double upper_bound = 1-estimated_error;
-    double lower_bound = estimated_error;
-    double cluster_lower_edge = means[i] - std_devs[i];
-    double cluster_upper_edge = means[i] + std_devs[i];
-
-    if(cluster_lower_edge < lower_bound || cluster_upper_edge > upper_bound){
-      //std::cerr << "HERE " << means[i] << " std dev " << std_devs[i] << " estimated error " << estimated_error << " " << cluster_lower_edge << " " << cluster_upper_edge << std::endl;
-      noise_indices.push_back(i);
-    }
-  }
-  return(noise_indices);
-}
-
 bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &solution_sets, const double error){
   std::cerr << "in subset sum" << std::endl;
   //gives all solutions that sum to 1
