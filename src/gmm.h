@@ -3,21 +3,6 @@
 #ifndef gmm
 #define gmm
 
-struct gaussian_mixture_model {
-  std::vector<std::vector<double>> prob_matrix;
-  uint32_t n;
-  uint32_t lower_n;
-  double var_floor;
-  double bic;
-  double log_likelihood;
-  std::vector<double> means;
-  std::vector<double> hefts;
-  std::vector<double> dcovs;
-  std::vector<std::vector<double>> clusters;
-  std::vector<double> cluster_std_devs;
-  std::vector<double> cluster_probabilities;
-};
-
 struct variant {
   uint32_t position;
   std::string nuc;

@@ -30,12 +30,7 @@ int main() {
    * B - Position flagged.
    */
   std::vector<variant> variants;
-  gaussian_mixture_model model;
-
   std::vector<double> means = {0.90, 0.10};
-  model.n = 2;
-  model.means = means;
-  model.dcovs = {0.001, 0.001};
 
   variant tmp;
   tmp.freq = 0.90;
@@ -49,8 +44,8 @@ int main() {
     for(double f : v.freq_numbers) {
       uint32_t best = 0;
       double best_dist = std::numeric_limits<double>::infinity();
-      for(uint32_t k = 0; k < model.n; k++) {
-        double d = std::abs(f - model.means[k]);
+      for(uint32_t k = 0; k < means.size(); k++) {
+        double d = std::abs(f - means[k]);
         if(d < best_dist) { best_dist = d; best = k; }
       }
       v.freq_assignments.push_back(best);
@@ -69,9 +64,7 @@ int main() {
   else std::cerr << "second test failed" << std::endl;
 
   variants.clear();
-  means.clear();
   means = {0.60, 0.40};
-  model.means = means;
   tmp.freq = 0.5;
   tmp.amplicon_flux = true;
   tmp.freq_numbers = {0.55, 0.45};
@@ -83,8 +76,8 @@ int main() {
     for(double f : v.freq_numbers) {
       uint32_t best = 0;
       double best_dist = std::numeric_limits<double>::infinity();
-      for(uint32_t k = 0; k < model.n; k++) {
-        double d = std::abs(f - model.means[k]);
+      for(uint32_t k = 0; k < means.size(); k++) {
+        double d = std::abs(f - means[k]);
         if(d < best_dist) { best_dist = d; best = k; }
       }
       v.freq_assignments.push_back(best);

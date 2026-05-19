@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-#include "../src/include/armadillo"
+#include <algorithm>
 #include "htslib/sam.h"
 #include "../src/gmm.h"
 #include "../src/saga.h"
@@ -38,51 +38,29 @@ int main() {
   int num_tests = 1;
   int success = 0;
 
-  uint32_t round_val = 4;
   uint32_t min_depth = 5;
   uint8_t min_qual = 20;
   double default_threshold = 0.5;
   double invariant_threshold = 0.99;
+  uint32_t n = 2;
+
   //TEST 1 - manually currated data
   std::string var_filename = "../data/version_bump_tests/vbump_consensus_var.txt";
   std::string consensus_filename = "../data/version_bump_tests/vbump_consensus_ivar.fa";
   std::string reference_file = "../data/version_bump_tests/MN908947.3_sequence.fasta";
-  std::vector<variant> base_variants;
-  std::vector<variant> variants;
-  uint32_t n = 2;
 
-  parse_internal_variants(var_filename, base_variants, min_depth, round_val, min_qual, invariant_threshold);
-  set_deletion_flags(base_variants, 0);
-  double error_rate = 0.01;
-  double lower_bound = 0.01;
-  double upper_bound = 0.99;
-  std::cerr << "lower error " << lower_bound << " upper error " << upper_bound << std::endl;
-  uint32_t count = 0;
-  set_freq_range_flags(base_variants, lower_bound, upper_bound, true);
-
-  for(uint32_t i=0; i < base_variants.size(); i++){
-    if(!base_variants[i].outside_freq_range && !base_variants[i].depth_flag && !base_variants[i].amplicon_flux && !base_variants[i].amplicon_masked && base_variants[i].include_clustering){
-      variants.push_back(base_variants[i]);
-      count++;
-    }
-  }
-  arma::mat data(1, count, arma::fill::zeros);
-  //(rows, cols) where each columns is a sample
-  for(uint32_t i = 0; i < variants.size(); i++){
-    double tmp = static_cast<double>(variants[i].gapped_freq);
-    data.col(i) = tmp;
-  }
   std::vector<double> solution;
-  bool clustering_failed = false;
-  double var_floor;
-  gaussian_mixture_model retrained;
-  add_noise_variants(variants, base_variants);
-  //solve_clusters(variants, retrained, lower_bound, solution, prefix, default_threshold, min_depth);
-  cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, retrained.means, reference_file);
-  std::vector<pair<std::string, std::string>> gt_sequences;
+  std::vector<double> means;
+  std::vector<variant> variants = gmm_model(var_filename, prefix, min_depth, min_qual, solution, means, reference_file, default_threshold, n, invariant_threshold, 1e-3, 1e-2);
+
+  if(!variants.empty()) {
+    cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, means, reference_file);
+  }
+
+  std::vector<std::pair<std::string, std::string>> gt_sequences;
   read_consensus(gt_sequences, consensus_filename);
   std::string exp_sequence;
-  std::vector<pair<std::string, std::string>> exp_sequences;
+  std::vector<std::pair<std::string, std::string>> exp_sequences;
   read_consensus(exp_sequences, prefix+".fa");
 
   bool correct = true;
@@ -90,7 +68,6 @@ int main() {
     if(itexp->second.size() != itgt->second.size()) {
       correct = false;
       std::cerr << "not same size" << std::endl;
-      //continue;
     }
     for(uint32_t i=0; i < itexp->second.size(); i++){
       char a = itgt->second[i];
