@@ -50,6 +50,10 @@ struct args_t {
   //contam params
   std::string variants;          // -s
   bool gapped_depth;             // -G
+  uint32_t gmm_n;                // -N
+  double gmm_invariant;          // -I
+  double gmm_cov_prior;          // -C
+  double gmm_mean_prior;         // -M
 } g_args;
 
 void print_usage() {
@@ -75,33 +79,20 @@ void print_usage() {
 
 void print_contam_usage() {
   std::cout
-      << "Usage: ivar contam \n\n"
+      << "Usage: ivar contam -s <variants.tsv> -p <prefix> -r <reference.fa> [options]\n\n"
+         "Required Options Description\n"
+         "           -s    Variants TSV file produced by ivar variants\n"
+         "           -p    Prefix for output files\n"
+         "           -r    Reference sequence FASTA\n\n"
          "Input Options    Description\n"
-         "           -i    BAM file, with aligned reads, to "
-         "trim primers and quality. If not specified will use standard in\n"
-         "           -b    BED file with primer sequences and positions. If no "
-         "BED file is specified, only quality trimming will be done.\n"
-         "           -f    [EXPERIMENTAL] Primer pair information file "
-         "containing left and right primer names for the same amplicon "
-         "separated by a tab\n"
-         "                 If provided, reads that do not fall within atleat "
-         "one amplicon will be ignored prior to primer trimming.\n"
-         "           -x    Primer position offset (Default: 0). Reads that "
-         "occur at the specified offset positions relative to primer positions "
-         "will also be trimmed.\n"
-         "           -m    Minimum length of read to retain after trimming "
-         "(Default: 50% average length of the first 1000 reads)\n"
-         "           -q    Minimum quality threshold for sliding window to "
-         "pass (Default: 20)\n"
-         "           -s    Width of sliding window (Default: 4)\n"
-         "           -e    Include reads with no primers. By default, reads "
-         "with no primers are excluded\n"
-         "           -k    Keep reads to allow for reanalysis: keep reads "
-         "which would be dropped by\n"
-         "                 alignment length filter or primer requirements, but "
-         "mark them QCFAIL\n\n"
-         "Output Options   Description\n"
-         "           -p    Prefix for the output BAM file. If none is specified output will go to std out\n";
+         "           -t    Minimum frequency threshold (Default: 0)\n"
+         "           -m    Minimum read depth (Default: 10)\n\n"
+         "GMM Prior Options  Description\n"
+         "           -N    Number of Gaussian components (Default: 12)\n"
+         "           -I    Invariant frequency threshold; variants above this\n"
+         "                 value are modeled with a half-normal (Default: 0.97)\n"
+         "           -C    Covariance prior (Default: 1e-3)\n"
+         "           -M    Mean precision prior (Default: 1e-2)\n";
 }
 
 void print_trim_usage() {
@@ -287,7 +278,7 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
-static const char *contam_opt_str = "p:s:t:m:r:h?";
+static const char *contam_opt_str = "p:s:t:m:r:N:I:C:M:h?";
 
 std::string get_filename_without_extension(std::string f, std::string ext) {
   if (ext.length() > f.length())  // If extension longer than filename
@@ -336,6 +327,11 @@ int main(int argc, char *argv[]) {
     g_args.min_depth = 10;
     g_args.min_qual = 20;
     g_args.ref = "";
+    g_args.gmm_n = 6;
+    g_args.gmm_invariant = 0.97;
+    //default to spike-in priors
+    g_args.gmm_cov_prior = 0.0;
+    g_args.gmm_mean_prior = 0.5;
     opt = getopt(argc, argv, contam_opt_str);
     while (opt != -1) {
       switch (opt) {
@@ -354,9 +350,21 @@ int main(int argc, char *argv[]) {
         case 'r':
           g_args.ref = optarg;
           break;
+        case 'N':
+          g_args.gmm_n = std::stoi(optarg);
+          break;
+        case 'I':
+          g_args.gmm_invariant = std::stod(optarg);
+          break;
+        case 'C':
+          g_args.gmm_cov_prior = std::stod(optarg);
+          break;
+        case 'M':
+          g_args.gmm_mean_prior = std::stod(optarg);
+          break;
         case 'h':
         case '?':
-          print_trim_usage();
+          print_contam_usage();
           return -1;
           break;
       }
@@ -365,7 +373,7 @@ int main(int argc, char *argv[]) {
     if (!g_args.variants.empty() && !g_args.prefix.empty()) {
       std::vector<double> solution;
       std::vector<double> means;
-      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.ref, g_args.min_threshold);
+      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.ref, g_args.min_threshold, g_args.gmm_n, g_args.gmm_invariant, g_args.gmm_cov_prior, g_args.gmm_mean_prior);
       cluster_consensus(variants, g_args.prefix, g_args.min_threshold, g_args.min_depth, g_args.min_qual, solution, means, g_args.ref);
     }
     res = 0;

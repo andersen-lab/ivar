@@ -582,16 +582,15 @@ void write_single_cluster_output(std::string output_prefix){
 
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, \
-                              std::string ref, double default_threshold){
+                              std::string ref, double default_threshold, \
+                              uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior){
   if(ref.empty()){
     std::cerr << "Please provide a reference sequence." << std::endl;
     exit(1);
   }
 
-  uint32_t n=6;
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
-  double invariant_threshold = 0.97;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
   set_deletion_flags(base_variants, 0.001);
 
@@ -619,11 +618,14 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   model.set_use_half_normal_for_noise(true, invariant_threshold);
 
   // spike in priors
-  model.set_mean_precision_prior(0.5);
+  //model.set_mean_precision_prior(0.5);
 
   //simulated priors
   //model.set_covariance_prior(1e-3);
   //model.set_mean_precision_prior(1e-2);
+
+  model.set_covariance_prior(covariance_prior);
+  model.set_mean_precision_prior(mean_precision_prior);
 
   model.fit(model_freqs);
   model.set_min_cluster_fraction(0.10);

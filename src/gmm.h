@@ -66,13 +66,12 @@ struct variant {
 
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations);
 void split(std::string &s, char delim, std::vector<std::string> &elems);
-std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::string ref, double default_threshold);
+std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, std::string ref, double default_threshold, uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior);
 void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold, double invariant_threshold);
 uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
 double calculate_mean(const std::vector<double>& data);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
-void assign_all_variants(std::vector<variant> &variants, std::vector<variant> base_variants, gaussian_mixture_model &gmodel, double lower_bound, double upper_bound);
 void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants);
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound);
 double calculate_mad(const std::vector<double>& data, double mean);
