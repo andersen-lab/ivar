@@ -699,7 +699,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       base_variants[i].half_normal_lower = true;
       base_variants[i].half_normal_upper = false;
       if(base_variants[i].position == 542){
-        std::cerr << "variant at position 542 assigned to half normal lower with frequency " << base_variants[i].gapped_freq << "\n";
+        std::cerr << "variant at position 542 assigned to half normal lower with frequency " << base_variants[i].gapped_freq << " " << all_labels[i] << "\n";
       }
     } else if(all_labels[i] == n-1){
       base_variants[i].half_normal_upper = true;
