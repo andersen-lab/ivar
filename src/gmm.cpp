@@ -16,6 +16,9 @@
 
 void flag_low_posterior_variants(std::vector<variant> &base_variants){
   for(auto &var : base_variants){
+    if(var.half_normal_upper || var.half_normal_lower){
+      continue;
+    }
     if(var.probabilities.empty()) continue;
     uint32_t assigned_cluster = var.cluster_assigned;
     double assigned_prob = var.probabilities[assigned_cluster];
@@ -692,15 +695,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     if(base_variants[i].gapped_freq > invariant_threshold){
       base_variants[i].half_normal_upper = true;
       base_variants[i].half_normal_lower = false;
-      if(base_variants[i].position == 542){
-        std::cerr << "variant at position 542 assigned to half normal upper with frequency " << base_variants[i].gapped_freq << " " << all_labels[i] <<  "\n";
-      }
     } else if(base_variants[i].gapped_freq < 1-invariant_threshold){
       base_variants[i].half_normal_lower = true;
       base_variants[i].half_normal_upper = false;
-      if(base_variants[i].position == 542){
-        std::cerr << "variant at position 542 assigned to half normal lower with frequency " << base_variants[i].gapped_freq << " " << all_labels[i] << "\n";
-      }
     } else if(all_labels[i] == n-1){
       base_variants[i].half_normal_upper = true;
       base_variants[i].half_normal_lower = false;
