@@ -5,7 +5,7 @@
 void overwrite_cluster_assigned(std::vector<variant> &variants, 
                                 std::vector<double> eff_means, 
                                 std::vector<double> means);
-bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &solution_sets, const double error);
+bool subset_sum(std::vector<double> &means, std::vector<std::vector<double>> &solution_sets, const double error);
 double find_neighboring_cluster(double freq, uint32_t cluster_assigned, std::vector<double> means);
 void find_combinations(std::vector<double> means, uint32_t index, std::vector<double> &current, std::vector<std::vector<double>> &results, double error);
 bool test_cluster_deviation(double nearest_cluster, double variant_cluster, double std_dev);

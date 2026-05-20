@@ -396,12 +396,42 @@ std::vector<std::vector<double>> deduplicate_solutions(std::vector<std::vector<d
   return(solutions);
 }
 
-bool subset_sum(std::vector<double> means, std::vector<std::vector<double>> &solution_sets, const double error){
+bool is_boundary_rescue(const std::vector<double>& means) {
+  if (means.size() != 2) return false;
+  const double BOUNDARY_TOL = 0.01;
+  int boundary_idx = -1, major_idx = -1;
+  for (int i = 0; i < 2; ++i) {
+    if (std::abs(means[i] - 0.03) < BOUNDARY_TOL)
+      boundary_idx = i;
+    else if (means[i] > 0.50 && std::abs(means[i] - 0.97) > BOUNDARY_TOL)
+      major_idx = i;
+  }
+  return (boundary_idx >= 0 && major_idx >= 0);
+}
+
+bool subset_sum(std::vector<double> &means, std::vector<std::vector<double>> &solution_sets, const double error){
   std::cerr << "in subset sum" << std::endl;
   //gives all solutions that sum to 1
   std::vector<std::vector<double>> solutions = find_solutions(means, error);
   if(solutions.size() == 0){
     std::cerr << "no solutions found" << std::endl;
+    // Rescue: 2 effective means, one absorbed at the 0.03 lower boundary and
+    // one intermediate (>0.50). Infer the minor frequency as the complement
+    // of the major mean and treat as a valid 2-population solution.
+    if (is_boundary_rescue(means)) {
+      const double BOUNDARY_TOL = 0.01;
+      int boundary_idx = -1, major_idx = -1;
+      for (int i = 0; i < 2; ++i) {
+        if (std::abs(means[i] - 0.03) < BOUNDARY_TOL) boundary_idx = i;
+        else if (means[i] > 0.50) major_idx = i;
+      }
+      double inferred_minor = 1.0 - means[major_idx];
+      std::cerr << "Rescue: lower boundary absorbed minor population; "
+                << "inferred complement = " << inferred_minor << "\n";
+      means[boundary_idx] = inferred_minor;
+      solution_sets.push_back({means[major_idx], inferred_minor});
+      return true;
+    }
     return(false);
   }
 

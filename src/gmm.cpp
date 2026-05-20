@@ -680,25 +680,39 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<double> model_means = model.get_means();
   std::vector<double> model_vars = model.get_variances();
   std::vector<double> model_weights = model.get_weights();
-
+ 
+  std::cerr << "all freqs " << all_freqs.size() << " base variants " << base_variants.size() << "\n";
   //take the model labels and assign them to the variants
   for(uint32_t i=0; i < all_labels.size(); i++){
-    if(all_labels[i] == n-1 || base_variants[i].gapped_freq > invariant_threshold){
-      base_variants[i].half_normal_upper = true;
-      base_variants[i].half_normal_lower = false;
-    } else if(all_labels[i] == n-2 || base_variants[i].gapped_freq < 1-invariant_threshold){
-      base_variants[i].half_normal_lower = true;
-      base_variants[i].half_normal_upper = false;
-    }
     base_variants[i].cluster_assigned = all_labels[i];
     if(!base_variants[i].half_normal_upper && !base_variants[i].half_normal_lower) {
       base_variants[i].probabilities = proba[i];
     }
+
+    if(base_variants[i].gapped_freq > invariant_threshold){
+      base_variants[i].half_normal_upper = true;
+      base_variants[i].half_normal_lower = false;
+      if(base_variants[i].position == 542){
+        std::cerr << "variant at position 542 assigned to half normal upper with frequency " << base_variants[i].gapped_freq << " " << all_labels[i] <<  "\n";
+      }
+    } else if(base_variants[i].gapped_freq < 1-invariant_threshold){
+      base_variants[i].half_normal_lower = true;
+      base_variants[i].half_normal_upper = false;
+      if(base_variants[i].position == 542){
+        std::cerr << "variant at position 542 assigned to half normal lower with frequency " << base_variants[i].gapped_freq << "\n";
+      }
+    } else if(all_labels[i] == n-1){
+      base_variants[i].half_normal_upper = true;
+      base_variants[i].half_normal_lower = false;
+    } else if(all_labels[i] == n-2){
+      base_variants[i].half_normal_lower = true;
+      base_variants[i].half_normal_upper = false;
+    }
+
   }
   
   std::vector<std::vector<double>> solution_sets;
   bool solved = subset_sum(eff_means, solution_sets, 0.10);
- 
 
   //output the clustering information
   std::ofstream out(output_prefix + "_gmm_1d_results.txt");
