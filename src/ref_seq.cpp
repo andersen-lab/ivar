@@ -180,6 +180,39 @@ char *ref_antd::get_codon(int64_t pos, std::string region, gff3_feature feature,
   return codon;
 }
 
+char *ref_antd::get_codon(int64_t pos, std::string region, const cds_group &group) {
+  if (seq == NULL) {
+    set_seq(region);
+  }
+  char *codon = new char[3];
+  int64_t cds_pos = group.genomic_to_cds_pos(pos);
+  int phase = group.get_phase();
+  // Edge case: group phase if always the phase of the first 5' end segment.
+  // So, note that the cds_pos < phase position will rarely be triggered.
+  if (cds_pos == -1 || cds_pos < phase) {
+    codon[0] = codon[1] = codon[2] = 'N';
+    return codon;
+  }
+  int64_t codon_idx = (cds_pos - phase) / 3;
+  int64_t codon_cds_start = phase + codon_idx * 3;
+  for (int i = 0; i < 3; i++) {
+    int64_t g = group.cds_to_genomic_pos(codon_cds_start + i);
+    if (g == -1) {
+      codon[i] = 'N';
+    } else {
+      codon[i] = *(seq + g - 1);
+    }
+  }
+  if (group.get_strand() == '-') {
+    reverse_complement_codon(codon);
+  }
+  return codon;
+}
+
+std::vector<cds_group> ref_antd::query_cds_groups(int64_t pos) {
+  return gff.query_cds_groups(static_cast<uint64_t>(pos));
+}
+
 int ref_antd::add_gff(std::string path) {
   // Read GFF file
   if (!path.empty()) gff.read_file(path);
