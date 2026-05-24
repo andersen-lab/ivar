@@ -138,6 +138,14 @@ add_executable(check_bd_threshold
         test_bd_threshold.cpp ../src/gmm_1d.cpp ../src/gaussian_sampler.cpp
 )
 
+add_executable(check_subset_sum
+        test_subset_sum.cpp ../src/solve_clustering.cpp ../src/gmm_1d.cpp ../src/call_consensus_clustering.cpp ../src/genomic_position.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp
+)
+
+add_executable(check_parse_gff
+        test_parse_gff.cpp ../src/parse_gff.cpp
+)
+
 set(ALL_TEST_EXECUTABLES check_primer_trim
         check_trim
         check_quality_trim
@@ -170,6 +178,8 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_multinomial_sampler
         check_bootstrap_variants
         check_bd_threshold
+        check_subset_sum
+        check_parse_gff
 )
 
 if(HTSLIB_PREFIX)
