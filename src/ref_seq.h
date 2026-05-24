@@ -31,6 +31,8 @@ class ref_antd {
   char *get_codon(int64_t pos, std::string region, gff3_feature feature);
   char *get_codon(int64_t pos, std::string region, gff3_feature feature,
                   char alt);
+  char *get_codon(int64_t pos, std::string region, const cds_group &group);
+  std::vector<cds_group> query_cds_groups(int64_t pos);
   std::vector<gff3_feature> get_gff_features();
 
  private:
