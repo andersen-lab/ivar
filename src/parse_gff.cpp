@@ -144,6 +144,7 @@ int gff3::read_file(std::string path) {
   }
   if(!features.empty()){
     this->is_empty = false;
+    build_cds_groups();
   } else {
     std::cerr << "GFF file is empty!" << std::endl;
   }
@@ -166,6 +167,50 @@ std::vector<gff3_feature> gff3::query_features(uint64_t pos, std::string type) {
 int gff3::get_count() { return features.size(); }
 
 bool gff3::empty() { return is_empty; }
+
+void gff3::build_cds_groups() {
+  cds_groups_.clear();
+  cds_group_index_.clear();
+  std::map<std::string, size_t> by_key;
+  size_t unassigned_counter = 0;
+  for (size_t fi = 0; fi < features.size(); ++fi) {
+    const gff3_feature &f = features[fi];
+    if (f.get_type() != "CDS") continue;
+    std::string key = f.get_attribute("ID");
+    if (key.empty()) key = f.get_attribute("Parent");
+    if (key.empty()) key = "_unassigned_" + std::to_string(unassigned_counter++);
+    std::map<std::string, size_t>::iterator it = by_key.find(key);
+    if (it == by_key.end()) {
+      by_key[key] = cds_groups_.size();
+      cds_groups_.push_back(cds_group());
+      it = by_key.find(key);
+    }
+    cds_groups_[it->second].add_segment(f);
+  }
+  for (size_t i = 0; i < cds_groups_.size(); ++i) {
+    cds_groups_[i].sort_and_finalize_segments();
+  }
+  cds_group_index_ = by_key;
+}
+
+std::vector<cds_group> gff3::query_cds_groups(uint64_t pos) const {
+  std::vector<cds_group> res;
+  for (size_t i = 0; i < cds_groups_.size(); ++i) {
+    if (cds_groups_[i].contains(static_cast<int64_t>(pos)))
+      res.push_back(cds_groups_[i]);
+  }
+  return res;
+}
+
+const std::vector<cds_group> &gff3::get_cds_groups() const {
+  return cds_groups_;
+}
+
+const cds_group *gff3::find_cds_group_by_id(const std::string &id) const {
+  std::map<std::string, size_t>::const_iterator it = cds_group_index_.find(id);
+  if (it == cds_group_index_.end()) return nullptr;
+  return &cds_groups_[it->second];
+}
 
 cds_group::cds_group() : strand_('+') {}
 
