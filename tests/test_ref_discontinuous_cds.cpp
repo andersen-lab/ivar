@@ -75,18 +75,19 @@ int main() {
     return -1;
   }
 
-  // pos 319: cds_pos 0, top=CAG, after RC = CTG
+  // pos 319: cds_pos 0, top=CAG (5' to 3'), after complement = GTC
   codon = refantd.get_codon(319, "test", rev_groups[0]);
-  success += (codon[0] == 'C' && codon[1] == 'T' && codon[2] == 'G');
+  success += (codon[0] == 'G' && codon[1] == 'T' && codon[2] == 'C');
   if(success != 8) {
-    std::cout << "Error at rev pos 319 (expected CTG): "
+    std::cout << "Error at rev pos 319 (expected GTC): "
               << codon[0] << codon[1] << codon[2];
     delete[] codon;
     return -1;
   }
   delete[] codon;
 
-  // pos 220: cds_pos 20, top=ACA (ref 301,300,220), after RC = TGT
+  // pos 220: cds_pos 20, top=ACA (ref 301,300,220 in 5' to 3'),
+  // after complement = TGT straddles CDSs
   codon = refantd.get_codon(220, "test", rev_groups[0]);
   success += (codon[0] == 'T' && codon[1] == 'G' && codon[2] == 'T');
   if(success != 9) {

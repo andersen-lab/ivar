@@ -46,11 +46,15 @@ int64_t ref_antd::get_length(std::string region) {
   return -1;
 }
 
-void ref_antd::reverse_complement_codon(char* codon) {
-    char temp = comp_base[(unsigned char)codon[2]];
-    codon[2] = comp_base[(unsigned char)codon[0]];
-    codon[0] = temp;
+void ref_antd::complement_codon(char* codon) {
+    codon[0] = comp_base[(unsigned char)codon[0]];
     codon[1] = comp_base[(unsigned char)codon[1]];
+    codon[2] = comp_base[(unsigned char)codon[2]];
+}
+
+void ref_antd::reverse_complement_codon(char* codon) {
+    std::swap(codon[0], codon[2]);
+    complement_codon(codon);
 }
 
 char *ref_antd::get_codon(int64_t pos, std::string region,
@@ -204,7 +208,9 @@ char *ref_antd::get_codon(int64_t pos, std::string region, const cds_group &grou
     }
   }
   if (group.get_strand() == '-') {
-    reverse_complement_codon(codon);
+    // cds_to_genomic_pos returns positions 5' to 3' so codon[] is in
+    // 5'->3' order. Only complement the bases (no reversal).
+    complement_codon(codon);
   }
   return codon;
 }

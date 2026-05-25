@@ -239,8 +239,7 @@ void cds_group::sort_and_finalize_segments() {
   }
   cumulative_len_before_.assign(segments_.size(), 0);
   for (size_t i = 1; i < segments_.size(); ++i) {
-    int64_t prev_len =
-        segments_[i - 1].get_end() - segments_[i - 1].get_start() + 1;
+    int64_t prev_len = segments_[i - 1].get_end() - segments_[i - 1].get_start() + 1;
     cumulative_len_before_[i] = cumulative_len_before_[i - 1] + prev_len;
   }
 }

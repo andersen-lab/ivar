@@ -81,7 +81,7 @@ class cds_group {
   void add_segment(const gff3_feature &f);
   void sort_and_finalize_segments();
 
-  // pos is 1-based genomic; cds_pos is 0-based offset in mRNA order
+  // pos is 1-based genomic; cds_pos is 0-based offset in 5' to 3'
   // (for - strand, cds_pos=0 corresponds to the highest genomic coord).
   int64_t genomic_to_cds_pos(int64_t pos) const; // -1 if not in group
   int64_t cds_to_genomic_pos(int64_t cds_pos) const; // -1 if past length
