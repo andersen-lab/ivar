@@ -146,6 +146,10 @@ add_executable(check_parse_gff
         test_parse_gff.cpp ../src/parse_gff.cpp
 )
 
+add_executable(check_ref_discontinuous_cds
+        test_ref_discontinuous_cds.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/allele_functions.cpp
+)
+
 set(ALL_TEST_EXECUTABLES check_primer_trim
         check_trim
         check_quality_trim
@@ -180,6 +184,7 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_bd_threshold
         check_subset_sum
         check_parse_gff
+        check_ref_discontinuous_cds
 )
 
 if(HTSLIB_PREFIX)
