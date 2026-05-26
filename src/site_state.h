@@ -8,6 +8,7 @@
 
 enum site_type {
   NUCLEOTIDE,
+  CODON,
   AMINO_ACID
 };
 

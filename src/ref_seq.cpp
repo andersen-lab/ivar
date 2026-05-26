@@ -219,6 +219,10 @@ std::vector<cds_group> ref_antd::query_cds_groups(int64_t pos) {
   return gff.query_cds_groups(static_cast<uint64_t>(pos));
 }
 
+const std::vector<cds_group> &ref_antd::get_cds_groups() const {
+  return gff.get_cds_groups();
+}
+
 int ref_antd::add_gff(std::string path) {
   // Read GFF file
   if (!path.empty()) gff.read_file(path);
