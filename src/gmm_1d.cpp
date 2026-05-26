@@ -203,9 +203,9 @@ gmm_1d::Matrix gmm_1d::estimate_log_prob(const std::vector<double>&x) const {
       }
 
       result[i][k] += std::log(2.0) + 0.5 / mean_precision_[k];
-      if (component_types_[k] == ComponentType::HALF_NORMAL_LEFT && x[i] > 1 - invariant_threshold_) {
+      if (component_types_[k] == ComponentType::HALF_NORMAL_LEFT && x[i] < 1 - invariant_threshold_) {
         result[i][k] = -std::numeric_limits<double>::infinity();
-      } else if (component_types_[k] == ComponentType::HALF_NORMAL_RIGHT && x[i] < invariant_threshold_) {
+      } else if (component_types_[k] == ComponentType::HALF_NORMAL_RIGHT && x[i] > invariant_threshold_) {
         result[i][k] = -std::numeric_limits<double>::infinity();
       }
     }
@@ -366,8 +366,7 @@ double gmm_1d::compute_lower_bound(const Matrix& log_resp) const {
   double entropy = 0.0;
   for (int i = 0; i < N; i++)
     for (int k = 0; k < this->n_components; k++)
-      if (std::isfinite(log_resp[i][k]))
-        entropy -= std::exp(log_resp[i][k]) * log_resp[i][k];
+      entropy -= std::exp(log_resp[i][k]) * log_resp[i][k];
 
   double sum_log_mp = 0.0;
   for (int k = 0; k < this->n_components; k++) {
