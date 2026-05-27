@@ -56,7 +56,7 @@ std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<
 double calculate_mean(const std::vector<double>& data);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
 void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants);
-void set_deletion_flags(std::vector<variant> &variants, double lower_bound);
+void set_deletion_flags(std::vector<variant> &variants, double lower_bound, double invariant_lower_bound);
 double calculate_mad(const std::vector<double>& data, double mean);
 void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample);
 void reset_variants_info(std::vector<variant> &variants);

@@ -542,9 +542,11 @@ void set_insertion_flags(std::vector<variant> &variants){
   }
 }
 
-void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
+void set_deletion_flags(std::vector<variant> &variants, double lower_bound, double invariant_lower_bound){
   std::vector<uint32_t> del_positions;
   std::vector<uint32_t> all_del_positions;
+  // accumulated gapped_freq of sub-threshold deletions covering each downstream position
+  std::unordered_map<uint32_t, double> sub_threshold_del_freq;
 
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].depth_flag) continue;
@@ -562,6 +564,13 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
         all_del_positions.push_back(variants[i].position+j);
       }
     }
+    // track deletions that are below the invariant lower bound (noise-level);
+    // their gap signal bleeds into downstream gapped_freqs
+    if(found && variants[i].outside_freq_range && variants[i].gapped_freq <= invariant_lower_bound){
+      for(uint32_t j=1; j < variants[i].nuc.size()-1; j++){
+        sub_threshold_del_freq[variants[i].position+j] += variants[i].gapped_freq;
+      }
+    }
   }
   //set the include_clustering flag to false if this covers a deletion position
   for(uint32_t i=0; i < variants.size(); i++){
@@ -572,6 +581,18 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
       variants[i].include_clustering = false;
     } else {
       variants[i].include_clustering = true;
+    }
+  }
+  // if a variant's reduced gapped_freq is fully explained by a sub-threshold deletion,
+  // treat it as invariant so it is assigned to all clusters rather than one
+  double invariant_upper_bound = 1.0 - invariant_lower_bound;
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].outside_freq_range) continue;
+    auto it = sub_threshold_del_freq.find(variants[i].position);
+    if(it == sub_threshold_del_freq.end()) continue;
+    if(variants[i].gapped_freq + it->second >= invariant_upper_bound){
+      variants[i].half_normal_upper = true;
+      variants[i].outside_freq_range = true;
     }
   }
 }
@@ -595,7 +616,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
-  set_deletion_flags(base_variants, 0.001);
+  set_deletion_flags(base_variants, 0.001, 1.0 - invariant_threshold);
 
   std::vector<variant> model_variants;
   std::vector<double> model_freqs;
