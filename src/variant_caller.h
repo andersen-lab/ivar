@@ -20,6 +20,8 @@ class variant_caller {
   ref_antd refantd;
   IntervalTree amplicons;
   site_aggregator sa;
+  std::vector<site_aggregator> codon_aggregators_;
+  std::vector<site_aggregator> aa_aggregators_;
   std::ofstream output_file;
   static const std::string FILE_HEADER;
   static const std::string DELIMITER;
@@ -27,6 +29,16 @@ class variant_caller {
   void get_read_amplicons(uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes);
 
  public:
+  static const std::string CODON_FILE_HEADER;
+  static const std::string AA_FILE_HEADER;
+
+  // For each cds_group, build codon and AA site_states from the nuc states.
+  // Codon/AA states have amplicon = nullptr (amplicon tracking is nuc-only).
+  void extract_codon_and_aa_states(
+      const std::vector<site_state> &nuc_states,
+      std::vector<std::vector<site_state> > &codon_states_by_group,
+      std::vector<std::vector<site_state> > &aa_states_by_group);
+
   variant_caller(uint8_t min_qual, std::string ref_path, std::string gff_path = "");
   bool initialize_region(std::string region);
   ~variant_caller();
@@ -42,6 +54,8 @@ class variant_caller {
   void merge_reads(std::vector<site_state> &read_site_states_one, std::vector<site_state> &read_site_states_two, std::vector<site_state> &merged_site_states);
 
   void write_to_file(std::string output_path, std::string ref_name);
+  void write_codon_to_file(std::string output_path, std::string ref_name);
+  void write_aa_to_file(std::string output_path, std::string ref_name);
 };
 
 #endif  // VARIANT_CALLER_H

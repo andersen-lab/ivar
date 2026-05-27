@@ -150,6 +150,14 @@ add_executable(check_ref_discontinuous_cds
         test_ref_discontinuous_cds.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/allele_functions.cpp
 )
 
+add_executable(check_codon_extraction
+        test_codon_extraction.cpp ../src/variant_caller.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/genomic_position.cpp ../src/site_state.cpp ../src/site_aggregator.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/site_aggregator_stats.cpp ../src/site_state_aggregator_stats.cpp
+)
+
+add_executable(check_write_codon_aa
+        test_write_codon_aa.cpp ../src/variant_caller.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/genomic_position.cpp ../src/site_state.cpp ../src/site_aggregator.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/site_aggregator_stats.cpp ../src/site_state_aggregator_stats.cpp
+)
+
 set(ALL_TEST_EXECUTABLES check_primer_trim
         check_trim
         check_quality_trim
@@ -185,6 +193,8 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_subset_sum
         check_parse_gff
         check_ref_discontinuous_cds
+        check_codon_extraction
+        check_write_codon_aa
 )
 
 if(HTSLIB_PREFIX)
