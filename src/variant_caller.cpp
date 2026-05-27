@@ -47,7 +47,6 @@ const std::string variant_caller::AA_FILE_HEADER =
     "REF_DEPTH_AA\t"
     "ALT_DEPTH_AA\t"
     "ALT_FREQ_AA\t"
-    "POS_CODON\t"
     "REF_CODON\t"
     "ALT_CODON";
 const std::string variant_caller::DELIMITER = "\t";
@@ -453,8 +452,7 @@ void variant_caller::write_codon_to_file(std::string output_path, std::string re
         const std::string &alt_codon = state_stats.get_state();
         if (alt_codon.size() != 3) continue;
         uint32_t alt_depth = state_stats.get_depth();
-        double alt_freq = total_depth > 0
-            ? alt_depth / static_cast<double>(total_depth) : 0;
+        double alt_freq = total_depth > 0 ? alt_depth / static_cast<double>(total_depth) : 0;
 
         // Comma-separated nuc differences
         std::string pos_list, ref_list, alt_list;
@@ -533,18 +531,16 @@ void variant_caller::write_aa_to_file(std::string output_path, std::string ref_n
         double alt_freq = total_depth > 0 ? alt_depth / static_cast<double>(total_depth) : 0;
 
         // Every observed codon at this position that translates to alt_aa
-        std::string pos_codon_list, ref_codon_list, alt_codon_list;
+        std::string ref_codon_list, alt_codon_list;
         for (const auto &codon_stats : codon_data[ci].get_site_state_stats()) {
           const std::string &codon = codon_stats.get_state();
           if (codon.size() != 3) continue;
           char codon_aa = codon2aa(codon[0], codon[1], codon[2]);
           if (codon_aa != alt_aa[0]) continue;
-          if (!pos_codon_list.empty()) {
-            pos_codon_list += ",";
+          if (!ref_codon_list.empty()) {
             ref_codon_list += ",";
             alt_codon_list += ",";
           }
-          pos_codon_list += std::to_string(ci + 1);
           ref_codon_list += ref_codon;
           alt_codon_list += codon;
         }
@@ -556,7 +552,6 @@ void variant_caller::write_aa_to_file(std::string output_path, std::string ref_n
              << ref_depth << "\t"
              << alt_depth << "\t"
              << alt_freq << "\t"
-             << pos_codon_list << "\t"
              << ref_codon_list << "\t"
              << alt_codon_list << "\n";
       }

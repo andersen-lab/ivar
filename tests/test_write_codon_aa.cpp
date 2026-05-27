@@ -120,7 +120,7 @@ int main() {
   bool found_stop = false;
   while (std::getline(aa_file, line)) {
     std::vector<std::string> f = split_tab(line);
-    if (f.size() < 10)
+    if (f.size() < 9)
       continue;
     if (f[3] == "*") {
       found_stop = true;
@@ -128,14 +128,10 @@ int main() {
         success += 1;
       else
         std::cout << "AA POS_AA mismatch: '" << f[1] << "'" << std::endl;
-      if (f[9] == "TGA")
+      if (f[8] == "TGA")
         success += 1;
       else
-        std::cout << "AA ALT_CODON mismatch: '" << f[9] << "'" << std::endl;
-      if (f[7] == "1")
-        success += 1;
-      else
-        std::cout << "AA POS_CODON mismatch: '" << f[7] << "'" << std::endl;
+        std::cout << "AA ALT_CODON mismatch: '" << f[8] << "'" << std::endl;
       if (f[6] == "0.3")
         success += 1;
       else
@@ -168,5 +164,5 @@ int main() {
   else
     std::cerr << "AA file should NOT exist without GFF" << std::endl;
 
-  return success == 17 ? 0 : 1;
+  return success == 16 ? 0 : 1;
 }
