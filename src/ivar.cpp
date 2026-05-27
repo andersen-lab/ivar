@@ -272,6 +272,7 @@ void print_version_info() {
 }
 
 static const char *trim_opt_str = "i:b:f:x:p:m:q:s:r:ekh?";
+static const char *saga_opt_str = "i:b:f:x:p:m:q:g:r:ekh?";
 static const char *variants_opt_str = "p:t:q:m:r:g:Gh?";
 static const char *consensus_opt_str = "i:p:q:t:c:m:n:kh?";
 static const char *removereads_opt_str = "i:p:t:b:h?";
@@ -388,7 +389,8 @@ int main(int argc, char *argv[]) {
     g_args.min_depth = 10;
     g_args.min_qual = 20;
     g_args.ref = "";
-    opt = getopt(argc, argv, trim_opt_str);
+    g_args.gff = "";
+    opt = getopt(argc, argv, saga_opt_str);
     while (opt != -1) {
       switch (opt) {
         case 'i':
@@ -412,13 +414,16 @@ int main(int argc, char *argv[]) {
         case 'r':
           g_args.ref = optarg;
           break;
+        case 'g':
+          g_args.gff = optarg;
+          break;
         case 'h':
         case '?':
           print_trim_usage();
           return -1;
           break;
       }
-      opt = getopt(argc, argv, trim_opt_str);
+      opt = getopt(argc, argv, saga_opt_str);
     }
     if (g_args.bam.empty() && isatty(STDIN_FILENO)) {
       std::cout << "Please supply a BAM file using -i or supply the input file "
@@ -431,8 +436,9 @@ int main(int argc, char *argv[]) {
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
     res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
                                cl_cmd.str(),
-                               g_args.primer_pair_file, g_args.primer_offset, g_args.min_depth, g_args.min_qual, g_args.ref);
-    }
+                               g_args.primer_pair_file, g_args.primer_offset, g_args.min_depth, g_args.min_qual, g_args.ref,
+                               g_args.gff);
+  }
 
   // ivar trim
   else if (cmd.compare("trim") == 0) {
