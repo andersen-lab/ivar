@@ -80,7 +80,7 @@ int main() {
       continue;
     if (f[2] == "AGC" && f[3] == "TGA") {
       found_tga = true;
-      if (f[1] == "10")
+      if (f[1] == "1")
         success += 1;
       else
         std::cout << "Codon POS_CODON mismatch: '" << f[1] << "'" << std::endl;
@@ -132,6 +132,10 @@ int main() {
         success += 1;
       else
         std::cout << "AA ALT_CODON mismatch: '" << f[9] << "'" << std::endl;
+      if (f[7] == "1")
+        success += 1;
+      else
+        std::cout << "AA POS_CODON mismatch: '" << f[7] << "'" << std::endl;
       if (f[6] == "0.3")
         success += 1;
       else
@@ -164,5 +168,5 @@ int main() {
   else
     std::cerr << "AA file should NOT exist without GFF" << std::endl;
 
-  return success == 16 ? 0 : 1;
+  return success == 17 ? 0 : 1;
 }

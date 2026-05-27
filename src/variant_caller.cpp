@@ -478,7 +478,7 @@ void variant_caller::write_codon_to_file(std::string output_path, std::string re
         }
 
         file << feature << "\t"
-             << anchor << "\t"
+             << (ci + 1) << "\t"
              << ref_codon << "\t"
              << alt_codon << "\t"
              << ref_depth << "\t"
@@ -544,7 +544,7 @@ void variant_caller::write_aa_to_file(std::string output_path, std::string ref_n
             ref_codon_list += ",";
             alt_codon_list += ",";
           }
-          pos_codon_list += std::to_string(anchor);
+          pos_codon_list += std::to_string(ci + 1);
           ref_codon_list += ref_codon;
           alt_codon_list += codon;
         }
