@@ -98,5 +98,79 @@ int main() {
   }
   delete[] codon;
 
+  // + strand within-group overlap: id-overlap-rev = [40,50] U [50,59].
+  std::vector<cds_group> fwd_overlap_groups = refantd.query_cds_groups(50);
+  success += fwd_overlap_groups.size() == 1;
+  if(success != 10) {
+    std::cout << "Error querying fwd-overlap group at pos 50";
+    return -1;
+  }
+
+  // pos 50: boundary base. genomic_to_cds_pos returns first hit (cds 10).
+  // codon 3 -> reads cds 9,10,11 = genomic 49,50,50 -> ref CTT.
+  codon = refantd.get_codon(50, "test", fwd_overlap_groups[0]);
+  success += (codon[0] == 'C' && codon[1] == 'T' && codon[2] == 'T');
+  if(success != 11) {
+    std::cout << "Error at fwd-overlap pos 50 (boundary, expected CTT): "
+              << codon[0] << codon[1] << codon[2];
+    delete[] codon;
+    return -1;
+  }
+  delete[] codon;
+
+  // pos 52: cds 12, codon 4 entirely in second segment -> 51,52,53 = TGG.
+  codon = refantd.get_codon(52, "test", fwd_overlap_groups[0]);
+  success += (codon[0] == 'T' && codon[1] == 'G' && codon[2] == 'G');
+  if(success != 12) {
+    std::cout << "Error at fwd-overlap pos 52 (expected TGG): " << codon[0] << codon[1] << codon[2];
+    delete[] codon;
+    return -1;
+  }
+  delete[] codon;
+
+  // - strand within-group overlap: id-overlap-rev = [160,170] U [170,179].
+  std::vector<cds_group> rev_overlap_groups = refantd.query_cds_groups(170);
+  success += rev_overlap_groups.size() == 1;
+  if(success != 13) {
+    std::cout << "Error querying rev-overlap group at pos 170";
+    return -1;
+  }
+
+  // pos 170: boundary base. genomic_to_cds_pos returns first hit (cds 9).
+  // codon 3 -> reads cds 9,10,11 = genomic 170,170,169 = ref CCT -> complement = GGA.
+  codon = refantd.get_codon(170, "test", rev_overlap_groups[0]);
+  success += (codon[0] == 'G' && codon[1] == 'G' && codon[2] == 'A');
+  if(success != 14) {
+    std::cout << "Error at rev-overlap pos 170 (boundary, expected GGA): "
+              << codon[0] << codon[1] << codon[2];
+    delete[] codon;
+    return -1;
+  }
+  delete[] codon;
+
+  // pos 175: cds 4, codon 1 first sorted segment -> 176,175,174
+  // = ref GTC -> complement = CAG.
+  codon = refantd.get_codon(175, "test", rev_overlap_groups[0]);
+  success += (codon[0] == 'C' && codon[1] == 'A' && codon[2] == 'G');
+  if(success != 15) {
+    std::cout << "Error at rev-overlap pos 175 (expected CAG): "
+              << codon[0] << codon[1] << codon[2];
+    delete[] codon;
+    return -1;
+  }
+  delete[] codon;
+
+  // pos 165: cds 15, codon 5 entirely in second sorted segment -> 165,164,163
+  // = ref AAG -> complement = TTC.
+  codon = refantd.get_codon(165, "test", rev_overlap_groups[0]);
+  success += (codon[0] == 'T' && codon[1] == 'T' && codon[2] == 'C');
+  if(success != 16) {
+    std::cout << "Error at rev-overlap pos 165 (expected TTC): "
+              << codon[0] << codon[1] << codon[2];
+    delete[] codon;
+    return -1;
+  }
+  delete[] codon;
+
   return 0;
 }
