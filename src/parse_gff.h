@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <iterator>
 #include <map>
@@ -77,6 +78,11 @@ class gff3_feature {
 // Combine CDSs with same ID into a group
 class cds_group {
  public:
+  struct codon_triple {
+    int64_t g0, g1, g2;
+    int64_t min_pos, max_pos;
+  };
+
   cds_group();
   void add_segment(const gff3_feature &f);
   void sort_and_finalize_segments();
@@ -93,10 +99,13 @@ class cds_group {
   const std::string &get_id() const;
   const std::string &get_gene() const;
   const std::vector<gff3_feature> &segments() const;
+  const std::vector<codon_triple> &codon_triples() const;
 
  private:
   std::vector<gff3_feature> segments_;
   std::vector<int64_t> cumulative_len_before_;
+  std::vector<int64_t> cds_genomic_index_;
+  std::vector<codon_triple> codon_triples_;
   std::string id_;
   std::string gene_;
   char strand_;

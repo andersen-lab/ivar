@@ -191,35 +191,17 @@ void variant_caller::extract_codon_and_aa_states(const std::vector<site_state> &
 
   for (size_t gi = 0; gi < groups.size(); ++gi) {
     const cds_group &g = groups[gi];
-    int64_t len = g.length();
-    if (len <= 0) continue;
-    int phase = g.get_phase();
-    int64_t n_codons = (len - phase) / 3;
-    if (n_codons <= 0) continue;
+    const std::vector<cds_group::codon_triple> &triples = g.codon_triples();
 
-    for (int64_t ci = 0; ci < n_codons; ++ci) {
-      int64_t codon_cds_start = phase + ci * 3;
-      int64_t g0 = g.cds_to_genomic_pos(codon_cds_start);
-      int64_t g1 = g.cds_to_genomic_pos(codon_cds_start + 1);
-      int64_t g2 = g.cds_to_genomic_pos(codon_cds_start + 2);
-      if (g0 < 0 || g1 < 0 || g2 < 0)
-        continue;
-
-      int64_t min_codon_pos, max_codon_pos;
-      if (g.get_strand() == '-') {
-        min_codon_pos = g2;
-        max_codon_pos = g0;
-      } else {
-        min_codon_pos = g0;
-        max_codon_pos = g2;
-      }
+    for (size_t ci = 0; ci < triples.size(); ++ci) {
+      const cds_group::codon_triple &t = triples[ci];
       // Codons not covered by read are skipped
-      if (min_codon_pos < min_pos || max_codon_pos > max_pos)
+      if (t.min_pos < min_pos || t.max_pos > max_pos)
         continue;
 
-      int64_t i0 = read_position_to_site[g0 - min_pos];
-      int64_t i1 = read_position_to_site[g1 - min_pos];
-      int64_t i2 = read_position_to_site[g2 - min_pos];
+      int64_t i0 = read_position_to_site[t.g0 - min_pos];
+      int64_t i1 = read_position_to_site[t.g1 - min_pos];
+      int64_t i2 = read_position_to_site[t.g2 - min_pos];
       if (i0 < 0 || i1 < 0 || i2 < 0) continue;
 
       char codon[3];

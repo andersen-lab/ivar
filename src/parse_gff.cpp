@@ -242,36 +242,65 @@ void cds_group::sort_and_finalize_segments() {
     int64_t prev_len = segments_[i - 1].get_end() - segments_[i - 1].get_start() + 1;
     cumulative_len_before_[i] = cumulative_len_before_[i - 1] + prev_len;
   }
+
+  int64_t total = 0;
+  for (const auto &s : segments_) {
+    total += static_cast<int64_t>(s.get_end()) - static_cast<int64_t>(s.get_start()) + 1;
+  }
+  cds_genomic_index_.clear();
+  cds_genomic_index_.reserve(total);
+  for (const auto &s : segments_) {
+    int64_t a = static_cast<int64_t>(s.get_start());
+    int64_t b = static_cast<int64_t>(s.get_end());
+    if (strand_ == '-') {
+      for (int64_t g = b; g >= a; --g) cds_genomic_index_.push_back(g);
+    } else {
+      for (int64_t g = a; g <= b; ++g) cds_genomic_index_.push_back(g);
+    }
+  }
+
+  int phase = segments_[0].get_phase();
+  int64_t n_codons = (total - phase) / 3;
+  codon_triples_.clear();
+  if (n_codons > 0) codon_triples_.reserve(n_codons);
+  for (int64_t ci = 0; ci < n_codons; ++ci) {
+    int64_t i0 = phase + 3 * ci;
+    codon_triple t;
+    t.g0 = cds_genomic_index_[i0];
+    t.g1 = cds_genomic_index_[i0 + 1];
+    t.g2 = cds_genomic_index_[i0 + 2];
+    if (strand_ == '-') {
+      t.min_pos = t.g2;
+      t.max_pos = t.g0;
+    } else {
+      t.min_pos = t.g0;
+      t.max_pos = t.g2;
+    }
+    codon_triples_.push_back(t);
+  }
+}
+
+const std::vector<cds_group::codon_triple> &cds_group::codon_triples() const {
+  return codon_triples_;
 }
 
 int64_t cds_group::genomic_to_cds_pos(int64_t pos) const {
-  for (size_t i = 0; i < segments_.size(); ++i) {
-    int64_t start = segments_[i].get_start();
-    int64_t end = segments_[i].get_end();
-    if (pos < start || pos > end) continue;
-    if (strand_ == '-') {
-      return cumulative_len_before_[i] + (end - pos);
-    }
-    return cumulative_len_before_[i] + (pos - start);
+  if (cds_genomic_index_.empty()) return -1;
+  std::vector<int64_t>::const_iterator b = cds_genomic_index_.begin();
+  std::vector<int64_t>::const_iterator e = cds_genomic_index_.end();
+  std::vector<int64_t>::const_iterator it;
+  if (strand_ == '-') {
+    it = std::lower_bound(b, e, pos, std::greater<int64_t>());
+  } else {
+    it = std::lower_bound(b, e, pos);
   }
-  return -1;
+  if (it == e || *it != pos) return -1;
+  return it - b;
 }
 
 int64_t cds_group::cds_to_genomic_pos(int64_t cds_pos) const {
-  if (cds_pos < 0) return -1;
-  for (size_t i = 0; i < segments_.size(); ++i) {
-    int64_t seg_len =
-        segments_[i].get_end() - segments_[i].get_start() + 1;
-    int64_t lo = cumulative_len_before_[i];
-    int64_t hi = lo + seg_len;
-    if (cds_pos < lo || cds_pos >= hi) continue;
-    int64_t offset = cds_pos - lo;
-    if (strand_ == '-') {
-      return segments_[i].get_end() - offset;
-    }
-    return segments_[i].get_start() + offset;
-  }
-  return -1;
+  if (cds_pos < 0 || cds_pos >= static_cast<int64_t>(cds_genomic_index_.size())) return -1;
+  return cds_genomic_index_[cds_pos];
 }
 
 char cds_group::get_strand() const { return strand_; }
