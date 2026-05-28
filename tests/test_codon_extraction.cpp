@@ -23,11 +23,11 @@ int main() {
   std::vector<std::vector<site_state> > codon_by_grp, aa_by_grp;
   vc.extract_codon_and_aa_states(nuc_states, codon_by_grp, aa_by_grp);
 
-  // 1 fwd (2 CDS), 1 rev (2 CDS), 1 fwd (1 CDS)
-  if (codon_by_grp.size() == 3)
+  // 1 fwd (2 CDS), 1 rev (2 CDS), 1 fwd (1 CDS), 1 fwd-overlap (2 CDS), 1 rev-overlap (2 CDS)
+  if (codon_by_grp.size() == 5)
     success += 1;
   else
-    std::cout << "Test 1: expected 3 groups, got " << codon_by_grp.size() << std::endl;
+    std::cout << "Test 1: expected 5 groups, got " << codon_by_grp.size() << std::endl;
 
   if (codon_by_grp[0].size() == 1)
     success += 1;
@@ -117,5 +117,55 @@ int main() {
   else
     std::cout << "Test 4: AA should be S, got '" << aa_by_grp[0][0].state << "'" << std::endl;
 
-  return success == 13 ? 0 : 1;
+  // Test 5: CDS overlap + strand. Codon 3 covers 49,50,50 (TGG)
+  nuc_states.clear();
+  nuc_states.push_back(make_nuc('A', 48));
+  nuc_states.push_back(make_nuc('T', 49));
+  nuc_states.push_back(make_nuc('G', 50));
+  nuc_states.push_back(make_nuc('C', 51));
+  codon_by_grp.clear();
+  aa_by_grp.clear();
+  vc.extract_codon_and_aa_states(nuc_states, codon_by_grp, aa_by_grp);
+
+  if (codon_by_grp[3].size() == 1)
+    success += 1;
+  else
+    std::cout << "Test 5: fwd-overlap group should have 1 codon, got " << codon_by_grp[3].size() << std::endl;
+
+  if (codon_by_grp[3].size() == 1 && codon_by_grp[3][0].state == "TGG")
+    success += 1;
+  else if (codon_by_grp[3].size() == 1)
+    std::cout << "Test 5: codon should be TGG, got '" << codon_by_grp[3][0].state << "'" << std::endl;
+
+  if (aa_by_grp[3].size() == 1 && aa_by_grp[3][0].state == "W")
+    success += 1;
+  else if (aa_by_grp[3].size() == 1)
+    std::cout << "Test 5: AA should be W, got '" << aa_by_grp[3][0].state << "'" << std::endl;
+
+  // Test 6: CDS overlap - strand. Codon 4 genomic 170,170,169 - TTC -> CCT
+  nuc_states.clear();
+  nuc_states.push_back(make_nuc('A', 169));
+  nuc_states.push_back(make_nuc('G', 170));
+  nuc_states.push_back(make_nuc('T', 171));
+  nuc_states.push_back(make_nuc('C', 172));
+  codon_by_grp.clear();
+  aa_by_grp.clear();
+  vc.extract_codon_and_aa_states(nuc_states, codon_by_grp, aa_by_grp);
+
+  if (codon_by_grp[4].size() == 1)
+    success += 1;
+  else
+    std::cout << "Test 5: rev-overlap group should have 1 codon, got " << codon_by_grp[4].size() << std::endl;
+
+  if (codon_by_grp[4].size() == 1 && codon_by_grp[4][0].state == "CCT")
+    success += 1;
+  else if (codon_by_grp[4].size() == 1)
+    std::cout << "Test 5: codon should be CCT, got '" << codon_by_grp[4][0].state << "'" << std::endl;
+
+  if (aa_by_grp[4].size() == 1 && aa_by_grp[4][0].state == "P")
+    success += 1;
+  else if (aa_by_grp[4].size() == 1)
+    std::cout << "Test 5: AA should be P, got '" << aa_by_grp[4][0].state << "'" << std::endl;
+
+  return success == 19 ? 0 : 1;
 }

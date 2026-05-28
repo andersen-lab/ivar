@@ -1,0 +1,10 @@
+## GFF3 file format
+test	Genbank	CDS	10	29	.	+	.	ID=id-fwd-discontinuous;gene=geneHereComesTheSun;
+test	Genbank	CDS	100	149	.	+	.	ID=id-fwd-discontinuous;gene=geneHereComesTheSun;
+test	Genbank	CDS	200	220	.	-	.	ID=id-rev-discontinuous;gene=geneBackInBlack;
+test	Genbank	CDS	300	319	.	-	.	ID=id-rev-discontinuous;gene=geneBackInBlack;
+test	Genbank	CDS	350	379	.	+	.	ID=id-single-segment;gene=geneBabaORiley;
+test	Genbank	CDS	40	50	.	+	.	ID=id-overlap-frame;gene=geneZeppelin;
+test	Genbank	CDS	50	59	.	+	.	ID=id-overlap-frame;gene=geneZeppelin;
+test	Genbank	CDS	160	170	.	-	.	ID=id-overlap-rev;gene=geneRevFloyd;
+test	Genbank	CDS	170	179	.	-	.	ID=id-overlap-rev;gene=geneRevFloyd;
