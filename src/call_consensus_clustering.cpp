@@ -20,8 +20,7 @@ void cluster_consensus(std::vector<variant> variants, \
                       uint32_t min_depth, \
                       uint8_t min_qual, \
                       std::vector<double> solution, \
-                      std::vector<double> means, \
-                      std::string ref){
+                      std::vector<double> means){
   std::cerr << "calling consensus" << std::endl;
   if(variants.size() == 0){
     return;
@@ -55,7 +54,7 @@ void cluster_consensus(std::vector<variant> variants, \
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 28881){
+    if(variants[i].position == 5099){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
@@ -64,10 +63,7 @@ void cluster_consensus(std::vector<variant> variants, \
       for(auto cc : variants[i].consensus_numbers){
         std::cerr << "consensus number " << cc << std::endl;
       }
-      for(auto a : variants[i].probabilities){
-        std::cerr << a << " ";
-      }
-      std::cerr << "\n";
+      std::cerr << "half normal upper " << variants[i].half_normal_upper << " half normal lower " << variants[i].half_normal_lower << std::endl;
     }else{
       print = false;
     }

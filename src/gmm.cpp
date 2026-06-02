@@ -606,13 +606,8 @@ void write_single_cluster_output(std::string output_prefix){
 
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, \
-                              std::string ref, double default_threshold, \
+                              double default_threshold, \
                               uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior){
-  if(ref.empty()){
-    std::cerr << "Please provide a reference sequence." << std::endl;
-    exit(1);
-  }
-
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
