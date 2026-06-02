@@ -292,32 +292,6 @@ std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<
   return transposed_vector;
 }
 
-void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample) {
-  std::vector<uint32_t> tmp;
-  tmp.reserve(n + amount_resample);
-
-  for (uint32_t i = 0; i < n; i++) {
-    if (i == index)
-      tmp.insert(tmp.end(), amount_resample, i);
-      else
-        tmp.push_back(i);
-  }
-
-  generate_ordered(tmp, 2, index, possible_permutations);
-  generate_ordered(tmp, 3, index, possible_permutations);
-  generate_ordered(tmp, 4, index, possible_permutations);
-
-
-  possible_permutations.erase(
-    std::remove_if(possible_permutations.begin(),
-                    possible_permutations.end(), [&](const std::vector<uint32_t>& perm) {
-                    if (perm.size() == 1) return false;
-                    return std::all_of(perm.begin(), perm.end(),
-                    [&](uint32_t v){ return v == index; });
-    }),
-  possible_permutations.end());
-}
-
 void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations){
     std::vector<uint32_t> d(n);
     std::iota(d.begin(),d.end(),0);
