@@ -155,15 +155,6 @@ std::vector<double> loglikelihoods_to_posteriors(const std::vector<double>& logl
     return exps;
 }
 
-void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants){
-  //lets add back in the 100% variants
-  for(uint32_t i=0; i < base_variants.size(); i++){
-    if(base_variants[i].outside_freq_range){
-      variants.push_back(base_variants[i]);
-    }
-  }
-}
-
 double calculate_distance(double point, double mean) {
   return std::abs(point - mean);
 }
