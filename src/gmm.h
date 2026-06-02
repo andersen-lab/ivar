@@ -51,10 +51,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold, double invariant_threshold);
 uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
-double calculate_mean(const std::vector<double>& data);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound, double invariant_lower_bound);
-double calculate_mad(const std::vector<double>& data, double mean);
 void reset_variants_info(std::vector<variant> &variants);
 void flag_position_conflicts(std::vector<variant> &variants);
 #endif

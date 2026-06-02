@@ -83,14 +83,6 @@ std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> 
   return(clusters);
 }
 
-double calculate_mean(const std::vector<double>& data) {
-    if (data.empty()) {
-        return 0.0f;
-    }
-    double sum = std::accumulate(data.begin(), data.end(), 0.0f);
-    return sum / data.size();
-}
-
 uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
   std::unordered_map<uint32_t, uint32_t> frequency_map;
   uint32_t max_count = 0;
@@ -101,14 +93,6 @@ uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
       }
   }
   return max_count;
-}
-
-double calculate_mad(const std::vector<double>& data, double mean){
-    double absDevSum = 0.0;
-    for (double value : data) {
-        absDevSum += std::abs(value - mean);
-    }
-    return absDevSum / data.size();
 }
 
 void generate_ordered(const std::vector<uint32_t>& elements,
