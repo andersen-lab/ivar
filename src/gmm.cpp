@@ -186,19 +186,6 @@ uint32_t smallest_value_index(std::vector<double> values){
   return(index);
 }
 
-void generate_combinations(std::vector<double> &input, std::vector<double>& current_combination, uint32_t start_index, uint32_t length, std::vector<std::vector<double>> &collect_combos) {
-  if (length == 0) {
-    collect_combos.push_back(current_combination);
-    return;
-  }
-
-  for (uint32_t i = start_index; i < input.size(); i++) {
-    current_combination.push_back(input[i]);
-    generate_combinations(input, current_combination, i + 1, length - 1, collect_combos);
-    current_combination.pop_back();
-  }
-}
-
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector) {
   std::vector<std::vector<double>> transposed_vector;
   // Check if the input vector is not empty
@@ -216,19 +203,6 @@ std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<
     }
   }
   return transposed_vector;
-}
-
-void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations){
-    std::vector<uint32_t> d(n);
-    std::iota(d.begin(),d.end(),0);
-    do {
-        std::vector<uint32_t> tmp;
-        for (int i = 0; i < k; i++){
-          tmp.push_back(d[i]);
-        }
-        possible_permutations.push_back(tmp);
-        std::reverse(d.begin()+k,d.end());
-    } while(std::next_permutation(d.begin(),d.end()));
 }
 
 void split(std::string &s, char delim, std::vector<std::string> &elems){
