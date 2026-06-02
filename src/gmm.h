@@ -55,7 +55,6 @@ uint32_t smallest_value_index(std::vector<double> values);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
 double calculate_mean(const std::vector<double>& data);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
-void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants);
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound, double invariant_lower_bound);
 double calculate_mad(const std::vector<double>& data, double mean);
 void reset_variants_info(std::vector<variant> &variants);
