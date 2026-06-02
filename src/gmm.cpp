@@ -155,47 +155,6 @@ std::vector<double> loglikelihoods_to_posteriors(const std::vector<double>& logl
     return exps;
 }
 
-/**
- * @brief Selects the permutation of assignments that maximizes the joint probability.
- *
- * This function evaluates a set of possible assignments (permutations) and computes the
- * total joint probability score for each, using the provided probability matrix.
- * It returns the permutation that yields the highest score.
- *
- * @param prob_matrix A 2D vector of probabilities, sized [n_variants][n_clusters].
- * @param permutations A vector of permutations to evaluate, each representing a possible assignment.
- *                     Each permutation must have a size equal to the number of clusters.
- * @return The permutation (as a vector of cluster indices) with the highest joint probability.
- */
-std::vector<uint32_t> calculate_joint_probabilities(const std::vector<std::vector<double>>  &prob_matrix, const std::vector<std::vector<uint32_t>> &permutations) {
-  if (permutations.empty() || prob_matrix.empty()) {
-    return {};
-  }
-  size_t n_clusters = prob_matrix.size();
-  double best_score = -std::numeric_limits<double>::infinity();
-  size_t best_index = 0;
-  for (size_t i = 0; i < permutations.size(); ++i) {
-    const auto& perm = permutations[i];
-    if (perm.size() != n_clusters) {
-        continue;
-    }
-    double score = 0.0;
-    for (size_t j = 0; j < n_clusters; ++j) {
-      // Guard against invalid index in permutation
-      if (perm[j] >= prob_matrix[j].size()) {
-        score = -std::numeric_limits<double>::infinity();
-        break;
-      }
-      score += prob_matrix[j][perm[j]];
-    }
-    if (score > best_score) {
-      best_score = score;
-      best_index = i;
-    }
-  }
-  return permutations[best_index];
-}
-
 void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants){
   //lets add back in the 100% variants
   for(uint32_t i=0; i < base_variants.size(); i++){
