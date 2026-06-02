@@ -229,18 +229,6 @@ void add_noise_variants(std::vector<variant> &variants, std::vector<variant> bas
   }
 }
 
-//test function
-std::string vec_to_pylist(const std::vector<double>& v){
-    std::ostringstream ss;
-    ss << "[";
-    for (size_t i = 0; i < v.size(); ++i) {
-        ss << v[i];
-        if (i + 1 < v.size()) ss << ", ";
-    }
-    ss << "]";
-    return ss.str();
-}
-
 double calculate_distance(double point, double mean) {
   return std::abs(point - mean);
 }
