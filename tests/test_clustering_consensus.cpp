@@ -2,14 +2,10 @@
 #include <vector>
 #include <fstream>
 #include <algorithm>
-#include "htslib/sam.h"
 #include "../src/gmm.h"
 #include "../src/saga.h"
-#include "../src/ref_seq.h"
-#include "../src/parse_gff.h"
 #include "../src/call_consensus_clustering.h"
 #include "../src/solve_clustering.h"
-#include "../src/interval_tree.h"
 
 void read_consensus(std::vector<std::pair<std::string, std::string>> &sequences, std::string filename){
   std::ifstream file(filename);
@@ -47,14 +43,13 @@ int main() {
   //TEST 1 - manually currated data
   std::string var_filename = "../data/version_bump_tests/vbump_consensus_var.txt";
   std::string consensus_filename = "../data/version_bump_tests/vbump_consensus_ivar.fa";
-  std::string reference_file = "../data/version_bump_tests/MN908947.3_sequence.fasta";
 
   std::vector<double> solution;
   std::vector<double> means;
-  std::vector<variant> variants = gmm_model(var_filename, prefix, min_depth, min_qual, solution, means, reference_file, default_threshold, n, invariant_threshold, 1e-3, 1e-2);
+  std::vector<variant> variants = gmm_model(var_filename, prefix, min_depth, min_qual, solution, means, default_threshold, n, invariant_threshold, 1e-3, 1e-2);
 
   if(!variants.empty()) {
-    cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, means, reference_file);
+    cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, means);
   }
 
   std::vector<std::pair<std::string, std::string>> gt_sequences;
