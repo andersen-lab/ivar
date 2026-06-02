@@ -25,7 +25,6 @@ void cluster_consensus(std::vector<variant> variants, \
   if(variants.size() == 0){
     return;
   }
-  double max_mean=0;
 
   //find the largest position in the variants file
   uint32_t max_position = 0;
@@ -99,7 +98,7 @@ void cluster_consensus(std::vector<variant> variants, \
     }*/
 
     uint32_t position = variants[i].position;
-    if(variants[i].vague_assignment && !variants[i].half_normal_upper && variants[i].freq < max_mean){
+    if(variants[i].vague_assignment && !variants[i].half_normal_upper){
        if(print){
           for(auto a : variants[i].probabilities){
             std::cerr << a << " ";
