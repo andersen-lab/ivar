@@ -70,16 +70,6 @@ void reset_variants_info(std::vector<variant> &variants){
   }
 }
 
-std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> variants){
-  std::vector<std::vector<double>> clusters(n);
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].cluster_assigned != -1){
-      clusters[variants[i].cluster_assigned].push_back(variants[i].gapped_freq);
-    }
-  }
-  return(clusters);
-}
-
 uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
   std::unordered_map<uint32_t, uint32_t> frequency_map;
   uint32_t max_count = 0;
