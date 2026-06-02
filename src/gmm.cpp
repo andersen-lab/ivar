@@ -92,56 +92,6 @@ uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
   return max_count;
 }
 
-std::vector<double> loglikelihoods_to_posteriors(const std::vector<double>& loglikes){
-    const size_t K = loglikes.size();
-    if (K == 0) return {};
-    // 1. Find max for numerical stability
-    double m = *std::max_element(loglikes.begin(), loglikes.end());
-    // 2. Exponentiate shifted log-likelihoods
-    std::vector<double> exps(K);
-    double sum_exp = 0.0;
-    for (size_t k = 0; k < K; ++k) {
-        exps[k] = std::exp(loglikes[k] - m);
-        sum_exp += exps[k];
-    }
-    // 3. Normalize
-    for (size_t k = 0; k < K; ++k) {
-        exps[k] /= sum_exp;
-    }
-    return exps;
-}
-
-double calculate_distance(double point, double mean) {
-  return std::abs(point - mean);
-}
-
-int find_closest_mean_index(double data_point, const std::vector<double>& means) {
-    // Find the index of the closest mean to the data point
-    int closest_index = 0;
-    double min_distance = std::numeric_limits<double>::infinity();
-
-    for (uint32_t i = 0; i < means.size(); ++i) {
-        double distance = calculate_distance(data_point, means[i]);
-        if (distance < min_distance) {
-            min_distance = distance;
-            closest_index = i;
-        }
-    }
-    return closest_index;
-}
-
-uint32_t smallest_value_index(std::vector<double> values){
-  double smallest_value = std::numeric_limits<double>::max();
-  size_t index = 0;
-  for (size_t i = 0; i < values.size(); ++i) {
-    if (values[i] < smallest_value) {
-      smallest_value = values[i];
-      index = i;
-    }
-  }
-  return(index);
-}
-
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector) {
   std::vector<std::vector<double>> transposed_vector;
   // Check if the input vector is not empty
