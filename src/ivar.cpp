@@ -85,13 +85,14 @@ void print_contam_usage() {
          "           -p    Prefix for output files\n\n"
          "Input Options    Description\n"
          "           -t    Minimum frequency threshold (Default: 0)\n"
-         "           -m    Minimum read depth (Default: 10)\n\n"
+         "           -m    Minimum read depth (Default: 10)\n"
+         "           -q    Minimum quality score threshold to count base (Default: 20)\n\n"
          "GMM Prior Options  Description\n"
          "           -N    Number of Gaussian components (Default: 12)\n"
          "           -I    Invariant frequency threshold; variants above this\n"
          "                 value are modeled with a half-normal (Default: 0.97)\n"
-         "           -C    Covariance prior (Default: 1e-3)\n"
-         "           -M    Mean precision prior (Default: 1e-2)\n";
+         "           -C    Covariance prior (Default: 0.0)\n"
+         "           -M    Mean precision prior (Default: 0.5)\n";
 }
 
 void print_trim_usage() {
@@ -277,7 +278,7 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
-static const char *contam_opt_str = "p:s:t:m:N:I:C:M:h?";
+static const char *contam_opt_str = "p:s:t:m:q:N:I:C:M:h?";
 
 std::string get_filename_without_extension(std::string f, std::string ext) {
   if (ext.length() > f.length())  // If extension longer than filename
@@ -325,7 +326,7 @@ int main(int argc, char *argv[]) {
     g_args.min_threshold = 0;
     g_args.min_depth = 10;
     g_args.min_qual = 20;
-    g_args.gmm_n = 6;
+    g_args.gmm_n = 12;
     g_args.gmm_invariant = 0.97;
     //default to spike-in priors
     g_args.gmm_cov_prior = 0.0;
@@ -344,6 +345,9 @@ int main(int argc, char *argv[]) {
           break;
         case 'm':
           g_args.min_depth = std::stoi(optarg);
+          break;
+        case 'q':
+          g_args.min_qual = atoi(optarg);
           break;
         case 'N':
           g_args.gmm_n = std::stoi(optarg);
