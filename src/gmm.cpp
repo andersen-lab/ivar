@@ -155,30 +155,6 @@ std::vector<double> loglikelihoods_to_posteriors(const std::vector<double>& logl
     return exps;
 }
 
-std::vector<uint32_t> compare_cluster_assignment(std::vector<std::vector<double>> prob_matrix, std::vector<uint32_t> assigned){
-  double threshold = 2;
-  std::vector<uint32_t> flagged_idx;
-
-  for(uint32_t i=0; i < prob_matrix.size(); i++){
-    std::vector<double> probs = loglikelihoods_to_posteriors(prob_matrix[i]);
-    /*for(auto p : probs){
-      std::cerr << p << " ";
-    }
-    std::cerr << "\n";*/
-    double assigned_prob = prob_matrix[i][assigned[i]];
-    std::vector<double> tmp = prob_matrix[i];
-    tmp.erase(tmp.begin() + assigned[i]);
-    std::sort(tmp.begin(), tmp.end(), std::greater<double>());
-    for(uint32_t j=0; j < tmp.size(); j++){
-      if(exp(tmp[j]) * threshold > exp(assigned_prob)){
-        flagged_idx.push_back(i);
-      }
-      break;
-    }
-  }
-  return(flagged_idx);
-}
-
 /**
  * @brief Selects the permutation of assignments that maximizes the joint probability.
  *
