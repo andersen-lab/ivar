@@ -4,10 +4,7 @@
 #include "gmm.h"
 #include "saga.h"
 #include "call_consensus_clustering.h"
-#include "ref_seq.h"
 #include <fstream>
-#include <cassert>
-#include <set>
 #include <cmath>
 #include <algorithm>
 #include <limits>
