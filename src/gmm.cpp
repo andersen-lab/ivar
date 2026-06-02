@@ -92,31 +92,6 @@ uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
   return max_count;
 }
 
-void generate_ordered(const std::vector<uint32_t>& elements,
-                      uint32_t n,
-                      uint32_t target,
-                      std::vector<std::vector<uint32_t>> &results) {
-    std::vector<uint32_t> seq;
-    seq.reserve(n);
-    int targetCount = 0;
-
-    std::function<void()> backtrack = [&]() {
-        if (seq.size() == n) {
-            if (targetCount >= 2) results.push_back(seq);
-            return;
-        }
-        for (uint32_t e : elements) {
-            seq.push_back(e);
-            if (e == target) targetCount++;
-            backtrack();
-            if (e == target) targetCount--;
-            seq.pop_back();
-        }
-    };
-
-    backtrack();
-}
-
 std::vector<double> loglikelihoods_to_posteriors(const std::vector<double>& loglikes){
     const size_t K = loglikes.size();
     if (K == 0) return {};
