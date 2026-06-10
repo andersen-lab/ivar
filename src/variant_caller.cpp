@@ -253,11 +253,25 @@ void variant_caller::merge_reads(std::vector<site_state> &read_site_states_one, 
       merged_site_states.emplace_back(read_site_states_two[j]);
       j++;
     } else {
+      /*
+       * From https://www.htslib.org/doc/samtools-mpileup.html
+       * The quality values of the retained base within an overlap will be the summation of the two bases if they agree,
+       * or 0.8 times the higher of the two bases if they disagree, with the base nucleotide also being the higher
+       * confident call.
+       */
       if(read_site_states_one[i].state == read_site_states_two[j].state) {
         read_site_states_one[i].quality = static_cast<uint8_t>(
           static_cast<double>(read_site_states_one[i].quality + read_site_states_two[j].quality) / 2
         );
         merged_site_states.emplace_back(read_site_states_one[i]);
+      } else {
+        if(read_site_states_one[i].quality > read_site_states_two[j].quality) {
+          read_site_states_one[i].quality = static_cast<uint8_t>(0.8 * read_site_states_one[i].quality);
+          merged_site_states.emplace_back(read_site_states_one[i]);
+        } else {
+          read_site_states_two[j].quality = static_cast<uint8_t>(0.8 * read_site_states_two[j].quality);
+          merged_site_states.emplace_back(read_site_states_two[j]);
+        }
       }
       i++;
       j++;

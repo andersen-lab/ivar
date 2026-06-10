@@ -129,6 +129,19 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
       read_map[read_name] = bam_dup1(aln);  // Duplicate the read to avoid overwriting
     }
   }
+
+  if(!read_map.empty())
+    std::cerr << "[Warning]: Mate could not be found for " << read_map.size() << " reads and were treated as unpaired." << std::endl;
+
+  for(auto &entry : read_map) {
+    aln = entry.second;
+    // Parse left over paired reads as unpaired reads if their mate was not found
+    std::vector<site_state> read_site_states;
+    vc.parse_single_read(aln, ref_name, read_site_states);
+    vc.assign_amplicon_to_read(aln->core.pos, bam_endpos(aln), read_site_states);
+    vc.add_variants(read_site_states);
+  }
+
   vc.write_to_file(bam_out, ref_name);
   vc.write_codon_to_file(bam_out, ref_name);
   vc.write_aa_to_file(bam_out, ref_name);
