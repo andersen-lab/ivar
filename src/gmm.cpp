@@ -39,9 +39,6 @@ void flag_position_conflicts(std::vector<variant> &variants) {
 
   for (const auto& v : variants) {
     if (v.half_normal_upper || v.half_normal_lower || v.depth_flag || v.qual_flag) continue;
-    /*if(v.position == 29402){
-      std::cerr << "position " << v.position << " " << v.gapped_freq << " " << v.cluster_assigned << std::endl;
-    }*/
     pos_cluster_count[v.position][v.cluster_assigned]++;
   }
 

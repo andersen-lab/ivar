@@ -410,6 +410,7 @@ bool is_boundary_rescue(const std::vector<double>& means) {
 }
 
 bool subset_sum(std::vector<double> &means, std::vector<std::vector<double>> &solution_sets, const double error){
+  double combination_error = 0.05;
   std::cerr << "in subset sum" << std::endl;
   //gives all solutions that sum to 1
   std::vector<std::vector<double>> solutions = find_solutions(means, error);
@@ -458,8 +459,9 @@ bool subset_sum(std::vector<double> &means, std::vector<std::vector<double>> &so
     return(false);
   }
 
+
   for(uint32_t i=0; i < realistic_solutions.size(); i++){
-    bool keep = account_peaks(realistic_solutions[i], means, 1, error);
+    bool keep = account_peaks(realistic_solutions[i], means, 1, combination_error);
     std::cerr << "keep " << keep << std::endl;
     for(auto s : realistic_solutions[i]){
       std::cerr << s << " ";
