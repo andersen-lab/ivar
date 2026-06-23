@@ -4,10 +4,7 @@
 #include "gmm.h"
 #include "saga.h"
 #include "call_consensus_clustering.h"
-#include "ref_seq.h"
 #include <fstream>
-#include <cassert>
-#include <set>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -73,24 +70,6 @@ void reset_variants_info(std::vector<variant> &variants){
   }
 }
 
-std::vector<std::vector<double>> form_clusters(uint32_t n, std::vector<variant> variants){
-  std::vector<std::vector<double>> clusters(n);
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].cluster_assigned != -1){
-      clusters[variants[i].cluster_assigned].push_back(variants[i].gapped_freq);
-    }
-  }
-  return(clusters);
-}
-
-double calculate_mean(const std::vector<double>& data) {
-    if (data.empty()) {
-        return 0.0f;
-    }
-    double sum = std::accumulate(data.begin(), data.end(), 0.0f);
-    return sum / data.size();
-}
-
 uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
   std::unordered_map<uint32_t, uint32_t> frequency_map;
   uint32_t max_count = 0;
@@ -101,188 +80,6 @@ uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
       }
   }
   return max_count;
-}
-
-double calculate_mad(const std::vector<double>& data, double mean){
-    double absDevSum = 0.0;
-    for (double value : data) {
-        absDevSum += std::abs(value - mean);
-    }
-    return absDevSum / data.size();
-}
-
-void generate_ordered(const std::vector<uint32_t>& elements,
-                      uint32_t n,
-                      uint32_t target,
-                      std::vector<std::vector<uint32_t>> &results) {
-    std::vector<uint32_t> seq;
-    seq.reserve(n);
-    int targetCount = 0;
-
-    std::function<void()> backtrack = [&]() {
-        if (seq.size() == n) {
-            if (targetCount >= 2) results.push_back(seq);
-            return;
-        }
-        for (uint32_t e : elements) {
-            seq.push_back(e);
-            if (e == target) targetCount++;
-            backtrack();
-            if (e == target) targetCount--;
-            seq.pop_back();
-        }
-    };
-
-    backtrack();
-}
-
-std::vector<double> loglikelihoods_to_posteriors(const std::vector<double>& loglikes){
-    const size_t K = loglikes.size();
-    if (K == 0) return {};
-    // 1. Find max for numerical stability
-    double m = *std::max_element(loglikes.begin(), loglikes.end());
-    // 2. Exponentiate shifted log-likelihoods
-    std::vector<double> exps(K);
-    double sum_exp = 0.0;
-    for (size_t k = 0; k < K; ++k) {
-        exps[k] = std::exp(loglikes[k] - m);
-        sum_exp += exps[k];
-    }
-    // 3. Normalize
-    for (size_t k = 0; k < K; ++k) {
-        exps[k] /= sum_exp;
-    }
-    return exps;
-}
-
-std::vector<uint32_t> compare_cluster_assignment(std::vector<std::vector<double>> prob_matrix, std::vector<uint32_t> assigned){
-  double threshold = 2;
-  std::vector<uint32_t> flagged_idx;
-
-  for(uint32_t i=0; i < prob_matrix.size(); i++){
-    std::vector<double> probs = loglikelihoods_to_posteriors(prob_matrix[i]);
-    /*for(auto p : probs){
-      std::cerr << p << " ";
-    }
-    std::cerr << "\n";*/
-    double assigned_prob = prob_matrix[i][assigned[i]];
-    std::vector<double> tmp = prob_matrix[i];
-    tmp.erase(tmp.begin() + assigned[i]);
-    std::sort(tmp.begin(), tmp.end(), std::greater<double>());
-    for(uint32_t j=0; j < tmp.size(); j++){
-      if(exp(tmp[j]) * threshold > exp(assigned_prob)){
-        flagged_idx.push_back(i);
-      }
-      break;
-    }
-  }
-  return(flagged_idx);
-}
-
-/**
- * @brief Selects the permutation of assignments that maximizes the joint probability.
- *
- * This function evaluates a set of possible assignments (permutations) and computes the
- * total joint probability score for each, using the provided probability matrix.
- * It returns the permutation that yields the highest score.
- *
- * @param prob_matrix A 2D vector of probabilities, sized [n_variants][n_clusters].
- * @param permutations A vector of permutations to evaluate, each representing a possible assignment.
- *                     Each permutation must have a size equal to the number of clusters.
- * @return The permutation (as a vector of cluster indices) with the highest joint probability.
- */
-std::vector<uint32_t> calculate_joint_probabilities(const std::vector<std::vector<double>>  &prob_matrix, const std::vector<std::vector<uint32_t>> &permutations) {
-  if (permutations.empty() || prob_matrix.empty()) {
-    return {};
-  }
-  size_t n_clusters = prob_matrix.size();
-  double best_score = -std::numeric_limits<double>::infinity();
-  size_t best_index = 0;
-  for (size_t i = 0; i < permutations.size(); ++i) {
-    const auto& perm = permutations[i];
-    if (perm.size() != n_clusters) {
-        continue;
-    }
-    double score = 0.0;
-    for (size_t j = 0; j < n_clusters; ++j) {
-      // Guard against invalid index in permutation
-      if (perm[j] >= prob_matrix[j].size()) {
-        score = -std::numeric_limits<double>::infinity();
-        break;
-      }
-      score += prob_matrix[j][perm[j]];
-    }
-    if (score > best_score) {
-      best_score = score;
-      best_index = i;
-    }
-  }
-  return permutations[best_index];
-}
-
-void add_noise_variants(std::vector<variant> &variants, std::vector<variant> base_variants){
-  //lets add back in the 100% variants
-  for(uint32_t i=0; i < base_variants.size(); i++){
-    if(base_variants[i].outside_freq_range){
-      variants.push_back(base_variants[i]);
-    }
-  }
-}
-
-//test function
-std::string vec_to_pylist(const std::vector<double>& v){
-    std::ostringstream ss;
-    ss << "[";
-    for (size_t i = 0; i < v.size(); ++i) {
-        ss << v[i];
-        if (i + 1 < v.size()) ss << ", ";
-    }
-    ss << "]";
-    return ss.str();
-}
-
-double calculate_distance(double point, double mean) {
-  return std::abs(point - mean);
-}
-
-int find_closest_mean_index(double data_point, const std::vector<double>& means) {
-    // Find the index of the closest mean to the data point
-    int closest_index = 0;
-    double min_distance = std::numeric_limits<double>::infinity();
-
-    for (uint32_t i = 0; i < means.size(); ++i) {
-        double distance = calculate_distance(data_point, means[i]);
-        if (distance < min_distance) {
-            min_distance = distance;
-            closest_index = i;
-        }
-    }
-    return closest_index;
-}
-
-uint32_t smallest_value_index(std::vector<double> values){
-  double smallest_value = std::numeric_limits<double>::max();
-  size_t index = 0;
-  for (size_t i = 0; i < values.size(); ++i) {
-    if (values[i] < smallest_value) {
-      smallest_value = values[i];
-      index = i;
-    }
-  }
-  return(index);
-}
-
-void generate_combinations(std::vector<double> &input, std::vector<double>& current_combination, uint32_t start_index, uint32_t length, std::vector<std::vector<double>> &collect_combos) {
-  if (length == 0) {
-    collect_combos.push_back(current_combination);
-    return;
-  }
-
-  for (uint32_t i = start_index; i < input.size(); i++) {
-    current_combination.push_back(input[i]);
-    generate_combinations(input, current_combination, i + 1, length - 1, collect_combos);
-    current_combination.pop_back();
-  }
 }
 
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector) {
@@ -302,45 +99,6 @@ std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<
     }
   }
   return transposed_vector;
-}
-
-void noise_resampler(uint32_t n, uint32_t index, std::vector<std::vector<uint32_t>> &possible_permutations, uint32_t amount_resample) {
-  std::vector<uint32_t> tmp;
-  tmp.reserve(n + amount_resample);
-
-  for (uint32_t i = 0; i < n; i++) {
-    if (i == index)
-      tmp.insert(tmp.end(), amount_resample, i);
-      else
-        tmp.push_back(i);
-  }
-
-  generate_ordered(tmp, 2, index, possible_permutations);
-  generate_ordered(tmp, 3, index, possible_permutations);
-  generate_ordered(tmp, 4, index, possible_permutations);
-
-
-  possible_permutations.erase(
-    std::remove_if(possible_permutations.begin(),
-                    possible_permutations.end(), [&](const std::vector<uint32_t>& perm) {
-                    if (perm.size() == 1) return false;
-                    return std::all_of(perm.begin(), perm.end(),
-                    [&](uint32_t v){ return v == index; });
-    }),
-  possible_permutations.end());
-}
-
-void perm_generator(int n, int k, std::vector<std::vector<uint32_t>> &possible_permutations){
-    std::vector<uint32_t> d(n);
-    std::iota(d.begin(),d.end(),0);
-    do {
-        std::vector<uint32_t> tmp;
-        for (int i = 0; i < k; i++){
-          tmp.push_back(d[i]);
-        }
-        possible_permutations.push_back(tmp);
-        std::reverse(d.begin()+k,d.end());
-    } while(std::next_permutation(d.begin(),d.end()));
 }
 
 void split(std::string &s, char delim, std::vector<std::string> &elems){
@@ -542,9 +300,11 @@ void set_insertion_flags(std::vector<variant> &variants){
   }
 }
 
-void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
+void set_deletion_flags(std::vector<variant> &variants, double lower_bound, double invariant_lower_bound){
   std::vector<uint32_t> del_positions;
   std::vector<uint32_t> all_del_positions;
+  // accumulated gapped_freq of sub-threshold deletions covering each downstream position
+  std::unordered_map<uint32_t, double> sub_threshold_del_freq;
 
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].depth_flag) continue;
@@ -562,6 +322,13 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
         all_del_positions.push_back(variants[i].position+j);
       }
     }
+    // track deletions that are below the invariant lower bound (noise-level);
+    // their gap signal bleeds into downstream gapped_freqs
+    if(found && variants[i].outside_freq_range && variants[i].gapped_freq <= invariant_lower_bound){
+      for(uint32_t j=1; j < variants[i].nuc.size()-1; j++){
+        sub_threshold_del_freq[variants[i].position+j] += variants[i].gapped_freq;
+      }
+    }
   }
   //set the include_clustering flag to false if this covers a deletion position
   for(uint32_t i=0; i < variants.size(); i++){
@@ -572,6 +339,18 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound){
       variants[i].include_clustering = false;
     } else {
       variants[i].include_clustering = true;
+    }
+  }
+  // if a variant's reduced gapped_freq is fully explained by a sub-threshold deletion,
+  // treat it as invariant so it is assigned to all clusters rather than one
+  double invariant_upper_bound = 1.0 - invariant_lower_bound;
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].outside_freq_range) continue;
+    auto it = sub_threshold_del_freq.find(variants[i].position);
+    if(it == sub_threshold_del_freq.end()) continue;
+    if(variants[i].gapped_freq + it->second >= invariant_upper_bound){
+      variants[i].half_normal_upper = true;
+      variants[i].outside_freq_range = true;
     }
   }
 }
@@ -585,17 +364,12 @@ void write_single_cluster_output(std::string output_prefix){
 
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, \
-                              std::string ref, double default_threshold, \
+                              double default_threshold, \
                               uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior){
-  if(ref.empty()){
-    std::cerr << "Please provide a reference sequence." << std::endl;
-    exit(1);
-  }
-
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
-  set_deletion_flags(base_variants, 0.001);
+  set_deletion_flags(base_variants, 0.001, 1.0 - invariant_threshold);
 
   std::vector<variant> model_variants;
   std::vector<double> model_freqs;
