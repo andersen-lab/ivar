@@ -11,6 +11,40 @@
 #include <unordered_map>
 #include <unordered_set>
 
+void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gmm_1d model){
+  std::vector<std::vector<double>> prob_matrix;
+  std::vector<double> tmp;
+
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].freq_numbers.size() < 2) continue;
+    if(variants[i].std_dev == 0) continue;
+    if(!variants[i].amplicon_flux && !variants[i].amplicon_masked) continue;
+
+    //predicy for all frequencies of this variant on each amplicon
+    std::vector<std::vector<double>> proba = model.predict_proba(variants[i].freq_numbers);
+    //per frequencie assignment
+    for(auto cluster_probs : proba){
+      auto it = std::max_element(cluster_probs.begin(), cluster_probs.end());
+      uint32_t index = std::distance(cluster_probs.begin(), it);
+      variants[i].freq_assignments.push_back(index);
+    }
+  }
+}
+
+void rewrite_position_masking(std::vector<variant> &variants){
+  for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].freq_numbers.size() < 2) continue;
+    if(!variants[i].amplicon_flux) continue;
+    if(variants[i].freq_assignments.empty()) continue;
+      bool all_equal = std::all_of(variants[i].freq_assignments.begin(), variants[i].freq_assignments.end(), [&](uint32_t v) {return v == variants[i].freq_assignments[0];});
+      if(all_equal){
+        variants[i].amplicon_flux = false;
+      } else {
+        variants[i].amplicon_flux = true;
+      }
+  }
+}
+
 void flag_low_posterior_variants(std::vector<variant> &base_variants){
   for(auto &var : base_variants){
     if(var.half_normal_upper || var.half_normal_lower){
@@ -448,6 +482,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //for the small signal clusters
   model.set_min_cluster_fraction(0.0);
   std::vector<int> all_labels = model.predict(all_freqs);
+  
   //gets the posterior probability per variant
   std::vector<std::vector<double>> proba = model.predict_proba(all_freqs);
   
@@ -576,6 +611,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       flag_low_posterior_variants(base_variants);
       assign_variants_solution(solution_sets[0], base_variants, eff_means);
       flag_position_conflicts(base_variants);
+
+      //predict clusters for amplicon specific frequencies
+      amplicon_specific_cluster_assignment(base_variants, model);
+      //write the amplicon flags based on cluster agreement
+      rewrite_position_masking(base_variants);
+
       solution = solution_sets[0];
     }
   } else {
