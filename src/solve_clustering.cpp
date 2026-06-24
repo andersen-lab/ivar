@@ -77,31 +77,6 @@ std::vector<uint32_t> find_missing_indexes(const std::vector<uint32_t>& tmp, con
   return missing_indexes;
 }
 
-bool test_cluster_deviation(double nearest_cluster, double variant_cluster, double std_dev){
-  bool fluctuation = false;
-  std::vector<double> tmp = {nearest_cluster, variant_cluster};
-  double cluster_dev = calculate_standard_deviation(tmp);
-  if(std_dev > cluster_dev){
-    fluctuation = true;
-  }
-  return(fluctuation);
-}
-
-double find_neighboring_cluster(double freq, uint32_t cluster_assigned, std::vector<double> means){
-  //find closest cluster by mean value
-  double min_dist = 1;
-  uint32_t index = 0;
-  for(uint32_t i=0; i < means.size(); i++){
-    if(i == cluster_assigned) continue;
-    double dist = std::abs(means[i]-freq);
-    if(dist < min_dist){
-      min_dist = dist;
-      index = i;
-    }
-  }
-  return(means[index]);
-}
-
 double find_nearest_distance(const std::vector<double> all_sums, double value) {
     double min_distance = std::numeric_limits<double>::max();
     for (auto num : all_sums) {
