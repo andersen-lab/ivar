@@ -77,29 +77,6 @@ std::vector<uint32_t> find_missing_indexes(const std::vector<uint32_t>& tmp, con
   return missing_indexes;
 }
 
-void modify_variant_masking(std::vector<uint32_t> amplicons_to_mask, std::vector<variant> &variants, std::vector<double> means){
-  std::cerr << "modify variant masking" << std::endl;
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].consensus_numbers.size() == 0) continue;
-    std::vector<uint32_t> tmp = variants[i].amplicon_numbers;
-    std::vector<uint32_t> valid_amplicons = find_missing_indexes(tmp, amplicons_to_mask);
-    if(valid_amplicons.size() == 0){
-      variants[i].amplicon_masked = true;
-    } else if(valid_amplicons.size() == tmp.size()){
-      variants[i].amplicon_masked = false;
-      variants[i].amplicon_flux = false;
-    } else {
-      for(auto j : valid_amplicons){
-        //std::cerr << variants[i].position << " " << variants[i].cluster_assigned << " " << variants[i].gapped_freq << std::endl;
-        if(j >= variants[i].consensus_numbers.size()) continue;
-        variants[i].cluster_assigned = variants[i].consensus_numbers[j];
-        variants[i].amplicon_masked = false;
-      }
-    }
-  }
-  std::cerr << "end variant masking" << std::endl;
-}
-
 bool test_cluster_deviation(double nearest_cluster, double variant_cluster, double std_dev){
   bool fluctuation = false;
   std::vector<double> tmp = {nearest_cluster, variant_cluster};
@@ -123,76 +100,6 @@ double find_neighboring_cluster(double freq, uint32_t cluster_assigned, std::vec
     }
   }
   return(means[index]);
-}
-
-/*
-void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gaussian_mixture_model model){
-  std::vector<std::vector<double>> prob_matrix;
-  std::vector<double> tmp;
-
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].freq_numbers.size() < 2) continue;
-    if(variants[i].std_dev == 0) continue;
-    if(!variants[i].amplicon_flux && !variants[i].amplicon_masked) continue;
-    arma::mat final_data = arma::conv_to<arma::rowvec>::from(variants[i].freq_numbers);
-    final_data.reshape(1, variants[i].freq_numbers.size());
-    tmp.clear();
-    prob_matrix.clear();
-    for(uint32_t j=0; j < model.n; j++){
-      arma::rowvec set_likelihood = model.model.log_p(final_data, j);
-      tmp.clear();
-      for(uint32_t k=0; k < final_data.n_cols; k++){
-        tmp.push_back((double)set_likelihood[k]);
-      }
-      prob_matrix.push_back(tmp);
-    }
-    std::vector<std::vector<double>> inverse = transpose_vector(prob_matrix);
-    for(uint32_t j=0; j < variants[i].freq_numbers.size(); j++){
-      auto max_it = std::max_element(inverse[j].begin(), inverse[j].end());
-      uint32_t index = std::distance(inverse[j].begin(), max_it);
-      variants[i].freq_assignments.push_back(index);
-    }
-  }
-}
-*/
-void rewrite_position_masking(std::vector<variant> &variants){
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].freq_numbers.size() < 2) continue;
-    if(!variants[i].amplicon_flux) continue;
-    if(variants[i].freq_assignments.empty()) continue;
-      bool all_equal = std::all_of(variants[i].freq_assignments.begin(), variants[i].freq_assignments.end(), [&](uint32_t v) {return v == variants[i].freq_assignments[0];});
-      if(all_equal) variants[i].amplicon_flux = false;
-      else variants[i].amplicon_flux = true;
-  }
-}
-
-std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, std::vector<double> means){
-  //stores the numbers of every amplicon where we believe experiences fluctuation that imapcts consensus
-  //here we define that as a position where the amplicon is fluctuating and the closest cluster is within a standard deviation
-  std::vector<uint32_t> amplicons_to_mask;
-
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].amplicon_flux && !variants[i].outside_freq_range && !variants[i].half_normal_upper && !variants[i].half_normal_lower){
-      //find all clusters not part of the same assignment
-      std::vector<double> other_population_clusters;
-      other_population_clusters.reserve(means.size());
-      for(uint32_t j=0; j< means.size();j++){
-        auto it = std::find(variants[i].consensus_numbers.begin(), variants[i].consensus_numbers.end(), j);
-        if(it == variants[i].consensus_numbers.end()) other_population_clusters.push_back(means[j]);
-      }
-      //find the second closest cluster index
-      double closest_mean = find_neighboring_cluster(variants[i].gapped_freq, variants[i].cluster_assigned, other_population_clusters);
-      //check if the cluster is within the standard dev of the variant
-      bool fluctuating = test_cluster_deviation(closest_mean, means[variants[i].cluster_assigned], variants[i].std_dev);
-      if(!fluctuating) continue;
-      for(auto v : variants[i].amplicon_numbers){
-        if(std::find(amplicons_to_mask.begin(), amplicons_to_mask.end(), v) == amplicons_to_mask.end()){
-          amplicons_to_mask.push_back(v);
-        }
-      }
-    }
-  }
-  return(amplicons_to_mask);
 }
 
 double find_nearest_distance(const std::vector<double> all_sums, double value) {
@@ -588,12 +495,4 @@ void assign_variants_solution(std::vector<double> solution,
       }
     }
   }
-  
-  //amplicon_specific_cluster_assignment(variants, model);
-  //rewrite_position_masking(variants);
-  std::vector<uint32_t> amplicons_to_mask;
-  //if(means.size() > 1){
-  //  amplicons_to_mask = rewrite_amplicon_masking(variants, means);
-  //}
-  //modify_variant_masking(amplicons_to_mask, variants, means);
 }
