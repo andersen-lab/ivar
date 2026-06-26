@@ -47,7 +47,7 @@ struct variant {
 };
 
 void split(std::string &s, char delim, std::vector<std::string> &elems);
-std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, double default_threshold, uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior);
+std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, double default_threshold, uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior, double min_cluster_fraction = 0.10);
 void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold, double invariant_threshold);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
