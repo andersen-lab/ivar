@@ -71,6 +71,9 @@ void cluster_consensus(std::vector<variant> variants, \
       if(print) std::cerr << "position conflict " << variants[i].position << std::endl;
       continue;
     }
+    if(variants[i].overlapped_deletion){
+      continue;
+    }
     if(variants[i].amplicon_flux && !variants[i].half_normal_upper){
       if(print) std::cerr << "amplicon flux " << variants[i].amplicon_flux << std::endl;
       continue;
