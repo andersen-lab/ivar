@@ -33,7 +33,7 @@ void read_consensus(std::vector<std::pair<std::string, std::string>> &sequences,
 
 int main() {
   std::string prefix = "/tmp/consensus";
-  int num_tests = 1;
+  int num_tests = 2;
   int success = 0;
 
   uint32_t min_depth = 5;
@@ -50,6 +50,34 @@ int main() {
   std::vector<double> solution;
   std::vector<double> means;
   std::vector<variant> variants = gmm_model(var_filename, prefix, min_depth, min_qual, solution, means, default_threshold, n, invariant_threshold, 1e-3, 1e-2, 0.05);
+
+  // TEST 2 - verify the dominant deletion -GGA at POS=486 (stored as position=487)
+  // is not excluded as an overlapped deletion and is assigned to at least one
+  // consensus with no duplicate consensus_numbers.
+  {
+    bool found = false;
+    for (const auto& v : variants) {
+      if (v.position == 487 && v.nuc == "-GGA") {
+        found = true;
+        std::set<uint32_t> cn_set(v.consensus_numbers.begin(), v.consensus_numbers.end());
+        bool no_dups = cn_set.size() == v.consensus_numbers.size();
+        std::cerr << "[GGA check] overlapped_deletion=" << v.overlapped_deletion
+                  << " consensus_numbers=[ ";
+        for (auto cn : v.consensus_numbers) std::cerr << cn << " ";
+        std::cerr << "] cluster=" << v.cluster_assigned
+                  << " gapped_freq=" << v.gapped_freq << std::endl;
+        if (!v.overlapped_deletion && !v.consensus_numbers.empty() && no_dups) {
+          success++;
+        } else {
+          std::cerr << "-GGA consensus_numbers check failed" << std::endl;
+        }
+        break;
+      }
+    }
+    if (!found) {
+      std::cerr << "-GGA deletion at position 487 not found in variants" << std::endl;
+    }
+  }
 
   for (const auto& v : variants) {
     if (v.position == 997) {
