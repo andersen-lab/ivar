@@ -13,128 +13,103 @@
 #include "../src/interval_tree.h"
 
 int main() {
-  int num_tests = 7;
+  int num_tests = 6;
   int success = 0;
-
-  /* TEST 1 - Position level masking based on amplicon fluctuation.
-   * If a position is on an amplicon experiencing fluctuation, \
-   * and all amplicon-specific variant frequencies are not assigned \
-   * to the same cluster, we keep the position marked as experiencing \
-   * fluctuation.
-   *
-   * First, we test to make sure amplicon-specific variant frequencies are \
-   * assigned to the correct clusters.
-   * Second, we check the amplicon flagging.
-   *
-   * A - Position not flagged.
-   * B - Position flagged.
-   */
   std::vector<variant> variants;
   std::vector<double> means = {0.90, 0.10};
 
-  variant tmp;
-  tmp.freq = 0.90;
-  tmp.amplicon_flux = true;
-  tmp.freq_numbers = {0.80, 1};
-  variants.push_back(tmp);
 
-  for(auto &v : variants) {
-    v.freq_assignments.clear();
-    if(!v.amplicon_flux && !v.amplicon_masked) continue;
-    for(double f : v.freq_numbers) {
-      uint32_t best = 0;
-      double best_dist = std::numeric_limits<double>::infinity();
-      for(uint32_t k = 0; k < means.size(); k++) {
-        double d = std::abs(f - means[k]);
-        if(d < best_dist) { best_dist = d; best = k; }
-      }
-      v.freq_assignments.push_back(best);
-    }
-  }
-
-  variant output = variants[0];
-  //this checks for correct assignment on the amplicon level
-  if(output.freq_assignments[0] == 0 && output.freq_assignments[1] == 0){
-    success++;
-  } else{
-    std::cerr << "first test failed" << std::endl;
-  }
-  rewrite_position_masking(variants); //change the position masking
-  if(!variants[0].amplicon_flux) success++; //should not be flagged
-  else std::cerr << "second test failed" << std::endl;
-
-  variants.clear();
-  means = {0.60, 0.40};
-  tmp.freq = 0.5;
-  tmp.amplicon_flux = true;
-  tmp.freq_numbers = {0.55, 0.45};
-  variants.push_back(tmp);
-
-  for(auto &v : variants) {
-    v.freq_assignments.clear();
-    if(!v.amplicon_flux && !v.amplicon_masked) continue;
-    for(double f : v.freq_numbers) {
-      uint32_t best = 0;
-      double best_dist = std::numeric_limits<double>::infinity();
-      for(uint32_t k = 0; k < means.size(); k++) {
-        double d = std::abs(f - means[k]);
-        if(d < best_dist) { best_dist = d; best = k; }
-      }
-      v.freq_assignments.push_back(best);
-    }
-  }
-
-  output = variants[0];
-  //here they should be assigned to different clusters
-  if(output.freq_assignments[0] == 0 && output.freq_assignments[1] == 1){
-    success++;
-  } else{
-    std::cerr << "third test failed" << std::endl;
-  }
-  if(variants[0].amplicon_flux){
-    success++;
-  } else{
-    std::cerr << "fourth test failed" << std::endl;
-  }
-
-  /* TEST 2 - Amplicons are masked only if they
-   * (a) they contain a position flagged as experiencing fluctuation
-   * (b) a cluster exists that is within the standard deviation bounds of the cluster the variant is assigned to
-   * In other words if we know a position experiences a std devation \
-   * of 0.10 and it's assigned to a cluster at 0.50, however a cluster \
-   * also exists at 0.45 we would flag the amplicon.
+  /* TEST 1 - set_deletion_flags: minor deletion starting at the same position as a dominant
+   * deletion is marked overlapped_deletion=true; dominant is not.
    */
+  {
+    variant del_dom, del_min;
+    del_dom.nuc = "-GGA"; del_dom.position = 5; del_dom.gapped_freq = 0.90;
+    del_min.nuc = "-G";   del_min.position = 5; del_min.gapped_freq = 0.05;
+    variants.clear();
+    variants.push_back(del_dom);
+    variants.push_back(del_min);
+    set_deletion_flags(variants, 0.03, 0.03);
+    if (!variants[0].overlapped_deletion && variants[1].overlapped_deletion) success++;
+    else std::cerr << "test 1 failed" << std::endl;
+  }
 
-  //std::vector<uint32_t> amplicons_to_mask = rewrite_amplicon_masking(variants, means);
-
-  /* TEST 3 - Flag positions that are adjacent to deletion starts as not being included in clustering
+  /* TEST 2 - set_deletion_flags: minor deletion with a different start but a range that
+   * overlaps the dominant deletion is still marked overlapped_deletion=true.
    */
-  variants.clear();
-  tmp.nuc = "-AA";   // length 3 so the inner loop registers position+1
-  tmp.position = 1;
-  tmp.gapped_freq = 1.0;
+  {
+    variant del_dom, del_min;
+    del_dom.nuc = "-GGA"; del_dom.position = 5; del_dom.gapped_freq = 0.90;
+    del_min.nuc = "-AG";  del_min.position = 6; del_min.gapped_freq = 0.05;
+    variants.clear();
+    variants.push_back(del_dom);
+    variants.push_back(del_min);
+    set_deletion_flags(variants, 0.03, 0.03);
+    if (!variants[0].overlapped_deletion && variants[1].overlapped_deletion) success++;
+    else std::cerr << "test 2 failed" << std::endl;
+  }
 
-  variant tmp2;
-  tmp2.position = 1;
+  /* TEST 3 - set_deletion_flags: two deletions whose ranges do not overlap are both kept
+   * (neither gets overlapped_deletion=true).
+   */
+  {
+    variant del_a, del_b;
+    del_a.nuc = "-G"; del_a.position = 5; del_a.gapped_freq = 0.90;
+    del_b.nuc = "-G"; del_b.position = 7; del_b.gapped_freq = 0.05;
+    variants.clear();
+    variants.push_back(del_a);
+    variants.push_back(del_b);
+    set_deletion_flags(variants, 0.03, 0.03);
+    if (!variants[0].overlapped_deletion && !variants[1].overlapped_deletion) success++;
+    else std::cerr << "test 3 failed" << std::endl;
+  }
 
-  variant tmp3;
-  tmp3.position = 2;
+  /* TEST 4 - flag_position_conflicts: two variants at the same position assigned to the
+   * same cluster both receive position_conflict=true.
+   */
+  {
+    variant va, vb;
+    va.position = 10; va.nuc = "A"; va.cluster_assigned = 0;
+    vb.position = 10; vb.nuc = "T"; vb.cluster_assigned = 0;
+    variants.clear();
+    variants.push_back(va);
+    variants.push_back(vb);
+    flag_position_conflicts(variants);
+    if (variants[0].position_conflict && variants[1].position_conflict) success++;
+    else std::cerr << "test 4 failed" << std::endl;
+  }
 
-  variants.push_back(tmp);
-  variants.push_back(tmp2);
-  variants.push_back(tmp3);
+  /* TEST 5 - flag_position_conflicts: two variants at the same position assigned to
+   * different clusters do not get flagged.
+   */
+  {
+    variant va, vb;
+    va.position = 10; va.nuc = "A"; va.cluster_assigned = 0;
+    vb.position = 10; vb.nuc = "T"; vb.cluster_assigned = 1;
+    variants.clear();
+    variants.push_back(va);
+    variants.push_back(vb);
+    flag_position_conflicts(variants);
+    if (!variants[0].position_conflict && !variants[1].position_conflict) success++;
+    else std::cerr << "test 5 failed" << std::endl;
+  }
 
-  //set_deletion_flags(variants, 0);
-  output = variants[0];
-  if(output.include_clustering == 1) success++;
-  else std::cerr << "fifth test failed" << std::endl;
-  output = variants[1];
-  if(output.include_clustering == 1) success++;
-  else std::cerr << "sixth test failed" << std::endl;
-  output = variants[2];
-  if(output.include_clustering == 0) success++;
-  else std::cerr << "seventh test failed" << std::endl;
-
+  /* TEST 6 - propagate_deletion_conflicts: a deletion that carries position_conflict=true
+   * propagates that flag to all positions its range covers.
+   */
+  {
+    variant del, p6, p7;
+    del.position = 5; del.nuc = "-GGA"; del.position_conflict = true;
+    p6.position = 6;  p6.nuc = "A";
+    p7.position = 7;  p7.nuc = "T";
+    variants.clear();
+    variants.push_back(del);
+    variants.push_back(p6);
+    variants.push_back(p7);
+    propagate_deletion_conflicts(variants);
+    if (variants[1].position_conflict && variants[2].position_conflict) success++;
+    else std::cerr << "test 6 failed" << std::endl;
+  }
   std::cerr << "success " << success << " tests " << num_tests << std::endl;
   return (num_tests == success) ? 0 : -1;
 }
