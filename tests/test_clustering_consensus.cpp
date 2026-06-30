@@ -37,8 +37,9 @@ int main() {
   uint32_t min_depth = 5;
   uint8_t min_qual = 20;
   double default_threshold = 0.5;
-  double invariant_threshold = 0.99;
-  uint32_t n = 2;
+  double invariant_threshold = 0.97;
+
+  uint32_t n = 4;
 
   //TEST 1 - manually currated data
   std::string var_filename = "../data/version_bump_tests/vbump_consensus_var.txt";
@@ -46,7 +47,7 @@ int main() {
 
   std::vector<double> solution;
   std::vector<double> means;
-  std::vector<variant> variants = gmm_model(var_filename, prefix, min_depth, min_qual, solution, means, default_threshold, n, invariant_threshold, 1e-3, 1e-2);
+  std::vector<variant> variants = gmm_model(var_filename, prefix, min_depth, min_qual, solution, means, default_threshold, n, invariant_threshold, 1e-3, 1e-2, 0.05);
 
   if(!variants.empty()) {
     cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, means);
