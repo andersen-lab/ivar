@@ -68,6 +68,28 @@ void flag_low_posterior_variants(std::vector<variant> &base_variants){
   }
 }
 
+void propagate_deletion_conflicts(std::vector<variant> &variants) {
+  std::unordered_set<uint32_t> deletion_covered;
+
+  for (const auto& v : variants) {
+    if (!v.position_conflict) continue;
+    if (v.nuc.find('-') == std::string::npos) continue;
+
+    std::string nuc = v.nuc;
+    nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
+    // mirror the fill loop in cluster_consensus: position covers [position, position+nuc.size()-1]
+    for (uint32_t z = 1; z < nuc.size(); z++) {
+      deletion_covered.insert(v.position + z);
+    }
+  }
+
+  for (auto& v : variants) {
+    if (deletion_covered.count(v.position)) {
+      v.position_conflict = true;
+    }
+  }
+}
+
 void flag_position_conflicts(std::vector<variant> &variants) {
   std::unordered_map<uint32_t, std::unordered_map<uint32_t, uint32_t>> pos_cluster_count;
 
@@ -89,8 +111,10 @@ void flag_position_conflicts(std::vector<variant> &variants) {
   for (auto& v : variants) {
     if (conflicted.count(v.position)) {
       v.position_conflict = true;
+      //std::cerr << "Position conflict: pos=" << v.position << " nuc=" << v.nuc << " gapped_freq=" << v.gapped_freq << " cluster=" << v.cluster_assigned << "\n";
     }
   }
+  propagate_deletion_conflicts(variants);
 }
 
 void reset_variants_info(std::vector<variant> &variants){
@@ -410,7 +434,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     if(!base_variants[i].depth_flag && !base_variants[i].qual_flag && !base_variants[i].outside_freq_range){
       model_variants.push_back(base_variants[i]);
       model_freqs.push_back(base_variants[i].gapped_freq);
-      //std::cerr << base_variants[i].position << " " << base_variants[i].gapped_freq << "\n";
+      //std::cerr << base_variants[i].nuc << " " << base_variants[i].position << " " << base_variants[i].gapped_freq << "\n";
     }
   }
   std::cerr << "Number of frequencies used for clustering: " << model_freqs.size() << "\n";
@@ -424,13 +448,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   gmm_1d model(n, 42);  // seed matches bootstrap replicate
   model.set_use_half_normal_for_noise(true, invariant_threshold);
-
-  // spike in priors
-  //model.set_mean_precision_prior(0.5);
-
-  //simulated priors
-  //model.set_covariance_prior(1e-3);
-  //model.set_mean_precision_prior(1e-2);
 
   model.set_covariance_prior(covariance_prior);
   model.set_mean_precision_prior(mean_precision_prior);
@@ -593,7 +610,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       base_variants.clear();
     } else{
       overwrite_cluster_assigned(base_variants, eff_means, model_means);
-
       //recalculate probabilities based on the new cluster assignments and only the effective means
       for(auto &v : base_variants){
         if(v.half_normal_upper || v.half_normal_lower || v.probabilities.empty()) continue;

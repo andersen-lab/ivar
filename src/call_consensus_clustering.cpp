@@ -108,8 +108,11 @@ void cluster_consensus(std::vector<variant> variants, \
        continue;
     }
 
-     bool del = variants[i].nuc.find('-') != std::string::npos;
-     //handle all the cases where you never assigned anything, assign to all if it's over the upper bound
+    bool del = variants[i].nuc.find('-') != std::string::npos;
+    if(del){
+      std::cerr << "deletion " << variants[i].nuc << " " << variants[i].position << std::endl;
+    }
+    //handle all the cases where you never assigned anything, assign to all if it's over the upper bound
      if(variants[i].half_normal_upper){
       if(print) std::cerr << "not assigned anything" << std::endl;
       for(uint32_t j=0; j < all_consensus_seqs.size(); j++){
