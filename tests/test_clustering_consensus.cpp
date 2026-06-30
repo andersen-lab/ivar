@@ -2,6 +2,8 @@
 #include <vector>
 #include <fstream>
 #include <algorithm>
+#include <limits>
+#include <set>
 #include "../src/gmm.h"
 #include "../src/saga.h"
 #include "../src/call_consensus_clustering.h"
@@ -49,8 +51,28 @@ int main() {
   std::vector<double> means;
   std::vector<variant> variants = gmm_model(var_filename, prefix, min_depth, min_qual, solution, means, default_threshold, n, invariant_threshold, 1e-3, 1e-2, 0.05);
 
+  for (const auto& v : variants) {
+    if (v.position == 997) {
+      std::cerr << "[pre-consensus pos=997] nuc=" << v.nuc
+                << " qual=" << v.qual
+                << " gapped_depth=" << v.gapped_depth
+                << " gapped_freq=" << v.gapped_freq
+                << " half_normal_upper=" << v.half_normal_upper
+                << " half_normal_lower=" << v.half_normal_lower
+                << " position_conflict=" << v.position_conflict
+                << " vague=" << v.vague_assignment
+                << std::endl;
+    }
+  }
+
   if(!variants.empty()) {
     cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, means);
+  }
+
+  uint32_t min_position = std::numeric_limits<uint32_t>::max();
+  for (const auto& v : variants) {
+    if (v.total_depth > 0 && v.position < min_position)
+      min_position = v.position;
   }
 
   std::vector<std::pair<std::string, std::string>> gt_sequences;
@@ -59,20 +81,82 @@ int main() {
   std::vector<std::pair<std::string, std::string>> exp_sequences;
   read_consensus(exp_sequences, prefix+".fa");
 
+  // Build a map from trimmed-string index to genomic position accounting for deletions.
+  // Deletions remove characters from the consensus string, so index i in the trimmed
+  // string does NOT equal min_position + i when deletions fall within the range.
+  std::set<uint32_t> deleted_positions;
+  for (const auto& v : variants) {
+    if (v.nuc.find('-') == std::string::npos) continue;
+    if (v.position_conflict) continue;
+    std::string nuc = v.nuc;
+    nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
+    for (uint32_t z = 0; z < nuc.size(); z++) {
+      deleted_positions.insert(v.position + z);
+    }
+  }
+  // Build index->genomic mapping: walk genomic positions starting at min_position,
+  // skip deleted ones, and assign each surviving position to the next string index.
+  std::vector<uint32_t> index_to_genomic;
+  {
+    uint32_t max_pos = 0;
+    for (const auto& v : variants) if (v.position > max_pos) max_pos = v.position;
+    for (uint32_t p = min_position; p <= max_pos + 10; p++) {
+      if (deleted_positions.count(p) == 0) {
+        index_to_genomic.push_back(p);
+      }
+    }
+  }
+
   bool correct = true;
   for (auto itgt = gt_sequences.begin(), itexp = exp_sequences.begin(); itgt != gt_sequences.end() && itexp != exp_sequences.end(); ++itgt, ++itexp) {
     if(itexp->second.size() != itgt->second.size()) {
       correct = false;
-      std::cerr << "not same size" << std::endl;
+      std::cerr << "not same size gt=" << itgt->second.size() << " exp=" << itexp->second.size() << std::endl;
     }
     for(uint32_t i=0; i < itexp->second.size(); i++){
       char a = itgt->second[i];
       char b = itexp->second[i];
 
       if(a != b){
-        std::cerr << "gt " << a << " exp " << b << " " << i+1 << std::endl;
+        uint32_t genomic_pos = (i < index_to_genomic.size()) ? index_to_genomic[i] : (min_position + i);
+        std::cerr << "gt " << a << " exp " << b << " consensus_pos=" << i+1 << " genomic_pos=" << genomic_pos << std::endl;
+        int ctx = 5;
+        std::cerr << "  gt  context: ";
+        for (int c = -ctx; c <= ctx; c++) {
+          int idx = (int)i + c;
+          if (idx < 0 || idx >= (int)itgt->second.size()) std::cerr << '.';
+          else std::cerr << (c == 0 ? '[' : ' ') << itgt->second[idx] << (c == 0 ? ']' : ' ');
+        }
+        std::cerr << std::endl;
+        std::cerr << "  exp context: ";
+        for (int c = -ctx; c <= ctx; c++) {
+          int idx = (int)i + c;
+          if (idx < 0 || idx >= (int)itexp->second.size()) std::cerr << '.';
+          else std::cerr << (c == 0 ? '[' : ' ') << itexp->second[idx] << (c == 0 ? ']' : ' ');
+        }
+        std::cerr << std::endl;
+        for (const auto& v : variants) {
+          if (v.position == genomic_pos) {
+            std::cerr << "  nuc=" << v.nuc
+                      << " gapped_freq=" << v.gapped_freq
+                      << " gapped_depth=" << v.gapped_depth
+                      << " qual=" << v.qual
+                      << " cluster=" << v.cluster_assigned
+                      << " half_normal_upper=" << v.half_normal_upper
+                      << " half_normal_lower=" << v.half_normal_lower
+                      << " position_conflict=" << v.position_conflict
+                      << " vague=" << v.vague_assignment
+                      << " amplicon_flux=" << v.amplicon_flux
+                      << " amplicon_masked=" << v.amplicon_masked
+                      << " depth_flag=" << v.depth_flag
+                      << " qual_flag=" << v.qual_flag
+                      << " outside_freq_range=" << v.outside_freq_range
+                      << " consensus_numbers=[ ";
+            for (auto cn : v.consensus_numbers) std::cerr << cn << " ";
+            std::cerr << "]" << std::endl;
+          }
+        }
         correct = false;
-        break;
       }
     }
   }

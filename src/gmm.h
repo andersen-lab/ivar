@@ -39,7 +39,7 @@ struct variant {
   bool qual_flag=false; //quality is below threshold
   bool outside_freq_range=false; //outside of useful frequency range for model
   bool cluster_outlier=false; //is an outlier for the cluster assigned
-  bool include_clustering=true; //here we flag the later positions of deletions
+  bool overlapped_deletion=false; //minor deletion overlapping a more abundant deletion at the same site
   bool imbalance=false;
   bool position_conflict=false; //multiple variants at this position assigned to the same cluster
   std::vector<double> probabilities;

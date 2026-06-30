@@ -449,6 +449,7 @@ void assign_variants_solution(std::vector<double> solution,
 
   //assign the number of the consensus genome
   for(uint32_t i=0; i < variants.size(); i++){
+    if(variants[i].half_normal_upper || variants[i].half_normal_lower) continue;
     if(variants[i].position == 11000){
       for(auto j : inverse_groups){
         for(auto k : j){

@@ -94,7 +94,7 @@ void flag_position_conflicts(std::vector<variant> &variants) {
   std::unordered_map<uint32_t, std::unordered_map<uint32_t, uint32_t>> pos_cluster_count;
 
   for (const auto& v : variants) {
-    if (v.half_normal_upper || v.half_normal_lower || v.depth_flag || v.qual_flag) continue;
+    if (v.half_normal_upper || v.half_normal_lower || v.depth_flag || v.qual_flag || v.overlapped_deletion) continue;
     pos_cluster_count[v.position][v.cluster_assigned]++;
   }
 
@@ -350,60 +350,75 @@ void set_insertion_flags(std::vector<variant> &variants){
     if(variants[i].depth_flag) continue;
     bool found = std::find(variants[i].nuc.begin(), variants[i].nuc.end(), '+') != variants[i].nuc.end();
     if(found){
-      variants[i].include_clustering = false;
+      //variants[i].include_clustering = false;
     }
   }
 }
 
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound, double invariant_lower_bound){
-  std::vector<uint32_t> del_positions;
-  std::vector<uint32_t> all_del_positions;
-  // accumulated gapped_freq of sub-threshold deletions covering each downstream position
-  std::unordered_map<uint32_t, double> sub_threshold_del_freq;
+  // Collect all valid deletions with their covered ranges.
+  struct del_info {
+    uint32_t idx;
+    uint32_t start;
+    uint32_t end;
+    double freq;
+  };
 
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].depth_flag) continue;
-
-    bool found = std::find(variants[i].nuc.begin(), variants[i].nuc.end(), '-') != variants[i].nuc.end();
-
-    //here we divide by two because universal cluster could contain some noise of two var
-    if(found && variants[i].gapped_freq > (lower_bound/(double)2 )){
-      for(uint32_t j=1; j < variants[i].nuc.size()-1; j++){
-        del_positions.push_back(variants[i].position+j);
-      }
-    }
-    if(found && variants[i].gapped_freq > 0.001){
-      for(uint32_t j=1; j < variants[i].nuc.size()-1; j++){
-        all_del_positions.push_back(variants[i].position+j);
-      }
-    }
-    // track deletions that are below the invariant lower bound (noise-level);
-    // their gap signal bleeds into downstream gapped_freqs
-    if(found && variants[i].outside_freq_range && variants[i].gapped_freq <= invariant_lower_bound){
-      for(uint32_t j=1; j < variants[i].nuc.size()-1; j++){
-        sub_threshold_del_freq[variants[i].position+j] += variants[i].gapped_freq;
-      }
-    }
+  std::vector<del_info> dels;
+  for (uint32_t i = 0; i < variants.size(); i++) {
+    if (variants[i].depth_flag) continue;
+    if (variants[i].nuc.find('-') == std::string::npos) continue;
+    std::string nuc = variants[i].nuc;
+    nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
+    if (nuc.empty()) continue;
+    uint32_t end = variants[i].position + (uint32_t)nuc.size() - 1;
+    dels.push_back({i, variants[i].position, end, variants[i].gapped_freq});
   }
-  //set the include_clustering flag to false if this covers a deletion position
-  for(uint32_t i=0; i < variants.size(); i++){
-    bool found = std::find(del_positions.begin(), del_positions.end(), variants[i].position) != del_positions.end();
-    size_t count = std::count(all_del_positions.begin(), all_del_positions.end(), variants[i].position);
-    //if the positions is covered by two deletions we exclude it from clustering
-    if(found || count > 1) {
-      variants[i].include_clustering = false;
+
+  // Sort dominant-first; greedily accept non-overlapping deletions and mark
+  // any deletion that overlaps an already-accepted one as overlapped_deletion.
+  std::sort(dels.begin(), dels.end(), [](const del_info& a, const del_info& b) {
+    return a.freq > b.freq;
+  });
+
+  std::vector<std::pair<uint32_t, uint32_t>> accepted;
+  for (const auto& d : dels) {
+    bool overlaps = false;
+    for (const auto& [s, e] : accepted) {
+      if (d.start <= e && d.end >= s) {
+        overlaps = true;
+        break;
+      }
+    }
+    if (overlaps) {
+      variants[d.idx].overlapped_deletion = true;
     } else {
-      variants[i].include_clustering = true;
+      accepted.push_back({d.start, d.end});
     }
   }
-  // if a variant's reduced gapped_freq is fully explained by a sub-threshold deletion,
-  // treat it as invariant so it is assigned to all clusters rather than one
+
+  // Accumulate gap signal from sub-threshold deletions so that variants whose
+  // reduced gapped_freq is fully explained by noise-level deletions are treated
+  // as invariant rather than assigned to a single cluster.
+  std::unordered_map<uint32_t, double> sub_threshold_del_freq;
+  for (uint32_t i = 0; i < variants.size(); i++) {
+    if (variants[i].depth_flag) continue;
+    if (variants[i].nuc.find('-') == std::string::npos) continue;
+    if (!variants[i].outside_freq_range) continue;
+    if (variants[i].gapped_freq > invariant_lower_bound) continue;
+    std::string nuc = variants[i].nuc;
+    nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
+    for (uint32_t j = 1; j < nuc.size(); j++) {
+      sub_threshold_del_freq[variants[i].position + j] += variants[i].gapped_freq;
+    }
+  }
+
   double invariant_upper_bound = 1.0 - invariant_lower_bound;
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].outside_freq_range) continue;
+  for (uint32_t i = 0; i < variants.size(); i++) {
+    if (variants[i].outside_freq_range) continue;
     auto it = sub_threshold_del_freq.find(variants[i].position);
-    if(it == sub_threshold_del_freq.end()) continue;
-    if(variants[i].gapped_freq + it->second >= invariant_upper_bound){
+    if (it == sub_threshold_del_freq.end()) continue;
+    if (variants[i].gapped_freq + it->second >= invariant_upper_bound) {
       variants[i].half_normal_upper = true;
       variants[i].outside_freq_range = true;
     }
@@ -431,7 +446,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<double> all_freqs;
   for(uint32_t i=0; i < base_variants.size(); i++){
     all_freqs.push_back(base_variants[i].gapped_freq);
-    if(!base_variants[i].depth_flag && !base_variants[i].qual_flag && !base_variants[i].outside_freq_range){
+    if(!base_variants[i].depth_flag && !base_variants[i].qual_flag && !base_variants[i].outside_freq_range && !base_variants[i].overlapped_deletion){
       model_variants.push_back(base_variants[i]);
       model_freqs.push_back(base_variants[i].gapped_freq);
       //std::cerr << base_variants[i].nuc << " " << base_variants[i].position << " " << base_variants[i].gapped_freq << "\n";
