@@ -53,9 +53,9 @@ void cluster_consensus(std::vector<variant> variants, \
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 28111){
+    if(variants[i].position == 11283){
       print = true;
-      std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << std::endl;
+      std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << " depth " << variants[i].total_depth << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
       std::cerr << "amplicon masked " << variants[i].amplicon_masked << " amp flux pos " << variants[i].amplicon_flux << std::endl;
       std::cerr << "cluster assigned " << variants[i].cluster_assigned << std::endl;
@@ -112,9 +112,7 @@ void cluster_consensus(std::vector<variant> variants, \
     }
 
     bool del = variants[i].nuc.find('-') != std::string::npos;
-    if(del){
-      std::cerr << "deletion " << variants[i].nuc << " " << variants[i].position << std::endl;
-    }
+
     //handle all the cases where you never assigned anything, assign to all if it's over the upper bound
      if(variants[i].half_normal_upper){
       if(print) std::cerr << "not assigned anything" << std::endl;
