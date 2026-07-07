@@ -84,15 +84,15 @@ int main() {
         success += 1;
       else
         std::cout << "Codon POS_CODON mismatch: '" << f[1] << "'" << std::endl;
-      if (f[7] == "10,12")
+      if (f[7] == "10,11,12")
         success += 1;
       else
         std::cout << "Codon POS list mismatch: '" << f[7] << "'" << std::endl;
-      if (f[8] == "A,C")
+      if (f[8] == "A,G,C")
         success += 1;
       else
         std::cout << "Codon REF list mismatch: '" << f[8] << "'" << std::endl;
-      if (f[9] == "T,A")
+      if (f[9] == "T,G,A")
         success += 1;
       else
         std::cout << "Codon ALT list mismatch: '" << f[9] << "'" << std::endl;

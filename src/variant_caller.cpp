@@ -446,11 +446,10 @@ void variant_caller::write_codon_to_file(std::string output_path, std::string re
 
       for (const auto &state_stats : data[ci].get_site_state_stats()) {
         const std::string &alt_codon = state_stats.get_state();
-        if (alt_codon.size() != 3) continue;
         uint32_t alt_depth = state_stats.get_depth();
         double alt_freq = total_depth > 0 ? alt_depth / static_cast<double>(total_depth) : 0;
 
-        // Comma-separated nuc differences
+        // Comma-separated per-nucleotide breakdown (all three positions)
         std::string pos_list, ref_list, alt_list;
         for (int i = 0; i < 3; i++) {
           char obs_top = alt_codon[i];
@@ -459,16 +458,14 @@ void variant_caller::write_codon_to_file(std::string output_path, std::string re
             obs_top = comp_base[(unsigned char)obs_top];
             ref_top = comp_base[(unsigned char)ref_top];
           }
-          if (obs_top != ref_top) {
-            if (!pos_list.empty()) {
-              pos_list += ",";
-              ref_list += ",";
-              alt_list += ",";
-            }
-            pos_list += std::to_string(g_arr[i]);
-            ref_list += ref_top;
-            alt_list += obs_top;
+          if (i > 0) {
+            pos_list += ",";
+            ref_list += ",";
+            alt_list += ",";
           }
+          pos_list += std::to_string(g_arr[i]);
+          ref_list += ref_top;
+          alt_list += obs_top;
         }
 
         file << feature << "\t"
@@ -522,7 +519,6 @@ void variant_caller::write_aa_to_file(std::string output_path, std::string ref_n
 
       for (const auto &state_stats : aa_data[ci].get_site_state_stats()) {
         const std::string &alt_aa = state_stats.get_state();
-        if (alt_aa.size() != 1) continue;
         uint32_t alt_depth = state_stats.get_depth();
         double alt_freq = total_depth > 0 ? alt_depth / static_cast<double>(total_depth) : 0;
 
