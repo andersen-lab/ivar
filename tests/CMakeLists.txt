@@ -1,162 +1,76 @@
-add_executable(check_primer_trim
-        test_primer_trim.cpp
-        ../src/trim_primer_quality.cpp
-        ../src/primer_bed.cpp
-        ../src/interval_tree.cpp
-        ../src/allele_functions.cpp
-        ../src/ref_seq.cpp
-        ../src/parse_gff.cpp
-)
+add_executable(check_primer_trim test_primer_trim.cpp)
 
-add_executable(check_trim
-        test_trim.cpp
-        ../src/trim_primer_quality.cpp
-        ../src/primer_bed.cpp
-        ../src/interval_tree.cpp
-        ../src/allele_functions.cpp
-        ../src/ref_seq.cpp
-        ../src/parse_gff.cpp
-)
+add_executable(check_trim test_trim.cpp)
 
-add_executable(check_quality_trim
-        test_quality_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
-)
+add_executable(check_quality_trim test_quality_trim.cpp)
 
-add_executable(check_consensus
-        test_call_consensus_from_plup.cpp ../src/call_consensus_pileup.cpp ../src/allele_functions.cpp
-)
+add_executable(check_consensus test_call_consensus_from_plup.cpp)
 
-add_executable(check_allele_depth
-        test_allele_depth.cpp ../src/allele_functions.cpp
-)
+add_executable(check_allele_depth test_allele_depth.cpp)
 
-add_executable(check_consensus_threshold
-        test_consensus_threshold.cpp ../src/call_consensus_pileup.cpp ../src/allele_functions.cpp
-)
+add_executable(check_consensus_threshold test_consensus_threshold.cpp)
 
-add_executable(check_consensus_min_insert_threshold
-        test_consensus_min_insert_threshold.cpp ../src/call_consensus_pileup.cpp ../src/allele_functions.cpp
-)
+add_executable(check_consensus_min_insert_threshold test_consensus_min_insert_threshold.cpp)
 
-add_executable(check_consensus_min_depth
-        test_consensus_min_depth.cpp ../src/call_consensus_pileup.cpp ../src/allele_functions.cpp
-)
+add_executable(check_consensus_min_depth test_consensus_min_depth.cpp)
 
-add_executable(check_consensus_seq_id
-        test_consensus_seq_id.cpp ../src/call_consensus_pileup.cpp ../src/allele_functions.cpp
-)
+add_executable(check_consensus_seq_id test_consensus_seq_id.cpp)
 
-add_executable(check_variants
-        test_variants.cpp ../src/call_variants.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
-)
+add_executable(check_variants test_variants.cpp)
 
-add_executable(check_variants_2
-        test_new_variants.cpp ../src/gmm_1d.cpp ../src/saga.cpp ../src/site_state.cpp ../src/site_aggregator.cpp ../src/site_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/site_state_aggregator_stats.cpp ../src/variant_caller.cpp ../src/interval_tree.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/gmm.cpp ../src/solve_clustering.cpp ../src/call_variants.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp ../src/genomic_position.cpp ../src/call_consensus_clustering.cpp
-)
+add_executable(check_variants_2 test_new_variants.cpp)
 
-add_executable(check_common_variants
-        test_common_variants.cpp ../src/get_common_variants.cpp
-)
+add_executable(check_common_variants test_common_variants.cpp)
 
-add_executable(check_primer_bed
-        test_primer_bed.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
-)
+add_executable(check_primer_bed test_primer_bed.cpp)
 
-add_executable(check_clustering_consensus
-        test_clustering_consensus.cpp ../src/gmm_1d.cpp ../src/gmm.cpp ../src/variant_caller.cpp ../src/site_aggregator.cpp ../src/site_aggregator_stats.cpp ../src/site_state.cpp ../src/site_state_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/call_consensus_clustering.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
-)
+add_executable(check_clustering_consensus test_clustering_consensus.cpp)
 
-add_executable(check_clustering_majority
-        test_clustering_majority.cpp ../src/gmm_1d.cpp ../src/gmm.cpp ../src/variant_caller.cpp ../src/site_aggregator.cpp ../src/site_aggregator_stats.cpp ../src/site_state.cpp ../src/site_state_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/call_consensus_clustering.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
-)
+add_executable(check_clustering_majority test_clustering_majority.cpp)
 
-add_executable(check_unit_consensus
-        test_unit_new_consensus.cpp ../src/gmm_1d.cpp ../src/gmm.cpp ../src/variant_caller.cpp ../src/site_aggregator.cpp ../src/site_aggregator_stats.cpp ../src/site_state.cpp ../src/site_state_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/call_consensus_clustering.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
-)
+add_executable(check_unit_consensus test_unit_new_consensus.cpp)
 
-add_executable(check_getmasked
-        test_getmasked.cpp ../src/get_masked_amplicons.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
-)
+add_executable(check_getmasked test_getmasked.cpp)
 
-add_executable(check_removereads
-        test_removereads.cpp ../src/remove_reads_from_amplicon.cpp ../src/primer_bed.cpp ../src/trim_primer_quality.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
-)
+add_executable(check_removereads test_removereads.cpp)
 
-add_executable(check_unpaired_trim
-        test_unpaired_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
-)
+add_executable(check_unpaired_trim test_unpaired_trim.cpp)
 
-add_executable(check_primer_trim_edge_cases
-        test_primer_trim_edge_cases.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
-)
+add_executable(check_primer_trim_edge_cases test_primer_trim_edge_cases.cpp)
 
-add_executable(check_isize_trim
-        test_isize_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
-)
+add_executable(check_isize_trim test_isize_trim.cpp)
 
-add_executable(check_interval_tree
-        test_interval_tree.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
-)
+add_executable(check_interval_tree test_interval_tree.cpp)
 
-add_executable(check_amplicon_search
-        test_amplicon_search.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
-)
+add_executable(check_amplicon_search test_amplicon_search.cpp)
 
-add_executable(check_variant_caller
-        test_variant_caller.cpp ../src/variant_caller.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/genomic_position.cpp ../src/site_state.cpp ../src/site_aggregator.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/site_aggregator_stats.cpp ../src/site_state_aggregator_stats.cpp
-)
+add_executable(check_variant_caller test_variant_caller.cpp)
 
-add_executable(check_site_aggregator
-        test_site_aggregator.cpp ../src/site_aggregator.cpp ../src/site_state_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/site_aggregator_stats.cpp ../src/site_state.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp
-)
+add_executable(check_site_aggregator test_site_aggregator.cpp)
 
-add_executable(check_site_amplicon_aggregator_stats
-        test_site_amplicon_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/site_state.cpp
-)
+add_executable(check_site_amplicon_aggregator_stats test_site_amplicon_aggregator_stats.cpp)
 
-add_executable(check_site_state_aggregator_stats
-        test_site_state_aggregator_stats.cpp ../src/site_state_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/site_state.cpp
-)
+add_executable(check_site_state_aggregator_stats test_site_state_aggregator_stats.cpp)
 
-add_executable(check_gmm_1d
-        test_gmm_1d.cpp ../src/gmm_1d.cpp ../src/bootstrap_variants.cpp ../src/multinomial_sampler.cpp ../src/solve_clustering.cpp ../src/gmm.cpp ../src/call_consensus_clustering.cpp ../src/genomic_position.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp
-)
+add_executable(check_gmm_1d test_gmm_1d.cpp)
 
-add_executable(check_gaussian_sampler
-        test_gaussian_sampler.cpp ../src/gaussian_sampler.cpp
-)
+add_executable(check_gaussian_sampler test_gaussian_sampler.cpp)
 
-add_executable(check_multinomial_sampler
-        test_multinomial_sampler.cpp ../src/multinomial_sampler.cpp
-)
+add_executable(check_multinomial_sampler test_multinomial_sampler.cpp)
 
-add_executable(check_bootstrap_variants
-        test_bootstrap_variants.cpp ../src/bootstrap_variants.cpp ../src/multinomial_sampler.cpp
-)
+add_executable(check_bootstrap_variants test_bootstrap_variants.cpp)
 
-add_executable(check_bd_threshold
-        test_bd_threshold.cpp ../src/gmm_1d.cpp ../src/gaussian_sampler.cpp
-)
+add_executable(check_bd_threshold test_bd_threshold.cpp)
 
-add_executable(check_subset_sum
-        test_subset_sum.cpp ../src/solve_clustering.cpp ../src/gmm_1d.cpp ../src/call_consensus_clustering.cpp ../src/genomic_position.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp
-)
+add_executable(check_subset_sum test_subset_sum.cpp)
 
-add_executable(check_parse_gff
-        test_parse_gff.cpp ../src/parse_gff.cpp
-)
+add_executable(check_parse_gff test_parse_gff.cpp)
 
-add_executable(check_ref_discontinuous_cds
-        test_ref_discontinuous_cds.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/allele_functions.cpp
-)
+add_executable(check_ref_discontinuous_cds test_ref_discontinuous_cds.cpp)
 
-add_executable(check_codon_extraction
-        test_codon_extraction.cpp ../src/variant_caller.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/genomic_position.cpp ../src/site_state.cpp ../src/site_aggregator.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/site_aggregator_stats.cpp ../src/site_state_aggregator_stats.cpp
-)
+add_executable(check_codon_extraction test_codon_extraction.cpp)
 
-add_executable(check_write_codon_aa
-        test_write_codon_aa.cpp ../src/variant_caller.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/genomic_position.cpp ../src/site_state.cpp ../src/site_aggregator.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/site_aggregator_stats.cpp ../src/site_state_aggregator_stats.cpp
-)
+add_executable(check_write_codon_aa test_write_codon_aa.cpp)
 
 set(ALL_TEST_EXECUTABLES check_primer_trim
         check_trim
@@ -197,26 +111,9 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_write_codon_aa
 )
 
-if(HTSLIB_PREFIX)
-    find_library(HTSLIB
-            NAMES hts
-            PATHS ${HTSLIB_PREFIX}/lib
-            NO_DEFAULT_PATH)
-else()
-    find_library(HTSLIB
-            NAMES hts)
-endif()
-
-if(NOT HTSLIB)
-    message(FATAL_ERROR "htslib not found")
-else()
-    foreach(test_executable ${ALL_TEST_EXECUTABLES})
-        # Include directories for htslib
-        target_include_directories(${test_executable} PRIVATE ${HTSLIB_PREFIX}/include)
-
-        # Link the executable with htslib
-        target_link_libraries(${test_executable} ${HTSLIB})
-
-        add_test(NAME ${test_executable} COMMAND ${test_executable})
-    endforeach ()
-endif()
+# All shared code lives in ivar_core, which PUBLIC-propagates the htslib
+# include directory and link dependencies to every test executable.
+foreach(test_executable ${ALL_TEST_EXECUTABLES})
+    target_link_libraries(${test_executable} PRIVATE ivar_core)
+    add_test(NAME ${test_executable} COMMAND ${test_executable})
+endforeach ()
