@@ -1,7 +1,6 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-#include "../src/include/armadillo"
 #include "htslib/sam.h"
 #include "../src/saga.h"
 #include "../src/interval_tree.h"

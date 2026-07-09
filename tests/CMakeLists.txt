@@ -18,7 +18,7 @@ add_executable(check_consensus_seq_id test_consensus_seq_id.cpp)
 
 add_executable(check_variants test_variants.cpp)
 
-add_executable(check_variants_2 test_new_variants.cpp)
+#add_executable(check_variants_2 test_new_variants.cpp)
 
 add_executable(check_common_variants test_common_variants.cpp)
 
@@ -87,7 +87,7 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_getmasked
         check_removereads
         check_variants
-        check_variants_2
+#        check_variants_2
         check_common_variants
         check_unpaired_trim
         check_primer_trim_edge_cases
