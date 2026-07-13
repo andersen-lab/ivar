@@ -94,20 +94,23 @@ int main() {
     else std::cerr << "test 5 failed" << std::endl;
   }
 
-  /* TEST 6 - propagate_deletion_conflicts: a deletion that carries position_conflict=true
-   * propagates that flag to all positions its range covers.
+  /* TEST 6 - flag_position_conflicts: a deletion spans positions 5-7 (nuc="-GGA"). Its start
+   * position (5) does not conflict with anything, but its last covered position (7) collides
+   * with another variant assigned to the same cluster. The deletion, which never had its own
+   * start flagged, must still pick up position_conflict via its span, and so must the variant
+   * it collides with at position 7. The variant at position 5 (different cluster) must not.
    */
   {
-    variant del, p6, p7;
-    del.position = 5; del.nuc = "-GGA"; del.position_conflict = true;
-    p6.position = 6;  p6.nuc = "A";
-    p7.position = 7;  p7.nuc = "T";
+    variant del, v5, v7;
+    del.position = 5; del.nuc = "-GGA"; del.cluster_assigned = 0;
+    v5.position = 5;  v5.nuc = "C"; v5.cluster_assigned = 1;
+    v7.position = 7;  v7.nuc = "T"; v7.cluster_assigned = 0;
     variants.clear();
     variants.push_back(del);
-    variants.push_back(p6);
-    variants.push_back(p7);
-    propagate_deletion_conflicts(variants);
-    if (variants[1].position_conflict && variants[2].position_conflict) success++;
+    variants.push_back(v5);
+    variants.push_back(v7);
+    flag_position_conflicts(variants);
+    if (variants[0].position_conflict && !variants[1].position_conflict && variants[2].position_conflict) success++;
     else std::cerr << "test 6 failed" << std::endl;
   }
   std::cerr << "success " << success << " tests " << num_tests << std::endl;

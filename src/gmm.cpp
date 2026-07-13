@@ -68,26 +68,11 @@ void flag_low_posterior_variants(std::vector<variant> &base_variants){
   }
 }
 
-void propagate_deletion_conflicts(std::vector<variant> &variants) {
-  std::unordered_set<uint32_t> deletion_covered;
-
-  for (const auto& v : variants) {
-    if (!v.position_conflict) continue;
-    if (v.nuc.find('-') == std::string::npos) continue;
-
-    std::string nuc = v.nuc;
-    nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
-    // mirror the fill loop in cluster_consensus: position covers [position, position+nuc.size()-1]
-    for (uint32_t z = 1; z < nuc.size(); z++) {
-      deletion_covered.insert(v.position + z);
-    }
-  }
-
-  for (auto& v : variants) {
-    if (deletion_covered.count(v.position)) {
-      v.position_conflict = true;
-    }
-  }
+uint32_t variant_span(const variant &v) {
+  if (v.nuc.find('-') == std::string::npos) return 1;
+  std::string nuc = v.nuc;
+  nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
+  return nuc.empty() ? 1 : (uint32_t)nuc.size();
 }
 
 void flag_position_conflicts(std::vector<variant> &variants) {
@@ -95,7 +80,10 @@ void flag_position_conflicts(std::vector<variant> &variants) {
 
   for (const auto& v : variants) {
     if (v.half_normal_upper || v.half_normal_lower || v.depth_flag || v.qual_flag || v.overlapped_deletion) continue;
-    pos_cluster_count[v.position][v.cluster_assigned]++;
+    uint32_t span = variant_span(v);
+    for (uint32_t z = 0; z <= span; z++) {
+      pos_cluster_count[v.position + z][v.cluster_assigned]++;
+    }
   }
 
   std::unordered_set<uint32_t> conflicted;
@@ -111,10 +99,16 @@ void flag_position_conflicts(std::vector<variant> &variants) {
   for (auto& v : variants) {
     if (conflicted.count(v.position)) {
       v.position_conflict = true;
-      //std::cerr << "Position conflict: pos=" << v.position << " nuc=" << v.nuc << " gapped_freq=" << v.gapped_freq << " cluster=" << v.cluster_assigned << "\n";
+      continue;
+    }
+    uint32_t span = variant_span(v);
+    for (uint32_t z = 1; z < span; z++) {
+      if (conflicted.count(v.position + z)) {
+        v.position_conflict = true;
+        break;
+      }
     }
   }
-  propagate_deletion_conflicts(variants);
 }
 
 void reset_variants_info(std::vector<variant> &variants){
@@ -326,7 +320,7 @@ void parse_internal_variants(std::string filename,
       tmp.primer_masked = false;
       tmp.version_1_var = true;
     }
-    if(tmp.total_depth < depth_cutoff){
+    if(tmp.gapped_depth < depth_cutoff){
       tmp.depth_flag = true;
     } else {
       tmp.depth_flag = false;

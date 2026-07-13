@@ -54,5 +54,4 @@ void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, do
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound, double invariant_lower_bound);
 void reset_variants_info(std::vector<variant> &variants);
 void flag_position_conflicts(std::vector<variant> &variants);
-void propagate_deletion_conflicts(std::vector<variant> &variants);
 #endif

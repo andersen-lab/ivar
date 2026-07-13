@@ -33,7 +33,7 @@ void cluster_consensus(std::vector<variant> variants, \
     if(x.position > max_position){
       max_position = x.position;
     }
-    if(x.position < min_position && x.total_depth > 0){
+    if(x.position < min_position && x.gapped_depth > 0){
         min_position = x.position;
     }
   }
@@ -53,7 +53,7 @@ void cluster_consensus(std::vector<variant> variants, \
   //iterate all variants and determine
   for(uint32_t i = 0; i < variants.size(); i++){
     //TESTLINES
-    if(variants[i].position == 11283){
+    if(variants[i].position == 21770){
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << " depth " << variants[i].total_depth << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
