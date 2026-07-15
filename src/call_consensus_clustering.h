@@ -18,6 +18,8 @@ class consensus_sequence {
     void add_variant(uint32_t position, const variant &v) {
       variant_records[position-1].push_back(v);
     }
+
+    void get_consensus();
 };
 
 std::string trim_leading_ambiguities(std::string sequence, uint32_t min_position);

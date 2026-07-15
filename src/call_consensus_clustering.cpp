@@ -23,6 +23,10 @@ void assign_variants_position(std::vector<variant> &variants, std::vector<consen
   }
 }
 
+void consensus_sequence::get_consensus(){
+
+}
+
 void cluster_consensus(std::vector<variant> variants, \
                       std::string clustering_file, \
                       double default_threshold, \
@@ -54,9 +58,12 @@ void cluster_consensus(std::vector<variant> variants, \
     all_consensus_seqs.emplace_back(max_position);
   }
   assign_variants_position(variants, all_consensus_seqs);
+  for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
+    all_consensus_seqs[i].get_consensus();
+  }
 
-  //order varaints by position
-  std::sort(variants.begin(), variants.end(), [](const variant& a, const variant& b) {return a.position < b.position;});
+
+
   std::vector<uint32_t> last_adjustment(all_consensus_seqs.size(), 0);
 
   //track deletions over time
