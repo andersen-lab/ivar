@@ -18,6 +18,7 @@ struct variant {
   double std_dev;
   bool half_normal_upper = false;
   bool half_normal_lower = false;
+  bool position_half_normal_upper = false;
 
   //number corresponding the the amplicons covering this position
   std::vector<uint32_t> amplicon_numbers;

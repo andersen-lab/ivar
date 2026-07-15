@@ -23,17 +23,70 @@ void assign_variants_position(std::vector<variant> &variants, std::vector<consen
   }
 }
 
-void consensus_sequence::get_consensus(){
+void consensus_sequence::get_consensus(uint32_t n){
+  uint32_t test_position = 0;
+  uint32_t deletion_span; //track deletion spans
   for(uint32_t i=0; i < variant_records.size(); i++){
+    /*if(i != test_position){
+      continue;
+    }*/
     if(variant_records[i].size() == 0){
       continue;
     }
+    std::vector<string> nucs; //all the possible nucs here?
+
     for(uint32_t j=0; j < variant_records[i].size(); j++){
-      //if we have one assigned to the upper half normal, we go with that and ignore the rest
-      if(variant_records[i][j].half_normal_upper){
-        break;
+      if(i == test_position){
+        std::cerr << "consensus " << n << " position " << i+1 << " nuc " << variant_records[i][j].nuc << " freq " << variant_records[i][j].gapped_freq << std::endl;
+        std::cerr << "qual " << variant_records[i][j].qual << " depth " << variant_records[i][j].total_depth << std::endl;
+        std::cerr << "upper half normal " << variant_records[i][j].half_normal_upper << " lower half normal " << variant_records[i][j].half_normal_lower << std::endl;
+        std::cerr << "consensus numbers " << std::endl;
+        for(auto cc : variant_records[i][j].consensus_numbers){
+          std::cerr << cc << " ";
+        }
+        std::cerr << std::endl;
       }
 
+      //if we have one assigned to the upper half normal, we go with that and ignore the rest
+      if(variant_records[i][j].half_normal_upper){
+        sequence[i] = variant_records[i][j].nuc;
+        break;
+      }
+      if(variant_records[i][j].position_half_normal_upper){
+        continue;
+      }
+      //if we have it assigned to the lower half normal, we ignore it
+      if(variant_records[i][j].half_normal_lower){
+        continue;
+      }
+
+      if(variant_records[i][j].qual_flag || variant_records[i][j].depth_flag){
+        continue;
+      }
+
+      //record the possible nucleotides at this position
+      nucs.push_back(variant_records[i][j].nuc);
+    } 
+
+    if(nucs.size() == 1){
+      sequence[i] = nucs[0];
+    } else if(nucs.size() > 1){
+      std::cerr << "position " << i+1 << " has multiple nucleotides assigned to it, cannot resolve" << std::endl;
+    }
+  }
+}
+
+void consensus_sequence::process_variant_assignments(){
+  for(uint32_t i=0; i < variant_records.size(); i++){
+    bool position_half_normal_upper = false;
+    for(uint32_t j=0; j < variant_records[i].size(); j++){
+      if(variant_records[i][j].half_normal_upper){
+        position_half_normal_upper = true;
+        break;
+      }
+    }
+    for(auto &v : variant_records[i]){
+      v.position_half_normal_upper = position_half_normal_upper;
     }
   }
 }
@@ -70,10 +123,9 @@ void cluster_consensus(std::vector<variant> variants, \
   }
   assign_variants_position(variants, all_consensus_seqs);
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
-    all_consensus_seqs[i].get_consensus();
+    all_consensus_seqs[i].process_variant_assignments();
+    all_consensus_seqs[i].get_consensus(i);
   }
-
-
 
   /*std::vector<uint32_t> last_adjustment(all_consensus_seqs.size(), 0);
 
