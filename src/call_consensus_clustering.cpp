@@ -38,12 +38,14 @@ void cluster_consensus(std::vector<variant> variants, \
     }
   }
   bool print = false;
-  //initialize sequences for all possible populations
-  std::vector<std::vector<std::string>> all_consensus_seqs;
+  //initialize a consensus_sequence for each possible population
+  std::vector<consensus_sequence> all_consensus_seqs;
+  all_consensus_seqs.reserve(means.size());
   for(uint32_t i=0; i < means.size(); i++){
-    std::vector<std::string> tmp(max_position, "N");
-    all_consensus_seqs.push_back(tmp);
+    all_consensus_seqs.emplace_back(max_position);
   }
+
+  
   //order varaints by position
   std::sort(variants.begin(), variants.end(), [](const variant& a, const variant& b) {return a.position < b.position;});
   std::vector<uint32_t> last_adjustment(all_consensus_seqs.size(), 0);
