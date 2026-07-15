@@ -64,7 +64,7 @@ void cluster_consensus(std::vector<variant> variants, \
 
 
 
-  std::vector<uint32_t> last_adjustment(all_consensus_seqs.size(), 0);
+  /*std::vector<uint32_t> last_adjustment(all_consensus_seqs.size(), 0);
 
   //track deletions over time
   std::vector<std::vector<uint32_t>> deletions(means.size());
@@ -110,13 +110,13 @@ void cluster_consensus(std::vector<variant> variants, \
     }
 
     //if this amplicon is experiencing fluctuation across amplicons, call ambiguity
-    /*if(variants[i].amplicon_masked && !variants[i].half_normal_upper){
+    if(variants[i].amplicon_masked && !variants[i].half_normal_upper){
       if(print){
         std::cerr << "amplicon is experiencing fluctuation" << std::endl;
       }
       continue;
     }
-    }*/
+    }
 
     uint32_t position = variants[i].position;
     if(variants[i].vague_assignment && !variants[i].half_normal_upper){
@@ -233,5 +233,5 @@ void cluster_consensus(std::vector<variant> variants, \
     file << ">"+clustering_file+"_cluster_"+ std::to_string(tmp_mean) << "\n";
     file << next_trimmed_sequence << "\n";
   }
-  file.close();
+  file.close();*/
 }
