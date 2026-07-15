@@ -24,7 +24,18 @@ void assign_variants_position(std::vector<variant> &variants, std::vector<consen
 }
 
 void consensus_sequence::get_consensus(){
+  for(uint32_t i=0; i < variant_records.size(); i++){
+    if(variant_records[i].size() == 0){
+      continue;
+    }
+    for(uint32_t j=0; j < variant_records[i].size(); j++){
+      //if we have one assigned to the upper half normal, we go with that and ignore the rest
+      if(variant_records[i][j].half_normal_upper){
+        break;
+      }
 
+    }
+  }
 }
 
 void cluster_consensus(std::vector<variant> variants, \

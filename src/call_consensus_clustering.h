@@ -5,13 +5,13 @@
 class consensus_sequence {
   std::string seq_name;
   uint32_t seq_length;
-  std::string sequence;
+  std::vector<std::string> sequence;
   std::vector<std::vector<variant>> variant_records;
 
   public:
     consensus_sequence(uint32_t max_position) {
       seq_length = max_position;
-      sequence = std::string(max_position, 'N');
+      sequence = std::vector<std::string>(max_position, "N");
       variant_records = std::vector<std::vector<variant>>(max_position);
     }
 
