@@ -12,6 +12,10 @@ class consensus_sequence {
       seq_length = max_position;
       variant_records = std::vector<std::vector<variant>>(max_position);
     }
+
+    void add_variant(uint32_t position, const variant &v) {
+      variant_records[position-1].push_back(v);
+    }
 };
 
 std::string trim_leading_ambiguities(std::string sequence, uint32_t min_position);
