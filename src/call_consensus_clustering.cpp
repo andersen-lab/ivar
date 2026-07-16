@@ -96,6 +96,15 @@ void consensus_sequence::process_variant_assignments(){
   }
 }
 
+void consensus_sequence::write_consensus_to_file(std::string consensus_filename){
+  std::ofstream file(consensus_filename, std::ios::app);
+  std::string tmp = std::accumulate(sequence.begin(), sequence.end(), std::string(""));
+  tmp.erase(std::remove(tmp.begin(), tmp.end(), '-'), tmp.end());
+  file << ">"+seq_name << "\n";
+  file << tmp << "\n";
+  file.close();
+}
+
 void cluster_consensus(std::vector<variant> variants, \
                       std::string clustering_file, \
                       double default_threshold, \
@@ -108,6 +117,8 @@ void cluster_consensus(std::vector<variant> variants, \
     return;
   }
 
+  std::string consensus_filename = clustering_file + ".fa";
+ 
   //find the largest position in the variants file
   uint32_t max_position = 0;
   uint32_t min_position = 4294967295U;;
@@ -122,16 +133,17 @@ void cluster_consensus(std::vector<variant> variants, \
   bool print = false;
   //initialize a consensus_sequence for each possible population
   std::vector<consensus_sequence> all_consensus_seqs;
-  all_consensus_seqs.reserve(means.size());
-  for(uint32_t i=0; i < means.size(); i++){
+  all_consensus_seqs.reserve(solution.size());
+  for(uint32_t i=0; i < solution.size(); i++){
     all_consensus_seqs.emplace_back(max_position);
   }
   assign_variants_position(variants, all_consensus_seqs);
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
+    all_consensus_seqs[i].set_seq_name(clustering_file + "_cluster_" + std::to_string(solution[i]));
     all_consensus_seqs[i].process_variant_assignments();
     all_consensus_seqs[i].get_consensus(i);
+    all_consensus_seqs[i].write_consensus_to_file(consensus_filename);
   }
-
   /*std::vector<uint32_t> last_adjustment(all_consensus_seqs.size(), 0);
 
   //track deletions over time
