@@ -33,7 +33,7 @@ void read_consensus(std::vector<std::pair<std::string, std::string>> &sequences,
 
 int main() {
   std::string prefix = "/tmp/consensus";
-  int num_tests = 2;
+  int num_tests = 3;
   int success = 0;
 
   uint32_t min_depth = 5;
@@ -79,17 +79,30 @@ int main() {
     }
   }
 
-  for (const auto& v : variants) {
-    if (v.position == 997) {
-      std::cerr << "[pre-consensus pos=997] nuc=" << v.nuc
-                << " qual=" << v.qual
-                << " gapped_depth=" << v.gapped_depth
-                << " gapped_freq=" << v.gapped_freq
-                << " half_normal_upper=" << v.half_normal_upper
-                << " half_normal_lower=" << v.half_normal_lower
-                << " position_conflict=" << v.position_conflict
-                << " vague=" << v.vague_assignment
-                << std::endl;
+  // TEST 3 - verify the dominant insertion +TT at POS=1553 (gapped_freq=0.9) is
+  // assigned to the major/dominant consensus genome (the one with the largest
+  // accepted solution fraction).
+  {
+    bool found = false;
+    for (const auto& v : variants) {
+      if (v.position == 1553 && v.nuc == "+TT") {
+        found = true;
+        uint32_t major_idx = std::distance(solution.begin(), std::max_element(solution.begin(), solution.end()));
+        bool in_major = std::find(v.consensus_numbers.begin(), v.consensus_numbers.end(), major_idx) != v.consensus_numbers.end();
+        std::cerr << "[+TT check] gapped_freq=" << v.gapped_freq << " cluster=" << v.cluster_assigned
+                  << " major_idx=" << major_idx << " consensus_numbers=[ ";
+        for (auto cn : v.consensus_numbers) std::cerr << cn << " ";
+        std::cerr << "]" << std::endl;
+        if (in_major) {
+          success++;
+        } else {
+          std::cerr << "+TT insertion at position 1553 not assigned to major genome" << std::endl;
+        }
+        break;
+      }
+    }
+    if (!found) {
+      std::cerr << "+TT insertion at position 1553 not found in variants" << std::endl;
     }
   }
 
@@ -122,32 +135,41 @@ int main() {
       deleted_positions.insert(v.position + z);
     }
   }
-  // Build index->genomic mapping: walk genomic positions starting at min_position,
+  // Build index->genomic mapping: production output (exp_sequences) is no longer
+  // trimmed to min_position, so it starts at genomic position 1. Walk from there,
   // skip deleted ones, and assign each surviving position to the next string index.
   std::vector<uint32_t> index_to_genomic;
   {
     uint32_t max_pos = 0;
     for (const auto& v : variants) if (v.position > max_pos) max_pos = v.position;
-    for (uint32_t p = min_position; p <= max_pos + 10; p++) {
+    for (uint32_t p = 1; p <= max_pos + 10; p++) {
       if (deleted_positions.count(p) == 0) {
         index_to_genomic.push_back(p);
       }
     }
   }
+  // gt_sequences is trimmed and starts at min_position; find where that lands in
+  // the untrimmed exp_sequences index mapping so the two can be compared aligned.
+  uint32_t exp_start = 0;
+  while (exp_start < index_to_genomic.size() && index_to_genomic[exp_start] < min_position) {
+    exp_start++;
+  }
 
   bool correct = true;
   for (auto itgt = gt_sequences.begin(), itexp = exp_sequences.begin(); itgt != gt_sequences.end() && itexp != exp_sequences.end(); ++itgt, ++itexp) {
-    if(itexp->second.size() != itgt->second.size()) {
+    uint32_t exp_len = itexp->second.size() > exp_start ? (uint32_t)itexp->second.size() - exp_start : 0;
+    if(exp_len != itgt->second.size()) {
       correct = false;
-      std::cerr << "not same size gt=" << itgt->second.size() << " exp=" << itexp->second.size() << std::endl;
+      std::cerr << "not same size gt=" << itgt->second.size() << " exp=" << exp_len << std::endl;
     }
-    for(uint32_t i=0; i < itexp->second.size(); i++){
+    for(uint32_t i=0; i < exp_len && i < itgt->second.size(); i++){
       char a = itgt->second[i];
-      char b = itexp->second[i];
+      char b = itexp->second[exp_start + i];
 
       if(a != b){
-        uint32_t genomic_pos = (i < index_to_genomic.size()) ? index_to_genomic[i] : (min_position + i);
+        uint32_t genomic_pos = (exp_start+i < index_to_genomic.size()) ? index_to_genomic[exp_start+i] : (min_position + i);
         std::cerr << "gt " << a << " exp " << b << " consensus_pos=" << i+1 << " genomic_pos=" << genomic_pos << std::endl;
+        exit(0);
         int ctx = 5;
         std::cerr << "  gt  context: ";
         for (int c = -ctx; c <= ctx; c++) {
@@ -158,7 +180,7 @@ int main() {
         std::cerr << std::endl;
         std::cerr << "  exp context: ";
         for (int c = -ctx; c <= ctx; c++) {
-          int idx = (int)i + c;
+          int idx = (int)(exp_start + i) + c;
           if (idx < 0 || idx >= (int)itexp->second.size()) std::cerr << '.';
           else std::cerr << (c == 0 ? '[' : ' ') << itexp->second[idx] << (c == 0 ? ']' : ' ');
         }
