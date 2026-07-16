@@ -31,6 +31,8 @@ struct variant {
   //if this cluster is fully resolveable or not
   bool resolved=true;
 
+  bool assigned_deletion=false;
+
   //for these true means flagged as problematic
   bool vague_assignment=false; //cannot be distinguished between two groups
   bool amplicon_flux=false; //fluctuation frequency across amplicons

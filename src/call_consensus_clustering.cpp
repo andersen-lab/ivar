@@ -25,16 +25,14 @@ void assign_variants_position(std::vector<variant> &variants, std::vector<consen
 }
 
 void consensus_sequence::get_consensus(uint32_t n){
-  uint32_t test_position = 25903;
+  uint32_t test_position = 28270;
   uint32_t deletion_span; //track deletion spans
   for(uint32_t i=0; i < variant_records.size(); i++){
-    if(i != test_position){
-      continue;
-    }
     if(variant_records[i].size() == 0){
       continue;
     }
     std::vector<string> nucs; //all the possible nucs here?
+    bool deletion_added = false;
 
     for(uint32_t j=0; j < variant_records[i].size(); j++){
       if(i == test_position){
@@ -64,14 +62,25 @@ void consensus_sequence::get_consensus(uint32_t n){
       if(variant_records[i][j].qual_flag || variant_records[i][j].depth_flag){
         continue;
       }
-
-      //record the possible nucleotides at this position
-      nucs.push_back(variant_records[i][j].nuc);
+ 
+      if(variant_records[i][j].assigned_deletion && !deletion_added){
+        nucs.push_back("-");
+        deletion_added = true;
+      } else {
+        nucs.push_back(variant_records[i][j].nuc);
+      }
     } 
 
+    //we only have one variant at this position, so we can assign it to the consensus sequence
     if(nucs.size() == 1){
       sequence[i] = nucs[0];
     } else if(nucs.size() > 1){
+      //we have multiple variants and one is a deletion so we call an N
+      bool has_deletion = std::any_of(nucs.begin(), nucs.end(), [](const std::string &s){ return s == "-"; });
+      if(has_deletion){
+        continue;
+      }
+      //we have multiple variants at this position, so we need to combine them into an IUPAC code
       char combined = nucs[0][0];
       for(uint32_t j=1; j < nucs.size(); j++){
         combined = gt2iupac(combined, nucs[j][0]);
@@ -82,16 +91,34 @@ void consensus_sequence::get_consensus(uint32_t n){
 }
 
 void consensus_sequence::process_variant_assignments(){
+  //flag positions where deletion overlap, and where we have an upper half normal assignment
   for(uint32_t i=0; i < variant_records.size(); i++){
     bool position_half_normal_upper = false;
+    bool is_del = false;
+    uint32_t deletion_span = 0;
+
     for(uint32_t j=0; j < variant_records[i].size(); j++){
       if(variant_records[i][j].half_normal_upper){
         position_half_normal_upper = true;
         break;
       }
+      if(variant_records[i][j].nuc.find('-') != std::string::npos){
+        is_del = true;
+        deletion_span = variant_records[i][j].nuc.size();
+        break;
+      }
     }
+
     for(auto &v : variant_records[i]){
       v.position_half_normal_upper = position_half_normal_upper;
+    }
+
+    if(is_del){
+      for(uint32_t z=0; z < deletion_span && (i+z) < variant_records.size(); z++){
+        for(auto &v : variant_records[i+z]){
+          v.assigned_deletion = true;
+        }
+      }
     }
   }
 }
