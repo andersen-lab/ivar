@@ -10,22 +10,28 @@
 #include <algorithm>
 #include <numeric>
 
-std::string trim_leading_ambiguities(std::string sequence, uint32_t min_position){
-  std::string result = sequence.substr(min_position-1);
-  return(result);
-}
-
 void assign_variants_position(std::vector<variant> &variants, std::vector<consensus_sequence> &all_consensus_seqs){
   for(uint32_t i=0; i < variants.size(); i++){
+    //deletions span multiple positions; register the record at every position
+    //it covers, not just its own start, so downstream per-position lookups
+    //(and the deletion-span walk in process_variant_assignments) can find it.
+    uint32_t span = 1;
+    if(variants[i].nuc.find('-') != std::string::npos){
+      std::string nuc = variants[i].nuc;
+      nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
+      span = (uint32_t)nuc.size();
+    }
     for(uint32_t j=0; j < variants[i].consensus_numbers.size(); j++){
       uint32_t k = variants[i].consensus_numbers[j];
-      all_consensus_seqs[k].add_variant(variants[i].position, variants[i]);
+      for(uint32_t z=0; z < span; z++){
+        all_consensus_seqs[k].add_variant(variants[i].position + z, variants[i]);
+      }
     }
   }
 }
 
 void consensus_sequence::get_consensus(uint32_t n){
-  uint32_t test_position = 28270;
+  uint32_t test_position = 487;
   uint32_t deletion_span; //track deletion spans
   for(uint32_t i=0; i < variant_records.size(); i++){
     if(variant_records[i].size() == 0){
@@ -36,7 +42,7 @@ void consensus_sequence::get_consensus(uint32_t n){
 
     for(uint32_t j=0; j < variant_records[i].size(); j++){
       if(i == test_position){
-        std::cerr << "consensus " << n << " position " << i+1 << " nuc " << variant_records[i][j].nuc << " freq " << variant_records[i][j].gapped_freq << std::endl;
+        std::cerr << "\nconsensus " << n << " position " << i+1 << " nuc " << variant_records[i][j].nuc << " freq " << variant_records[i][j].gapped_freq << std::endl;
         std::cerr << "qual " << variant_records[i][j].qual << " depth " << variant_records[i][j].total_depth << std::endl;
         std::cerr << "upper half normal " << variant_records[i][j].half_normal_upper << " lower half normal " << variant_records[i][j].half_normal_lower << std::endl;
         std::cerr << "consensus numbers " << std::endl;
@@ -76,6 +82,9 @@ void consensus_sequence::get_consensus(uint32_t n){
 
     //we only have one variant at this position, so we can assign it to the consensus sequence
     if(nucs.size() == 1){
+      if(i == test_position){
+        std::cerr << "consensus " << n << " position " << i+1 << " nuc " << nucs[0] << std::endl;
+      }
       sequence[i] = nucs[0];
     } else if(nucs.size() > 1){
       //we have multiple variants and one is a deletion so we call an N
@@ -90,6 +99,10 @@ void consensus_sequence::get_consensus(uint32_t n){
       }
       sequence[i] = std::string(1, combined);
     }
+  }
+
+  for(uint32_t i=485; i < 490; i++){
+    std::cerr << "consensus " << n << " position " << i+1 << " nuc " << sequence[i] << std::endl;
   }
 }
 
@@ -133,6 +146,8 @@ void consensus_sequence::write_consensus_to_file(std::string consensus_filename)
   file << ">"+seq_name << "\n";
   file << tmp << "\n";
   file.close();
+
+  //std::cerr << tmp << std::endl;
 }
 
 void cluster_consensus(std::vector<variant> variants, \
@@ -168,12 +183,24 @@ void cluster_consensus(std::vector<variant> variants, \
     all_consensus_seqs.emplace_back(max_position);
   }
   assign_variants_position(variants, all_consensus_seqs);
-  std::ofstream(consensus_filename, std::ios::trunc); //start each run from an empty file, since write_consensus_to_file appends
+  //all_consensus_seqs[k] is indexed to match solution[k]/consensus_numbers, so this
+  //processing loop stays in that original order; only the final write order changes.
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
     all_consensus_seqs[i].set_seq_name(clustering_file + "_cluster_" + std::to_string(solution[i]));
     all_consensus_seqs[i].process_variant_assignments();
     all_consensus_seqs[i].get_consensus(i);
-    all_consensus_seqs[i].write_consensus_to_file(consensus_filename);
+  }
+
+  //write largest-abundance genome first: sort indices by solution value, descending
+  std::vector<uint32_t> write_order(all_consensus_seqs.size());
+  for(uint32_t i=0; i < write_order.size(); i++){
+    write_order[i] = i;
+  }
+  std::sort(write_order.begin(), write_order.end(), [&](uint32_t a, uint32_t b){ return solution[a] > solution[b]; });
+
+  std::ofstream(consensus_filename, std::ios::trunc); //start each run from an empty file, since write_consensus_to_file appends
+  for(uint32_t idx : write_order){
+    all_consensus_seqs[idx].write_consensus_to_file(consensus_filename);
   }
   /*std::vector<uint32_t> last_adjustment(all_consensus_seqs.size(), 0);
 
