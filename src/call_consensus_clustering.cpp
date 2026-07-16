@@ -1,6 +1,7 @@
 #include "call_consensus_clustering.h"
 #include "gmm.h"
 #include "saga.h"
+#include "allele_functions.h"
 #include <ostream>
 #include <iostream>
 #include <vector>
@@ -24,12 +25,12 @@ void assign_variants_position(std::vector<variant> &variants, std::vector<consen
 }
 
 void consensus_sequence::get_consensus(uint32_t n){
-  uint32_t test_position = 0;
+  uint32_t test_position = 25903;
   uint32_t deletion_span; //track deletion spans
   for(uint32_t i=0; i < variant_records.size(); i++){
-    /*if(i != test_position){
+    if(i != test_position){
       continue;
-    }*/
+    }
     if(variant_records[i].size() == 0){
       continue;
     }
@@ -71,7 +72,11 @@ void consensus_sequence::get_consensus(uint32_t n){
     if(nucs.size() == 1){
       sequence[i] = nucs[0];
     } else if(nucs.size() > 1){
-      std::cerr << "position " << i+1 << " has multiple nucleotides assigned to it, cannot resolve" << std::endl;
+      char combined = nucs[0][0];
+      for(uint32_t j=1; j < nucs.size(); j++){
+        combined = gt2iupac(combined, nucs[j][0]);
+      }
+      sequence[i] = std::string(1, combined);
     }
   }
 }
