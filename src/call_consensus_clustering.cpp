@@ -62,7 +62,10 @@ void consensus_sequence::get_consensus(uint32_t n){
       if(variant_records[i][j].qual_flag || variant_records[i][j].depth_flag){
         continue;
       }
- 
+      bool has_insertion = variant_records[i][j].nuc.find('+') != std::string::npos;
+      if(has_insertion){
+        std::cerr << "insertion found at position " << i+1 << " for consensus " << n << " " << variant_records[i][j].nuc << std::endl;
+      }
       if(variant_records[i][j].assigned_deletion && !deletion_added){
         nucs.push_back("-");
         deletion_added = true;
@@ -165,6 +168,7 @@ void cluster_consensus(std::vector<variant> variants, \
     all_consensus_seqs.emplace_back(max_position);
   }
   assign_variants_position(variants, all_consensus_seqs);
+  std::ofstream(consensus_filename, std::ios::trunc); //start each run from an empty file, since write_consensus_to_file appends
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
     all_consensus_seqs[i].set_seq_name(clustering_file + "_cluster_" + std::to_string(solution[i]));
     all_consensus_seqs[i].process_variant_assignments();
