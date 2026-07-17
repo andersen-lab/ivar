@@ -31,7 +31,7 @@ void assign_variants_position(std::vector<variant> &variants, std::vector<consen
 }
 
 void consensus_sequence::get_consensus(uint32_t n){
-  uint32_t test_position = 1552;
+  uint32_t test_position = 0;
   uint32_t deletion_span; //track deletion spans
   for(uint32_t i=0; i < variant_records.size(); i++){
     if(variant_records[i].size() == 0){
@@ -56,7 +56,6 @@ void consensus_sequence::get_consensus(uint32_t n){
         if(has_insertion){
           insertion = variant_records[i][j].nuc;
           insertion.erase(std::remove(insertion.begin(), insertion.end(), '+'), insertion.end());
-          std::cerr << "insertion found at position " << i+1 << " for consensus " << n << " " << variant_records[i][j].nuc << std::endl;
       }
 
       //if we have one assigned to the upper half normal, we go with that and ignore the rest
@@ -109,14 +108,6 @@ void consensus_sequence::get_consensus(uint32_t n){
       }
       sequence[i] = std::string(1, combined);
     }
-  }
-
-  for(uint32_t i=1550; i < 1555; i++){
-    std::cerr << "consensus " << n << " position " << i+1 << " nuc ";
-    for(auto s : sequence[i]){
-      std::cerr << s;
-    }
-    std::cerr << std::endl;
   }
 }
 
