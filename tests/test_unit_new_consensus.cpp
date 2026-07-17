@@ -11,11 +11,7 @@ int main() {
   int num_tests = 0;
   int success = 0;
 
-  // Unit test for consensus_sequence::get_consensus, built by hand (bypassing
-  // gmm_model/assign_variants_position/process_variant_assignments entirely) so
-  // variant_records reflect exactly the scenario we want to check.
-  //
-  // 5 positions. Position 2 has three competing calls:
+  // FIRST SCENARIO: 5 positions. Position 2 has three competing calls:
   //   -AAA  freq=0.90  (dominant deletion)  -> consensus genome 0
   //   -AA   freq=0.03  (minor, overlapped)  -> excluded (would be suppressed
   //                                            upstream by set_deletion_flags,
@@ -28,40 +24,104 @@ int main() {
   consensus_sequence genome0(max_position);
   consensus_sequence genome1(max_position);
 
-  for (uint32_t pos = 1; pos <= max_position; pos++) {
-    if (pos == 2) continue;
+  // genome 0, position 1: background "A"
+  {
     variant v{};
-    v.position = pos;
+    v.position = 1;
     v.nuc = "A";
     v.gapped_freq = 1.0;
     v.half_normal_upper = true;
     v.position_half_normal_upper = true;
     v.consensus_numbers = {0, 1};
-
-    genome0.add_variant(pos, v);
-    genome1.add_variant(pos, v);
+    genome0.add_variant(1, v);
+  }
+  // genome 1, position 1: background "A"
+  {
+    variant v{};
+    v.position = 1;
+    v.nuc = "A";
+    v.gapped_freq = 1.0;
+    v.half_normal_upper = true;
+    v.position_half_normal_upper = true;
+    v.consensus_numbers = {0, 1};
+    genome1.add_variant(1, v);
   }
 
+  // genome 0, position 2: dominant deletion -AAA (freq 0.90), spans 2-4
   {
     variant v{};
     v.position = 2;
     v.nuc = "-AAA";
     v.gapped_freq = 0.90;
-    v.assigned_deletion = true; // resolved deletion for this position
+    v.assigned_deletion = true;
     v.consensus_numbers = {0};
     genome0.add_variant(2, v);
   }
 
-  // -AA (freq 0.03) intentionally not added anywhere: represents the minor,
-  // overlapped deletion that set_deletion_flags would suppress upstream.
-
+  // genome 1, position 2 minor variant
   {
     variant v{};
     v.position = 2;
     v.nuc = "A";
     v.gapped_freq = 0.10;
+    v.assigned_deletion = true;
     v.consensus_numbers = {1};
     genome1.add_variant(2, v);
+  }
+  // genome 1, position 2 deletion which is likely an error
+  {
+    variant v{};
+    v.position = 2;
+    v.nuc = "-AA";
+    v.gapped_freq = 0.03;
+    v.assigned_deletion = true;
+    v.consensus_numbers = {1};
+    genome1.add_variant(2, v);
+  }
+  // genome 0, position 3 doesn't exist
+  // genome 1, position 3
+  {
+    variant v{};
+    v.position = 3;
+    v.nuc = "A";
+    v.gapped_freq = 0.10;
+    v.assigned_deletion = true;
+    v.consensus_numbers = {1};
+    genome1.add_variant(3, v);
+  }
+  // genome 0, position 4 doesn't exist
+  // genome 1, position 4 deletion which is likely an error
+  {
+    variant v{};
+    v.position = 4;
+    v.nuc = "A";
+    v.gapped_freq = 0.10;
+    v.assigned_deletion = false;
+    v.consensus_numbers = {1};
+    genome1.add_variant(4, v);
+  } 
+  // genome 0, position 5: background "A"
+  {
+    variant v{};
+    v.position = 5;
+    v.nuc = "A";
+    v.gapped_freq = 1.0;
+    v.half_normal_upper = true;
+    v.position_half_normal_upper = true;
+    v.consensus_numbers = {0, 1};
+    genome0.add_variant(5, v);
+  }
+
+  // genome 1, position 5: background "A"
+  {
+    variant v{};
+    v.position = 5;
+    v.nuc = "A";
+    v.gapped_freq = 1.0;
+    v.half_normal_upper = true;
+    v.position_half_normal_upper = true;
+    v.consensus_numbers = {0, 1};
+    genome1.add_variant(5, v);
   }
 
   genome0.get_consensus(0);
@@ -72,7 +132,7 @@ int main() {
   {
     bool pass = true;
     for (uint32_t pos = 1; pos <= max_position; pos++) {
-      std::string expected = (pos == 2) ? "-" : "A";
+      std::string expected = (pos == 2 || pos == 3 || pos == 4) ? "-" : "A";
       std::string actual = genome0.get_base(pos);
       if (actual != expected) {
         pass = false;
@@ -85,11 +145,12 @@ int main() {
   }
 
   // TEST 2 - genome 1 (the minor genome, no deletion) should show "A" at every
-  // position, including position 2 where the reference persists.
+  // position, except for 2 and 3 which are 'N'
   {
     bool pass = true;
     for (uint32_t pos = 1; pos <= max_position; pos++) {
       std::string expected = "A";
+      if (pos == 2 || pos == 3) expected = "N";
       std::string actual = genome1.get_base(pos);
       if (actual != expected) {
         pass = false;
@@ -101,7 +162,7 @@ int main() {
     if (pass) success++;
   }
 
-  // Second scenario: 5 positions again. Position 2 has two competing alleles,
+  // SECOND SCENARIO: 5 positions again. Position 2 has two competing alleles,
   // no deletion this time: A@0.90 -> genome 0, T@0.10 -> genome 1, each its own
   // standalone record. Position 3 has a background invariant "A"
   // (half_normal_upper, both genomes) plus a minor insertion +CC@0.10 assigned
