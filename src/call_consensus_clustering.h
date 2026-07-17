@@ -23,6 +23,10 @@ class consensus_sequence {
       seq_name = name;
     }
 
+    std::string get_base(uint32_t position) const {
+      return sequence[position-1];
+    }
+
     void get_consensus(uint32_t n);
     void process_variant_assignments();
     void write_consensus_to_file(std::string consensus_filename);
