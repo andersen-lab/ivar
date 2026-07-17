@@ -41,7 +41,7 @@ void consensus_sequence::get_consensus(uint32_t n){
     bool deletion_added = false;
     std::string insertion;
     for(uint32_t j=0; j < variant_records[i].size(); j++){
-      if(i == test_position){
+      /*if(i == test_position){
         std::cerr << "\nconsensus " << n << " position " << i+1 << " nuc " << variant_records[i][j].nuc << " freq " << variant_records[i][j].gapped_freq << std::endl;
         std::cerr << "qual " << variant_records[i][j].qual << " depth " << variant_records[i][j].total_depth << std::endl;
         std::cerr << "upper half normal " << variant_records[i][j].half_normal_upper << " lower half normal " << variant_records[i][j].half_normal_lower << std::endl;
@@ -50,7 +50,7 @@ void consensus_sequence::get_consensus(uint32_t n){
           std::cerr << cc << " ";
         }
         std::cerr << std::endl;
-      }
+      }*/
 
       bool has_insertion = variant_records[i][j].nuc.find('+') != std::string::npos;
         if(has_insertion){
@@ -86,13 +86,13 @@ void consensus_sequence::get_consensus(uint32_t n){
 
     //we only have one variant at this position, so we can assign it to the consensus sequence
     if(nucs.size() == 1){
-      if(i == test_position){
+      /*if(i == test_position){
         std::cerr << "consensus " << n << " position " << i+1 << " nuc ";
         for(auto s : nucs){
           std::cerr << s;
         }
         std::cerr << std::endl;
-      }
+      }*/
       sequence[i] = nucs[0] + insertion;
 
     } else if(nucs.size() > 1){
@@ -136,6 +136,13 @@ void consensus_sequence::process_variant_assignments(){
 
     if(is_del){
       for(uint32_t z=0; z < deletion_span && (i+z) < variant_records.size(); z++){
+        if(variant_records[i+z].empty()){
+          variant blank{};
+          blank.position = i+z+1;
+          blank.assigned_deletion = true;
+          variant_records[i+z].push_back(blank);
+          continue;
+        }
         for(auto &v : variant_records[i+z]){
           v.assigned_deletion = true;
         }
