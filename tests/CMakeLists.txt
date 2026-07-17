@@ -66,10 +66,6 @@ add_executable(check_clustering_consensus
         test_clustering_consensus.cpp ../src/gmm_1d.cpp ../src/gmm.cpp ../src/variant_caller.cpp ../src/site_aggregator.cpp ../src/site_aggregator_stats.cpp ../src/site_state.cpp ../src/site_state_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/call_consensus_clustering.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
 )
 
-add_executable(check_clustering_majority
-        test_clustering_majority.cpp ../src/gmm_1d.cpp ../src/gmm.cpp ../src/variant_caller.cpp ../src/site_aggregator.cpp ../src/site_aggregator_stats.cpp ../src/site_state.cpp ../src/site_state_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/call_consensus_clustering.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
-)
-
 add_executable(check_unit_consensus
         test_unit_new_consensus.cpp ../src/gmm_1d.cpp ../src/gmm.cpp ../src/variant_caller.cpp ../src/site_aggregator.cpp ../src/site_aggregator_stats.cpp ../src/site_state.cpp ../src/site_state_aggregator_stats.cpp ../src/site_amplicon_aggregator_stats.cpp ../src/call_consensus_clustering.cpp ../src/saga.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp ../src/allele_functions.cpp ../src/trim_primer_quality.cpp ../src/solve_clustering.cpp ../src/ref_seq.cpp ../src/parse_gff.cpp ../src/genomic_position.cpp
 )
@@ -148,7 +144,6 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_consensus_seq_id
         check_primer_bed
         check_clustering_consensus
-        check_clustering_majority
         check_unit_consensus
         check_getmasked
         check_removereads

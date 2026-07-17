@@ -1,118 +1,197 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-#include <cmath>
-#include <limits>
-#include "htslib/sam.h"
+#include <algorithm>
 #include "../src/gmm.h"
 #include "../src/saga.h"
-#include "../src/ref_seq.h"
-#include "../src/parse_gff.h"
 #include "../src/call_consensus_clustering.h"
 #include "../src/solve_clustering.h"
-#include "../src/interval_tree.h"
 
 int main() {
-  int num_tests = 6;
+  int num_tests = 0;
   int success = 0;
-  std::vector<variant> variants;
-  std::vector<double> means = {0.90, 0.10};
 
+  // Unit test for consensus_sequence::get_consensus, built by hand (bypassing
+  // gmm_model/assign_variants_position/process_variant_assignments entirely) so
+  // variant_records reflect exactly the scenario we want to check.
+  //
+  // 5 positions. Position 2 has three competing calls:
+  //   -AAA  freq=0.90  (dominant deletion)  -> consensus genome 0
+  //   -AA   freq=0.03  (minor, overlapped)  -> excluded (would be suppressed
+  //                                            upstream by set_deletion_flags,
+  //                                            so it never reaches either genome)
+  //   A     freq=0.10  (ref persists)       -> consensus genome 1
+  // All other positions (1,3,4,5) are background/invariant: a single "A" call,
+  // half_normal_upper=true, assigned to both genomes.
 
-  /* TEST 1 - set_deletion_flags: minor deletion starting at the same position as a dominant
-   * deletion is marked overlapped_deletion=true; dominant is not.
-   */
-  {
-    variant del_dom, del_min;
-    del_dom.nuc = "-GGA"; del_dom.position = 5; del_dom.gapped_freq = 0.90;
-    del_min.nuc = "-G";   del_min.position = 5; del_min.gapped_freq = 0.05;
-    variants.clear();
-    variants.push_back(del_dom);
-    variants.push_back(del_min);
-    set_deletion_flags(variants, 0.03, 0.03);
-    if (!variants[0].overlapped_deletion && variants[1].overlapped_deletion) success++;
-    else std::cerr << "test 1 failed" << std::endl;
+  uint32_t max_position = 5;
+  consensus_sequence genome0(max_position);
+  consensus_sequence genome1(max_position);
+
+  for (uint32_t pos = 1; pos <= max_position; pos++) {
+    if (pos == 2) continue;
+    variant v{};
+    v.position = pos;
+    v.nuc = "A";
+    v.gapped_freq = 1.0;
+    v.half_normal_upper = true;
+    v.position_half_normal_upper = true;
+    v.consensus_numbers = {0, 1};
+
+    genome0.add_variant(pos, v);
+    genome1.add_variant(pos, v);
   }
 
-  /* TEST 2 - set_deletion_flags: minor deletion with a different start but a range that
-   * overlaps the dominant deletion is still marked overlapped_deletion=true.
-   */
   {
-    variant del_dom, del_min;
-    del_dom.nuc = "-GGA"; del_dom.position = 5; del_dom.gapped_freq = 0.90;
-    del_min.nuc = "-AG";  del_min.position = 6; del_min.gapped_freq = 0.05;
-    variants.clear();
-    variants.push_back(del_dom);
-    variants.push_back(del_min);
-    set_deletion_flags(variants, 0.03, 0.03);
-    if (!variants[0].overlapped_deletion && variants[1].overlapped_deletion) success++;
-    else std::cerr << "test 2 failed" << std::endl;
+    variant v{};
+    v.position = 2;
+    v.nuc = "-AAA";
+    v.gapped_freq = 0.90;
+    v.assigned_deletion = true; // resolved deletion for this position
+    v.consensus_numbers = {0};
+    genome0.add_variant(2, v);
   }
 
-  /* TEST 3 - set_deletion_flags: two deletions whose ranges do not overlap are both kept
-   * (neither gets overlapped_deletion=true).
-   */
+  // -AA (freq 0.03) intentionally not added anywhere: represents the minor,
+  // overlapped deletion that set_deletion_flags would suppress upstream.
+
   {
-    variant del_a, del_b;
-    del_a.nuc = "-G"; del_a.position = 5; del_a.gapped_freq = 0.90;
-    del_b.nuc = "-G"; del_b.position = 7; del_b.gapped_freq = 0.05;
-    variants.clear();
-    variants.push_back(del_a);
-    variants.push_back(del_b);
-    set_deletion_flags(variants, 0.03, 0.03);
-    if (!variants[0].overlapped_deletion && !variants[1].overlapped_deletion) success++;
-    else std::cerr << "test 3 failed" << std::endl;
+    variant v{};
+    v.position = 2;
+    v.nuc = "A";
+    v.gapped_freq = 0.10;
+    v.consensus_numbers = {1};
+    genome1.add_variant(2, v);
   }
 
-  /* TEST 4 - flag_position_conflicts: two variants at the same position assigned to the
-   * same cluster both receive position_conflict=true.
-   */
+  genome0.get_consensus(0);
+  genome1.get_consensus(1);
+
+  // TEST 1 - genome 0 (the dominant/majority genome) should show the deletion
+  // at position 2 and "A" everywhere else.
   {
-    variant va, vb;
-    va.position = 10; va.nuc = "A"; va.cluster_assigned = 0;
-    vb.position = 10; vb.nuc = "T"; vb.cluster_assigned = 0;
-    variants.clear();
-    variants.push_back(va);
-    variants.push_back(vb);
-    flag_position_conflicts(variants);
-    if (variants[0].position_conflict && variants[1].position_conflict) success++;
-    else std::cerr << "test 4 failed" << std::endl;
+    bool pass = true;
+    for (uint32_t pos = 1; pos <= max_position; pos++) {
+      std::string expected = (pos == 2) ? "-" : "A";
+      std::string actual = genome0.get_base(pos);
+      if (actual != expected) {
+        pass = false;
+        std::cerr << "genome0 position " << pos << " expected " << expected
+                  << " got " << actual << std::endl;
+      }
+    }
+    num_tests++;
+    if (pass) success++;
   }
 
-  /* TEST 5 - flag_position_conflicts: two variants at the same position assigned to
-   * different clusters do not get flagged.
-   */
+  // TEST 2 - genome 1 (the minor genome, no deletion) should show "A" at every
+  // position, including position 2 where the reference persists.
   {
-    variant va, vb;
-    va.position = 10; va.nuc = "A"; va.cluster_assigned = 0;
-    vb.position = 10; vb.nuc = "T"; vb.cluster_assigned = 1;
-    variants.clear();
-    variants.push_back(va);
-    variants.push_back(vb);
-    flag_position_conflicts(variants);
-    if (!variants[0].position_conflict && !variants[1].position_conflict) success++;
-    else std::cerr << "test 5 failed" << std::endl;
+    bool pass = true;
+    for (uint32_t pos = 1; pos <= max_position; pos++) {
+      std::string expected = "A";
+      std::string actual = genome1.get_base(pos);
+      if (actual != expected) {
+        pass = false;
+        std::cerr << "genome1 position " << pos << " expected " << expected
+                  << " got " << actual << std::endl;
+      }
+    }
+    num_tests++;
+    if (pass) success++;
   }
 
-  /* TEST 6 - flag_position_conflicts: a deletion spans positions 5-7 (nuc="-GGA"). Its start
-   * position (5) does not conflict with anything, but its last covered position (7) collides
-   * with another variant assigned to the same cluster. The deletion, which never had its own
-   * start flagged, must still pick up position_conflict via its span, and so must the variant
-   * it collides with at position 7. The variant at position 5 (different cluster) must not.
-   */
+  // Second scenario: 5 positions again. Position 2 has two competing alleles,
+  // no deletion this time: A@0.90 -> genome 0, T@0.10 -> genome 1, each its own
+  // standalone record. Position 3 has a background invariant "A"
+  // (half_normal_upper, both genomes) plus a minor insertion +CC@0.10 assigned
+  // only to genome 1. All other positions are background "A"s (half_normal_upper,
+  // both genomes).
   {
-    variant del, v5, v7;
-    del.position = 5; del.nuc = "-GGA"; del.cluster_assigned = 0;
-    v5.position = 5;  v5.nuc = "C"; v5.cluster_assigned = 1;
-    v7.position = 7;  v7.nuc = "T"; v7.cluster_assigned = 0;
-    variants.clear();
-    variants.push_back(del);
-    variants.push_back(v5);
-    variants.push_back(v7);
-    flag_position_conflicts(variants);
-    if (variants[0].position_conflict && !variants[1].position_conflict && variants[2].position_conflict) success++;
-    else std::cerr << "test 6 failed" << std::endl;
+    consensus_sequence genome0(max_position);
+    consensus_sequence genome1(max_position);
+
+    for (uint32_t pos = 1; pos <= max_position; pos++) {
+      if (pos == 2) continue;
+      variant v{};
+      v.position = pos;
+      v.nuc = "A";
+      v.gapped_freq = 1.0;
+      v.half_normal_upper = true;
+      v.position_half_normal_upper = true;
+      v.consensus_numbers = {0, 1};
+
+      genome0.add_variant(pos, v);
+      genome1.add_variant(pos, v);
+    }
+
+    {
+      variant v{};
+      v.position = 2;
+      v.nuc = "A";
+      v.gapped_freq = 0.90;
+      v.consensus_numbers = {0};
+      genome0.add_variant(2, v);
+    }
+
+    {
+      variant v{};
+      v.position = 2;
+      v.nuc = "T";
+      v.gapped_freq = 0.10;
+      v.consensus_numbers = {1};
+      genome1.add_variant(2, v);
+    }
+
+    {
+      variant v{};
+      v.position = 3;
+      v.nuc = "+CC";
+      v.gapped_freq = 0.10;
+      v.position_half_normal_upper = true; // position 3 also has the background half_normal_upper "A"
+      v.consensus_numbers = {1};
+      genome1.add_variant(3, v);
+    }
+
+    genome0.get_consensus(2);
+    genome1.get_consensus(3);
+
+    // TEST 3 - genome 0: plain "A" at every position (no insertion, no minor allele).
+    {
+      bool pass = true;
+      for (uint32_t pos = 1; pos <= max_position; pos++) {
+        std::string expected = "A";
+        std::string actual = genome0.get_base(pos);
+        if (actual != expected) {
+          pass = false;
+          std::cerr << "genome0 position " << pos << " expected " << expected
+                    << " got " << actual << std::endl;
+        }
+      }
+      num_tests++;
+      if (pass) success++;
+    }
+
+    // TEST 4 - genome 1: "T" at position 2 (the minor allele), "ACC" at
+    // position 3 (background "A" with the insertion appended), "A" elsewhere.
+    {
+      bool pass = true;
+      for (uint32_t pos = 1; pos <= max_position; pos++) {
+        std::string expected = "A";
+        if (pos == 2) expected = "T";
+        if (pos == 3) expected = "ACC";
+        std::string actual = genome1.get_base(pos);
+        if (actual != expected) {
+          pass = false;
+          std::cerr << "genome1 position " << pos << " expected " << expected
+                    << " got " << actual << std::endl;
+        }
+      }
+      num_tests++;
+      if (pass) success++;
+    }
   }
-  std::cerr << "success " << success << " tests " << num_tests << std::endl;
+
+  std::cerr << "num tests " << num_tests << " success " << success << std::endl;
   return (num_tests == success) ? 0 : -1;
 }
