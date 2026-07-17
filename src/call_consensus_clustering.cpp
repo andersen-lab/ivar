@@ -31,7 +31,7 @@ void assign_variants_position(std::vector<variant> &variants, std::vector<consen
 }
 
 void consensus_sequence::get_consensus(uint32_t n){
-  uint32_t test_position = 487;
+  uint32_t test_position = 1552;
   uint32_t deletion_span; //track deletion spans
   for(uint32_t i=0; i < variant_records.size(); i++){
     if(variant_records[i].size() == 0){
@@ -39,7 +39,7 @@ void consensus_sequence::get_consensus(uint32_t n){
     }
     std::vector<string> nucs; //all the possible nucs here?
     bool deletion_added = false;
-
+    std::string insertion;
     for(uint32_t j=0; j < variant_records[i].size(); j++){
       if(i == test_position){
         std::cerr << "\nconsensus " << n << " position " << i+1 << " nuc " << variant_records[i][j].nuc << " freq " << variant_records[i][j].gapped_freq << std::endl;
@@ -52,10 +52,18 @@ void consensus_sequence::get_consensus(uint32_t n){
         std::cerr << std::endl;
       }
 
+      bool has_insertion = variant_records[i][j].nuc.find('+') != std::string::npos;
+        if(has_insertion){
+          insertion = variant_records[i][j].nuc;
+          insertion.erase(std::remove(insertion.begin(), insertion.end(), '+'), insertion.end());
+          std::cerr << "insertion found at position " << i+1 << " for consensus " << n << " " << variant_records[i][j].nuc << std::endl;
+      }
+
       //if we have one assigned to the upper half normal, we go with that and ignore the rest
+
       if(variant_records[i][j].half_normal_upper){
-        sequence[i] = variant_records[i][j].nuc;
-        break;
+        nucs.push_back(variant_records[i][j].nuc);
+        continue;
       }
       if(variant_records[i][j].position_half_normal_upper){
         continue;
@@ -68,10 +76,7 @@ void consensus_sequence::get_consensus(uint32_t n){
       if(variant_records[i][j].qual_flag || variant_records[i][j].depth_flag){
         continue;
       }
-      bool has_insertion = variant_records[i][j].nuc.find('+') != std::string::npos;
-      if(has_insertion){
-        std::cerr << "insertion found at position " << i+1 << " for consensus " << n << " " << variant_records[i][j].nuc << std::endl;
-      }
+
       if(variant_records[i][j].assigned_deletion && !deletion_added){
         nucs.push_back("-");
         deletion_added = true;
@@ -83,9 +88,14 @@ void consensus_sequence::get_consensus(uint32_t n){
     //we only have one variant at this position, so we can assign it to the consensus sequence
     if(nucs.size() == 1){
       if(i == test_position){
-        std::cerr << "consensus " << n << " position " << i+1 << " nuc " << nucs[0] << std::endl;
+        std::cerr << "consensus " << n << " position " << i+1 << " nuc ";
+        for(auto s : nucs){
+          std::cerr << s;
+        }
+        std::cerr << std::endl;
       }
-      sequence[i] = nucs[0];
+      sequence[i] = nucs[0] + insertion;
+
     } else if(nucs.size() > 1){
       //we have multiple variants and one is a deletion so we call an N
       bool has_deletion = std::any_of(nucs.begin(), nucs.end(), [](const std::string &s){ return s == "-"; });
@@ -101,8 +111,12 @@ void consensus_sequence::get_consensus(uint32_t n){
     }
   }
 
-  for(uint32_t i=485; i < 490; i++){
-    std::cerr << "consensus " << n << " position " << i+1 << " nuc " << sequence[i] << std::endl;
+  for(uint32_t i=1550; i < 1555; i++){
+    std::cerr << "consensus " << n << " position " << i+1 << " nuc ";
+    for(auto s : sequence[i]){
+      std::cerr << s;
+    }
+    std::cerr << std::endl;
   }
 }
 
