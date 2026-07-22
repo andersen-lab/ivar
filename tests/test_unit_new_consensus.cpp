@@ -123,8 +123,9 @@ int main() {
     v.consensus_numbers = {0, 1};
     genome1.add_variant(5, v);
   }
-
+  genome0.process_variant_assignments();
   genome0.get_consensus(0);
+  genome1.process_variant_assignments();
   genome1.get_consensus(1);
 
   // TEST 1 - genome 0 (the dominant/majority genome) should show the deletion
@@ -136,7 +137,7 @@ int main() {
       std::string actual = genome0.get_base(pos);
       if (actual != expected) {
         pass = false;
-        std::cerr << "genome0 position " << pos << " expected " << expected
+        std::cerr << "scenario 1 genome0 position " << pos << " expected " << expected
                   << " got " << actual << std::endl;
       }
     }
@@ -154,7 +155,7 @@ int main() {
       std::string actual = genome1.get_base(pos);
       if (actual != expected) {
         pass = false;
-        std::cerr << "genome1 position " << pos << " expected " << expected
+        std::cerr << "scenario 1 genome1 position " << pos << " expected " << expected
                   << " got " << actual << std::endl;
       }
     }
@@ -172,49 +173,134 @@ int main() {
     consensus_sequence genome0(max_position);
     consensus_sequence genome1(max_position);
 
-    for (uint32_t pos = 1; pos <= max_position; pos++) {
-      if (pos == 2) continue;
-      variant v{};
-      v.position = pos;
-      v.nuc = "A";
-      v.gapped_freq = 1.0;
-      v.half_normal_upper = true;
-      v.position_half_normal_upper = true;
-      v.consensus_numbers = {0, 1};
+  // genome 0, position 1: background "A"
+  {
+    variant v{};
+    v.position = 1;
+    v.nuc = "A";
+    v.gapped_freq = 1.0;
+    v.half_normal_upper = true;
+    v.position_half_normal_upper = true;
+    v.consensus_numbers = {0, 1};
+    genome0.add_variant(1, v);
+  }
+  // genome 1, position 1: background "A"
+  {
+    variant v{};
+    v.position = 1;
+    v.nuc = "A";
+    v.gapped_freq = 1.0;
+    v.half_normal_upper = true;
+    v.position_half_normal_upper = true;
+    v.consensus_numbers = {0, 1};
+    genome1.add_variant(1, v);
+  }
 
-      genome0.add_variant(pos, v);
-      genome1.add_variant(pos, v);
-    }
+  // genome 0, position 2 dominant A (freq 0.90)
+  {
+    variant v{};
+    v.position = 2;
+    v.nuc = "A";
+    v.gapped_freq = 0.90;
+    v.assigned_deletion = false;
+    v.consensus_numbers = {0};
+    genome0.add_variant(2, v);
+  }
 
-    {
-      variant v{};
-      v.position = 2;
-      v.nuc = "A";
-      v.gapped_freq = 0.90;
-      v.consensus_numbers = {0};
-      genome0.add_variant(2, v);
-    }
+  // genome 1, position 2 minor variant T (freq 0.10)
+  {
+    variant v{};
+    v.position = 2;
+    v.nuc = "T";
+    v.gapped_freq = 0.10;
+    v.assigned_deletion = false;
+    v.consensus_numbers = {1};
+    genome1.add_variant(2, v);
+  }
+  // genome 0, position 3 background "A"
+  {
+    variant v{};
+    v.position = 3;
+    v.nuc = "A";
+    v.gapped_freq = 1;
+    v.assigned_deletion = false;
+    v.half_normal_upper = true;
+    v.position_half_normal_upper = true; 
+    v.consensus_numbers = {0, 1};
+    genome0.add_variant(3, v);
+  } 
+  // genome 1, position 3 background "A"
+  {
+    variant v{};
+    v.position = 3;
+    v.nuc = "A";
+    v.gapped_freq = 1;
+    v.half_normal_upper = true;
+    v.position_half_normal_upper = true; 
+    v.assigned_deletion = true;
+    v.consensus_numbers = {1};
+    genome1.add_variant(3, v);
+  }
+  //genom 1, position 3 minor insertion +CC (freq 0.10)
+  {
+    variant v{};
+    v.position = 3;
+    v.nuc = "+CC";
+    v.gapped_freq = 0.10;
+    v.assigned_deletion = true;
+    v.consensus_numbers = {1};
+    genome1.add_variant(3, v);
+  }
+  // genome 0, position 4: background "A"
+  {
+    variant v{};
+    v.position = 4;
+    v.nuc = "A";
+    v.gapped_freq = 1.0;
+    v.half_normal_upper = true;
+    v.position_half_normal_upper = true;
+    v.consensus_numbers = {0, 1};
+    genome0.add_variant(4, v);
+  }
+  // genome 1, position 4: background "A"
+  {
+    variant v{};
+    v.position = 4;
+    v.nuc = "A";
+    v.gapped_freq = 1;
+    v.half_normal_upper = true;
+    v.position_half_normal_upper = true; 
+    v.assigned_deletion = false;
+    v.consensus_numbers = {0, 1};
+    genome1.add_variant(4, v);
+  } 
+  // genome 0, position 5: background "A"
+  {
+    variant v{};
+    v.position = 5;
+    v.nuc = "A";
+    v.gapped_freq = 1.0;
+    v.half_normal_upper = true;
+    v.position_half_normal_upper = true;
+    v.consensus_numbers = {0, 1};
+    genome0.add_variant(5, v);
+  }
 
-    {
-      variant v{};
-      v.position = 2;
-      v.nuc = "T";
-      v.gapped_freq = 0.10;
-      v.consensus_numbers = {1};
-      genome1.add_variant(2, v);
-    }
+  // genome 1, position 5: background "A"
+  {
+    variant v{};
+    v.position = 5;
+    v.nuc = "A";
+    v.gapped_freq = 1.0;
+    v.half_normal_upper = true;
+    v.position_half_normal_upper = true;
+    v.consensus_numbers = {0, 1};
+    genome1.add_variant(5, v);
+  }
 
-    {
-      variant v{};
-      v.position = 3;
-      v.nuc = "+CC";
-      v.gapped_freq = 0.10;
-      v.position_half_normal_upper = true; // position 3 also has the background half_normal_upper "A"
-      v.consensus_numbers = {1};
-      genome1.add_variant(3, v);
-    }
-
+    genome0.process_variant_assignments();
     genome0.get_consensus(2);
+    genome1.process_variant_assignments();
     genome1.get_consensus(3);
 
     // TEST 3 - genome 0: plain "A" at every position (no insertion, no minor allele).
@@ -225,7 +311,7 @@ int main() {
         std::string actual = genome0.get_base(pos);
         if (actual != expected) {
           pass = false;
-          std::cerr << "genome0 position " << pos << " expected " << expected
+          std::cerr << "scenario 2 genome0 position " << pos << " expected " << expected
                     << " got " << actual << std::endl;
         }
       }
@@ -244,7 +330,7 @@ int main() {
         std::string actual = genome1.get_base(pos);
         if (actual != expected) {
           pass = false;
-          std::cerr << "genome1 position " << pos << " expected " << expected
+          std::cerr << "scenario 2 genome1 position " << pos << " expected " << expected
                     << " got " << actual << std::endl;
         }
       }
