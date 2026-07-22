@@ -31,7 +31,7 @@ void assign_variants_position(std::vector<variant> &variants, std::vector<consen
 }
 
 void consensus_sequence::get_consensus(uint32_t n){
-  uint32_t test_position = 0;
+  uint32_t test_position = 3-1;
   uint32_t deletion_span; //track deletion spans
   for(uint32_t i=0; i < variant_records.size(); i++){
     if(variant_records[i].size() == 0){
@@ -43,9 +43,8 @@ void consensus_sequence::get_consensus(uint32_t n){
     for(uint32_t j=0; j < variant_records[i].size(); j++){
       /*if(i == test_position){
         std::cerr << "\nconsensus " << n << " position " << i+1 << " nuc " << variant_records[i][j].nuc << " freq " << variant_records[i][j].gapped_freq << std::endl;
-        std::cerr << "qual " << variant_records[i][j].qual << " depth " << variant_records[i][j].total_depth << std::endl;
         std::cerr << "upper half normal " << variant_records[i][j].half_normal_upper << " lower half normal " << variant_records[i][j].half_normal_lower << std::endl;
-        std::cerr << "consensus numbers " << std::endl;
+        std::cerr << "assigned deletion " << variant_records[i][j].assigned_deletion << std::endl;
         for(auto cc : variant_records[i][j].consensus_numbers){
           std::cerr << cc << " ";
         }
@@ -79,22 +78,16 @@ void consensus_sequence::get_consensus(uint32_t n){
       if(variant_records[i][j].assigned_deletion && !deletion_added){
         nucs.push_back("-");
         deletion_added = true;
-      } else {
+      }
+
+      if(variant_records[i][j].nuc.find('-') == std::string::npos){
         nucs.push_back(variant_records[i][j].nuc);
       }
     } 
 
     //we only have one variant at this position, so we can assign it to the consensus sequence
     if(nucs.size() == 1){
-      /*if(i == test_position){
-        std::cerr << "consensus " << n << " position " << i+1 << " nuc ";
-        for(auto s : nucs){
-          std::cerr << s;
-        }
-        std::cerr << std::endl;
-      }*/
       sequence[i] = nucs[0] + insertion;
-
     } else if(nucs.size() > 1){
       //we have multiple variants and one is a deletion so we call an N
       bool has_deletion = std::any_of(nucs.begin(), nucs.end(), [](const std::string &s){ return s == "-"; });
@@ -125,7 +118,7 @@ void consensus_sequence::process_variant_assignments(){
       }
       if(variant_records[i][j].nuc.find('-') != std::string::npos){
         is_del = true;
-        deletion_span = variant_records[i][j].nuc.size();
+        deletion_span = variant_records[i][j].nuc.size()-1;
         break;
       }
     }
@@ -133,12 +126,12 @@ void consensus_sequence::process_variant_assignments(){
     for(auto &v : variant_records[i]){
       v.position_half_normal_upper = position_half_normal_upper;
     }
-
     if(is_del){
       for(uint32_t z=0; z < deletion_span && (i+z) < variant_records.size(); z++){
         if(variant_records[i+z].empty()){
           variant blank{};
           blank.position = i+z+1;
+          blank.nuc = "-";
           blank.assigned_deletion = true;
           variant_records[i+z].push_back(blank);
           continue;
@@ -158,8 +151,6 @@ void consensus_sequence::write_consensus_to_file(std::string consensus_filename)
   file << ">"+seq_name << "\n";
   file << tmp << "\n";
   file.close();
-
-  //std::cerr << tmp << std::endl;
 }
 
 void cluster_consensus(std::vector<variant> variants, \
