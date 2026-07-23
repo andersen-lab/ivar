@@ -163,11 +163,12 @@ int main() {
     if (pass) success++;
   }
 
-  // SECOND SCENARIO: 5 positions again. Position 2 has two competing alleles,
+  // SECOND SCENARIO: 5 positions. Position 2 has two competing alleles,
   // no deletion this time: A@0.90 -> genome 0, T@0.10 -> genome 1, each its own
   // standalone record. Position 3 has a background invariant "A"
   // (half_normal_upper, both genomes) plus a minor insertion +CC@0.10 assigned
-  // only to genome 1. All other positions are background "A"s (half_normal_upper,
+  // only to genome 1.
+  // All other positions are background "A"s (half_normal_upper,
   // both genomes).
   {
     consensus_sequence genome0(max_position);
@@ -331,6 +332,172 @@ int main() {
         if (actual != expected) {
           pass = false;
           std::cerr << "scenario 2 genome1 position " << pos << " expected " << expected
+                    << " got " << actual << std::endl;
+        }
+      }
+      num_tests++;
+      if (pass) success++;
+    }
+  }
+
+  // THIRD SCENARIO: ambiguities. Starting baseline - 5 positions, all
+  // background/invariant "A" (half_normal_upper=true, both genomes), same
+  // style as the first two scenarios' background positions.
+  {
+    consensus_sequence genome0(max_position);
+    consensus_sequence genome1(max_position);
+
+    // genome 0, position 1: background "A"
+    {
+      variant v{};
+      v.position = 1;
+      v.nuc = "A";
+      v.gapped_freq = 1.0;
+      v.half_normal_upper = true;
+      v.position_half_normal_upper = true;
+      v.consensus_numbers = {0, 1};
+      genome0.add_variant(1, v);
+    }
+    // genome 1, position 1: background "A"
+    {
+      variant v{};
+      v.position = 1;
+      v.nuc = "A";
+      v.gapped_freq = 1.0;
+      v.half_normal_upper = true;
+      v.position_half_normal_upper = true;
+      v.consensus_numbers = {0, 1};
+      genome1.add_variant(1, v);
+    }
+
+    // genome 0, position 2: background "A"
+    {
+      variant v{};
+      v.position = 2;
+      v.nuc = "A";
+      v.gapped_freq = 0.90;
+      v.consensus_numbers = {0};
+      genome0.add_variant(2, v);
+    }
+    // genome 1, position 2: minor allele "C" (freq 0.06)
+    {
+      variant v{};
+      v.position = 2;
+      v.nuc = "C";
+      v.gapped_freq = 0.06;
+      v.consensus_numbers = {1};
+      genome1.add_variant(2, v);
+    }
+    // genome 1, position 2: minor allele "T" (freq 0.0.04)
+    {
+      variant v{};
+      v.position = 2;
+      v.nuc = "T";
+      v.gapped_freq = 0.04;
+      v.consensus_numbers = {1};
+      genome1.add_variant(2, v);
+    }
+    // genome 0, position 3: background "A"
+    {
+      variant v{};
+      v.position = 3;
+      v.nuc = "A";
+      v.gapped_freq = 1.0;
+      v.half_normal_upper = true;
+      v.position_half_normal_upper = true;
+      v.consensus_numbers = {0, 1};
+      genome0.add_variant(3, v);
+    }
+    // genome 1, position 3: background "A"
+    {
+      variant v{};
+      v.position = 3;
+      v.nuc = "A";
+      v.gapped_freq = 1.0;
+      v.half_normal_upper = true;
+      v.position_half_normal_upper = true;
+      v.consensus_numbers = {0, 1};
+      genome1.add_variant(3, v);
+    }
+
+    // genome 0, position 4: background "A"
+    {
+      variant v{};
+      v.position = 4;
+      v.nuc = "A";
+      v.gapped_freq = 1.0;
+      v.half_normal_upper = true;
+      v.position_half_normal_upper = true;
+      v.consensus_numbers = {0, 1};
+      genome0.add_variant(4, v);
+    }
+    // genome 1, position 4: background "A"
+    {
+      variant v{};
+      v.position = 4;
+      v.nuc = "A";
+      v.gapped_freq = 1.0;
+      v.half_normal_upper = true;
+      v.position_half_normal_upper = true;
+      v.consensus_numbers = {0, 1};
+      genome1.add_variant(4, v);
+    }
+
+    // genome 0, position 5: background "A"
+    {
+      variant v{};
+      v.position = 5;
+      v.nuc = "A";
+      v.gapped_freq = 1.0;
+      v.half_normal_upper = true;
+      v.position_half_normal_upper = true;
+      v.consensus_numbers = {0, 1};
+      genome0.add_variant(5, v);
+    }
+    // genome 1, position 5: background "A"
+    {
+      variant v{};
+      v.position = 5;
+      v.nuc = "A";
+      v.gapped_freq = 1.0;
+      v.half_normal_upper = true;
+      v.position_half_normal_upper = true;
+      v.consensus_numbers = {0, 1};
+      genome1.add_variant(5, v);
+    }
+
+    genome0.process_variant_assignments();
+    genome0.get_consensus(4);
+    genome1.process_variant_assignments();
+    genome1.get_consensus(5);
+
+    // TEST 5 - genome 0: plain "A" at every position.
+    {
+      bool pass = true;
+      for (uint32_t pos = 1; pos <= max_position; pos++) {
+        std::string expected = "A";
+        std::string actual = genome0.get_base(pos);
+        if (actual != expected) {
+          pass = false;
+          std::cerr << "scenario 3 genome0 position " << pos << " expected " << expected
+                    << " got " << actual << std::endl;
+        }
+      }
+      num_tests++;
+      if (pass) success++;
+    }
+
+    // TEST 6 - genome 1: "A" everywhere except position 2, where the
+    // competing "C"/"T" minor alleles should combine into the IUPAC
+    // ambiguity code "Y".
+    {
+      bool pass = true;
+      for (uint32_t pos = 1; pos <= max_position; pos++) {
+        std::string expected = (pos == 2) ? "Y" : "A";
+        std::string actual = genome1.get_base(pos);
+        if (actual != expected) {
+          pass = false;
+          std::cerr << "scenario 3 genome1 position " << pos << " expected " << expected
                     << " got " << actual << std::endl;
         }
       }
