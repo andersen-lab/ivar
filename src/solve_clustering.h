@@ -12,6 +12,6 @@ bool test_cluster_deviation(double nearest_cluster, double variant_cluster, doub
 std::vector<uint32_t> rewrite_amplicon_masking(std::vector<variant> variants, std::vector<double> means);
 void rewrite_position_masking(std::vector<variant> &variants);
 void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth);
-void assign_variants_solution(std::vector<double> solution, std::vector<variant> &variants, std::vector<double> means);
+void assign_variants_solution(std::vector<double> solution, std::vector<variant> &variants, std::vector<double> means, double threshold);
 std::vector<std::vector<double>> subset_sum(std::vector<double> means);
 #endif

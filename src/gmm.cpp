@@ -634,7 +634,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       }
       //flag low posterior variants based on the new probabilities
       flag_low_posterior_variants(base_variants);
-      assign_variants_solution(solution_sets[0], base_variants, eff_means);
+      assign_variants_solution(solution_sets[0], base_variants, eff_means, 2.0);
       flag_position_conflicts(base_variants);
 
       //predict clusters for amplicon specific frequencies

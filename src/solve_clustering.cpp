@@ -389,9 +389,10 @@ void overwrite_cluster_assigned(std::vector<variant> &variants,
 
 }
 
-void assign_variants_solution(std::vector<double> solution, 
+void assign_variants_solution(std::vector<double> solution,
                               std::vector<variant> &variants,
-                              std::vector<double> means){
+                              std::vector<double> means,
+                              double threshold){
   double error = 0.05; 
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
@@ -446,14 +447,36 @@ void assign_variants_solution(std::vector<double> solution,
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].half_normal_upper || variants[i].half_normal_lower) continue;
 
+    //assign to every cluster that's still plausible given the posterior
+    //probabilities, not just the single argmax cluster_assigned - a variant
+    //within threshold of the best probability is genuinely ambiguous between
+    //those clusters, so it should reach every genome any of them map to.
+    std::vector<uint32_t> top_clusters;
+    if(!variants[i].probabilities.empty()){
+      double best_probability = *std::max_element(variants[i].probabilities.begin(), variants[i].probabilities.end());
+      for(uint32_t c=0; c < variants[i].probabilities.size(); c++){
+        if(variants[i].probabilities[c] > best_probability / threshold){
+          top_clusters.push_back(c);
+        }
+      }
+    } else {
+      top_clusters.push_back(variants[i].cluster_assigned);
+    }
+
     for(uint32_t j=0; j < inverse_groups.size(); j++){
       //check to make sure you're lookin at a group that's part of the solution
       auto mit = std::find(solution.begin(), solution.end(), means[j]);
       if(mit == solution.end()) continue;
 
-      //assign the point to all applicable groups
-      auto it = std::find(inverse_groups[j].begin(), inverse_groups[j].end(), variants[i].cluster_assigned);
-      if(it != inverse_groups[j].end()){
+      //assign the point to all applicable groups if any top cluster is a member
+      bool matches = false;
+      for(auto c : top_clusters){
+        if(std::find(inverse_groups[j].begin(), inverse_groups[j].end(), c) != inverse_groups[j].end()){
+          matches = true;
+          break;
+        }
+      }
+      if(matches){
         variants[i].consensus_numbers.push_back(j);
       }
     }
