@@ -425,7 +425,6 @@ int main() {
       variant v{};
       v.position = 4;
       v.nuc = "A";
-      v.vague_assignment = true;
       v.gapped_freq = 0.66;
       v.consensus_numbers = {0};
       genome0.add_variant(4, v);
@@ -435,10 +434,27 @@ int main() {
       variant v{};
       v.position = 4;
       v.nuc = "C";
-      v.vague_assignment = true;
       v.gapped_freq = 0.44;
-      v.consensus_numbers = {1};
+      v.consensus_numbers = {0, 1};
       genome1.add_variant(4, v);
+    }
+    // genome 1, position 4: vague assignment "A" (freq 0.66)
+    {
+      variant v{};
+      v.position = 4;
+      v.nuc = "A";
+      v.gapped_freq = 0.66;
+      v.consensus_numbers = {0, 1};
+      genome1.add_variant(4, v);
+    }
+    // genome 0, position 4: vague assignment "C" (freq 0.44)
+    {
+      variant v{};
+      v.position = 4;
+      v.nuc = "C";
+      v.gapped_freq = 0.44;
+      v.consensus_numbers = {0, 1};
+      genome0.add_variant(4, v);
     }
 
     // genome 0, position 5: background "A"
