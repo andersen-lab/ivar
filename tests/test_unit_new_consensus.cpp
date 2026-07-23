@@ -420,26 +420,24 @@ int main() {
       genome1.add_variant(3, v);
     }
 
-    // genome 0, position 4: background "A"
+    // genome 0, position 4: vague assignment "A" (freq 0.66)
     {
       variant v{};
       v.position = 4;
       v.nuc = "A";
-      v.gapped_freq = 1.0;
-      v.half_normal_upper = true;
-      v.position_half_normal_upper = true;
-      v.consensus_numbers = {0, 1};
+      v.vague_assignment = true;
+      v.gapped_freq = 0.66;
+      v.consensus_numbers = {0};
       genome0.add_variant(4, v);
     }
-    // genome 1, position 4: background "A"
+    // genome 1, position 4: vague assignment "C" (freq 0.44)
     {
       variant v{};
       v.position = 4;
-      v.nuc = "A";
-      v.gapped_freq = 1.0;
-      v.half_normal_upper = true;
-      v.position_half_normal_upper = true;
-      v.consensus_numbers = {0, 1};
+      v.nuc = "C";
+      v.vague_assignment = true;
+      v.gapped_freq = 0.44;
+      v.consensus_numbers = {1};
       genome1.add_variant(4, v);
     }
 
@@ -471,11 +469,12 @@ int main() {
     genome1.process_variant_assignments();
     genome1.get_consensus(5);
 
-    // TEST 5 - genome 0: plain "A" at every position.
+    // TEST 5 - genome 0: "A" at every position except position 4, where the
+    // vaguely-assigned "A"/"C" alleles should combine into IUPAC code "M".
     {
       bool pass = true;
       for (uint32_t pos = 1; pos <= max_position; pos++) {
-        std::string expected = "A";
+        std::string expected = (pos == 4) ? "M" : "A";
         std::string actual = genome0.get_base(pos);
         if (actual != expected) {
           pass = false;
@@ -489,11 +488,14 @@ int main() {
 
     // TEST 6 - genome 1: "A" everywhere except position 2, where the
     // competing "C"/"T" minor alleles should combine into the IUPAC
-    // ambiguity code "Y".
+    // ambiguity code "Y", and position 4, where the vaguely-assigned
+    // "A"/"C" alleles should combine into IUPAC code "M".
     {
       bool pass = true;
       for (uint32_t pos = 1; pos <= max_position; pos++) {
-        std::string expected = (pos == 2) ? "Y" : "A";
+        std::string expected = "A";
+        if (pos == 2) expected = "Y";
+        if (pos == 4) expected = "M";
         std::string actual = genome1.get_base(pos);
         if (actual != expected) {
           pass = false;
