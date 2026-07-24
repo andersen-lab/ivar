@@ -13,54 +13,6 @@
 #include <numeric>
 #include <limits>
 
-void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth){
-  std::cerr << "in majority consensus call" << std::endl;
-  uint32_t max_position=0;
-  for(auto x : variants){
-    if(x.position > max_position){
-      max_position = x.position;
-    }
-  }
-
-  std::vector<std::string> nucs;
-  std::vector<double> freqs;
-  std::vector<std::string> tmp(max_position, "N");
-
-  for(uint32_t i=1; i <= max_position; i++){
-    freqs.clear();
-    nucs.clear();
-    for(uint32_t j=0; j < variants.size(); j++){
-      if(variants[j].position == i){
-        if(variants[j].total_depth < min_depth){
-          continue;
-        }
-        nucs.push_back(variants[j].nuc);
-        freqs.push_back(variants[j].gapped_freq);
-      }
-    }
-    if(freqs.size() == 0) continue;
-    //find the largest frequency
-    uint32_t index = std::distance(freqs.begin(), std::max_element(freqs.begin(), freqs.end()));
-    if(default_threshold > 0){
-      if(freqs[index] >= default_threshold){
-        tmp[i-1] = nucs[index];
-      }
-    } else {
-      tmp[i-1] = nucs[index];
-    }
-  }
-
-  std::string consensus_string = std::accumulate(tmp.begin(), tmp.end(), std::string(""));
-  //write the consensus to file
-  std::string consensus_filename = clustering_file + "_threshold.fa";
-  std::ofstream file(consensus_filename);
-  std::string name = ">"+clustering_file+"_"+std::to_string(default_threshold)+"_threshold";
-  file << name << "\n";
-  file << consensus_string;
-  file << "\n";
-  file.close();
-}
-
 std::vector<uint32_t> find_missing_indexes(const std::vector<uint32_t>& tmp, const std::vector<uint32_t>& amplicons_to_mask) {
   std::unordered_set<uint32_t> mask_set(amplicons_to_mask.begin(), amplicons_to_mask.end());
   std::vector<uint32_t> missing_indexes;
