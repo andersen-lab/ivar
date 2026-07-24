@@ -45,49 +45,6 @@ void rewrite_position_masking(std::vector<variant> &variants){
   }
 }
 
-uint32_t variant_span(const variant &v) {
-  if (v.nuc.find('-') == std::string::npos) return 1;
-  std::string nuc = v.nuc;
-  nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
-  return nuc.empty() ? 1 : (uint32_t)nuc.size();
-}
-
-void flag_position_conflicts(std::vector<variant> &variants) {
-  std::unordered_map<uint32_t, std::unordered_map<uint32_t, uint32_t>> pos_cluster_count;
-
-  for (const auto& v : variants) {
-    if (v.half_normal_upper || v.half_normal_lower || v.depth_flag || v.qual_flag || v.overlapped_deletion) continue;
-    uint32_t span = variant_span(v);
-    for (uint32_t z = 0; z <= span; z++) {
-      pos_cluster_count[v.position + z][v.cluster_assigned]++;
-    }
-  }
-
-  std::unordered_set<uint32_t> conflicted;
-  for (const auto& [pos, cluster_counts] : pos_cluster_count) {
-    for (const auto& [cluster, count] : cluster_counts) {
-      if (count > 1) {
-        conflicted.insert(pos);
-        break;
-      }
-    }
-  }
-
-  for (auto& v : variants) {
-    if (conflicted.count(v.position)) {
-      v.position_conflict = true;
-      continue;
-    }
-    uint32_t span = variant_span(v);
-    for (uint32_t z = 1; z < span; z++) {
-      if (conflicted.count(v.position + z)) {
-        v.position_conflict = true;
-        break;
-      }
-    }
-  }
-}
-
 void reset_variants_info(std::vector<variant> &variants){
   //reset cluster assignments and probabilities prior to rerunning another model
   for(auto &var : variants){
@@ -610,7 +567,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         v.probabilities = eff_proba;
       }
       assign_variants_solution(solution_sets[0], base_variants, eff_means, 2.0);
-      flag_position_conflicts(base_variants);
 
       //predict clusters for amplicon specific frequencies
       amplicon_specific_cluster_assignment(base_variants, model);

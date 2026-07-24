@@ -55,5 +55,4 @@ std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound, double invariant_lower_bound);
 void reset_variants_info(std::vector<variant> &variants);
-void flag_position_conflicts(std::vector<variant> &variants);
 #endif

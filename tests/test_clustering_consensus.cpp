@@ -128,7 +128,6 @@ int main() {
   std::set<uint32_t> deleted_positions;
   for (const auto& v : variants) {
     if (v.nuc.find('-') == std::string::npos) continue;
-    if (v.position_conflict) continue;
     std::string nuc = v.nuc;
     nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
     for (uint32_t z = 0; z < nuc.size(); z++) {
@@ -194,7 +193,6 @@ int main() {
                       << " cluster=" << v.cluster_assigned
                       << " half_normal_upper=" << v.half_normal_upper
                       << " half_normal_lower=" << v.half_normal_lower
-                      << " position_conflict=" << v.position_conflict
                       << " amplicon_flux=" << v.amplicon_flux
                       << " amplicon_masked=" << v.amplicon_masked
                       << " depth_flag=" << v.depth_flag
