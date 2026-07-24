@@ -195,7 +195,6 @@ int main() {
                       << " half_normal_upper=" << v.half_normal_upper
                       << " half_normal_lower=" << v.half_normal_lower
                       << " position_conflict=" << v.position_conflict
-                      << " vague=" << v.vague_assignment
                       << " amplicon_flux=" << v.amplicon_flux
                       << " amplicon_masked=" << v.amplicon_masked
                       << " depth_flag=" << v.depth_flag
