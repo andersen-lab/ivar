@@ -45,29 +45,6 @@ void rewrite_position_masking(std::vector<variant> &variants){
   }
 }
 
-void flag_low_posterior_variants(std::vector<variant> &base_variants){
-  for(auto &var : base_variants){
-    if(var.half_normal_upper || var.half_normal_lower){
-      continue;
-    }
-    if(var.probabilities.empty()) continue;
-    uint32_t assigned_cluster = var.cluster_assigned;
-    double assigned_prob = var.probabilities[assigned_cluster];
-
-    double next_best = 0.0;
-    for(uint32_t k = 0; k < var.probabilities.size(); k++){
-      if(k == assigned_cluster) continue;
-      if(var.probabilities[k] > next_best) next_best = var.probabilities[k];
-    }
-
-    if(next_best > 0.0 && (assigned_prob / next_best) < 2.0){
-      var.vague_assignment = true;
-    } else {
-      var.vague_assignment = false;
-    }
-  }
-}
-
 uint32_t variant_span(const variant &v) {
   if (v.nuc.find('-') == std::string::npos) return 1;
   std::string nuc = v.nuc;
@@ -632,8 +609,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
           for(auto &p : eff_proba) p /= sum;
         v.probabilities = eff_proba;
       }
-      //flag low posterior variants based on the new probabilities
-      flag_low_posterior_variants(base_variants);
       assign_variants_solution(solution_sets[0], base_variants, eff_means, 2.0);
       flag_position_conflicts(base_variants);
 
