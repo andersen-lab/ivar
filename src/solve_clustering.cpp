@@ -375,7 +375,6 @@ void assign_variants_solution(std::vector<double> solution,
     }
   }
 
-
   //check if the variant corresponds to an unresolved cluster
   for(uint32_t i=0; i < variants.size(); i++){
     auto it = std::find(unresolved.begin(), unresolved.end(), means[variants[i].cluster_assigned]);
