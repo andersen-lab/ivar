@@ -23,7 +23,7 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
   assign_variants_position(variants, all_consensus_seqs);
   all_consensus_seqs[0].set_seq_name(clustering_file + "_" + std::to_string(default_threshold) + "_threshold");
   all_consensus_seqs[0].process_variant_assignments();
-  all_consensus_seqs[0].get_consensus(0);
+  all_consensus_seqs[0].get_majority_consensus(0);
   std::string consensus_filename = clustering_file + "_threshold.fa";
   std::ofstream(consensus_filename, std::ios::trunc); //start each run from an empty file, since write_consensus_to_file appends
   all_consensus_seqs[0].write_consensus_to_file(consensus_filename);
@@ -119,6 +119,62 @@ void consensus_sequence::get_consensus(uint32_t n){
         combined = gt2iupac(combined, nucs[j][0]);
       }
       sequence[i] = std::string(1, combined);
+    }
+  }
+}
+
+void consensus_sequence::get_majority_consensus(double threshold){
+  for(uint32_t i=0; i < variant_records.size(); i++){
+    if(variant_records[i].size() == 0){
+      continue;
+    }
+
+    std::vector<std::string> nucs;
+    std::vector<double> freqs;
+    std::string insertion;
+
+    for(uint32_t j=0; j < variant_records[i].size(); j++){
+      if(variant_records[i][j].qual_flag || variant_records[i][j].depth_flag){
+        continue;
+      }
+
+      bool has_insertion = variant_records[i][j].nuc.find('+') != std::string::npos;
+      if(has_insertion){
+        insertion = variant_records[i][j].nuc;
+        insertion.erase(std::remove(insertion.begin(), insertion.end(), '+'), insertion.end());
+        continue;
+      }
+
+      if(variant_records[i][j].assigned_deletion){
+        nucs.push_back("-");
+      } else {
+        nucs.push_back(variant_records[i][j].nuc);
+      }
+      freqs.push_back(variant_records[i][j].gapped_freq);
+    }
+
+    if(nucs.empty()) continue;
+
+    //find the majority (highest-frequency) allele
+    uint32_t max_index = std::distance(freqs.begin(), std::max_element(freqs.begin(), freqs.end()));
+    uint32_t max_count = std::count(freqs.begin(), freqs.end(), freqs[max_index]);
+
+    if((threshold == 0.0 && max_count == 1) || (threshold > 0.0 && freqs[max_index] > threshold)){
+      //threshold of exactly 0 means always take the majority allele outright,
+      //unless there's a tie for the top frequency - then it's an ambiguity;
+      //otherwise it still has to clear the bar to avoid ambiguity
+      sequence[i] = nucs[max_index] + insertion;
+    } else {
+      //no allele dominates enough - call an ambiguity of the remaining alleles
+      bool has_deletion = std::any_of(nucs.begin(), nucs.end(), [](const std::string &s){ return s == "-"; });
+      if(has_deletion){
+        continue; //deletion mixed with alleles can't be IUPAC-combined - leave as "N"
+      }
+      char combined = nucs[0][0];
+      for(uint32_t j=1; j < nucs.size(); j++){
+        combined = gt2iupac(combined, nucs[j][0]);
+      }
+      sequence[i] = std::string(1, combined) + insertion;
     }
   }
 }

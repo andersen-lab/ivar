@@ -28,6 +28,7 @@ class consensus_sequence {
     }
 
     void get_consensus(uint32_t n);
+    void get_majority_consensus(double threshold);
     void process_variant_assignments();
     void write_consensus_to_file(std::string consensus_filename);
 };
