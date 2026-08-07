@@ -24,7 +24,7 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
   all_consensus_seqs[0].set_seq_name(clustering_file + "_" + std::to_string(default_threshold) + "_threshold");
   all_consensus_seqs[0].process_variant_assignments();
   all_consensus_seqs[0].get_consensus(0);
-  std::string consensus_filename = clustering_file + ".fa";
+  std::string consensus_filename = clustering_file + "_threshold.fa";
   std::ofstream(consensus_filename, std::ios::trunc); //start each run from an empty file, since write_consensus_to_file appends
   all_consensus_seqs[0].write_consensus_to_file(consensus_filename);
 }
