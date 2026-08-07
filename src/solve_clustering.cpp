@@ -271,15 +271,6 @@ void overwrite_cluster_assigned(std::vector<variant> &variants,
         best_index = j;
       }
     }
-    if(variants[i].position == 11000){
-      std::cerr << "position " << variants[i].position << " freq " << variants[i].freq << " gapped freq " << variants[i].gapped_freq << std::endl;
-      std::cerr << "base " << mean << " cluster assigned " << cluster_assigned << std::endl;
-      std::cerr << "eff mean index " << best_index << " effective mean " << eff_means[best_index] << std::endl;
-      for(auto h : means){
-        std::cerr << h << " ";
-      }
-      std::cerr << "\n";
-    }
     variants[i].cluster_assigned = best_index;
   }                                 
 
@@ -296,26 +287,6 @@ void assign_variants_solution(std::vector<double> solution,
   for(uint32_t i=0; i < cluster_groups.size(); i++){
     for(uint32_t j=0; j < cluster_groups[i].size(); j++){
       inverse_groups[cluster_groups[i][j]].push_back(i);
-    }
-  }
-
-  double largest = *std::max_element(solution.begin(), solution.end());
-  //define the clusters which contain the majority population
-  std::vector<std::vector<double>> possible_clusters;
-  std::vector<double> current;
-  find_combinations(solution, 0, current, possible_clusters, 0);
-  std::vector<double> expected_clusters;
-  for(uint32_t i=0; i < possible_clusters.size(); i++){
-    bool keep = false;
-    for(uint32_t j=0; j < possible_clusters[i].size(); j++){
-      if(possible_clusters[i][j] == largest){
-        keep = true;
-        break;
-      }
-    }
-    if(keep){
-      double sum = std::accumulate(possible_clusters[i].begin(), possible_clusters[i].end(), 0.0f);
-      expected_clusters.push_back(sum);
     }
   }
 
