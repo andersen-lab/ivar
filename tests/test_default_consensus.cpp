@@ -47,11 +47,21 @@ int main() {
     v.consensus_numbers = {0};
     variants.push_back(v);
   }
+  //position 2 should still be called as A since it is the majority allele
   {
     variant v{};
     v.position = 2;
     v.nuc = "A";
-    v.gapped_freq = 1.0;
+    v.gapped_freq = 0.95;
+    v.total_depth = 100;
+    v.consensus_numbers = {0};
+    variants.push_back(v);
+  }
+  {
+    variant v{};
+    v.position = 2;
+    v.nuc = "G";
+    v.gapped_freq = 0.05;
     v.total_depth = 100;
     v.consensus_numbers = {0};
     variants.push_back(v);
@@ -108,6 +118,30 @@ int main() {
     std::string header, sequence;
     if (std::getline(file, header) && std::getline(file, sequence)) {
       std::string expected = "AARAN";
+      if (sequence != expected) {
+        pass = false;
+        std::cerr << "expected " << expected << " got " << sequence << std::endl;
+      }
+    } else {
+      pass = false;
+      std::cerr << "could not read output file " << clustering_file + "_threshold.fa" << std::endl;
+    }
+    num_tests++;
+    if (pass) success++;
+  }
+
+  default_threshold = 0.90;
+  call_majority_consensus(variants, clustering_file, default_threshold);
+  // TEST 2 - the written consensus file should contain "VARAN"
+  // the first position contains three alleles but all are below the threshold of 0.9, so it is called as an ambiguity V
+  // the third position is an ambiguity 0.5/0.5 between AG and should be an R
+  // last position below min depth so call an N
+  {
+    bool pass = true;
+    std::ifstream file(clustering_file + "_threshold.fa");
+    std::string header, sequence;
+    if (std::getline(file, header) && std::getline(file, sequence)) {
+      std::string expected = "VARAN";
       if (sequence != expected) {
         pass = false;
         std::cerr << "expected " << expected << " got " << sequence << std::endl;
