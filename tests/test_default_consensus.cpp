@@ -60,22 +60,23 @@ int main() {
     v.position = 5;
     v.nuc = "A";
     v.gapped_freq = 1.0;
-    v.total_depth = 100;
+    v.total_depth = 5;
+    v.depth_flag = true;
     v.consensus_numbers = {0};
     variants.push_back(v);
   }
 
   double default_threshold = 0.0;
-  uint32_t min_depth = 10;
-  call_majority_consensus(variants, clustering_file, default_threshold, min_depth);
+  call_majority_consensus(variants, clustering_file, default_threshold);
 
-  // TEST 1 - the written consensus file should contain "ACGTA"
+  // TEST 1 - the written consensus file should contain "AAAAN"
+  // last position below min depth so call an N
   {
     bool pass = true;
     std::ifstream file(clustering_file + "_threshold.fa");
     std::string header, sequence;
     if (std::getline(file, header) && std::getline(file, sequence)) {
-      std::string expected = "AAAAA";
+      std::string expected = "AAAAN";
       if (sequence != expected) {
         pass = false;
         std::cerr << "expected " << expected << " got " << sequence << std::endl;
