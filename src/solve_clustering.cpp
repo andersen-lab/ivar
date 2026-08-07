@@ -4,7 +4,6 @@
 #include "gmm.h"
 #include "saga.h"
 #include <ostream>
-#include <unordered_set>
 #include <iostream>
 #include <vector>
 #include <sstream>
@@ -12,17 +11,6 @@
 #include <algorithm>
 #include <numeric>
 #include <limits>
-
-std::vector<uint32_t> find_missing_indexes(const std::vector<uint32_t>& tmp, const std::vector<uint32_t>& amplicons_to_mask) {
-  std::unordered_set<uint32_t> mask_set(amplicons_to_mask.begin(), amplicons_to_mask.end());
-  std::vector<uint32_t> missing_indexes;
-  for (uint32_t i = 0; i < tmp.size(); ++i) {
-    if (mask_set.find(tmp[i]) == mask_set.end()) {
-      missing_indexes.push_back(i);
-    }
-  }
-  return missing_indexes;
-}
 
 double find_nearest_distance(const std::vector<double> all_sums, double value) {
     double min_distance = std::numeric_limits<double>::max();
@@ -86,28 +74,6 @@ std::vector<std::vector<double>> find_subsets_with_error(std::vector<double> mea
     }
   }
   return(valid_combinations);
-}
-
-std::vector<std::vector<double>> frequency_pair_finder(std::vector<variant> variants, std::vector<double> means){
-  std::vector<std::vector<double>> pairs;
-  std::vector<uint32_t> track_positions;
-
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(!variants[i].depth_flag && !variants[i].qual_flag && !variants[i].outside_freq_range && variants[i].cluster_assigned != -1){
-      auto it = std::find(track_positions.begin(), track_positions.end(), variants[i].position);
-      //found
-      if(it != track_positions.end()){
-        size_t index = std::distance(track_positions.begin(), it);
-        pairs[index].push_back(means[variants[i].cluster_assigned]);
-      } else{
-        std::vector<double> tmp = {means[variants[i].cluster_assigned]};
-        pairs.push_back(tmp);
-        track_positions.push_back(variants[i].position);
-      }
-    }
-  }
-
-  return(pairs);
 }
 
 void find_combinations(std::vector<double> means, uint32_t index, std::vector<double> &current, std::vector<std::vector<double>> &results, double error){
@@ -201,28 +167,6 @@ std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<double> so
   }*/
   //for(auto u : unresolved) std::cerr << u << std::endl;
   return(cluster_indexes);
-}
-
-std::vector<std::vector<double>> deduplicate_solutions(std::vector<std::vector<double>> vectors){
-  std::vector<std::vector<double>> solutions;
-  for(uint32_t i=0; i < vectors.size(); i++){
-    if(i == 0){
-      solutions.push_back(vectors[i]);
-      continue;
-    }
-    bool add = true;
-    for(uint32_t j=0; j < solutions.size(); j++){
-      bool same = std::equal(solutions[j].begin(), solutions[j].end(), vectors[i].begin());
-      if(same && (solutions[j].size() == vectors[i].size())){
-        add = false;
-        break;
-      }
-    }
-    if(add){
-      solutions.push_back(vectors[i]);
-    }
-  }
-  return(solutions);
 }
 
 bool is_boundary_rescue(const std::vector<double>& means) {
