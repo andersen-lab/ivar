@@ -33,6 +33,6 @@ class consensus_sequence {
 };
 
 void cluster_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth, uint8_t min_qual, std::vector<double> solution, std::vector<double> means);
-void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth);
+void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold);
 void assign_variants_position(std::vector<variant> &variants, std::vector<consensus_sequence> &all_consensus_seqs);
 #endif

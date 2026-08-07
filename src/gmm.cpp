@@ -385,7 +385,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //handle the case of no variants less than the universal cluster
   if(model_variants.size() <= 1){
     assign_variants_solution(std::vector<double>(1, 1.0), base_variants, std::vector<double>(1, 1.0), 2.0);
-    call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
+    call_majority_consensus(base_variants, output_prefix, default_threshold);
     write_single_cluster_output(output_prefix);
     base_variants.clear();
     return(base_variants);
@@ -551,7 +551,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   if(solved){
     if(solution_sets.size() > 1){
       assign_variants_solution(std::vector<double>(1, 1.0), base_variants, std::vector<double>(1, 1.0), 2.0);
-      call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
+      call_majority_consensus(base_variants, output_prefix, default_threshold);
       base_variants.clear();
     } else{
       overwrite_cluster_assigned(base_variants, eff_means, model_means);
@@ -579,7 +579,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     }
   } else {
     assign_variants_solution(std::vector<double>(1, 1.0), base_variants, std::vector<double>(1, 1.0), 2.0);
-    call_majority_consensus(base_variants, output_prefix, default_threshold, min_depth);
+    call_majority_consensus(base_variants, output_prefix, default_threshold);
     base_variants.clear();
   }  
 

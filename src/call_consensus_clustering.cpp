@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <numeric>
 
-void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold, uint32_t min_depth){
+void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold){
   std::cerr << "in majority consensus call" << std::endl;
   uint32_t max_position = 0;
   for(auto x : variants){
