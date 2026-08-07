@@ -23,7 +23,7 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
   assign_variants_position(variants, all_consensus_seqs);
   all_consensus_seqs[0].set_seq_name(clustering_file + "_" + std::to_string(default_threshold) + "_threshold");
   all_consensus_seqs[0].process_variant_assignments();
-  all_consensus_seqs[0].get_majority_consensus(0);
+  all_consensus_seqs[0].get_majority_consensus(default_threshold);
   std::string consensus_filename = clustering_file + "_threshold.fa";
   std::ofstream(consensus_filename, std::ios::trunc); //start each run from an empty file, since write_consensus_to_file appends
   all_consensus_seqs[0].write_consensus_to_file(consensus_filename);
@@ -155,24 +155,38 @@ void consensus_sequence::get_majority_consensus(double threshold){
 
     if(nucs.empty()) continue;
 
-    //find the majority (highest-frequency) allele
-    uint32_t max_index = std::distance(freqs.begin(), std::max_element(freqs.begin(), freqs.end()));
-    uint32_t max_count = std::count(freqs.begin(), freqs.end(), freqs[max_index]);
+    //sort indices by frequency, descending
+    std::vector<uint32_t> order(nucs.size());
+    for(uint32_t j=0; j < order.size(); j++) order[j] = j;
+    std::sort(order.begin(), order.end(), [&](uint32_t a, uint32_t b){ return freqs[a] > freqs[b]; });
 
-    if((threshold == 0.0 && max_count == 1) || (threshold > 0.0 && freqs[max_index] > threshold)){
-      //threshold of exactly 0 means always take the majority allele outright,
-      //unless there's a tie for the top frequency - then it's an ambiguity;
-      //otherwise it still has to clear the bar to avoid ambiguity
-      sequence[i] = nucs[max_index] + insertion;
+    //walk alleles largest -> smallest, pulling in an entire tied-frequency
+    //group at once, accumulating frequency until the running sum reaches or
+    //exceeds threshold (or every allele has been included)
+    std::vector<std::string> included;
+    double cumulative = 0.0;
+    uint32_t idx = 0;
+    while(idx < order.size()){
+      double group_freq = freqs[order[idx]];
+      while(idx < order.size() && freqs[order[idx]] == group_freq){
+        included.push_back(nucs[order[idx]]);
+        cumulative += freqs[order[idx]];
+        idx++;
+      }
+      if(cumulative >= threshold) break;
+    }
+
+    if(included.size() == 1){
+      sequence[i] = included[0] + insertion;
     } else {
-      //no allele dominates enough - call an ambiguity of the remaining alleles
-      bool has_deletion = std::any_of(nucs.begin(), nucs.end(), [](const std::string &s){ return s == "-"; });
+      //multiple alleles needed to reach the threshold - call an ambiguity between them
+      bool has_deletion = std::any_of(included.begin(), included.end(), [](const std::string &s){ return s == "-"; });
       if(has_deletion){
         continue; //deletion mixed with alleles can't be IUPAC-combined - leave as "N"
       }
-      char combined = nucs[0][0];
-      for(uint32_t j=1; j < nucs.size(); j++){
-        combined = gt2iupac(combined, nucs[j][0]);
+      char combined = included[0][0];
+      for(uint32_t j=1; j < included.size(); j++){
+        combined = gt2iupac(combined, included[j][0]);
       }
       sequence[i] = std::string(1, combined) + insertion;
     }
