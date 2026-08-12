@@ -125,13 +125,12 @@ std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<double> so
   for(uint32_t i=0; i < means.size(); i++){
     double target = means[i];
     auto it = std::find(solution.begin(), solution.end(), target);
-
+    std::vector<double> distances(totals.size());
+    std::transform(totals.begin(), totals.end(), distances.begin(), [target](double num) { return std::abs(target - num); });
+    uint32_t count = 0;
     //the mean is part of the solution
     if(it != solution.end()){
         cluster_indexes[i].push_back(i);
-        std::vector<double> distances(totals.size());
-        std::transform(totals.begin(), totals.end(), distances.begin(), [target](double num) { return std::abs(target - num); });
-        uint32_t count = 0;
         //this checks the distances from the mean to all other possible peaks
         for(uint32_t d=0; d < distances.size(); d++){
           if(distances[d] < 0.03 && distances[d] != 0){
@@ -143,10 +142,6 @@ std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<double> so
     } else {
       //the problem with this is that it looks at the min but not if two overlapping peaks occur
       auto it = std::min_element(totals.begin(), totals.end(), [target](double a, double b) {return std::abs(a - target) < std::abs(b - target);});
-
-      std::vector<double> distances(totals.size());
-      std::transform(totals.begin(), totals.end(), distances.begin(), [target](double num) { return std::abs(target - num); });
-      uint32_t count = 0;
       for(uint32_t d=0; d < distances.size(); d++){
         if(distances[d] < 0.03) count += 1;
       }
@@ -159,13 +154,6 @@ std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<double> so
       if(count > 1) unresolved.push_back(means[i]);
     }
   }
-  /*for(uint32_t i=0; i < cluster_indexes.size(); i++){
-    for(uint32_t j=0; j < cluster_indexes[i].size(); j++){
-      std::cerr << cluster_indexes[i][j] << " ";
-    }
-    std::cerr << "\n";
-  }*/
-  //for(auto u : unresolved) std::cerr << u << std::endl;
   return(cluster_indexes);
 }
 
@@ -176,7 +164,7 @@ bool is_boundary_rescue(const std::vector<double>& means) {
   for (int i = 0; i < 2; ++i) {
     if (std::abs(means[i] - 0.03) < BOUNDARY_TOL)
       boundary_idx = i;
-    else if (means[i] > 0.50 && std::abs(means[i] - 0.97) > BOUNDARY_TOL)
+    else if (means[i] > 0.70 && std::abs(means[i] - 0.97) > BOUNDARY_TOL)
       major_idx = i;
   }
   return (boundary_idx >= 0 && major_idx >= 0);
@@ -196,7 +184,7 @@ bool subset_sum(std::vector<double> &means, std::vector<std::vector<double>> &so
       int boundary_idx = -1, major_idx = -1;
       for (int i = 0; i < 2; ++i) {
         if (std::abs(means[i] - 0.03) < BOUNDARY_TOL) boundary_idx = i;
-        else if (means[i] > 0.50) major_idx = i;
+        else if (means[i] > 0.70) major_idx = i;
       }
       double inferred_minor = 1.0 - means[major_idx];
       std::cerr << "Rescue: lower boundary absorbed minor population; "
@@ -273,6 +261,7 @@ void assign_variants_solution(std::vector<double> solution,
                               std::vector<variant> &variants,
                               std::vector<double> means,
                               double threshold){
+                    
   double error = 0.05; 
   std::vector<double> unresolved;
   std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
