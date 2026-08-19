@@ -11,6 +11,9 @@
 #include <algorithm>
 #include <numeric>
 #include <limits>
+#include <set>
+
+const double PEAK_COLLISION_TOLERANCE = 0.03;
 
 double find_nearest_distance(const std::vector<double> all_sums, double value) {
     double min_distance = std::numeric_limits<double>::max();
@@ -108,9 +111,10 @@ std::vector<std::vector<double>> find_solutions(std::vector<double> means, doubl
   return(final_results);
 }
 
-std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<double> solution, std::vector<double> means, std::vector<double> &unresolved, double error){
+std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<double> solution, std::vector<double> means, std::vector<double> &unresolved, double error, std::vector<std::vector<uint32_t>> &ambiguous_indexes){
 
   std::vector<std::vector<uint32_t>> cluster_indexes(means.size());
+  ambiguous_indexes.assign(means.size(), {});
   std::vector<double> current;
   std::vector<std::vector<double>> results;
   std::vector<double> totals;
@@ -121,38 +125,60 @@ std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<double> so
     totals.push_back(sum);
   }
 
-  //given a solution and the means, map each cluster to the cluster it contains
+  //given a solution and the means, map each peak to every combination of solution
+  //values ("explanation") whose sum lands within PEAK_COLLISION_TOLERANCE of it
   for(uint32_t i=0; i < means.size(); i++){
     double target = means[i];
     auto it = std::find(solution.begin(), solution.end(), target);
-    std::vector<double> distances(totals.size());
-    std::transform(totals.begin(), totals.end(), distances.begin(), [target](double num) { return std::abs(target - num); });
-    uint32_t count = 0;
-    //the mean is part of the solution
-    if(it != solution.end()){
-        cluster_indexes[i].push_back(i);
-        //this checks the distances from the mean to all other possible peaks
-        for(uint32_t d=0; d < distances.size(); d++){
-          if(distances[d] < 0.03 && distances[d] != 0){
-            count += 1;
-          }
-        }
-        if(count > 1) unresolved.push_back(target);
 
-    } else {
-      //the problem with this is that it looks at the min but not if two overlapping peaks occur
-      auto it = std::min_element(totals.begin(), totals.end(), [target](double a, double b) {return std::abs(a - target) < std::abs(b - target);});
-      for(uint32_t d=0; d < distances.size(); d++){
-        if(distances[d] < 0.03) count += 1;
+    std::vector<std::vector<uint32_t>> explanations;
+    if(it != solution.end()){
+      explanations.push_back({i}); //the mean is itself a standalone population
+    }
+    for(uint32_t r=0; r < results.size(); r++){
+      if(results[r].size() < 2) continue; //singletons are covered above
+      if(std::abs(totals[r] - target) >= PEAK_COLLISION_TOLERANCE) continue;
+      std::vector<uint32_t> members;
+      for(auto x : results[r]){
+        auto it2 = std::find(std::begin(means), std::end(means), x);
+        members.push_back((uint32_t)std::distance(std::begin(means), it2));
       }
-      uint32_t index = std::distance(totals.begin(), it);
+      explanations.push_back(members);
+    }
+
+    if(explanations.empty()){
+      //no exact/combination explanation - fall back to nearest total
+      auto nearest = std::min_element(totals.begin(), totals.end(), [target](double a, double b) {return std::abs(a - target) < std::abs(b - target);});
+      uint32_t index = std::distance(totals.begin(), nearest);
+      std::vector<uint32_t> members;
       for(auto x : results[index]){
         auto it2 = std::find(std::begin(means), std::end(means), x);
-        uint32_t index2 = std::distance(std::begin(means), it2);
-        cluster_indexes[i].push_back(index2);
+        members.push_back((uint32_t)std::distance(std::begin(means), it2));
       }
-      if(count > 1) unresolved.push_back(means[i]);
+      explanations.push_back(members);
     }
+
+    if(explanations.size() == 1){
+      cluster_indexes[i] = explanations[0];
+      continue;
+    }
+
+    //multiple explanations: confirmed = present in every explanation,
+    //ambiguous = present in some but not all
+    std::set<uint32_t> confirmed(explanations[0].begin(), explanations[0].end());
+    std::set<uint32_t> unioned(explanations[0].begin(), explanations[0].end());
+    for(uint32_t e=1; e < explanations.size(); e++){
+      std::set<uint32_t> current_set(explanations[e].begin(), explanations[e].end());
+      std::set<uint32_t> new_confirmed;
+      std::set_intersection(confirmed.begin(), confirmed.end(), current_set.begin(), current_set.end(), std::inserter(new_confirmed, new_confirmed.begin()));
+      confirmed = new_confirmed;
+      unioned.insert(current_set.begin(), current_set.end());
+    }
+    cluster_indexes[i] = std::vector<uint32_t>(confirmed.begin(), confirmed.end());
+    std::set<uint32_t> ambig;
+    std::set_difference(unioned.begin(), unioned.end(), confirmed.begin(), confirmed.end(), std::inserter(ambig, ambig.begin()));
+    ambiguous_indexes[i] = std::vector<uint32_t>(ambig.begin(), ambig.end());
+    unresolved.push_back(target);
   }
   return(cluster_indexes);
 }
@@ -262,13 +288,18 @@ void assign_variants_solution(std::vector<double> solution,
                               std::vector<double> means,
                               double threshold){
                     
-  double error = 0.05; 
+  double error = 0.05;
   std::vector<double> unresolved;
-  std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error);
+  std::vector<std::vector<uint32_t>> ambiguous_groups;
+  std::vector<std::vector<uint32_t>> cluster_groups = find_combination_peaks(solution, means, unresolved, error, ambiguous_groups);
   std::vector<std::vector<uint32_t>> inverse_groups(means.size());
+  std::vector<std::vector<uint32_t>> ambiguous_inverse_groups(means.size());
   for(uint32_t i=0; i < cluster_groups.size(); i++){
     for(uint32_t j=0; j < cluster_groups[i].size(); j++){
       inverse_groups[cluster_groups[i][j]].push_back(i);
+    }
+    for(uint32_t j=0; j < ambiguous_groups[i].size(); j++){
+      ambiguous_inverse_groups[ambiguous_groups[i][j]].push_back(i);
     }
   }
 
@@ -326,6 +357,22 @@ void assign_variants_solution(std::vector<double> solution,
       }
       if(matches){
         variants[i].consensus_numbers.push_back(j);
+      }
+    }
+
+    for(uint32_t j=0; j < ambiguous_inverse_groups.size(); j++){
+      auto mit = std::find(solution.begin(), solution.end(), means[j]);
+      if(mit == solution.end()) continue;
+
+      bool matches = false;
+      for(auto c : top_clusters){
+        if(std::find(ambiguous_inverse_groups[j].begin(), ambiguous_inverse_groups[j].end(), c) != ambiguous_inverse_groups[j].end()){
+          matches = true;
+          break;
+        }
+      }
+      if(matches){
+        variants[i].ambiguous_numbers.push_back(j);
       }
     }
   }

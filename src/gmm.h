@@ -28,6 +28,8 @@ struct variant {
   std::vector<uint32_t> freq_assignments;
   //the consensus sequence this variant is assigned to
   std::vector<uint32_t> consensus_numbers;
+  //consensus genomes for which this variant's peak has multiple explanations
+  std::vector<uint32_t> ambiguous_numbers;
   //if this cluster is fully resolveable or not
   bool resolved=true;
 
