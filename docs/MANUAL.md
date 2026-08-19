@@ -8,6 +8,8 @@ Available Commands
 | Command | Description |
 |:--------|:------------|
 | trim | Trim reads in aligned BAM |
+| saga | (EXPERIMENTAL) Call variants read by read as preprocessing for `contam` |
+| contam | (EXPERIMENTAL) Estimate the number of populations in a sample |
 | variants | Call variants from aligned BAM file |
 | filtervariants | Filter variants across replicates or multiple samples aligned using the same reference |
 | consensus | Call consensus from aligned BAM file |
@@ -89,6 +91,94 @@ Puerto	1054	1076	400_3_out_R*	60	-
 .
 .
 ```
+
+(Experimental) Call variants read by read with iVar
+----
+
+**Note: This feature is under active development and not completely validated yet.**
+
+`ivar saga` is a variant caller, like `ivar variants` — it produces the same kind of per-site REGION/POS/REF/ALT allele table — but instead of reading text output piped in from `samtools mpileup`, it works directly off an aligned, sorted BAM file and aggregates nucleotide states **read by read** (merging overlapping mate-pair information for paired reads). If a primer BED file (`-b`) and primer pair file (`-f`) are both supplied, reads are additionally assigned to amplicons so that per-amplicon depth and frequency statistics can be calculated; without both files, amplicon-specific measurements are skipped.
+
+`ivar saga` is the preprocessing step for `ivar contam`: its output carries the extra per-amplicon columns (flux/masking flags, per-amplicon frequencies) that `ivar contam`'s clustering model uses to distinguish real minor populations from amplicon artifacts.
+
+Command:
+```
+ivar saga
+
+Usage: ivar saga -i <input.bam> -r <reference.fa> -p <prefix> [-b <primers.bed>] [-f <primer_pairs.tsv>] [-x <primer-offset>]
+
+Input Options    Description
+           -i    (Required) Sorted BAM file with aligned reads to call variants from
+           -r    (Required) Reference FASTA file used for alignment
+           -b    BED file with primer sequences and positions. Must be supplied along with -f to calculate per-amplicon statistics
+           -f    Primer pair information file containing left and right primer names for the same amplicon separated by a tab. Must be supplied along with -b to calculate per-amplicon statistics
+           -x    Primer position offset (Default: 0), used the same way as in `ivar trim`
+
+Output Options   Description
+           -p    Prefix for the output variant table
+```
+
+Example Usage:
+```
+ivar saga -i test.trimmed.bam -r test_reference.fa -b test_primers.bed -f pair_information.tsv -p test.saga
+```
+
+The command above will produce `test.saga.txt`, a tab separated file with the same REGION/POS/REF/ALT/depth/quality/frequency/amino-acid-translation columns as `ivar variants` (see the field descriptions in the "Call variants with iVar" section below), plus the following additional columns used by `ivar contam`:
+
+| Field | Description |
+|:------|:------------|
+| POS\_AA | Codon position of the variant within the translated amino acid |
+| GAPPED\_FREQ | Frequency of the alternate base including gapped (deletion) reads in the depth |
+| GAPPED\_DEPTH | Total depth at the position including gaps |
+| FLAGGED\_POS | Whether the position has been flagged as problematic |
+| AMP\_MASKED | Whether the variant has been masked due to amplicon-level issues |
+| STD\_DEV | Standard deviation of the alternate allele frequency across amplicons covering the position |
+| AMP\_FREQ | Per-amplicon frequencies of the alternate allele |
+| AMP\_NUMBERS | Amplicon numbers covering the position |
+
+(Experimental) Population-specific consensus calling for mixed samples with iVar
+----
+
+**Note: This feature is under active development and not completely validated yet.**
+
+`ivar contam` is a population-specific consensus caller for mixed samples. It estimates how many distinct populations (e.g. co-infecting strains, mixed samples, or cross-contamination) are present in a sample by fitting a Gaussian Mixture Model (GMM) to the allele frequencies reported in a variants `.tsv` file, then uses the fitted populations to call a separate consensus sequence for each one. This file is normally the output of `ivar saga`, which preprocesses the BAM read by read and supplies amplicon-specific statistics; a plain `ivar variants` `.tsv` also works as input, but without those extra columns the model has less information to separate real minor populations from amplicon noise. Each fitted Gaussian component corresponds to a candidate population frequency, and low-weight components (below the minimum cluster fraction) are pruned. Variants with a frequency above the invariant threshold (or below `1 - invariant threshold`) are modeled separately with a half-normal distribution, to handle alleles belonging to all populations (frequency close to 1.0) and noise (frequency close to 0) rather than folding them into a population-frequency cluster. Once the population frequencies (effective means) have been estimated, iVar searches for a subset of those means that sum to ~1 (a "solution set") in order to group the underlying variants into a consensus sequence per estimated population.
+
+Command:
+```
+ivar contam
+Usage: ivar contam -s <variants.tsv> -p <prefix> [options]
+
+Required Options Description
+           -s    Variants TSV file produced by ivar saga (or ivar variants)
+           -p    Prefix for output files
+
+Input Options    Description
+           -t    Minimum frequency threshold (Default: 0)
+           -m    Minimum read depth (Default: 10)
+           -q    Minimum quality score threshold to count base (Default: 20)
+
+GMM Prior Options  Description
+           -N    Number of Gaussian components (Default: 12)
+           -I    Invariant frequency threshold; variants above this
+                 value are modeled with a half-normal (Default: 0.97)
+           -C    Covariance prior (Default: 0.0)
+           -M    Mean precision prior (Default: 0.5)
+           -F    Minimum cluster fraction; clusters with fewer than
+                 this fraction of the data are pruned (Default: 0.10)
+```
+
+Example Usage:
+```
+ivar saga -i test.trimmed.bam -r test_reference.fa -b test_primers.bed -f pair_information.tsv -p test.saga
+ivar contam -s test.saga.txt -p test.contam
+```
+
+The command above will produce two output files:
+
+* `test.contam_gmm_1d_results.txt` - The parameters of the fitted mixture model: the number of components requested, the number of effective (non-pruned) components, and the means, variances and weights of both the full model and the effective components, along with any subset of effective means found to sum to ~1 (`Solution_Sets`).
+* `test.contam.fa` - A FASTA file with one consensus sequence per estimated population, with headers in the format `test.contam_cluster_<N>`.
+
+**Note**: This command consumes the output of `ivar saga` (or `ivar variants`), so variants must first be called for the sample. The GMM prior options default to values tuned for spike-in/mixed-population controls and may need adjustment depending on sample composition.
 
 Call variants with iVar
 ----
