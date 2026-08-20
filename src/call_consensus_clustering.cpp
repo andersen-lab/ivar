@@ -46,6 +46,12 @@ void assign_variants_position(std::vector<variant> &variants, std::vector<consen
         all_consensus_seqs[k].add_variant(variants[i].position + z, variants[i]);
       }
     }
+    for(uint32_t j=0; j < variants[i].ambiguous_numbers.size(); j++){
+      uint32_t k = variants[i].ambiguous_numbers[j];
+      for(uint32_t z=0; z < span; z++){
+        all_consensus_seqs[k].mark_ambiguous(variants[i].position + z);
+      }
+    }
   }
 }
 
@@ -53,6 +59,9 @@ void consensus_sequence::get_consensus(uint32_t n){
   uint32_t test_position = 4184-1;
   uint32_t deletion_span; //track deletion spans
   for(uint32_t i=0; i < variant_records.size(); i++){
+    if(position_ambiguous[i]){
+      continue; //multiple explanations for this peak - leave as N
+    }
     if(variant_records[i].size() == 0){
       continue;
     }

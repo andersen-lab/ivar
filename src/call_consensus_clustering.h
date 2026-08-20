@@ -7,16 +7,22 @@ class consensus_sequence {
   uint32_t seq_length;
   std::vector<std::string> sequence;
   std::vector<std::vector<variant>> variant_records;
+  std::vector<bool> position_ambiguous;
 
   public:
     consensus_sequence(uint32_t max_position) {
       seq_length = max_position;
       sequence = std::vector<std::string>(max_position, "N");
       variant_records = std::vector<std::vector<variant>>(max_position);
+      position_ambiguous = std::vector<bool>(max_position, false);
     }
 
     void add_variant(uint32_t position, const variant &v) {
       variant_records[position-1].push_back(v);
+    }
+
+    void mark_ambiguous(uint32_t position) {
+      position_ambiguous[position-1] = true;
     }
 
     void set_seq_name(std::string name) {

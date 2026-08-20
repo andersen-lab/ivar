@@ -33,7 +33,7 @@ void read_consensus(std::vector<std::pair<std::string, std::string>> &sequences,
 
 int main() {
   std::string prefix = "/tmp/consensus";
-  int num_tests = 3;
+  int num_tests = 4;
   int success = 0;
 
   uint32_t min_depth = 5;
@@ -103,6 +103,53 @@ int main() {
     }
     if (!found) {
       std::cerr << "+TT insertion at position 1553 not found in variants" << std::endl;
+    }
+  }
+
+  // TEST 4 - a genome that has a confident, single-nucleotide "confirmed" call
+  // at a position must still be forced to N if a different explanation for
+  // that same position also implicates it as merely ambiguous (the classic
+  // 10%/30% shared-mutation collision landing on the same peak as a private
+  // 40% mutation). Tested directly against assign_variants_position/
+  // get_consensus so it's independent of how solve_clustering.cpp derived
+  // consensus_numbers/ambiguous_numbers - that combinatorics is covered
+  // separately in test_solve_clustering.cpp.
+  {
+    variant v_confirmed;
+    v_confirmed.position = 5;
+    v_confirmed.nuc = "A";
+    v_confirmed.consensus_numbers = {3}; //genome 3 looks confidently assigned here
+
+    variant v_ambiguous;
+    v_ambiguous.position = 5;
+    v_ambiguous.nuc = "T";
+    v_ambiguous.ambiguous_numbers = {3}; //but the same genome is also implicated by a colliding explanation
+
+    variant v_private;
+    v_private.position = 8;
+    v_private.nuc = "G";
+    v_private.consensus_numbers = {1}; //unrelated genome, unambiguous - should be unaffected
+
+    std::vector<variant> ambiguity_variants = {v_confirmed, v_ambiguous, v_private};
+
+    std::vector<consensus_sequence> ambiguity_consensus_seqs;
+    for(uint32_t i=0; i < 4; i++){
+      ambiguity_consensus_seqs.emplace_back(10);
+    }
+    assign_variants_position(ambiguity_variants, ambiguity_consensus_seqs);
+    for(uint32_t i=0; i < ambiguity_consensus_seqs.size(); i++){
+      ambiguity_consensus_seqs[i].process_variant_assignments();
+      ambiguity_consensus_seqs[i].get_consensus(i);
+    }
+
+    bool forced_ambiguous = ambiguity_consensus_seqs[3].get_base(5) == "N";
+    bool private_still_confident = ambiguity_consensus_seqs[1].get_base(8) == "G";
+
+    if(forced_ambiguous && private_still_confident){
+      success++;
+    } else {
+      std::cerr << "TEST 4 failed, genome 3 pos 5 = " << ambiguity_consensus_seqs[3].get_base(5)
+                << " genome 1 pos 8 = " << ambiguity_consensus_seqs[1].get_base(8) << std::endl;
     }
   }
 
