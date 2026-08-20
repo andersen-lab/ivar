@@ -356,7 +356,7 @@ void assign_variants_solution(std::vector<double> solution,
         }
       }
       if(matches){
-        variants[i].consensus_numbers.push_back(j);
+        variants[i].consensus_numbers.push_back((uint32_t)std::distance(solution.begin(), mit));
       }
     }
 
@@ -372,7 +372,7 @@ void assign_variants_solution(std::vector<double> solution,
         }
       }
       if(matches){
-        variants[i].ambiguous_numbers.push_back(j);
+        variants[i].ambiguous_numbers.push_back((uint32_t)std::distance(solution.begin(), mit));
       }
     }
   }
