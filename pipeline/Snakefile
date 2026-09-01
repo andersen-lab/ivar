@@ -42,7 +42,7 @@ rule call_variants_post_removal:
     output:
         "{out_dir}/masked_variants/{sample}_{rep}.masked.tsv"
     shell:
-        "samtools mpileup -A -d 0 --reference {input[1]} -Q 0 -F 0 {input[0]} | ivar variants -p {output} -t 0.03"
+        "samtools mpileup -A -d 0 --reference {input[1]} -Q 0 -F 0 {input[0]} | ivar variants_pileup -p {output} -t 0.03"
 
 rule remove_reads:
     input:
@@ -77,7 +77,7 @@ rule call_variants_in_primer:
     output:
         "{out_dir}/primer_mismatches/{sample}.tsv"
     shell:
-        "samtools mpileup -A -d 0 --reference {input[1]} -Q 0 -F 0 {input[0]} | ivar variants -p {output} -t 0.03"
+        "samtools mpileup -A -d 0 --reference {input[1]} -Q 0 -F 0 {input[0]} | ivar variants_pileup -p {output} -t 0.03"
 
 rule create_bed:
     input:
@@ -119,7 +119,7 @@ rule call_consensus:
     shell:
         """
         mkdir -p $(dirname {output[0]})/
-        samtools mpileup -A -d 0 -Q 0 -F 0 {input} | ivar consensus -p {output[0]}
+        samtools mpileup -A -d 0 -Q 0 -F 0 {input} | ivar consensus_pileup -p {output[0]}
         mkdir -p $(dirname {output[1]})
         bwa index -p {wildcards.out_dir}/index/{wildcards.sample} {output[0]}
         """

@@ -60,16 +60,16 @@ struct args_t {
 void print_usage() {
   std::cout
       << "Usage:	ivar [command "
-         "<trim|variants|filtervariants|consensus|getmasked|removereads|contam|saga|"
+         "<trim|variants|filtervariants|consensus|getmasked|removereads|consensus_pileup|variants_pileup|"
          "version|help>]\n"
          "\n"
          "        Command       Description\n"
          "           trim       Trim reads in aligned BAM file\n"
-         "         contam       Estimate the number of populations in a sample\n"
-         "           saga       Call consensus with an automated threshold\n"
-         "       variants       Call variants from aligned BAM file\n"
+         "      consensus       Estimate the number of populations in a sample\n"
+         "       variants       Call consensus with an automated threshold\n"
+         "variants_pileup       Call variants from aligned BAM file\n"
          " filtervariants       Filter variants across replicates or samples\n"
-         "      consensus       Call consensus from aligned BAM file\n"
+         "consensus_pileup      Call consensus from aligned BAM file\n"
          "      getmasked       Detect primer mismatches and get primer "
          "indices for the amplicon to be masked\n"
          "    removereads       Remove reads from trimmed BAM file\n"
@@ -80,7 +80,7 @@ void print_usage() {
 
 void print_contam_usage() {
   std::cout
-      << "Usage: ivar contam -s <variants.tsv> -p <prefix> [options]\n\n"
+      << "Usage: ivar consensus -s <variants.tsv> -p <prefix> [options]\n\n"
          "Required Options Description\n"
          "           -s    Variants TSV file produced by ivar variants\n"
          "           -p    Prefix for output files\n\n"
@@ -130,13 +130,38 @@ void print_trim_usage() {
          "           -p    Prefix for the output BAM file. If none is specified output will go to std out\n";
 }
 
+void print_saga_usage() {
+  std::cout
+      << "Usage: ivar variants -i <input.bam> -p <prefix> [-b <primers.bed>] "
+         "[-f <primer_pairs.tsv>] [-x <primer-offset>] [-m <min-length>] "
+         "[-r <reference-fasta>]\n\n"
+         "Input Options    Description\n"
+         "           -i    BAM file, with aligned reads, to call variants "
+         "read by read. If not specified will use standard in\n"
+         "           -b    BED file with primer sequences and positions.\n"
+         "           -f    Primer pair information file containing left and "
+         "right primer names for the same amplicon separated by a tab.\n"
+         "                 If provided along with -b, reads are assigned to "
+         "amplicons so per-amplicon depth and frequency statistics can be "
+         "calculated; without both files, amplicon-specific measurements are "
+         "skipped.\n"
+         "           -x    Primer position offset (Default: 0). Reads that "
+         "occur at the specified offset positions relative to primer "
+         "positions will also be considered trimmed.\n"
+         "           -m    Minimum length of read to retain "
+         "(Default: 50% average length of the first 1000 reads)\n"
+         "           -r    Reference file used for alignment.\n\n"
+         "Output Options   Description\n"
+         "           -p    Prefix for the output files\n";
+}
+
 void print_variants_usage() {
   std::cout
       << "Usage: samtools mpileup -aa -A -d 0 -B -Q 0 --reference "
-         "[<reference-fasta] <input.bam> | ivar variants -p <prefix> [-q "
+         "[<reference-fasta] <input.bam> | ivar variants_pileup -p <prefix> [-q "
          "<min-quality>] [-t <min-frequency-threshold>] [-m <minimum depth>] "
          "[-r <reference-fasta>] [-g GFF file]\n\n"
-         "Note : samtools mpileup output must be piped into ivar variants\n\n"
+         "Note : samtools mpileup output must be piped into ivar variants_pileup\n\n"
          "Input Options    Description\n"
          "           -q    Minimum quality score threshold to count base "
          "(Default: 20)\n"
@@ -173,9 +198,9 @@ void print_filtervariants_usage() {
 void print_consensus_usage() {
   std::cout
       << "Usage: samtools mpileup -aa -A -d 0 -Q 0 <input.bam> | ivar "
-         "consensus -p <prefix> \n\n"
+         "consensus_pileup -p <prefix> \n\n"
          "Note : samtools mpileup output must be piped into `ivar "
-         "consensus`\n\n"
+         "consensus_pileup`\n\n"
          "Input Options    Description\n"
          "           -q    Minimum quality score threshold to count base "
          "(Default: 20)\n"
@@ -324,8 +349,8 @@ int main(int argc, char *argv[]) {
   argv++;
   argc--;
 
-  //ivar contam
-  if (cmd.compare("contam") == 0) {
+  //ivar consensus
+  if (cmd.compare("consensus") == 0) {
     g_args.min_threshold = 0;
     g_args.min_depth = 10;
     g_args.min_qual = 20;
@@ -386,8 +411,8 @@ int main(int argc, char *argv[]) {
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
   }
 
-  //ivar saga
-  else if (cmd.compare("saga") == 0) {
+  //ivar variants
+  else if (cmd.compare("variants") == 0) {
     g_args.bed = "";
     g_args.primer_pair_file = "";
     g_args.primer_offset = 0;
@@ -420,7 +445,7 @@ int main(int argc, char *argv[]) {
           break;
         case 'h':
         case '?':
-          print_trim_usage();
+          print_saga_usage();
           return -1;
           break;
       }
@@ -431,7 +456,7 @@ int main(int argc, char *argv[]) {
                    "through standard input"
                 << std::endl
                 << std::endl;
-      print_trim_usage();
+      print_saga_usage();
       return -1;
     }
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
@@ -506,8 +531,8 @@ int main(int argc, char *argv[]) {
                                g_args.keep_for_reanalysis, g_args.min_length,
                                g_args.primer_pair_file, g_args.primer_offset);
   }
-  // ivar variants
-  else if (cmd.compare("variants") == 0) {
+  // ivar variants_pileup
+  else if (cmd.compare("variants_pileup") == 0) {
     g_args.min_qual = 20;
     g_args.min_threshold = 0.03;
     g_args.min_depth = 0;
@@ -572,7 +597,7 @@ int main(int argc, char *argv[]) {
             ? 0.03
             : g_args.min_threshold;
     if (isatty(STDIN_FILENO)) {
-      std::cout << "Please pipe mpileup into `ivar variants` command.\n\n";
+      std::cout << "Please pipe mpileup into `ivar variants_pileup` command.\n\n";
       print_variants_usage();
       return -1;
     }
@@ -580,8 +605,8 @@ int main(int argc, char *argv[]) {
                                   g_args.min_threshold, g_args.min_depth,
                                   g_args.ref, g_args.gff, g_args.gapped_depth);
   }
-  // ivar consensus
-  else if (cmd.compare("consensus") == 0) {
+  // ivar consensus_pileup
+  else if (cmd.compare("consensus_pileup") == 0) {
     opt = getopt(argc, argv, consensus_opt_str);
     g_args.seq_id = "";
     g_args.min_threshold = 0;
@@ -630,7 +655,7 @@ int main(int argc, char *argv[]) {
       return -1;
     }
     if (isatty(STDIN_FILENO)) {
-      std::cout << "Please pipe mpileup into `ivar consensus` command.\n\n";
+      std::cout << "Please pipe mpileup into `ivar consensus_pileup` command.\n\n";
       print_consensus_usage();
       return -1;
     }

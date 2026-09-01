@@ -8,11 +8,11 @@ Available Commands
 | Command | Description |
 |:--------|:------------|
 | trim | Trim reads in aligned BAM |
-| saga | (EXPERIMENTAL) Call variants read by read as preprocessing for `contam` |
-| contam | (EXPERIMENTAL) Estimate the number of populations in a sample |
-| variants | Call variants from aligned BAM file |
+| variants | (EXPERIMENTAL) Call variants read by read as preprocessing for `consensus` |
+| consensus | (EXPERIMENTAL) Estimate the number of populations in a sample |
+| variants_pileup | Call variants from aligned BAM file |
 | filtervariants | Filter variants across replicates or multiple samples aligned using the same reference |
-| consensus | Call consensus from aligned BAM file |
+| consensus_pileup | Call consensus from aligned BAM file |
 | getmasked | Detect primer mismatches and get primer indices for the amplicon to be masked |
 | removereads | Remove reads from trimmed BAM file |
 | version | Show version information |
@@ -72,7 +72,7 @@ The command above will produce a trimmed BAM file test.trimmed.bam after trimmin
 
 Example Usage:
 ```
-bwa mem -t 32 reference.fa 1.fq 2.fq | ivar trim -b test_primers.bed -x 3 -m 30 | samtools sort - | samtools mpileup -aa -A -Q 0 -d 0 - | ivar consensus -p test_consensus -m 10 -n N -t 0.5
+bwa mem -t 32 reference.fa 1.fq 2.fq | ivar trim -b test_primers.bed -x 3 -m 30 | samtools sort - | samtools mpileup -aa -A -Q 0 -d 0 - | ivar consensus_pileup -p test_consensus -m 10 -n N -t 0.5
 ```
 
 The command above will allow you to go from alignment to consensus sequence in a single command using the bwa aligner.
@@ -97,15 +97,15 @@ Puerto	1054	1076	400_3_out_R*	60	-
 
 **Note: This feature is under active development and not completely validated yet.**
 
-`ivar saga` is a variant caller, like `ivar variants` — it produces the same kind of per-site REGION/POS/REF/ALT allele table — but instead of reading text output piped in from `samtools mpileup`, it works directly off an aligned, sorted BAM file and aggregates nucleotide states **read by read** (merging overlapping mate-pair information for paired reads). If a primer BED file (`-b`) and primer pair file (`-f`) are both supplied, reads are additionally assigned to amplicons so that per-amplicon depth and frequency statistics can be calculated; without both files, amplicon-specific measurements are skipped.
+`ivar variants` is a variant caller, like `ivar variants_pileup` — it produces the same kind of per-site REGION/POS/REF/ALT allele table — but instead of reading text output piped in from `samtools mpileup`, it works directly off an aligned, sorted BAM file and aggregates nucleotide states **read by read** (merging overlapping mate-pair information for paired reads). If a primer BED file (`-b`) and primer pair file (`-f`) are both supplied, reads are additionally assigned to amplicons so that per-amplicon depth and frequency statistics can be calculated; without both files, amplicon-specific measurements are skipped.
 
-`ivar saga` is the preprocessing step for `ivar contam`: its output carries the extra per-amplicon columns (flux/masking flags, per-amplicon frequencies) that `ivar contam`'s clustering model uses to distinguish real minor populations from amplicon artifacts.
+`ivar variants` is the preprocessing step for `ivar consensus`: its output carries the extra per-amplicon columns (flux/masking flags, per-amplicon frequencies) that `ivar consensus`'s clustering model uses to distinguish real minor populations from amplicon artifacts.
 
 Command:
 ```
-ivar saga
+ivar variants
 
-Usage: ivar saga -i <input.bam> -r <reference.fa> -p <prefix> [-b <primers.bed>] [-f <primer_pairs.tsv>] [-x <primer-offset>]
+Usage: ivar variants -i <input.bam> -r <reference.fa> -p <prefix> [-b <primers.bed>] [-f <primer_pairs.tsv>] [-x <primer-offset>]
 
 Input Options    Description
            -i    (Required) Sorted BAM file with aligned reads to call variants from
@@ -120,10 +120,10 @@ Output Options   Description
 
 Example Usage:
 ```
-ivar saga -i test.trimmed.bam -r test_reference.fa -b test_primers.bed -f pair_information.tsv -p test.saga
+ivar variants -i test.trimmed.bam -r test_reference.fa -b test_primers.bed -f pair_information.tsv -p test.saga
 ```
 
-The command above will produce `test.saga.txt`, a tab separated file with the same REGION/POS/REF/ALT/depth/quality/frequency/amino-acid-translation columns as `ivar variants` (see the field descriptions in the "Call variants with iVar" section below), plus the following additional columns used by `ivar contam`:
+The command above will produce `test.saga.txt`, a tab separated file with the same REGION/POS/REF/ALT/depth/quality/frequency/amino-acid-translation columns as `ivar variants_pileup` (see the field descriptions in the "Call variants with iVar" section below), plus the following additional columns used by `ivar consensus`:
 
 | Field | Description |
 |:------|:------------|
@@ -141,15 +141,15 @@ The command above will produce `test.saga.txt`, a tab separated file with the sa
 
 **Note: This feature is under active development and not completely validated yet.**
 
-`ivar contam` is a population-specific consensus caller for mixed samples. It estimates how many distinct populations (e.g. co-infecting strains, mixed samples, or cross-contamination) are present in a sample by fitting a Gaussian Mixture Model (GMM) to the allele frequencies reported in a variants `.tsv` file, then uses the fitted populations to call a separate consensus sequence for each one. This file is normally the output of `ivar saga`, which preprocesses the BAM read by read and supplies amplicon-specific statistics; a plain `ivar variants` `.tsv` also works as input, but without those extra columns the model has less information to separate real minor populations from amplicon noise. Each fitted Gaussian component corresponds to a candidate population frequency, and low-weight components (below the minimum cluster fraction) are pruned. Variants with a frequency above the invariant threshold (or below `1 - invariant threshold`) are modeled separately with a half-normal distribution, to handle alleles belonging to all populations (frequency close to 1.0) and noise (frequency close to 0) rather than folding them into a population-frequency cluster. Once the population frequencies (effective means) have been estimated, iVar searches for a subset of those means that sum to ~1 (a "solution set") in order to group the underlying variants into a consensus sequence per estimated population.
+`ivar consensus` is a population-specific consensus caller for mixed samples. It estimates how many distinct populations (e.g. co-infecting strains, mixed samples, or cross-contamination) are present in a sample by fitting a Gaussian Mixture Model (GMM) to the allele frequencies reported in a variants `.tsv` file, then uses the fitted populations to call a separate consensus sequence for each one. This file is normally the output of `ivar variants`, which preprocesses the BAM read by read and supplies amplicon-specific statistics; a plain `ivar variants_pileup` `.tsv` also works as input, but without those extra columns the model has less information to separate real minor populations from amplicon noise. Each fitted Gaussian component corresponds to a candidate population frequency, and low-weight components (below the minimum cluster fraction) are pruned. Variants with a frequency above the invariant threshold (or below `1 - invariant threshold`) are modeled separately with a half-normal distribution, to handle alleles belonging to all populations (frequency close to 1.0) and noise (frequency close to 0) rather than folding them into a population-frequency cluster. Once the population frequencies (effective means) have been estimated, iVar searches for a subset of those means that sum to ~1 (a "solution set") in order to group the underlying variants into a consensus sequence per estimated population.
 
 Command:
 ```
-ivar contam
-Usage: ivar contam -s <variants.tsv> -p <prefix> [options]
+ivar consensus
+Usage: ivar consensus -s <variants.tsv> -p <prefix> [options]
 
 Required Options Description
-           -s    Variants TSV file produced by ivar saga (or ivar variants)
+           -s    Variants TSV file produced by ivar variants (or ivar variants_pileup)
            -p    Prefix for output files
 
 Input Options    Description
@@ -169,8 +169,8 @@ GMM Prior Options  Description
 
 Example Usage:
 ```
-ivar saga -i test.trimmed.bam -r test_reference.fa -b test_primers.bed -f pair_information.tsv -p test.saga
-ivar contam -s test.saga.txt -p test.contam
+ivar variants -i test.trimmed.bam -r test_reference.fa -b test_primers.bed -f pair_information.tsv -p test.saga
+ivar consensus -s test.saga.txt -p test.contam
 ```
 
 The command above will produce two output files:
@@ -178,12 +178,12 @@ The command above will produce two output files:
 * `test.contam_gmm_1d_results.txt` - The parameters of the fitted mixture model: the number of components requested, the number of effective (non-pruned) components, and the means, variances and weights of both the full model and the effective components, along with any subset of effective means found to sum to ~1 (`Solution_Sets`).
 * `test.contam.fa` - A FASTA file with one consensus sequence per estimated population, with headers in the format `test.contam_cluster_<N>`.
 
-**Note**: This command consumes the output of `ivar saga` (or `ivar variants`), so variants must first be called for the sample. The GMM prior options default to values tuned for spike-in/mixed-population controls and may need adjustment depending on sample composition.
+**Note**: This command consumes the output of `ivar variants` (or `ivar variants_pileup`), so variants must first be called for the sample. The GMM prior options default to values tuned for spike-in/mixed-population controls and may need adjustment depending on sample composition.
 
 Call variants with iVar
 ----
 
-iVar uses the output of the `samtools mpileup` command to call variants - single nucleotide variants(SNVs) and indels. In order to call variants correctly, the reference file used for alignment must be passed to iVar using the `-r` flag. The output of `samtools pileup` is piped into `ivar variants` to generate a .tsv file with the variants. There are two parameters that can be set for variant calling using iVar - minimum quality(Default: 20) and minimum frequency(Default: 0.03). Minimum quality is the minimum quality for a base to be counted towards the ungapped depth to canculate iSNV frequency at a given position. For insertions, the quality metric is discarded and the mpileup depth is used directly. Minimum frequency is the minimum frequency required for a SNV or indel to be reported. 
+iVar uses the output of the `samtools mpileup` command to call variants - single nucleotide variants(SNVs) and indels. In order to call variants correctly, the reference file used for alignment must be passed to iVar using the `-r` flag. The output of `samtools pileup` is piped into `ivar variants_pileup` to generate a .tsv file with the variants. There are two parameters that can be set for variant calling using iVar - minimum quality(Default: 20) and minimum frequency(Default: 0.03). Minimum quality is the minimum quality for a base to be counted towards the ungapped depth to canculate iSNV frequency at a given position. For insertions, the quality metric is discarded and the mpileup depth is used directly. Minimum frequency is the minimum frequency required for a SNV or indel to be reported. 
 
 #### Amino acid translation of iSNVs
 
@@ -202,9 +202,9 @@ If a certain base is present in multiple CDSs, iVar will add a new row for each 
 
 Command:
 ```
-Usage: samtools mpileup -aa -A -d 0 -B -Q 0 --reference [<reference-fasta] <input.bam> | ivar variants -p <prefix> [-q <min-quality>] [-t <min-frequency-threshold>] [-m <minimum depth>] [-r <reference-fasta>] [-g GFF file]
+Usage: samtools mpileup -aa -A -d 0 -B -Q 0 --reference [<reference-fasta] <input.bam> | ivar variants_pileup -p <prefix> [-q <min-quality>] [-t <min-frequency-threshold>] [-m <minimum depth>] [-r <reference-fasta>] [-g GFF file]
 
-Note : samtools mpileup output must be piped into ivar variants
+Note : samtools mpileup output must be piped into ivar variants_pileup
 
 Input Options    Description
            -q    Minimum quality score threshold to count base (Default: 20)
@@ -220,7 +220,7 @@ Output Options   Description
 
 Example Usage:
 ```
-samtools mpileup -aa -A -d 600000 -B -Q 0 test.trimmed.bam | ivar variants -p test -q 20 -t 0.03 -r test_reference.fa -g test.gff
+samtools mpileup -aa -A -d 600000 -B -Q 0 test.trimmed.bam | ivar variants_pileup -p test -q 20 -t 0.03 -r test_reference.fa -g test.gff
 ```
 
 The command above will generate a test.tsv file.
@@ -340,7 +340,7 @@ Description of fields
 Generate a consensus sequences from an aligned BAM file
 ----
 
-To generate a consensus sequence iVar uses the output of `samtools mpileup` command. The mpileup output must be piped into `ivar consensus`. There are five parameters that can be set -  minimum quality(Default: 20), minimum frequency threshold(Default: 0), minimum depth to call a consensus(Default: 10), a flag to exclude nucleotides from regions with depth less than the minimum depth and a character to call in regions with coverage lower than the speicifed minimum depth(Default: 'N'). Minimum quality is the minimum quality of a base to be considered in calculations of variant frequencies at a given position. Minimum frequency threshold is the minimum frequency that a base must match to be called as the consensus base at a position. If one base is not enough to match a given frequency, then an ambigious nucleotide is called at that position. Minimum depth is the minimum required depth to call a consensus. If '-k' flag is set then these regions are not included in the consensus sequence. If '-k' is not set then by default, a 'N' is called in these regions. You can also specfy which character you want to add to the consensus to cover regions with depth less than the minimum depth. This can be done using -n option. It takes one of two values: '-' or 'N'.
+To generate a consensus sequence iVar uses the output of `samtools mpileup` command. The mpileup output must be piped into `ivar consensus_pileup`. There are five parameters that can be set -  minimum quality(Default: 20), minimum frequency threshold(Default: 0), minimum depth to call a consensus(Default: 10), a flag to exclude nucleotides from regions with depth less than the minimum depth and a character to call in regions with coverage lower than the speicifed minimum depth(Default: 'N'). Minimum quality is the minimum quality of a base to be considered in calculations of variant frequencies at a given position. Minimum frequency threshold is the minimum frequency that a base must match to be called as the consensus base at a position. If one base is not enough to match a given frequency, then an ambigious nucleotide is called at that position. Minimum depth is the minimum required depth to call a consensus. If '-k' flag is set then these regions are not included in the consensus sequence. If '-k' is not set then by default, a 'N' is called in these regions. You can also specfy which character you want to add to the consensus to cover regions with depth less than the minimum depth. This can be done using -n option. It takes one of two values: '-' or 'N'.
 
 As an example, consider a position with 6As, 3Ts and 1C. The table below shows the consensus nucleotide called at different frequencies.
 
@@ -370,11 +370,11 @@ Command:
 
 ```
 
-ivar consensus
+ivar consensus_pileup
 
-Usage: samtools mpileup -aa -A -d 0 -Q 0 <input.bam> | ivar consensus -p <prefix> 
+Usage: samtools mpileup -aa -A -d 0 -Q 0 <input.bam> | ivar consensus_pileup -p <prefix> 
 
-Note : samtools mpileup output must be piped into ivar consensus
+Note : samtools mpileup output must be piped into ivar consensus_pileup
 
 Input Options    Description
            -q    Minimum quality score threshold to count base (Default: 20)
@@ -397,7 +397,7 @@ Output Options   Description
 
 Example Usage:
 ```
-samtools mpileup -d 1000 -A -Q 0 test.bam | ivar consensus -p test -q 20 -t 0
+samtools mpileup -d 1000 -A -Q 0 test.bam | ivar consensus_pileup -p test -q 20 -t 0
 ```
 
 The command above will produce a test.fa fasta file with the consensus sequence and a test.qual.txt with the average quality of each base in the consensus sequence.

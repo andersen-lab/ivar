@@ -37,7 +37,7 @@ digraph fc{
 		       fontcolor="#ececec",
 		       group=rep1];
 		o1[style=invis group=rep1];
-		vc1 [label="{Variant Calling\n3% minimum frequency | samtools mpileup\nivar variants}",
+		vc1 [label="{Variant Calling\n3% minimum frequency | samtools mpileup\nivar variants_pileup}",
 		     fillcolor="/ylgnbu3/2",
 		     color="#2b2b2b",
 		     fontcolor="#2b2b2b",
@@ -47,7 +47,7 @@ digraph fc{
 		     color="#ececec",
 		     fontcolor="#ececec",
 		     group=rep1];
-		vc2_1 [label="{Redo variant Calling\n3% minimum frequency | samtools mpileup\nivar variants}",
+		vc2_1 [label="{Redo variant Calling\n3% minimum frequency | samtools mpileup\nivar variants_pileup}",
 		       fillcolor="/ylgnbu3/2",
 		       color="#2b2b2b",
 		       fontcolor="#2b2b2b",
@@ -79,7 +79,7 @@ digraph fc{
 		       fontcolor="#ececec",
 		       group=rep2];
 		o2[style=invis group=rep2];
-		vc2 [label="{Variant Calling\n3% minimum frequency | samtools mpileup\nivar variants}",
+		vc2 [label="{Variant Calling\n3% minimum frequency | samtools mpileup\nivar variants_pileup}",
 		     fillcolor="/ylgnbu3/2",
 		     color="#2b2b2b",
 		     fontcolor="#2b2b2b",
@@ -89,7 +89,7 @@ digraph fc{
 		     color="#ececec",
 		     fontcolor="#ececec",
 		     group=rep2];
-		vc2_2 [label="{Redo variant Calling\n3% minimum frequency | samtools mpileup\nivar variants}",
+		vc2_2 [label="{Redo variant Calling\n3% minimum frequency | samtools mpileup\nivar variants_pileup}",
 		       fillcolor="/ylgnbu3/2",
 		       color="#2b2b2b",
 		       fontcolor="#2b2b2b",
@@ -105,7 +105,7 @@ digraph fc{
 			color="#2b2b2b",
 			fontcolor="#2b2b2b",
 		    ];
-		cns[label="{Call consensus | samtools mpileup\nivar consensus}",
+		cns[label="{Call consensus | samtools mpileup\nivar consensus_pileup}",
 		       fillcolor="/ylgnbu3/2",
 		       color="#2b2b2b",
 		       fontcolor="#2b2b2b"];
@@ -140,11 +140,11 @@ digraph fc{
 	// 	align1cmd [label="bwa mem ... \l"];
 	// 	trim1cmd [label="ivar trim ... \lsamtools sort ...\lsamtools index ..."];
 	// 	mrgcmd [label="samtools merge ...\l"];
-	// 	cnscmd [label="samtools mpileup ... \| ivar consensus ... \l"];
+	// 	cnscmd [label="samtools mpileup ... \| ivar consensus_pileup ... \l"];
 	// 	bedcmd [label="bwa mem ...\lbedtools bamtobed ... \l"];
-	// 	vc1cmd [label="samtools mpileup ... \| ivar variants ... \l"];
+	// 	vc1cmd [label="samtools mpileup ... \| ivar variants_pileup ... \l"];
 	// 	rrcmd [label="ivar getmasked ... \livar removereads ... \l"];
-	// 	vc2cmd [label="samtools mpileup ... \| ivar variants ... \l"];
+	// 	vc2cmd [label="samtools mpileup ... \| ivar variants_pileup ... \l"];
 	// 	combinecmd [label="ivar filtervariants ... \l"];
 	// }
 
