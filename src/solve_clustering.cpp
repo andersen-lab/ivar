@@ -36,7 +36,7 @@ bool account_for_inferred_means(std::vector<double> possible_solution, std::vect
   std::vector<double> all_sums;
   for(auto result : results){ 
     if(result.size() == 1) continue;
-    double sum = std::accumulate(result.begin(), result.end(), 0.0f);
+    double sum = std::accumulate(result.begin(), result.end(), 0.0);
     all_sums.push_back(sum);
   }
 
@@ -55,7 +55,7 @@ bool account_for_inferred_means(std::vector<double> possible_solution, std::vect
 
 bool within_error_range(std::vector<double> values, double target, double error){
   //test if the sum of the vector equals the target value within some error
-  double sum = std::accumulate(values.begin(), values.end(), 0.0f);
+  double sum = std::accumulate(values.begin(), values.end(), 0.0);
   if(sum < target+(error) && sum > target-(error)){
     return(true);
   } else{
@@ -121,7 +121,7 @@ std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<double> so
 
   find_combinations(solution, 0, current, results, error);
   for(uint32_t i=0; i < results.size(); i++){
-    double sum = std::accumulate(results[i].begin(), results[i].end(), 0.0f);
+    double sum = std::accumulate(results[i].begin(), results[i].end(), 0.0);
     totals.push_back(sum);
   }
 
