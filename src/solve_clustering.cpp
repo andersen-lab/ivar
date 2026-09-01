@@ -45,7 +45,8 @@ bool account_for_inferred_means(std::vector<double> possible_solution, std::vect
     bool found = std::find(possible_solution.begin(), possible_solution.end(), mean) != possible_solution.end();
     if(found) continue;
     double dist = find_nearest_distance(all_sums, mean);
-    if(dist > error){
+    //exclusive, matching within_error_range
+    if(dist >= error){
       valid = false;
       break;
     }
