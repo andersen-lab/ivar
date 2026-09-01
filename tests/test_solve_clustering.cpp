@@ -136,6 +136,21 @@ int main() {
     }
   }
 
+  //TEST 8 - unit_sum_error must not reach the decomposition test. 0.15+0.30=0.45
+  //is 0.03 from the 0.48 peak, so 0.48 is decomposable at SUBSET_SUM_ERROR (0.05)
+  //no matter how tight the argument gets. Merging the two tolerances back
+  //together drops this to 0 solutions.
+  means.clear();
+  solution_sets.clear();
+  means = {0.15, 0.30, 0.48, 0.55};
+  solution_status = subset_sum(means, solution_sets, 0.02);
+  num_tests++;
+  if(solution_sets.size() == 1) {
+    success++;
+  } else {
+    std::cerr << "TEST 8 failed, found " << solution_sets.size() << " solutions" << std::endl;
+  }
+
   /*std::cerr << solution_sets.size() << " solutions found for means: ";
   for(auto solution : solution_sets){
     for(auto s : solution){
