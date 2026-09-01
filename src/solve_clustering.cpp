@@ -26,7 +26,7 @@ double find_nearest_distance(const std::vector<double> all_sums, double value) {
     return min_distance;
 }
 
-bool account_peaks(std::vector<double> possible_solution, std::vector<double> means, double total, double error){
+bool account_for_inferred_means(std::vector<double> possible_solution, std::vector<double> means, double total, double error){
   bool valid = true;
   std::vector<double> current;
   std::vector<std::vector<double>> results;
@@ -63,7 +63,7 @@ bool within_error_range(std::vector<double> values, double target, double error)
   }
 }
 
-std::vector<std::vector<double>> find_subsets_with_error(std::vector<double> means, double target, double error){
+std::vector<std::vector<double>> find_subsets(std::vector<double> means, double target, double error){
   //first we find all the possible combinations
   std::vector<double> current;
   std::vector<std::vector<double>> results;
@@ -196,10 +196,11 @@ bool is_boundary_rescue(const std::vector<double>& means) {
   return (boundary_idx >= 0 && major_idx >= 0);
 }
 
-bool subset_sum(std::vector<double> &means, std::vector<std::vector<double>> &solution_sets, const double error){
+bool subset_sum(std::vector<double> &means, std::vector<std::vector<double>> &solution_sets, const double unit_sum_error){
   double combination_error = 0.05;
+
   //gives all solutions that sum to 1
-  std::vector<std::vector<double>> solutions = find_solutions(means, error);
+  std::vector<std::vector<double>> solutions = find_solutions(means, unit_sum_error);
   if(solutions.size() == 0){
     std::cerr << "no solutions found" << std::endl;
     // Rescue: 2 effective means, one absorbed at the 0.03 lower boundary and
@@ -224,7 +225,7 @@ bool subset_sum(std::vector<double> &means, std::vector<std::vector<double>> &so
 
   std::vector<double> non_subset_means;
   for(uint32_t i=0; i < means.size(); i++){
-    std::vector<std::vector<double>> tmp = find_subsets_with_error(means, means[i], error);
+    std::vector<std::vector<double>> tmp = find_subsets(means, means[i], unit_sum_error);
     if(tmp.size() <= 1){
       non_subset_means.push_back(means[i]);
     }
@@ -246,7 +247,7 @@ bool subset_sum(std::vector<double> &means, std::vector<std::vector<double>> &so
   }
 
   for(uint32_t i=0; i < realistic_solutions.size(); i++){
-    bool keep = account_peaks(realistic_solutions[i], means, 1, combination_error);
+    bool keep = account_for_inferred_means(realistic_solutions[i], means, 1, combination_error);
     if(keep){
       solution_sets.push_back(realistic_solutions[i]);
     }
