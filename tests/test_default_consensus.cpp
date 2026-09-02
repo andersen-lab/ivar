@@ -17,7 +17,7 @@ int main() {
   // 5 positions, each with a single dominant allele: A C G T A.
   // consensus_numbers is set manually here since call_majority_consensus's
   // real callers never populate it (that field is only filled in by
-  // assign_variants_solution, which doesn't run on this fallback path).
+  // variant_assigner, which does not run on this fallback path).
   std::vector<variant> variants;
   //position 1 has mulitple ambiguity
   {

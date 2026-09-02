@@ -384,7 +384,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   
   //handle the case of no variants less than the universal cluster
   if(model_variants.size() <= 1){
-    assign_variants_solution(std::vector<double>(1, 1.0), base_variants, std::vector<double>(1, 1.0), 2.0);
+    variant_assigner(std::vector<double>(1, 1.0), std::vector<double>(1, 1.0), 2.0).assign(base_variants);
     call_majority_consensus(base_variants, output_prefix, default_threshold);
     write_single_cluster_output(output_prefix);
     base_variants.clear();
@@ -475,8 +475,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   }
   
-  std::vector<std::vector<double>> solution_sets;
-  bool solved = subset_sum(eff_means, solution_sets, 0.10);
+  subset_sum_solver solver(eff_means, subset_sum_solver::UNIT_SUM_ERROR, invariant_threshold);
+  bool solved = solver.solve();
+  //the boundary rescue may have refined a mean, and downstream matching against the
+  //solution is exact equality, so adopt the refined means
+  eff_means = solver.refined_means();
+  std::vector<std::vector<double>> solution_sets = solver.get_solution_sets();
 
   //output the clustering information
   std::ofstream out(output_prefix + "_gmm_1d_results.txt");
@@ -550,11 +554,11 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   if(solved){
     if(solution_sets.size() > 1){
-      assign_variants_solution(std::vector<double>(1, 1.0), base_variants, std::vector<double>(1, 1.0), 2.0);
+      variant_assigner(std::vector<double>(1, 1.0), std::vector<double>(1, 1.0), 2.0).assign(base_variants);
       call_majority_consensus(base_variants, output_prefix, default_threshold);
       base_variants.clear();
     } else{
-      overwrite_cluster_assigned(base_variants, eff_means, model_means);
+      variant_assigner::overwrite_cluster_assigned(base_variants, eff_means, model_means);
       //recalculate probabilities based on the new cluster assignments and only the effective means
       for(auto &v : base_variants){
         if(v.half_normal_upper || v.half_normal_lower || v.probabilities.empty()) continue;
@@ -568,7 +572,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
           for(auto &p : eff_proba) p /= sum;
         v.probabilities = eff_proba;
       }
-      assign_variants_solution(solution_sets[0], base_variants, eff_means, 2.0);
+      variant_assigner(solution_sets[0], eff_means, 2.0).assign(base_variants);
 
       //predict clusters for amplicon specific frequencies
       amplicon_specific_cluster_assignment(base_variants, model);
@@ -578,7 +582,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       solution = solution_sets[0];
     }
   } else {
-    assign_variants_solution(std::vector<double>(1, 1.0), base_variants, std::vector<double>(1, 1.0), 2.0);
+    variant_assigner(std::vector<double>(1, 1.0), std::vector<double>(1, 1.0), 2.0).assign(base_variants);
     call_majority_consensus(base_variants, output_prefix, default_threshold);
     base_variants.clear();
   }  

@@ -17,7 +17,9 @@ int main() {
   //TEST 1 - Since our error is 0.10 we should be able to find a solution for means 0.11 and 0.80
   std::vector<double> means = {0.11, 0.80};
   std::vector<std::vector<double>> solution_sets;
-  bool solution_status = subset_sum(means, solution_sets, error);
+  subset_sum_solver solver1(means, error);
+  bool solution_status = solver1.solve();
+  solution_sets = solver1.get_solution_sets();
   num_tests++;
   if(solution_sets.size() == 1) {
     success++;
@@ -29,7 +31,9 @@ int main() {
   means.clear();
   solution_sets.clear();
   means = {0.10, 0.80};
-  solution_status = subset_sum(means, solution_sets, error);
+  subset_sum_solver solver2(means, error);
+  solution_status = solver2.solve();
+  solution_sets = solver2.get_solution_sets();
   num_tests++;
   if(solution_sets.size() == 0) {
     success++;
@@ -42,7 +46,9 @@ int main() {
   means.clear();
   solution_sets.clear();
   means = {0.10, 0.20, 0.30, 0.40, 0.50};
-  solution_status = subset_sum(means, solution_sets, error);
+  subset_sum_solver solver3(means, error);
+  solution_status = solver3.solve();
+  solution_sets = solver3.get_solution_sets();
   num_tests++;
   if(solution_sets.size() == 1) {
     success++;
@@ -51,12 +57,17 @@ int main() {
   }
 
   //TEST 4 - The boundary rescue should infer a lower population if it gets wrapped into the lower half normal
+  //The rescue must also refine the mean to the inferred complement, bit-identical
+  //to the solution entry, since downstream matching is exact equality
   means.clear();
   solution_sets.clear();
-  means = {0.03, 0.85};
-  solution_status = subset_sum(means, solution_sets, error);
+  const double invariant_threshold = 0.97;
+  means = {1.0 - invariant_threshold, 0.85}; //gmm_1d pins this peak, don't hand-write 0.03
+  subset_sum_solver solver4(means, error);
+  solution_status = solver4.solve();
+  solution_sets = solver4.get_solution_sets();
   num_tests++;
-  if(solution_sets.size() == 1) {
+  if(solution_sets.size() == 1 && solver4.refined_means()[0] == solution_sets[0][1]) {
     success++;
   } else {
     std::cerr << "TEST 4 failed, found " << solution_sets.size() << " solutions" << std::endl;
@@ -66,7 +77,9 @@ int main() {
   means.clear();
   solution_sets.clear();
   means = {0.10, 0.12, 0.15, 0.18, 0.20, 0.30, 0.50};
-  solution_status = subset_sum(means, solution_sets, error);
+  subset_sum_solver solver5(means, error);
+  solution_status = solver5.solve();
+  solution_sets = solver5.get_solution_sets();
   num_tests++;
   if(solution_sets.size() == 3) {
     success++;
@@ -78,7 +91,9 @@ int main() {
   means.clear();
   solution_sets.clear();
   means = {0.10, 0.30, 0.50, 0.70};
-  solution_status = subset_sum(means, solution_sets, error);
+  subset_sum_solver solver6(means, error);
+  solution_status = solver6.solve();
+  solution_sets = solver6.get_solution_sets();
   num_tests++;
   if(solution_sets.size() == 0) {
     success++;
@@ -87,7 +102,7 @@ int main() {
   }
   
   //TEST 7 - Same 0.1/0.2/0.3/0.4 mixture as TEST 3, but this time exercising
-  //assign_variants_solution directly. A variant sitting on the 0.40 peak is
+  //variant_assigner directly. A variant sitting on the 0.40 peak is
   //explainable two ways - {0.40} alone, or {0.10 + 0.30} - so it should be
   //*ambiguous* across 0.10/0.30/0.40 (none of them confirmed) rather than
   //confidently assigned to the 0.40 genome. A variant on the 0.20 peak has no
@@ -104,7 +119,7 @@ int main() {
     v_private.cluster_assigned = 1; //index of the 0.20 peak in peak_means
 
     std::vector<variant> variants = {v_collision, v_private};
-    assign_variants_solution(solution, variants, peak_means, 2.0);
+    variant_assigner(solution, peak_means, 2.0).assign(variants);
 
     std::set<uint32_t> collision_confirmed(variants[0].consensus_numbers.begin(), variants[0].consensus_numbers.end());
     std::set<uint32_t> collision_ambiguous(variants[0].ambiguous_numbers.begin(), variants[0].ambiguous_numbers.end());
@@ -143,7 +158,9 @@ int main() {
   means.clear();
   solution_sets.clear();
   means = {0.15, 0.30, 0.48, 0.55};
-  solution_status = subset_sum(means, solution_sets, 0.02);
+  subset_sum_solver solver7(means, 0.02);
+  solution_status = solver7.solve();
+  solution_sets = solver7.get_solution_sets();
   num_tests++;
   if(solution_sets.size() == 1) {
     success++;
