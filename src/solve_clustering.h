@@ -34,7 +34,9 @@ class subset_sum_solver {
   //passed explicitly, since callers needing another value must be able to say so
   static constexpr double UNIT_SUM_ERROR = 0.10;
 
-  subset_sum_solver(std::vector<double> means, double unit_sum_error, double invariant_threshold = 0.97);
+  //invariant_threshold comes from the -I flag, so no default here - ivar.cpp is the
+  //only place that value should be spelled
+  subset_sum_solver(std::vector<double> means, double unit_sum_error, double invariant_threshold);
   bool solve();
 
   //the boundary rescue replaces the absorbed lower boundary mean with the inferred

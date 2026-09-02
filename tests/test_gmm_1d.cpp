@@ -171,7 +171,7 @@ int main(int argc, char* argv[]) {
     std::vector<double> weights = model.get_weights();
 
     std::vector<std::vector<double>> solutions_sets;
-    subset_sum_solver solver(eff_means, 0.05);
+    subset_sum_solver solver(eff_means, 0.05, invariant_threshold);
     bool solved = solver.solve();
     solutions_sets = solver.get_solution_sets();
     std::cerr << "solution status: " << solved << "\n";
