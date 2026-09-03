@@ -314,7 +314,7 @@ void cluster_consensus(std::vector<variant> variants, \
       print = true;
       std::cerr << "\ntop freq " << variants[i].freq << " " << variants[i].nuc << " cluster " << variants[i].cluster_assigned << " gapped freq " << variants[i].gapped_freq << " depth " << variants[i].total_depth << std::endl;
       std::cerr << "vague assignment " << variants[i].vague_assignment << " depth flag " << variants[i].depth_flag << std::endl;
-      std::cerr << "amplicon masked " << variants[i].amplicon_masked << " amp flux pos " << variants[i].amplicon_flux << std::endl;
+      std::cerr << "amplicon masked " << variants[i].amplicon_masked << " position masked " << variants[i].position_masked << std::endl;
       std::cerr << "cluster assigned " << variants[i].cluster_assigned << std::endl;
       for(auto cc : variants[i].consensus_numbers){
         std::cerr << "consensus number " << cc << std::endl;
@@ -331,8 +331,8 @@ void cluster_consensus(std::vector<variant> variants, \
     if(variants[i].overlapped_deletion){
       continue;
     }
-    if(variants[i].amplicon_flux && !variants[i].half_normal_upper){
-      if(print) std::cerr << "amplicon flux " << variants[i].amplicon_flux << std::endl;
+    if(variants[i].position_masked && !variants[i].half_normal_upper){
+      if(print) std::cerr << "position masked " << variants[i].position_masked << std::endl;
       continue;
     }
     double freq = variants[i].gapped_freq;

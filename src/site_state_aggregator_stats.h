@@ -11,8 +11,6 @@ struct amplicon_variation_data {
   std::vector<ITNode*> amplicons;
 
   int num_amplicons = 0;
-  double stdev = 0;
-  bool amplicon_frequency_variation = false;
 
   bool has_variation() const {
     return num_amplicons > 1;
@@ -25,20 +23,7 @@ class site_state_aggregator_stats {
   std::vector<site_amplicon_aggregator_stats> site_state_amplicon_stats;
   std::string state;
 
-  std::vector<site_amplicon_aggregator_stats> get_unambiguous_site_state_amplicon_stats() const {
-    std::vector<site_amplicon_aggregator_stats> filtered;
-    for (const auto& ssa_stats : site_state_amplicon_stats) {
-      if (ssa_stats.get_amplicon() != nullptr) {
-        filtered.emplace_back(ssa_stats);
-      }
-    }
-    return filtered;
-  }
-
-  static double calculate_weighted_standard_deviation(std::vector<double> values, std::vector<uint32_t> weights);
   site_amplicon_aggregator_stats* find_or_create_site_amplicon_aggregator_stats(ITNode* amplicon);
-
-  static const double STDEV_THRESHOLD;
 
  public:
 

@@ -15,15 +15,16 @@ struct variant {
   double logit = 0;
   int cluster_assigned = -1;
   bool version_1_var=false;
-  double std_dev;
   bool half_normal_upper = false;
   bool half_normal_lower = false;
   bool position_half_normal_upper = false;
 
-  //number corresponding the the amplicons covering this position
-  std::vector<uint32_t> amplicon_numbers;
+  //identifiers of the amplicons covering this position, "low-high"
+  std::vector<std::string> amplicon_ids;
   //frequencies of this variants on each amplicon
   std::vector<double> freq_numbers;
+  //depth of each amplicon covering this position
+  std::vector<uint32_t> amplicon_depths;
   //per amplicon frequency assignments to clusters
   std::vector<uint32_t> freq_assignments;
   //the consensus sequence this variant is assigned to
@@ -36,9 +37,8 @@ struct variant {
   bool assigned_deletion=false;
 
   //for these true means flagged as problematic
-  bool amplicon_flux=false; //fluctuation frequency across amplicons
-  bool amplicon_masked=false; //masked due to another variant experiencing flux
-  bool primer_masked=false; //mutation in primer binding region of overlapped amplicon
+  bool position_masked=false; //this position fluctuates in frequency across amplicons
+  bool amplicon_masked=false; //an amplicon covering this position fluctuates elsewhere
   bool depth_flag=false; //depth is below the threshold
   bool qual_flag=false; //quality is below threshold
   bool outside_freq_range=false; //outside of useful frequency range for model
@@ -56,6 +56,7 @@ void parse_internal_variants(std::string filename, std::vector<variant> &base_va
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);
 void set_deletion_flags(std::vector<variant> &variants, double lower_bound, double invariant_lower_bound);
-void reset_variants_info(std::vector<variant> &variants);
+void flag_amplicon_variation(std::vector<variant> &variants);
+void propagate_amplicon_masking(std::vector<variant> &variants);
 void rewrite_position_masking(std::vector<variant> &variants);
 #endif

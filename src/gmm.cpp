@@ -11,22 +11,81 @@
 #include <unordered_map>
 #include <unordered_set>
 
-void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gmm_1d model){
-  std::vector<std::vector<double>> prob_matrix;
-  std::vector<double> tmp;
+//weighted stdev of a variant's per-amplicon frequencies above which the position is masked
+static const double AMPLICON_STDEV = 0.05;
 
+static double weighted_standard_deviation(const std::vector<double> &values, const std::vector<uint32_t> &weights){
+  double weighted_sum = 0.0, total_weight = 0.0;
+  for(uint32_t i=0; i < values.size(); i++){
+    weighted_sum += values[i] * weights[i];
+    total_weight += weights[i];
+  }
+  if(total_weight == 0) return 0.0;
+  double mean = weighted_sum / total_weight;
+
+  double variance = 0.0;
+  for(uint32_t i=0; i < values.size(); i++){
+    variance += weights[i] * std::pow(values[i] - mean, 2);
+  }
+  variance /= total_weight;
+  return std::sqrt(variance);
+}
+
+//a variant is amplicon masked when an amplicon covering it fluctuates at some other
+//position. Runs over every variant at once, so the result does not depend on the
+//order positions were written in
+void propagate_amplicon_masking(std::vector<variant> &variants){
+  //count rather than flag, so a variant's own flux can be subtracted back out below
+  std::unordered_map<std::string, uint32_t> flagged_counts;
+  for(const auto &var : variants){
+    if(!var.position_masked) continue;
+    for(const auto &id : var.amplicon_ids){
+      flagged_counts[id]++;
+    }
+  }
+
+  for(auto &var : variants){
+    uint32_t self = var.position_masked ? 1 : 0;
+    var.amplicon_masked = false;
+    for(const auto &id : var.amplicon_ids){
+      auto it = flagged_counts.find(id);
+      //a variant's own flux is reported by position_masked, not here
+      if(it != flagged_counts.end() && it->second > self){
+        var.amplicon_masked = true;
+        break;
+      }
+    }
+  }
+}
+
+void flag_amplicon_variation(std::vector<variant> &variants){
+  for(auto &var : variants){
+    if(var.freq_numbers.size() < 2 || var.freq_numbers.size() != var.amplicon_depths.size()){
+      var.position_masked = false;
+      continue;
+    }
+    var.position_masked = weighted_standard_deviation(var.freq_numbers, var.amplicon_depths) > AMPLICON_STDEV;
+  }
+  propagate_amplicon_masking(variants);
+}
+
+void amplicon_specific_cluster_assignment(std::vector<variant> &variants, const gmm_1d &model, const std::vector<int> &component_indices){
+  if(component_indices.empty()) return;
   for(uint32_t i=0; i < variants.size(); i++){
+    variants[i].freq_assignments.clear();
     if(variants[i].freq_numbers.size() < 2) continue;
-    if(variants[i].std_dev == 0) continue;
-    if(!variants[i].amplicon_flux && !variants[i].amplicon_masked) continue;
+    if(!variants[i].position_masked) continue;
 
-    //predicy for all frequencies of this variant on each amplicon
+    //predict for all frequencies of this variant on each amplicon
     std::vector<std::vector<double>> proba = model.predict_proba(variants[i].freq_numbers);
-    //per frequencie assignment
+    //per frequency assignment, restricted to the components the model kept so that
+    //a discarded component cannot split two frequencies of the same cluster
     for(auto cluster_probs : proba){
-      auto it = std::max_element(cluster_probs.begin(), cluster_probs.end());
-      uint32_t index = std::distance(cluster_probs.begin(), it);
-      variants[i].freq_assignments.push_back(index);
+      uint32_t best = component_indices[0];
+      for(int ci : component_indices){
+        if(cluster_probs[ci] > cluster_probs[best]) best = ci;
+      }
+      variants[i].freq_assignments.push_back(best);
     }
   }
 }
@@ -34,23 +93,16 @@ void amplicon_specific_cluster_assignment(std::vector<variant> &variants, gmm_1d
 void rewrite_position_masking(std::vector<variant> &variants){
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].freq_numbers.size() < 2) continue;
-    if(!variants[i].amplicon_flux) continue;
+    if(!variants[i].position_masked) continue;
     if(variants[i].freq_assignments.empty()) continue;
-      bool all_equal = std::all_of(variants[i].freq_assignments.begin(), variants[i].freq_assignments.end(), [&](uint32_t v) {return v == variants[i].freq_assignments[0];});
-      if(all_equal){
-        variants[i].amplicon_flux = false;
-      } else {
-        variants[i].amplicon_flux = true;
-      }
+    //per-amplicon frequencies that all land in one cluster are within-cluster noise,
+    //not flux, so clear the stdev flag
+    bool all_equal = std::all_of(variants[i].freq_assignments.begin(), variants[i].freq_assignments.end(), [&](uint32_t v) {return v == variants[i].freq_assignments[0];});
+    if(all_equal){
+      variants[i].position_masked = false;
+    }
   }
-}
-
-void reset_variants_info(std::vector<variant> &variants){
-  //reset cluster assignments and probabilities prior to rerunning another model
-  for(auto &var : variants){
-    var.cluster_assigned = -1;
-    var.probabilities.clear();
-  }
+  propagate_amplicon_masking(variants);
 }
 
 uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
@@ -112,6 +164,17 @@ std::vector<uint32_t> split_csv(const std::string& input) {
 
     while (std::getline(ss, token, ',')) {
       result.push_back(std::stoi(token));
+    }
+    return result;
+}
+
+std::vector<std::string> split_csv_string(const std::string& input) {
+    std::vector<std::string> result;
+    std::stringstream ss(input);
+    std::string token;
+
+    while (std::getline(ss, token, ',')) {
+      result.push_back(token);
     }
     return result;
 }
@@ -204,7 +267,6 @@ void parse_internal_variants(std::string filename,
   double multiplier = pow(10, round_val);
   double compare_quality = static_cast<double>(quality_threshold);
 
-  auto to_bool = [](const std::string& s) -> bool {return s == "TRUE" || s == "true" || s == "True" || s == "1";};
   //track which ref alleles we've already added
   while (std::getline(infile, line)) {
     std::vector<std::string> row_values;
@@ -213,45 +275,42 @@ void parse_internal_variants(std::string filename,
     while (std::getline(row_ss, value, '\t')) {
       row_values.push_back(value);
     }
+    //trailing empty fields are dropped by getline, so a named column may be absent
+    //from the row even when the header declares it
+    auto field = [&](const std::string &name) -> std::string {
+      auto it = col_index.find(name);
+      if(it == col_index.end() || (uint32_t)it->second >= row_values.size()) return "";
+      return row_values[it->second];
+    };
     variant tmp;
-    tmp.nuc = row_values[col_index["ALT"]];
-    tmp.position = std::stoi(row_values[col_index["POS"]]);
+    tmp.nuc = field("ALT");
+    tmp.position = std::stoi(field("POS"));
     //adjust for the -1 of variant files for deletions
     auto it = std::find(tmp.nuc.begin(), tmp.nuc.end(), '-');
     if(it != tmp.nuc.end()){
       tmp.position = tmp.position+1;
     }
-    tmp.depth = std::stoi(row_values[col_index["ALT_DP"]]);
-    tmp.total_depth = std::stoi(row_values[col_index["TOTAL_DP"]]);
-    tmp.freq = std::round(std::stof(row_values[col_index["ALT_FREQ"]]) * multiplier) / multiplier;
-    tmp.qual = std::stod(row_values[col_index["ALT_QUAL"]]);
+    tmp.depth = std::stoi(field("ALT_DP"));
+    tmp.total_depth = std::stoi(field("TOTAL_DP"));
+    tmp.freq = std::round(std::stof(field("ALT_FREQ")) * multiplier) / multiplier;
+    tmp.qual = std::stod(field("ALT_QUAL"));
 
-    if(row_values.size() > 20){
-      tmp.gapped_freq = round(std::stod(row_values[col_index["GAPPED_FREQ"]]) * multiplier) / multiplier;
-      tmp.gapped_depth = std::stoi(row_values[col_index["GAPPED_DEPTH"]]);
-      tmp.amplicon_flux = to_bool(row_values[col_index["FLAGGED_POS"]]);
-      tmp.amplicon_masked = to_bool(row_values[col_index["AMP_MASKED"]]);
-      if(!(is_empty_field(row_values[col_index["STD_DEV"]]))){
-        tmp.std_dev = std::stod(row_values[col_index["STD_DEV"]]);
-      } else {
-        tmp.std_dev = 0;
+    if(col_index.count("GAPPED_FREQ")){
+      tmp.gapped_freq = round(std::stod(field("GAPPED_FREQ")) * multiplier) / multiplier;
+      tmp.gapped_depth = std::stoi(field("GAPPED_DEPTH"));
+      if(!is_empty_field(field("AMP_NUMBERS"))){
+        tmp.amplicon_ids = split_csv_string(field("AMP_NUMBERS"));
       }
-      if(row_values.size() > 26 && !(is_empty_field(row_values[col_index["AMP_NUMBERS"]]))){ 
-        tmp.amplicon_numbers = split_csv(row_values[col_index["AMP_NUMBERS"]]);
-      } else {
-        tmp.amplicon_numbers = {};
+      if(!is_empty_field(field("AMP_FREQ"))){
+        tmp.freq_numbers = split_csv_double(field("AMP_FREQ"));
       }
-      if(row_values.size() > 25 && !(is_empty_field(row_values[col_index["AMP_FREQ"]]))){
-        tmp.freq_numbers = split_csv_double(row_values[col_index["AMP_FREQ"]]);
-      } else {
-        tmp.freq_numbers = {};
+      if(!is_empty_field(field("AMP_DEPTH"))){
+        tmp.amplicon_depths = split_csv(field("AMP_DEPTH"));
       }
       tmp.version_1_var = false;
     } else {
       tmp.gapped_freq = 0.0;
-      tmp.amplicon_flux = false;
-      tmp.amplicon_masked = false;
-      tmp.primer_masked = false;
+      tmp.gapped_depth = 0;
       tmp.version_1_var = true;
     }
     if(tmp.gapped_depth < depth_cutoff){
@@ -367,6 +426,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
+  flag_amplicon_variation(base_variants);
   set_deletion_flags(base_variants, 0.001, 1.0 - invariant_threshold);
 
   std::vector<variant> model_variants;
@@ -575,7 +635,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       variant_assigner(solution_sets[0], eff_means, 2.0).assign(base_variants);
 
       //predict clusters for amplicon specific frequencies
-      amplicon_specific_cluster_assignment(base_variants, model);
+      amplicon_specific_cluster_assignment(base_variants, model, component_indices);
       //write the amplicon flags based on cluster agreement
       rewrite_position_masking(base_variants);
 

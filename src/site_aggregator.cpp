@@ -19,16 +19,6 @@ bool site_aggregator::calculate_amplicon_depths(site_coordinate coord, std::unor
   return true;
 }
 
-void site_aggregator::add_to_masked_amplicons(ITNode *amp) {
-  if (std::find(masked_amplicons.begin(), masked_amplicons.end(), amp) == masked_amplicons.end()) {
-    masked_amplicons.push_back(amp);
-  }
-}
-
-bool site_aggregator::is_amplicon_masked(ITNode *amp) {
-  return std::find(masked_amplicons.begin(), masked_amplicons.end(), amp) != masked_amplicons.end();
-}
-
 void site_aggregator::clear() {
   aggregated_site_states.clear();
 }

@@ -23,11 +23,9 @@ const std::string variant_caller::FILE_HEADER="REGION\t"
     "POS_AA\t"
     "GAPPED_FREQ\t"
     "GAPPED_DEPTH\t"
-    "FLAGGED_POS\t"
-    "AMP_MASKED\t"
-    "STD_DEV\t"
+    "AMP_NUMBERS\t"
     "AMP_FREQ\t"
-    "AMP_NUMBERS\n";
+    "AMP_DEPTH\n";
 const std::string variant_caller::DELIMITER = "\t";
 
 variant_caller::variant_caller(uint8_t min_qual, std::string ref_path, std::string gff_path)
@@ -205,6 +203,10 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
       std::cerr << "Position " << coord.position << "was not found in " << ref_name << std::endl;
       continue;
     }
+    // Deletions are reported against the preceding position, so they need its
+    // amplicon depths to match GAPPED_FREQ/GAPPED_DEPTH
+    std::unordered_map<ITNode*, uint32_t> amp_depths_del;
+    sa.calculate_amplicon_depths(coord_del, amp_depths_del);
 
     for(auto const &state_stats: site_stats.get_site_state_stats()) {
       //TODO: Implement minimum depth and minimum frequency filter
@@ -244,32 +246,25 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
         file << total_gapped_depth << DELIMITER; // GAPPED_DEPTH
       }
 
-      // Calculating amplicon-specific statistics
-      amplicon_variation_data av_data = state_stats.calculate_amplicon_variation(amp_depths);
-      file << (av_data.amplicon_frequency_variation ? "True" : "False") << DELIMITER; // FLAGGED_POS -> Variant level
-      if(av_data.amplicon_frequency_variation) {
-        for (int i = 0; i < av_data.amplicons.size(); i++)
-          sa.add_to_masked_amplicons(av_data.amplicons[i]);
-      }
-      bool is_amplicon_masked = false;
+      // Raw per-amplicon observations; flux and masking are derived downstream
+      amplicon_variation_data av_data = state_stats.calculate_amplicon_variation(
+          (site_state::is_deletion(state)) ? amp_depths_del : amp_depths);
       for(int i = 0; i < av_data.amplicons.size(); i++){
-        if (sa.is_amplicon_masked(av_data.amplicons[i])) {
-                is_amplicon_masked = true;
-                break;
-        }
+        if(i > 0)
+          file << ",";
+        file << av_data.amplicons[i]->to_string(); // AMP_NUMBERS
       }
-      file << (is_amplicon_masked ? "True" : "False") << DELIMITER; // AMP_MASKED
-      file << av_data.stdev << DELIMITER; // STD_DEV
+      file << DELIMITER;
       for(int i = 0; i < av_data.frequencies.size(); i++){
         if(i > 0)
           file << ",";
-        file << av_data.frequencies[i]; // AMP FREQ
+        file << av_data.frequencies[i]; // AMP_FREQ
       }
       file << DELIMITER;
-      for(int i = 0; i < av_data.amplicons.size(); i++){
+      for(int i = 0; i < av_data.weights.size(); i++){
         if(i > 0)
           file << ",";
-        file << av_data.amplicons[i]->to_string(); // AMP NUMBERS
+        file << av_data.weights[i]; // AMP_DEPTH
       }
       file << "\n";
     }

@@ -240,7 +240,7 @@ int main() {
                       << " cluster=" << v.cluster_assigned
                       << " half_normal_upper=" << v.half_normal_upper
                       << " half_normal_lower=" << v.half_normal_lower
-                      << " amplicon_flux=" << v.amplicon_flux
+                      << " position_masked=" << v.position_masked
                       << " amplicon_masked=" << v.amplicon_masked
                       << " depth_flag=" << v.depth_flag
                       << " qual_flag=" << v.qual_flag

@@ -1,12 +1,33 @@
 #include "../src/site_state_aggregator_stats.h"
 
-int main() {
-  std::vector<site_state> site_states;
+bool check(const amplicon_variation_data &av, const std::vector<double> &expected_frequencies,
+           const std::vector<uint32_t> &expected_weights) {
+  if(av.num_amplicons != (int)expected_frequencies.size()) {
+    std::cerr << "Expected " << expected_frequencies.size() << " amplicons, got " << av.num_amplicons << std::endl;
+    return false;
+  }
+  if(av.frequencies.size() != expected_frequencies.size() || av.weights.size() != expected_weights.size()) {
+    std::cerr << "Frequency/weight vectors are not aligned with the amplicon list" << std::endl;
+    return false;
+  }
+  for(uint32_t i = 0; i < expected_frequencies.size(); i++){
+    if(av.frequencies[i] != expected_frequencies[i]){
+      std::cerr << "Frequencies do not match expected values" << std::endl;
+      return false;
+    }
+    if(av.weights[i] != expected_weights[i]){
+      std::cerr << "Weights do not match expected values" << std::endl;
+      return false;
+    }
+  }
+  return true;
+}
 
+int main() {
   ITNode *amp1 = new ITNode(Interval(0, 25));
   ITNode *amp2 = new ITNode(Interval(15, 40));
 
-  // Test with two amplicons
+  // Test with the state present on two amplicons
   site_state_aggregator_stats ssas("A");
 
   for(int i = 0; i < 10; i++){
@@ -18,81 +39,47 @@ int main() {
   for(int i = 0; i < 5; i++){
     site_state ss("A", 20, 20, NUCLEOTIDE);
     ss.set_amplicon(amp2);
-    site_states.emplace_back(ss);
     ssas.add_site(ss);
   }
 
   amplicon_variation_data av = ssas.calculate_amplicon_variation({ {amp1, 10}, {amp2, 10} });
+  if(!check(av, {1.0, 0.5}, {10, 10})) return -1;
 
-  if(av.num_amplicons != 2 || av.stdev != 0.25 || !av.amplicon_frequency_variation) {
-    std::cerr << "Expected 2 amplicons with stdev 0.25 and variation true" << std::endl;
-    return -1;
-  }
-
-  std::vector<double> expected_frequencies = {1.0, 0.5};
-  for(int i = 0; i < av.frequencies.size(); i++){
-    if(av.frequencies[i] != expected_frequencies[i]){
-      std::cerr << "Frequencies do not match expected values" << std::endl;
-      return -1;
-    }
-  }
-  std::vector<double> expected_weights = {10, 10};
-  for(int i = 0; i < av.weights.size(); i++){
-    if(av.weights[i] != expected_weights[i]){
-      std::cerr << "Weights do not match expected values" << std::endl;
-      return -1;
-    }
-  }
-
-  // Test with one amplicon
+  // Test with the state present on one of two covering amplicons. The amplicon it is
+  // absent from must still be reported, at frequency 0, so dropout stays visible
   site_state_aggregator_stats ssas2("A");
-  expected_frequencies.clear();
-  expected_weights.clear();
 
-  for(int i = 0; i < 10; i++){
+  for(int i = 0; i < 15; i++){
     site_state ss("A", 20, 20, NUCLEOTIDE);
     ss.set_amplicon(amp1);
-    ssas2.add_site(ss);
-  }
-
-  for(int i = 0; i < 5; i++){
-    site_state ss("A", 20, 20, NUCLEOTIDE);
-    ss.set_amplicon(amp1);
-    site_states.emplace_back(ss);
     ssas2.add_site(ss);
   }
 
   av = ssas2.calculate_amplicon_variation({ {amp1, 20}, {amp2, 10} });
+  if(!check(av, {0.75, 0.0}, {20, 10})) return -1;
 
-  if(av.num_amplicons != 1 || av.stdev != 0 || av.amplicon_frequency_variation || av.frequencies.size() != 0 || av.weights.size() != 0) {
-    std::cerr << "Expected 1 amplicons with stdev 0 and variation false" << std::endl;
-    return -1;
-  }
-
-  // Test with null
+  // Reads that could not be assigned to a single amplicon are keyed under nullptr and
+  // must be excluded rather than reported as an amplicon
   site_state_aggregator_stats ssas3("A");
-  expected_frequencies.clear();
-  expected_weights.clear();
 
   for(int i = 0; i < 10; i++){
     site_state ss("A", 20, 20, NUCLEOTIDE);
-    ss.set_amplicon(nullptr);
-    ssas2.add_site(ss);
+    ss.set_amplicon(amp1);
+    ssas3.add_site(ss);
   }
 
-  for(int i = 0; i < 5; i++){
+  for(int i = 0; i < 15; i++){
     site_state ss("A", 20, 20, NUCLEOTIDE);
     ss.set_amplicon(nullptr);
-    site_states.emplace_back(ss);
-    ssas2.add_site(ss);
+    ssas3.add_site(ss);
   }
 
-  av = ssas2.calculate_amplicon_variation({ {amp1, 20}, {amp2, 10} });
+  av = ssas3.calculate_amplicon_variation({ {amp1, 20}, {amp2, 10}, {nullptr, 15} });
+  if(!check(av, {0.5, 0.0}, {20, 10})) return -1;
 
-  if(av.num_amplicons != 1 || av.stdev != 0 || av.amplicon_frequency_variation || av.frequencies.size() != 0 || av.weights.size() != 0) {
-    std::cerr << "Expected 1 amplicons with stdev 0 and variation false" << std::endl;
-    return -1;
-  }
+  // Amplicons with no depth at the position are not reported
+  av = ssas3.calculate_amplicon_variation({ {amp1, 20}, {amp2, 0} });
+  if(!check(av, {0.5}, {20})) return -1;
 
   return 0;
 }

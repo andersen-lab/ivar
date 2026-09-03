@@ -1,7 +1,6 @@
 #include "site_state_aggregator_stats.h"
+#include <algorithm>
 #include <cmath>
-
-const double site_state_aggregator_stats::STDEV_THRESHOLD = 0.055;
 
 void site_state_aggregator_stats::add_site(site_state &ss) {
   //TODO: Add explicit check if site_state.state == this->state
@@ -38,30 +37,36 @@ void site_state_aggregator_stats::accumulate_amplicon_depths(std::unordered_map<
 
 amplicon_variation_data site_state_aggregator_stats::calculate_amplicon_variation(const std::unordered_map<ITNode *, uint32_t> &amp_depths) const {
   amplicon_variation_data result;
-  std::vector<site_amplicon_aggregator_stats> unambiguous_site_state_amplicon_stats = get_unambiguous_site_state_amplicon_stats();
-  result.num_amplicons = unambiguous_site_state_amplicon_stats.size();
-  if (result.num_amplicons <= 1)
-    return result;
 
+  // Every amplicon covering the position, not just those carrying this state, so
+  // that a state absent from an amplicon is reported at frequency 0 rather than
+  // dropped
+  for (const auto &depth_it : amp_depths) {
+    ITNode* amplicon = depth_it.first;
+    uint32_t depth = depth_it.second;
+    if (amplicon == nullptr || depth == 0)
+      continue;
+    result.amplicons.push_back(amplicon);
+  }
+
+  std::sort(result.amplicons.begin(), result.amplicons.end(), [](ITNode* a, ITNode* b) {
+    if (a->data->low != b->data->low)
+      return a->data->low < b->data->low;
+    return a->data->high < b->data->high;
+  });
+
+  result.num_amplicons = result.amplicons.size();
   result.frequencies.reserve(result.num_amplicons);
   result.weights.reserve(result.num_amplicons);
 
-  for(const auto& ssa_stats : unambiguous_site_state_amplicon_stats) {
-    ITNode* amplicon = ssa_stats.get_amplicon();
-    uint32_t count = ssa_stats.get_count();
+  for (ITNode* amplicon : result.amplicons) {
+    uint32_t depth = amp_depths.at(amplicon);
+    const site_amplicon_aggregator_stats* ssa_stats = get_site_amplicon_aggregator_stats(amplicon);
+    uint32_t count = (ssa_stats != nullptr) ? ssa_stats->get_count() : 0;
 
-    auto depth_it = amp_depths.find(amplicon);
-
-    if (depth_it != amp_depths.end() && depth_it->second > 0) {
-      double frequency = static_cast<double>(count) / static_cast<double>(depth_it->second);
-      result.frequencies.push_back(frequency);
-      result.weights.push_back(depth_it->second);
-      result.amplicons.push_back(amplicon);
-    }
+    result.frequencies.push_back(static_cast<double>(count) / static_cast<double>(depth));
+    result.weights.push_back(depth);
   }
-
-  result.stdev = calculate_weighted_standard_deviation(result.frequencies, result.weights);
-  result.amplicon_frequency_variation = result.stdev > STDEV_THRESHOLD;
 
   return result;
 }
@@ -89,24 +94,4 @@ uint8_t site_state_aggregator_stats::get_mean_quality() const {
       weighted_sum / (total_depth)
   );
   return mean_quality;
-}
-
-double site_state_aggregator_stats::calculate_weighted_standard_deviation(std::vector<double> values, std::vector<uint32_t> weights) {
-  double weighted_sum = 0.0, total_weight = 0.0;
-
-  // Compute weighted mean
-  for (size_t i = 0; i < values.size(); ++i) {
-    weighted_sum += values[i] * weights[i];
-    total_weight += weights[i];
-  }
-  double mean = weighted_sum / total_weight;
-
-  // Compute weighted variance
-  double variance = 0.0f;
-  for (size_t i = 0; i < values.size(); ++i) {
-    variance += weights[i] * std::pow(values[i] - mean, 2);
-  }
-  variance /= total_weight;
-
-  return std::sqrt(variance);
 }

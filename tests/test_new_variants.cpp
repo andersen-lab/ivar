@@ -137,9 +137,10 @@ int main() {
   int result_2 = preprocess_reads(bam_filename_2, bed_file, prefix_2, "", pair_info, primer_offset, min_depth, min_qual, reference_file);
   std::vector<variant> new_variants_2;
   parse_internal_variants(prefix_2 + ".txt", new_variants_2, min_depth, round_val, min_qual, invariant_threshold);
+  flag_amplicon_variation(new_variants_2);
   bool amp_flags_correct = true;
   for(auto var : new_variants_2){
-    if(var.position == 670 && !var.amplicon_flux){
+    if(var.position == 670 && !var.position_masked){
       std::cerr << "amp incorrect flag " << var.position << std::endl;
       amp_flags_correct = false;
     }
