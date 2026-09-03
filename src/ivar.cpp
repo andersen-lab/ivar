@@ -133,8 +133,8 @@ void print_trim_usage() {
 void print_saga_usage() {
   std::cout
       << "Usage: ivar variants -i <input.bam> -p <prefix> [-b <primers.bed>] "
-         "[-f <primer_pairs.tsv>] [-x <primer-offset>] [-m <min-length>] "
-         "[-r <reference-fasta>]\n\n"
+         "[-f <primer_pairs.tsv>] [-x <primer-offset>] [-m <minimum depth>] "
+         "[-q <min-quality>] [-r <reference-fasta>]\n\n"
          "Input Options    Description\n"
          "           -i    BAM file, with aligned reads, to call variants "
          "read by read. If not specified will use standard in\n"
@@ -148,8 +148,10 @@ void print_saga_usage() {
          "           -x    Primer position offset (Default: 0). Reads that "
          "occur at the specified offset positions relative to primer "
          "positions will also be considered trimmed.\n"
-         "           -m    Minimum length of read to retain "
-         "(Default: 50% average length of the first 1000 reads)\n"
+         "           -m    Minimum read depth to call variants (Default: 10)\n"
+         "           -q    Minimum quality score threshold to count base "
+         "(Default: 20). Insertions, deletions and gaps carry no base quality "
+         "and are always counted.\n"
          "           -r    Reference file used for alignment.\n\n"
          "Output Options   Description\n"
          "           -p    Prefix for the output files\n";
@@ -438,7 +440,10 @@ int main(int argc, char *argv[]) {
           g_args.prefix = optarg;
           break;
         case 'm':
-          g_args.min_length = std::stoi(optarg);
+          g_args.min_depth = std::stoi(optarg);
+          break;
+        case 'q':
+          g_args.min_qual = std::stoi(optarg);
           break;
         case 'r':
           g_args.ref = optarg;

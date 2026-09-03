@@ -28,8 +28,9 @@ const std::string variant_caller::FILE_HEADER="REGION\t"
     "AMP_DEPTH\n";
 const std::string variant_caller::DELIMITER = "\t";
 
-variant_caller::variant_caller(uint8_t min_qual, std::string ref_path, std::string gff_path)
+variant_caller::variant_caller(uint8_t min_qual, uint32_t min_depth, std::string ref_path, std::string gff_path)
     : min_qual(min_qual),
+      min_depth(min_depth),
       refantd(ref_path, gff_path) {
 }
 
@@ -52,12 +53,14 @@ bool variant_caller::parse_read(const bam1_t* read, std::string ref_name, std::v
   for (uint32_t i = 0; i < read->core.n_cigar; i++){
     uint32_t op = bam_cigar_op(cigar[i]);
     uint32_t len = bam_cigar_oplen(cigar[i]);
-    //TODO: Implement minimum quality filter
+    // Indels and gaps carry no sequencer quality, so they are stamped with min_qual
+    // and kept by the >= test below. This matches update_allele_depth().
     if(op == 0){
       for(uint32_t j=0; j < len; j++){
         uint32_t qpos = total_query_pos + j;
         uint32_t rpos = total_ref_pos + j;
         uint8_t tqual = static_cast<uint8_t>(qual[qpos]);
+        if(tqual < min_qual) continue;
         uint8_t base_code = bam_seqi(query_sequence, qpos);
         char nuc = seq_nt_lookup[base_code];
         read_site_states.emplace_back(nuc, tqual, rpos, NUCLEOTIDE);
@@ -74,17 +77,13 @@ bool variant_caller::parse_read(const bam1_t* read, std::string ref_name, std::v
       read_site_states.emplace_back(del_state, min_qual, total_ref_pos, NUCLEOTIDE);
     } else if(op == 1){
       std::string tmp = "+";
-      double qual_sum = 0;
       //collect all nucs in insertions
       for(uint32_t j=0; j < len; j++){
-        uint32_t qpos = total_query_pos + j;
         uint8_t base_code = bam_seqi(query_sequence, total_query_pos + j);
         char nuc = seq_nt_lookup[base_code];
         tmp += nuc;
-        qual_sum += qual[qpos];
       }
-      uint8_t avg_qual = static_cast<uint8_t>(qual_sum / len);
-      read_site_states.emplace_back(tmp, avg_qual, total_ref_pos-1, NUCLEOTIDE);
+      read_site_states.emplace_back(tmp, min_qual, total_ref_pos-1, NUCLEOTIDE);
     }
 
     //consumes ref
@@ -197,6 +196,12 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
     // Get gapped and ungapped total depth
     uint32_t total_depth = site_stats.get_total_depth();
     uint32_t total_gapped_depth = site_stats.get_total_gapped_depth();
+
+    // Skip the whole position, measured on ungapped depth, matching
+    // call_variants_from_plup()
+    if(total_depth < min_depth)
+      continue;
+
     // Get amplicon depths
     amp_depths.clear();
     if(!sa.calculate_amplicon_depths(coord, amp_depths)){

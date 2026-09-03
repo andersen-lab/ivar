@@ -81,7 +81,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   bam_hdr_destroy(header);
 
   //Initiate variants
-  variant_caller vc(min_qual, ref_file, gff_path);
+  variant_caller vc(min_qual, min_depth, ref_file, gff_path);
   if(!vc.initialize_region(ref_name)) {
     std::cerr << "Unable to initialize region " << ref_name << std::endl;
     return 0;
