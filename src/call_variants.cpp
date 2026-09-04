@@ -154,7 +154,8 @@ int call_variants_from_plup(std::istream &cin, std::string out_file,
         Obs | AD    | RD       |
        */
       // adding pvalue related info
-      err = pow(10, (-1 * (it->mean_qual) / 10));
+      // mean_qual is unsigned: -1 * mean_qual wraps and makes err inf
+      err = pow(10, -1.0 * static_cast<double>(it->mean_qual) / 10.0);
       kt_fisher_exact((err * mdepth), (1 - err) * mdepth, it->depth,
                       ref_it->depth, &pval_left, &pval_right, &pval_twotailed);
       out_str << pval_left << "\t";
