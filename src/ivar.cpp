@@ -55,6 +55,7 @@ struct args_t {
   double gmm_cov_prior;          // -C
   double gmm_mean_prior;         // -M
   double gmm_min_cluster_fraction; // -F
+  double amplicon_stdev;         // -A
 } g_args;
 
 void print_usage() {
@@ -95,7 +96,12 @@ void print_contam_usage() {
          "           -C    Covariance prior (Default: 0.0)\n"
          "           -M    Mean precision prior (Default: 0.5)\n"
          "           -F    Minimum cluster fraction; clusters with fewer than\n"
-         "                 this fraction of the data are pruned (Default: 0.10)\n";
+         "                 this fraction of the data are pruned (Default: 0.10)\n\n"
+         "Amplicon Options   Description\n"
+         "           -A    Weighted standard deviation of a variant's per-amplicon\n"
+         "                 frequencies above which the position is masked to N.\n"
+         "                 Requires AMP_FREQ/AMP_DEPTH columns. Default 2.0 is\n"
+         "                 unreachable, so masking is off unless this is set.\n";
 }
 
 void print_trim_usage() {
@@ -308,7 +314,7 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
-static const char *contam_opt_str = "p:s:t:m:q:N:I:C:M:F:h?";
+static const char *contam_opt_str = "p:s:t:m:q:N:I:C:M:F:A:h?";
 
 std::string get_filename_without_extension(std::string f, std::string ext) {
   if (ext.length() > f.length())  // If extension longer than filename
@@ -362,6 +368,7 @@ int main(int argc, char *argv[]) {
     g_args.gmm_cov_prior = 0.0;
     g_args.gmm_mean_prior = 0.5;
     g_args.gmm_min_cluster_fraction = 0.10;
+    g_args.amplicon_stdev = DEFAULT_AMPLICON_STDEV;
     opt = getopt(argc, argv, contam_opt_str);
     while (opt != -1) {
       switch (opt) {
@@ -395,6 +402,9 @@ int main(int argc, char *argv[]) {
         case 'F':
           g_args.gmm_min_cluster_fraction = std::stod(optarg);
           break;
+        case 'A':
+          g_args.amplicon_stdev = std::stod(optarg);
+          break;
         case 'h':
         case '?':
           print_contam_usage();
@@ -406,7 +416,7 @@ int main(int argc, char *argv[]) {
     if (!g_args.variants.empty() && !g_args.prefix.empty()) {
       std::vector<double> solution;
       std::vector<double> means;
-      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.min_threshold, g_args.gmm_n, g_args.gmm_invariant, g_args.gmm_cov_prior, g_args.gmm_mean_prior, g_args.gmm_min_cluster_fraction);
+      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.min_threshold, g_args.gmm_n, g_args.gmm_invariant, g_args.gmm_cov_prior, g_args.gmm_mean_prior, g_args.gmm_min_cluster_fraction, g_args.amplicon_stdev);
       cluster_consensus(variants, g_args.prefix, g_args.min_threshold, g_args.min_depth, g_args.min_qual, solution, means);
     }
     res = 0;

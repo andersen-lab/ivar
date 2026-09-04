@@ -62,6 +62,11 @@ void consensus_sequence::get_consensus(uint32_t n){
     if(position_ambiguous[i]){
       continue; //multiple explanations for this peak - leave as N
     }
+    //frequency fluctuates across amplicons - leave as N
+    if(std::any_of(variant_records[i].begin(), variant_records[i].end(),
+                   [](const variant &v){ return v.position_masked && !v.half_normal_upper; })){
+      continue;
+    }
     if(variant_records[i].size() == 0){
       continue;
     }

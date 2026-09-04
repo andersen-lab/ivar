@@ -11,8 +11,10 @@
 #include <unordered_map>
 #include <unordered_set>
 
-//weighted stdev of a variant's per-amplicon frequencies above which the position is masked
-static const double AMPLICON_STDEV = 0.05;
+//weighted stdev of a variant's per-amplicon frequencies above which the position is
+//masked. Defaults to 2.0, which is unreachable for frequencies bounded in [0,1], so
+//amplicon masking is off unless a threshold is passed
+const double DEFAULT_AMPLICON_STDEV = 2.0;
 
 static double weighted_standard_deviation(const std::vector<double> &values, const std::vector<uint32_t> &weights){
   double weighted_sum = 0.0, total_weight = 0.0;
@@ -58,13 +60,13 @@ void propagate_amplicon_masking(std::vector<variant> &variants){
   }
 }
 
-void flag_amplicon_variation(std::vector<variant> &variants){
+void flag_amplicon_variation(std::vector<variant> &variants, double amplicon_stdev){
   for(auto &var : variants){
     if(var.freq_numbers.size() < 2 || var.freq_numbers.size() != var.amplicon_depths.size()){
       var.position_masked = false;
       continue;
     }
-    var.position_masked = weighted_standard_deviation(var.freq_numbers, var.amplicon_depths) > AMPLICON_STDEV;
+    var.position_masked = weighted_standard_deviation(var.freq_numbers, var.amplicon_depths) > amplicon_stdev;
   }
   propagate_amplicon_masking(variants);
 }
@@ -422,11 +424,11 @@ void write_single_cluster_output(std::string output_prefix){
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, \
                               double default_threshold, \
-                              uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior, double min_cluster_fraction){
+                              uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior, double min_cluster_fraction, double amplicon_stdev){
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
-  flag_amplicon_variation(base_variants);
+  flag_amplicon_variation(base_variants, amplicon_stdev);
   set_deletion_flags(base_variants, 0.001, 1.0 - invariant_threshold);
 
   std::vector<variant> model_variants;
