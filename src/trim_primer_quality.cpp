@@ -656,7 +656,6 @@ int trim_bam_qual_primer(std::string bam, std::string bed, std::string bam_out,
             cand_primer =
                 get_min_start(overlapping_primers);  // fetch reverse primer (?)
             print_primer_info(cand_primer);
-            exit(1);
             t = primer_trim(aln, isize_flag, cand_primer.get_start() - 1,
                             false);
 
