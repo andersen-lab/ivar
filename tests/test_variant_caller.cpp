@@ -10,8 +10,9 @@ void print_cigar(uint32_t *cigar, int nlength) {
 
 int main(){
   uint8_t min_qual = 20;
+  uint32_t min_depth = 0;
   std::string ref_path="../../data/db/test_ref.fa";
-  variant_caller vc(min_qual, ref_path, "");
+  variant_caller vc(min_qual, min_depth, ref_path, "");
   vc.initialize_region("test");
   samFile *bam = sam_open("../../data/test.unmapped.sorted.bam", "r");
   sam_hdr_t *header = sam_hdr_read(bam);
@@ -29,7 +30,9 @@ int main(){
   expected_read_site_states[0].push_back(ss);
 
   // Read name: test_20_381_1:0:0_6:0:0_1_150
-  ss.set_nucleotide("+G", 63, 30);
+  // Insertions carry min_qual, not the mean of the inserted bases, matching
+  // update_allele_depth() in the pileup caller. Was 63 (the computed mean).
+  ss.set_nucleotide("+G", min_qual, 30);
   expected_read_site_states[1].push_back(ss);
   ss.set_nucleotide("T", 49, 42);
   expected_read_site_states[1].push_back(ss);
@@ -37,7 +40,7 @@ int main(){
   // Read name: test_20_381_1_softclip:0:0_6:0:0_1_150
   ss.set_nucleotide("C", 20, 20);
   expected_read_site_states[2].push_back(ss);
-  ss.set_nucleotide("+A", 63, 25);
+  ss.set_nucleotide("+A", min_qual, 25);  // see note above: insertions carry min_qual
   expected_read_site_states[2].push_back(ss);
   ss.set_nucleotide("-CT", 20, 23);
   expected_read_site_states[2].push_back(ss);

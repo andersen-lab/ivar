@@ -7,6 +7,11 @@
 
 void amplicon_specific_cluster_assignment(std::vector<variant> &variants, const gmm_1d &model, const std::vector<int> &component_indices);
 
+// Pinned explicitly rather than relying on DEFAULT_AMPLICON_STDEV: that default
+// is 2.0 (masking off), so these cases only exercise anything with a real
+// threshold passed in.
+static const double TEST_STDEV = 0.05;
+
 variant make_variant(uint32_t position, const std::vector<std::string> &ids,
                      const std::vector<double> &freqs, const std::vector<uint32_t> &depths) {
   variant v;
@@ -30,7 +35,7 @@ bool test_stdev_flagging() {
     make_variant(20, {"1-500", "300-800"}, {0.50, 0.10}, {100, 100}),
     make_variant(30, {"1-500"}, {}, {}),
   };
-  flag_amplicon_variation(variants);
+  flag_amplicon_variation(variants, TEST_STDEV);
 
   bool ok = true;
   ok &= expect(!variants[0].position_masked, "tight frequencies should not be masked");
@@ -44,8 +49,8 @@ bool test_stdev_flagging() {
 bool test_depth_weighting() {
   std::vector<variant> even = { make_variant(10, {"1-500", "300-800"}, {0.50, 0.62}, {100, 100}) };
   std::vector<variant> lopsided = { make_variant(10, {"1-500", "300-800"}, {0.50, 0.62}, {1000, 10}) };
-  flag_amplicon_variation(even);
-  flag_amplicon_variation(lopsided);
+  flag_amplicon_variation(even, TEST_STDEV);
+  flag_amplicon_variation(lopsided, TEST_STDEV);
 
   bool ok = true;
   ok &= expect(even[0].position_masked, "evenly weighted split should be masked");
@@ -61,8 +66,8 @@ bool test_masking_is_order_independent() {
 
   std::vector<variant> forward = {low, high};
   std::vector<variant> reverse = {high, low};
-  flag_amplicon_variation(forward);
-  flag_amplicon_variation(reverse);
+  flag_amplicon_variation(forward, TEST_STDEV);
+  flag_amplicon_variation(reverse, TEST_STDEV);
 
   bool ok = true;
   ok &= expect(forward[0].amplicon_masked, "flux at a later position must mask an earlier one");
@@ -75,13 +80,13 @@ bool test_masking_is_order_independent() {
 // amplicon_masked reports flux found elsewhere, so a variant's own flux must not set it
 bool test_self_flux_does_not_mask() {
   std::vector<variant> alone = { make_variant(400, {"1-500", "300-800"}, {0.50, 0.10}, {100, 100}) };
-  flag_amplicon_variation(alone);
+  flag_amplicon_variation(alone, TEST_STDEV);
 
   std::vector<variant> pair = {
     make_variant(400, {"1-500", "300-800"}, {0.50, 0.10}, {100, 100}),
     make_variant(450, {"1-500"}, {0.50, 0.10}, {100, 100}),
   };
-  flag_amplicon_variation(pair);
+  flag_amplicon_variation(pair, TEST_STDEV);
 
   bool ok = true;
   ok &= expect(alone[0].position_masked, "the lone variant should still be position masked");
@@ -144,7 +149,7 @@ bool test_assignments_use_effective_components() {
   gmm_1d model = fit_bimodal_model(component_indices);
 
   std::vector<variant> variants = { make_variant(10, {"1-500", "300-800"}, {0.20, 0.35}, {100, 100}) };
-  flag_amplicon_variation(variants);
+  flag_amplicon_variation(variants, TEST_STDEV);
   if(!expect(variants[0].position_masked, "fixture should be flagged by stdev first")) return false;
 
   amplicon_specific_cluster_assignment(variants, model, component_indices);
