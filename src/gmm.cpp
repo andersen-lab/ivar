@@ -416,8 +416,8 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound, doub
 
 void write_single_cluster_output(std::string output_prefix){
   std::ofstream out(output_prefix + "_gmm_1d_results.txt");
-  out << "Components\tDistinct_Components\tMeans\tVariances\tWeights\tEffective_Means\tEffective_Variances\tEffective_Weights\tSolution_Sets\n";
-  out << "1\t1\t[]\t[]\t[]\t[0,1]\t[0,0]\t[0,0]\t[[1]]\n";
+  out << "Components\tDistinct_Components\tMeans\tVariances\tWeights\tEffective_Means\tEffective_Variances\tEffective_Weights\tSolution_Sets\tAmbiguous_Populations\tAmbiguous_Positions\n";
+  out << "1\t1\t[]\t[]\t[]\t[0,1]\t[0,0]\t[0,0]\t[[1]]\t[]\t[]\n";
   out.close();
 }
 
@@ -544,6 +544,59 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   eff_means = solver.refined_means();
   std::vector<std::vector<double>> solution_sets = solver.get_solution_sets();
 
+  //positions left as N by a peak with >1 decomposition into the solution,
+  //indexed by position in the solution
+  std::vector<std::vector<uint32_t>> ambiguous_positions;
+
+  if(solved){
+    if(solution_sets.size() > 1){
+      variant_assigner(std::vector<double>(1, 1.0), std::vector<double>(1, 1.0), 2.0).assign(base_variants);
+      call_majority_consensus(base_variants, output_prefix, default_threshold);
+      base_variants.clear();
+    } else{
+      variant_assigner::overwrite_cluster_assigned(base_variants, eff_means, model_means);
+      //recalculate probabilities based on the new cluster assignments and only the effective means
+      for(auto &v : base_variants){
+        if(v.half_normal_upper || v.half_normal_lower || v.probabilities.empty()) continue;
+        std::vector<double> eff_proba;
+        double sum = 0.0;
+        for(int ci : component_indices){
+          eff_proba.push_back(v.probabilities[ci]);
+          sum += v.probabilities[ci];
+        }
+        if(sum > 0.0)
+          for(auto &p : eff_proba) p /= sum;
+        v.probabilities = eff_proba;
+      }
+      variant_assigner(solution_sets[0], eff_means, 2.0).assign(base_variants);
+
+      //collect the ambiguous positions per genome. deletions span several
+      //positions in the consensus but only the start is recorded here.
+      ambiguous_positions.assign(solution_sets[0].size(), {});
+      for(const auto &v : base_variants){
+        for(auto p : v.ambiguous_numbers){
+          if(p < ambiguous_positions.size())
+            ambiguous_positions[p].push_back(v.position);
+        }
+      }
+      for(auto &positions : ambiguous_positions){
+        std::sort(positions.begin(), positions.end());
+        positions.erase(std::unique(positions.begin(), positions.end()), positions.end());
+      }
+
+      //predict clusters for amplicon specific frequencies
+      amplicon_specific_cluster_assignment(base_variants, model, component_indices);
+      //write the amplicon flags based on cluster agreement
+      rewrite_position_masking(base_variants);
+
+      solution = solution_sets[0];
+    }
+  } else {
+    variant_assigner(std::vector<double>(1, 1.0), std::vector<double>(1, 1.0), 2.0).assign(base_variants);
+    call_majority_consensus(base_variants, output_prefix, default_threshold);
+    base_variants.clear();
+  }  
+
   //output the clustering information
   std::ofstream out(output_prefix + "_gmm_1d_results.txt");
   if (!out.is_open()) {
@@ -552,7 +605,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   if (!out) {
     std::cerr << "Stream bad immediately after open: " << output_prefix << std::endl;
   }
-  out << "Components\tDistinct_Components\tMeans\tVariances\tWeights\tEffective_Means\tEffective_Variances\tEffective_Weights\tSolution_Sets\n";
+  out << "Components\tDistinct_Components\tMeans\tVariances\tWeights\tEffective_Means\tEffective_Variances\tEffective_Weights\tSolution_Sets\tAmbiguous_Populations\tAmbiguous_Positions\n";
   out << std::to_string(n) << "\t";
   out << component_indices.size() << "\t";
   out << "[";
@@ -612,42 +665,35 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     out << "]";
   }
   out << "]";
-  out << "\n";
+  out << "\t";
 
-  if(solved){
-    if(solution_sets.size() > 1){
-      variant_assigner(std::vector<double>(1, 1.0), std::vector<double>(1, 1.0), 2.0).assign(base_variants);
-      call_majority_consensus(base_variants, output_prefix, default_threshold);
-      base_variants.clear();
-    } else{
-      variant_assigner::overwrite_cluster_assigned(base_variants, eff_means, model_means);
-      //recalculate probabilities based on the new cluster assignments and only the effective means
-      for(auto &v : base_variants){
-        if(v.half_normal_upper || v.half_normal_lower || v.probabilities.empty()) continue;
-        std::vector<double> eff_proba;
-        double sum = 0.0;
-        for(int ci : component_indices){
-          eff_proba.push_back(v.probabilities[ci]);
-          sum += v.probabilities[ci];
-        }
-        if(sum > 0.0)
-          for(auto &p : eff_proba) p /= sum;
-        v.probabilities = eff_proba;
-      }
-      variant_assigner(solution_sets[0], eff_means, 2.0).assign(base_variants);
-
-      //predict clusters for amplicon specific frequencies
-      amplicon_specific_cluster_assignment(base_variants, model, component_indices);
-      //write the amplicon flags based on cluster agreement
-      rewrite_position_masking(base_variants);
-
-      solution = solution_sets[0];
+  //abundances of the genomes with at least one ambiguous position, and the
+  //positions themselves. the two lists are parallel to each other.
+  out << "[";
+  bool first = true;
+  for(uint32_t t=0; t < ambiguous_positions.size(); t++){
+    if(ambiguous_positions[t].empty()) continue;
+    if(!first) out << ",";
+    out << std::to_string(solution_sets[0][t]);
+    first = false;
+  }
+  out << "]";
+  out << "\t";
+  out << "[";
+  first = true;
+  for(uint32_t t=0; t < ambiguous_positions.size(); t++){
+    if(ambiguous_positions[t].empty()) continue;
+    if(!first) out << ",";
+    out << "[";
+    for(uint32_t s=0; s < ambiguous_positions[t].size(); s++){
+      if(s != 0) out << ",";
+      out << ambiguous_positions[t][s];
     }
-  } else {
-    variant_assigner(std::vector<double>(1, 1.0), std::vector<double>(1, 1.0), 2.0).assign(base_variants);
-    call_majority_consensus(base_variants, output_prefix, default_threshold);
-    base_variants.clear();
-  }  
+    out << "]";
+    first = false;
+  }
+  out << "]";
+  out << "\n";
 
   means = eff_means;
   return(base_variants);
