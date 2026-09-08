@@ -452,6 +452,15 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     base_variants.clear();
     return(base_variants);
   }
+  //kmeans seeds one gaussian per frequency; the two half normals are not seeded
+  //that way, so -N cannot exceed the frequency count plus those two
+  uint32_t max_components = model_freqs.size() + 2;
+  if(n > max_components){
+    std::cerr << "Requested " << n << " components but only " << model_freqs.size()
+              << " frequencies available, using " << max_components << "\n";
+    n = max_components;
+  }
+
   gmm_1d model(n, 42);  // seed matches bootstrap replicate
   model.set_use_half_normal_for_noise(true, invariant_threshold);
 
