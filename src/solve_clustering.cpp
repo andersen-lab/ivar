@@ -268,7 +268,9 @@ void variant_assigner::overwrite_cluster_assigned(std::vector<variant> &variants
     uint32_t cluster_assigned = variants[i].cluster_assigned;
     double mean = means[cluster_assigned];
     // Use nearest-match instead of exact equality to handle floating-point
-    // precision differences between model_means and eff_means.
+    // precision differences between model_means and eff_means. Labels are now
+    // restricted to the effective set, so every mean resolves at distance 0 except
+    // one refined by the boundary rescue, which matches no model mean at all.
     uint32_t best_index = 0;
     double best_dist = std::abs(eff_means[0] - mean);
     for(uint32_t j = 1; j < eff_means.size(); j++){

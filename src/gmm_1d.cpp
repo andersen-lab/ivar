@@ -561,6 +561,50 @@ bool gmm_1d::fit(const std::vector<double>& x) {
   return true;
 }
 
+std::vector<int> gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& allowed_component_ids, bool include_half_normals) const {
+  std::vector<bool> allowed(this->n_components, false);
+  for (int k : allowed_component_ids)
+    if (k >= 0 && k < this->n_components) allowed[k] = true;
+
+  //the two half normals both point inward from their pinned means, so they overlap across the
+  //whole signal range. only offer the nearer one, otherwise the noise component pinned near zero
+  //can capture a high frequency point
+  int half_normal_left = -1, half_normal_right = -1;
+  if (include_half_normals && use_half_normal_for_noise_) {
+    for (int k = 0; k < this->n_components; k++) {
+      if (!is_half_normal_component(k)) continue;
+      if (component_types_[k] == ComponentType::HALF_NORMAL_LEFT) half_normal_left = k;
+      else half_normal_right = k;
+    }
+  }
+
+  Matrix w = estimate_weighted_log_prob(x);
+  int n_data_points = x.size();
+  std::vector<int> labels(n_data_points, 0);
+  for (int i = 0; i < n_data_points; i++) {
+    int nearer_half_normal = -1;
+    if (half_normal_left >= 0 && half_normal_right >= 0) {
+      double d_left = std::abs(x[i] - fixed_mean_for_component(half_normal_left));
+      double d_right = std::abs(x[i] - fixed_mean_for_component(half_normal_right));
+      nearer_half_normal = (d_left <= d_right) ? half_normal_left : half_normal_right;
+    }
+
+    int best = -1;
+    for (int k = 0; k < this->n_components; k++) {
+      if (!allowed[k] && k != nearer_half_normal) continue;
+      //best < 0 first so an all -inf row still yields the first candidate
+      if (best < 0 || w[i][k] > w[i][best]) best = k;
+    }
+    if (best < 0) {
+      best = 0;
+      for (int k = 1; k < this->n_components; k++)
+        if (w[i][k] > w[i][best]) best = k;
+    }
+    labels[i] = best;
+  }
+  return labels;
+}
+
 std::vector<int> gmm_1d::predict(const std::vector<double>& x) const {
   Matrix w = estimate_weighted_log_prob(x);
   int n_data_points = x.size();

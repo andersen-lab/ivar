@@ -509,11 +509,11 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     }
     std::cerr << "\n";
 
-  //predict on all the frequencies - disable min_cluster_fraction here because all_freqs
-  //includes tens of thousands of reference alleles, making the 10% threshold nonsensical
-  //for the small signal clusters
-  model.set_min_cluster_fraction(0.0);
-  std::vector<int> all_labels = model.predict(all_freqs);
+  //predict on all the frequencies, restricted to the components the first pass kept plus the
+  //half normals. an unrestricted argmax can land a variant on a discarded component, leaving it
+  //with no consensus genome. min_cluster_fraction is not re-applied here because all_freqs is
+  //mostly reference alleles, so a point count threshold over it is meaningless
+  std::vector<int> all_labels = model.predict(all_freqs, component_indices);
   
   //gets the posterior probability per variant
   std::vector<std::vector<double>> proba = model.predict_proba(all_freqs);
@@ -529,7 +529,6 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     if(!base_variants[i].half_normal_upper && !base_variants[i].half_normal_lower) {
       base_variants[i].probabilities = proba[i];
     }
-
     if(base_variants[i].gapped_freq > invariant_threshold){
       base_variants[i].half_normal_upper = true;
       base_variants[i].half_normal_lower = false;
@@ -564,6 +563,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       base_variants.clear();
     } else{
       variant_assigner::overwrite_cluster_assigned(base_variants, eff_means, model_means);
+      
       //recalculate probabilities based on the new cluster assignments and only the effective means
       for(auto &v : base_variants){
         if(v.half_normal_upper || v.half_normal_lower || v.probabilities.empty()) continue;
@@ -573,8 +573,13 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
           eff_proba.push_back(v.probabilities[ci]);
           sum += v.probabilities[ci];
         }
-        if(sum > 0.0)
+        if(sum > 0.0){
           for(auto &p : eff_proba) p /= sum;
+        } else {
+          //an all zero row is non empty, so assign() would take neither the probability path
+          //nor the cluster_assigned fallback and the variant would reach no genome
+          eff_proba.clear();
+        }
         v.probabilities = eff_proba;
       }
       variant_assigner(solution_sets[0], eff_means, 2.0).assign(base_variants);
