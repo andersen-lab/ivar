@@ -140,7 +140,7 @@ void print_saga_usage() {
   std::cout
       << "Usage: ivar variants -i <input.bam> -p <prefix> [-b <primers.bed>] "
          "[-f <primer_pairs.tsv>] [-x <primer-offset>] [-m <minimum depth>] "
-         "[-q <min-quality>] [-r <reference-fasta>]\n\n"
+         "[-q <min-quality>] [-r <reference-fasta>] [-g GFF file]\n\n"
          "Input Options    Description\n"
          "           -i    BAM file, with aligned reads, to call variants "
          "read by read. If not specified will use standard in\n"
@@ -158,7 +158,12 @@ void print_saga_usage() {
          "           -q    Minimum quality score threshold to count base "
          "(Default: 20). Insertions, deletions and gaps carry no base quality "
          "and are always counted.\n"
-         "           -r    Reference file used for alignment.\n\n"
+         "           -r    Reference file used for alignment.\n"
+         "           -g    A GFF file in the GFF3 format can be supplied to "
+         "specify coordinates of open reading frames (ORFs). In absence of GFF "
+         "file, amino acid translation will not be done. Where a position falls "
+         "in more than one CDS, the amino acid columns hold one comma separated "
+         "entry per feature.\n\n"
          "Output Options   Description\n"
          "           -p    Prefix for the output files\n";
 }
@@ -308,6 +313,7 @@ void print_version_info() {
 }
 
 static const char *trim_opt_str = "i:b:f:x:p:m:q:s:r:ekh?";
+static const char *saga_opt_str = "i:b:f:x:p:m:q:r:g:h?";
 static const char *variants_opt_str = "p:t:q:m:r:g:Gh?";
 static const char *consensus_opt_str = "i:p:q:t:c:m:n:kh?";
 static const char *removereads_opt_str = "i:p:t:b:h?";
@@ -431,7 +437,8 @@ int main(int argc, char *argv[]) {
     g_args.min_depth = 10;
     g_args.min_qual = 20;
     g_args.ref = "";
-    opt = getopt(argc, argv, trim_opt_str);
+    g_args.gff = "";
+    opt = getopt(argc, argv, saga_opt_str);
     while (opt != -1) {
       switch (opt) {
         case 'i':
@@ -458,13 +465,16 @@ int main(int argc, char *argv[]) {
         case 'r':
           g_args.ref = optarg;
           break;
+        case 'g':
+          g_args.gff = optarg;
+          break;
         case 'h':
         case '?':
           print_saga_usage();
           return -1;
           break;
       }
-      opt = getopt(argc, argv, trim_opt_str);
+      opt = getopt(argc, argv, saga_opt_str);
     }
     if (g_args.bam.empty() && isatty(STDIN_FILENO)) {
       std::cout << "Please supply a BAM file using -i or supply the input file "
@@ -474,10 +484,21 @@ int main(int argc, char *argv[]) {
       print_saga_usage();
       return -1;
     }
+    if (g_args.gff.empty())
+      std::cout << "A GFF file containing the open reading frames (ORFs) has "
+                   "not been provided. Amino acid translation will not be done."
+                << std::endl;
+    if (!g_args.gff.empty() && g_args.ref.empty()) {
+      std::cout << "Please specify reference (using -r) based on which the GFF "
+                   "file was computed."
+                << std::endl;
+      print_saga_usage();
+      return -1;
+    }
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
     res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
                                cl_cmd.str(),
-                               g_args.primer_pair_file, g_args.primer_offset, g_args.min_depth, g_args.min_qual, g_args.ref);
+                               g_args.primer_pair_file, g_args.primer_offset, g_args.min_depth, g_args.min_qual, g_args.ref, g_args.gff);
     }
 
   // ivar trim

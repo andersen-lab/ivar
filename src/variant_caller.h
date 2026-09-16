@@ -26,6 +26,7 @@ class variant_caller {
   static const std::string DELIMITER;
 
   void get_read_amplicons(uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes);
+  void write_codon_columns(std::ofstream &file, const std::vector<codon_annotation> &anns);
 
  public:
   variant_caller(uint8_t min_qual, uint32_t min_depth, std::string ref_path, std::string gff_path = "");

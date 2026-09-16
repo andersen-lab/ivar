@@ -13,6 +13,15 @@
 const char UNKNOWN_BASE = 'N';
 extern const unsigned char comp_base[256];
 
+struct codon_annotation {
+  std::string feature;  // "gene:ID", or "ID" when there is no gene attribute
+  std::string ref_codon;
+  std::string alt_codon;
+  char ref_aa;
+  char alt_aa;
+  int64_t aa_pos;
+};
+
 class ref_antd {
  public:
   ref_antd(std::string ref_path);
@@ -28,6 +37,11 @@ class ref_antd {
 
   int codon_aa_stream(std::string region, std::ostringstream &line_stream,
                       std::ofstream &fout, int64_t pos, char alt);
+  bool has_annotations();
+  std::vector<gff3_feature> query_cds(int64_t pos);
+  std::vector<codon_annotation> annotate_codon(
+      std::string region, int64_t pos, char alt,
+      std::vector<gff3_feature> &features);
   char *get_codon(int64_t pos, std::string region, gff3_feature feature);
   char *get_codon(int64_t pos, std::string region, gff3_feature feature,
                   char alt);

@@ -8,20 +8,17 @@
 #include "variant_caller.h"
 
 //first main function call
-int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std::string cmd, std::string pair_info, int32_t primer_offset, uint32_t min_depth, uint8_t min_qual, std::string ref_file){
+int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std::string cmd, std::string pair_info, int32_t primer_offset, uint32_t min_depth, uint8_t min_qual, std::string ref_file, std::string gff_path){
   if(ref_file.empty()){
     std::cerr << "Please provide reference." << std::endl;
     exit(1);
   }
-  //load the reference
-  ref_antd refantd(ref_file, "");
 
   int retval = 0;
   std::vector<primer> primers;
   if (!bed.empty()) {
     primers = populate_from_file(bed, primer_offset);
   }
-  std::string gff_path = "";
   IntervalTree amplicons;
   if (!pair_info.empty() && !primers.empty()) {
     amplicons = populate_amplicons(pair_info, primers);

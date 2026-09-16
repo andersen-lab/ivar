@@ -161,10 +161,33 @@ void variant_caller::assign_amplicon_to_read(uint32_t lower, uint32_t upper, std
   }
 }
 
+void variant_caller::write_codon_columns(std::ofstream &file, const std::vector<codon_annotation> &anns) {
+  // A position can fall in more than one CDS, so each column holds one comma
+  // separated entry per feature. Row count stays one per allele.
+  if(anns.empty()){
+    for(int i = 0; i < 6; i++)
+      file << "NA" << DELIMITER;
+    return;
+  }
+  for(size_t i = 0; i < anns.size(); i++){ if(i) file << ","; file << anns[i].feature; }
+  file << DELIMITER;
+  for(size_t i = 0; i < anns.size(); i++){ if(i) file << ","; file << anns[i].ref_codon; }
+  file << DELIMITER;
+  for(size_t i = 0; i < anns.size(); i++){ if(i) file << ","; file << anns[i].ref_aa; }
+  file << DELIMITER;
+  for(size_t i = 0; i < anns.size(); i++){ if(i) file << ","; file << anns[i].alt_codon; }
+  file << DELIMITER;
+  for(size_t i = 0; i < anns.size(); i++){ if(i) file << ","; file << anns[i].alt_aa; }
+  file << DELIMITER;
+  for(size_t i = 0; i < anns.size(); i++){ if(i) file << ","; file << anns[i].aa_pos; }
+  file << DELIMITER;
+}
+
 void variant_caller::write_to_file(std::string output_path, std::string ref_name) {
   ofstream file;
   file.open(output_path + ".txt", ios::trunc);
   file << FILE_HEADER;
+  const bool annotate = refantd.has_annotations();
   std::unordered_map<ITNode*, uint32_t> amp_depths;
   std::vector<site_aggregator_stats> aggregated_site_states = sa.get_data();
   // Start iterating from position 1
@@ -213,6 +236,12 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
     std::unordered_map<ITNode*, uint32_t> amp_depths_del;
     sa.calculate_amplicon_depths(coord_del, amp_depths_del);
 
+    // Queried once per position rather than once per allele, query_cds scans
+    // every feature and returns them by value
+    std::vector<gff3_feature> cds_features;
+    if(annotate)
+      cds_features = refantd.query_cds(coord.position);
+
     for(auto const &state_stats: site_stats.get_site_state_stats()) {
       //TODO: Implement minimum depth and minimum frequency filter
       const std::string &state = state_stats.get_state();
@@ -237,12 +266,20 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
       file << total_depth << DELIMITER; // TOTAL_DP
       file << DELIMITER; // PVAL
       file << DELIMITER; // PASS
-      file << DELIMITER; // GFF_FEATURE
-      file << DELIMITER; //ref codon
-      file << DELIMITER; //ref aa
-      file << DELIMITER; //alt codon
-      file << DELIMITER; //alt aa
-      file << DELIMITER; //pos aa
+      // GFF_FEATURE, REF_CODON, REF_AA, ALT_CODON, ALT_AA, POS_AA
+      if(!annotate){
+        for(int i = 0; i < 6; i++)
+          file << DELIMITER;
+      } else if(site_state::is_deletion(state) || site_state::is_insertion(state)){
+        // Indels need frameshift aware translation, matching
+        // call_variants_from_plup(). If ever implemented, deletions are
+        // reported against coord.position - 1
+        for(int i = 0; i < 6; i++)
+          file << "NA" << DELIMITER;
+      } else {
+        std::vector<codon_annotation> anns = refantd.annotate_codon(ref_name, coord.position, state[0], cds_features);
+        write_codon_columns(file, anns);
+      }
       if(site_state::is_deletion(state)){
         file << state_stats.get_depth() / static_cast<double>(total_gapped_depth_del) << DELIMITER; // GAPPED_FREQ
         file << total_gapped_depth_del << DELIMITER; // GAPPED_DEPTH
