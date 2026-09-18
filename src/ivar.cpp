@@ -53,6 +53,7 @@ struct args_t {
   uint32_t gmm_n;                // -N
   double gmm_invariant;          // -I
   double gmm_cov_prior;          // -C
+  double gmm_half_normal_cov_prior; // -H
   double gmm_mean_prior;         // -M
   double gmm_min_cluster_fraction; // -F
   double amplicon_stdev;         // -A
@@ -94,6 +95,8 @@ void print_contam_usage() {
          "           -I    Invariant frequency threshold; variants above this\n"
          "                 value are modeled with a half-normal (Default: 0.97)\n"
          "           -C    Covariance prior (Default: 0.0)\n"
+         "           -H    Half-normal covariance prior; applies to the\n"
+         "                 half-normal noise components (Default: 0.0)\n"
          "           -M    Mean precision prior (Default: 0.5)\n"
          "           -F    Minimum cluster fraction; clusters with fewer than\n"
          "                 this fraction of the data are pruned (Default: 0.10)\n\n"
@@ -320,7 +323,7 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
-static const char *contam_opt_str = "p:s:t:m:q:N:I:C:M:F:A:h?";
+static const char *contam_opt_str = "p:s:t:m:q:N:I:C:H:M:F:A:h?";
 
 std::string get_filename_without_extension(std::string f, std::string ext) {
   if (ext.length() > f.length())  // If extension longer than filename
@@ -372,6 +375,7 @@ int main(int argc, char *argv[]) {
     g_args.gmm_invariant = 0.97;
     //default to spike-in priors
     g_args.gmm_cov_prior = 0.0;
+    g_args.gmm_half_normal_cov_prior = 0.0;
     g_args.gmm_mean_prior = 0.5;
     g_args.gmm_min_cluster_fraction = 0.10;
     g_args.amplicon_stdev = DEFAULT_AMPLICON_STDEV;
@@ -402,6 +406,9 @@ int main(int argc, char *argv[]) {
         case 'C':
           g_args.gmm_cov_prior = std::stod(optarg);
           break;
+        case 'H':
+          g_args.gmm_half_normal_cov_prior = std::stod(optarg);
+          break;
         case 'M':
           g_args.gmm_mean_prior = std::stod(optarg);
           break;
@@ -422,7 +429,7 @@ int main(int argc, char *argv[]) {
     if (!g_args.variants.empty() && !g_args.prefix.empty()) {
       std::vector<double> solution;
       std::vector<double> means;
-      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.min_threshold, g_args.gmm_n, g_args.gmm_invariant, g_args.gmm_cov_prior, g_args.gmm_mean_prior, g_args.gmm_min_cluster_fraction, g_args.amplicon_stdev);
+      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.min_threshold, g_args.gmm_n, g_args.gmm_invariant, g_args.gmm_cov_prior, g_args.gmm_mean_prior, g_args.gmm_half_normal_cov_prior, g_args.gmm_min_cluster_fraction, g_args.amplicon_stdev);
       cluster_consensus(variants, g_args.prefix, g_args.min_threshold, g_args.min_depth, g_args.min_qual, solution, means);
     }
     res = 0;

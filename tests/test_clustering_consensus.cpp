@@ -49,7 +49,7 @@ int main() {
 
   std::vector<double> solution;
   std::vector<double> means;
-  std::vector<variant> variants = gmm_model(var_filename, prefix, min_depth, min_qual, solution, means, default_threshold, n, invariant_threshold, 1e-3, 1e-2, 0.05);
+  std::vector<variant> variants = gmm_model(var_filename, prefix, min_depth, min_qual, solution, means, default_threshold, n, invariant_threshold, 1e-3, 1e-2, 0.0, 0.05);
 
   // TEST 2 - verify the dominant deletion -GGA at POS=486 (stored as position=487)
   // is not excluded as an overlapped deletion and is assigned to at least one

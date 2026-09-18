@@ -162,6 +162,8 @@ GMM Prior Options  Description
            -I    Invariant frequency threshold; variants above this
                  value are modeled with a half-normal (Default: 0.97)
            -C    Covariance prior (Default: 0.0)
+           -H    Half-normal covariance prior; applies to the
+                 half-normal noise components (Default: 0.0)
            -M    Mean precision prior (Default: 0.5)
            -F    Minimum cluster fraction; clusters with fewer than
                  this fraction of the data are pruned (Default: 0.10)

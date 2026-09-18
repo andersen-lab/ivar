@@ -424,7 +424,7 @@ void write_single_cluster_output(std::string output_prefix){
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, \
                               double default_threshold, \
-                              uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior, double min_cluster_fraction, double amplicon_stdev){
+                              uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior, double half_normal_covariance_prior, double min_cluster_fraction, double amplicon_stdev){
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
@@ -465,6 +465,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   model.set_use_half_normal_for_noise(true, invariant_threshold);
 
   model.set_covariance_prior(covariance_prior);
+  model.set_half_normal_covariance_prior(half_normal_covariance_prior);
   model.set_mean_precision_prior(mean_precision_prior);
 
   model.fit(model_freqs);
