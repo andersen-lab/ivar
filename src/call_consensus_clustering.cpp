@@ -20,7 +20,19 @@ void call_majority_consensus(std::vector<variant> variants, std::string clusteri
   }
   consensus_sequence cs(max_position); 
   std::vector<consensus_sequence> all_consensus_seqs = {cs};
-  assign_variants_position(variants, all_consensus_seqs);
+  //a majority consensus votes over every record, so don't filter on consensus_numbers
+  //the way assign_variants_position does
+  for(uint32_t i=0; i < variants.size(); i++){
+    uint32_t span = 1;
+    if(variants[i].nuc.find('-') != std::string::npos){
+      std::string nuc = variants[i].nuc;
+      nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
+      span = (uint32_t)nuc.size();
+    }
+    for(uint32_t z=0; z < span && variants[i].position + z <= max_position; z++){
+      all_consensus_seqs[0].add_variant(variants[i].position + z, variants[i]);
+    }
+  }
   all_consensus_seqs[0].set_seq_name(clustering_file + "_" + std::to_string(default_threshold) + "_threshold");
   all_consensus_seqs[0].process_variant_assignments();
   all_consensus_seqs[0].get_majority_consensus(default_threshold);
@@ -146,6 +158,7 @@ void consensus_sequence::get_majority_consensus(double threshold){
     std::vector<std::string> nucs;
     std::vector<double> freqs;
     std::string insertion;
+    double insertion_freq = -1.0;
 
     for(uint32_t j=0; j < variant_records[i].size(); j++){
       if(variant_records[i][j].qual_flag || variant_records[i][j].depth_flag){
@@ -154,12 +167,29 @@ void consensus_sequence::get_majority_consensus(double threshold){
 
       bool has_insertion = variant_records[i][j].nuc.find('+') != std::string::npos;
       if(has_insertion){
-        insertion = variant_records[i][j].nuc;
-        insertion.erase(std::remove(insertion.begin(), insertion.end(), '+'), insertion.end());
+        const variant &v = variant_records[i][j];
+        //insertion frequency is not part of the substitution sum, so test it
+        //against the threshold on its own rather than adding it to freqs[]
+        if(v.gapped_freq >= threshold){
+          std::string candidate = v.nuc;
+          candidate.erase(std::remove(candidate.begin(), candidate.end(), '+'), candidate.end());
+          //several insertion alleles can coexist here; keep the best supported
+          //rather than the last one read, ties broken on length then lexically
+          if(v.gapped_freq > insertion_freq ||
+             (v.gapped_freq == insertion_freq &&
+              (candidate.size() > insertion.size() ||
+               (candidate.size() == insertion.size() && candidate < insertion)))){
+            insertion = candidate;
+            insertion_freq = v.gapped_freq;
+          }
+        }
         continue;
       }
 
-      if(variant_records[i][j].assigned_deletion){
+      //read the deletion off the record itself, not the assigned_deletion stamp -
+      //process_variant_assignments stamps every allele across a deletion's span, which
+      //would let a sub-threshold deletion erase the real bases there
+      if(variant_records[i][j].nuc.find('-') != std::string::npos){
         nucs.push_back("-");
       } else {
         nucs.push_back(variant_records[i][j].nuc);
