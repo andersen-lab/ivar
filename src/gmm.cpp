@@ -478,6 +478,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   std::cerr << "\n";
 
+  std::cerr << "All weights: ";
+  for(auto x: model.get_weights()){
+    std::cerr << x << " ";
+  }
+  std::cerr << "\n";
+
   std::vector<int> component_indices = model.get_effective_components(labels);
   std::cerr << "VB effective components: " << component_indices.size() << "\n";
   std::cerr << "VB effective means: ";

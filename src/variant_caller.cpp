@@ -220,9 +220,9 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
     uint32_t total_depth = site_stats.get_total_depth();
     uint32_t total_gapped_depth = site_stats.get_total_gapped_depth();
 
-    // Skip the whole position, measured on ungapped depth, matching
-    // call_variants_from_plup()
-    if(total_depth < min_depth)
+    // Skip the whole position, measured on gapped depth. A deletion's record lives at
+    // its first deleted base, where ungapped depth is near zero when it is dominant.
+    if(total_gapped_depth < min_depth)
       continue;
 
     // Get amplicon depths
@@ -258,11 +258,9 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
       file << state_stats.get_depth() << DELIMITER; // ALT_DP
       file << DELIMITER; // ALT_RV
       file << static_cast<int>(state_stats.get_mean_quality()) << DELIMITER; // ALT_QUAL
-      if(site_state::is_deletion(state)){
-        file << state_stats.get_depth() / static_cast<double>(total_depth_del) << DELIMITER; // ALT_FREQ
-      } else {
-        file << state_stats.get_depth() / static_cast<double>(total_depth) << DELIMITER; // ALT_FREQ
-      }
+      // a fully deleted position has no ungapped depth, so guard the denominator
+      uint32_t alt_freq_depth = site_state::is_deletion(state) ? total_depth_del : total_depth;
+      file << (alt_freq_depth ? state_stats.get_depth() / static_cast<double>(alt_freq_depth) : 0.0) << DELIMITER; // ALT_FREQ
       file << total_depth << DELIMITER; // TOTAL_DP
       file << DELIMITER; // PVAL
       file << DELIMITER; // PASS

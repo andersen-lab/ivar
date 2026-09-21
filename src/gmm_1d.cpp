@@ -509,6 +509,7 @@ bool gmm_1d::fit(const std::vector<double>& x) {
     seed_labels[i] = best;
   }
   std::cerr << "Kmeans variances: ";
+  double max_var = 0.0;
   for(size_t k=0; k < seed_indices.size(); k++){
     double sum = 0.0;
     uint32_t n = 0;
@@ -528,9 +529,11 @@ bool gmm_1d::fit(const std::vector<double>& x) {
       }
       var /= n;
     }
+    if(var > max_var) max_var = var;
     std::cerr << var << ", ";
   }
   std::cerr << std::endl;
+  std::cerr << "Kmeans max variance: " << std::round(max_var * 100000.0) / 100000.0 << std::endl;
 
   // Set mean prior from kmeans for gaussian components
   for (int k = 0; k < n_gaussian; k++) {
