@@ -220,6 +220,10 @@ void consensus_sequence::get_majority_consensus(double threshold){
       if(cumulative >= threshold) break;
     }
 
+    //every allele was included and the total still fell short of the threshold,
+    //so no call here is supported - leave it as N
+    if(cumulative < threshold) continue;
+
     if(included.size() == 1){
       sequence[i] = included[0] + insertion;
     } else {
