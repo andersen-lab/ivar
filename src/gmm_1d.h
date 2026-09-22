@@ -38,6 +38,8 @@ class gmm_1d {
   double half_normal_covariance_prior_ = 0.0;
   double invariant_threshold_ = 0.97;
   double min_cluster_fraction_ = 0.0;
+  //absolute point count, used in place of min_cluster_fraction_ when non-zero
+  uint32_t min_cluster_points_ = 0;
 
   // Model parameters
   std::vector<double> stick_beta_a_, stick_beta_b_;
@@ -99,6 +101,8 @@ class gmm_1d {
   void set_half_normal_covariance_prior(double v) { half_normal_covariance_prior_ = v; }
   void set_min_cluster_fraction(double f) { min_cluster_fraction_ = f; }
   double get_min_cluster_fraction() const { return min_cluster_fraction_; }
+  void set_min_cluster_points(uint32_t n) { min_cluster_points_ = n; }
+  uint32_t get_min_cluster_points() const { return min_cluster_points_; }
 
   static void logit_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static void sigmoid_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);

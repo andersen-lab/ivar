@@ -659,7 +659,7 @@ std::vector<int> gmm_1d::predict(const std::vector<double>& x) const {
     labels[i] = best;
   }
 
-  if (min_cluster_fraction_ <= 0.0) return labels;
+  if (min_cluster_fraction_ <= 0.0 && min_cluster_points_ == 0) return labels;
 
   std::vector<bool> low_weight_clusters(n_components, false);
 
@@ -674,7 +674,12 @@ std::vector<int> gmm_1d::predict(const std::vector<double>& x) const {
     for (int k = 0; k < n_components; k++) {
       if(is_half_normal_component(k))
         continue;
-      if (!low_weight_clusters[k] && counts[k] > 0 && (static_cast<double>(counts[k]) / n_data_points) < min_cluster_fraction_) {
+      //a fixed fraction is a different bar per sample when n ranges from ~16 to
+      //~200 variants, so an absolute count can be used instead
+      bool too_small = min_cluster_points_ > 0
+          ? counts[k] < static_cast<int>(min_cluster_points_)
+          : (static_cast<double>(counts[k]) / n_data_points) < min_cluster_fraction_;
+      if (!low_weight_clusters[k] && counts[k] > 0 && too_small) {
         low_weight_clusters[k] = true;
         found_new = true;
       }

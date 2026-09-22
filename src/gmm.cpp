@@ -469,6 +469,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   model.fit(model_freqs);
   model.set_min_cluster_fraction(min_cluster_fraction);
+  model.set_min_cluster_points(3);
 
   std::vector<int> labels = model.predict(model_freqs);
 
