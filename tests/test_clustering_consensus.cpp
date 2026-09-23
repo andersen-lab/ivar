@@ -33,7 +33,7 @@ void read_consensus(std::vector<std::pair<std::string, std::string>> &sequences,
 
 int main() {
   std::string prefix = "/tmp/consensus";
-  int num_tests = 4;
+  int num_tests = 5;
   int success = 0;
 
   uint32_t min_depth = 5;
@@ -255,6 +255,41 @@ int main() {
     }
   }
   if(correct) success++;
+
+  // TEST 5 - a deletion assigned to the upper half normal is written as a gap,
+  // not as its deleted bases repeated once per span position
+  {
+    consensus_sequence cs(10);
+    cs.set_seq_name("upper_deletion");
+    std::string ref = "ACGTACGTAC";
+    variant del;
+    del.position = 4;
+    del.nuc = "-TAC";
+    del.half_normal_upper = true;
+    for(uint32_t p = 1; p <= 10; p++){
+      if(p >= 4 && p <= 6){
+        cs.add_variant(p, del);
+      } else {
+        variant v;
+        v.position = p;
+        v.nuc = std::string(1, ref[p-1]);
+        v.half_normal_upper = true;
+        cs.add_variant(p, v);
+      }
+    }
+    cs.get_consensus(0);
+    std::string out_file = "/tmp/upper_deletion.fa";
+    std::ofstream(out_file, std::ios::trunc);
+    cs.write_consensus_to_file(out_file);
+    std::vector<std::pair<std::string, std::string>> seqs;
+    read_consensus(seqs, out_file);
+    if(seqs.size() == 1 && seqs[0].second == "ACGGTAC"){
+      success++;
+    } else {
+      std::cerr << "upper half normal deletion written as "
+                << (seqs.empty() ? "<none>" : seqs[0].second) << std::endl;
+    }
+  }
 
   std::cerr << "num tests " << num_tests << " success " << success << std::endl;
   return (num_tests == success) ? 0 : -1;

@@ -105,7 +105,15 @@ void consensus_sequence::get_consensus(uint32_t n){
       //if we have one assigned to the upper half normal, we go with that and ignore the rest
 
       if(variant_records[i][j].half_normal_upper){
-        nucs.push_back(variant_records[i][j].nuc);
+        //deletions are written as a gap, as in the normal path below
+        if(variant_records[i][j].nuc.find('-') != std::string::npos){
+          if(!deletion_added){
+            nucs.push_back("-");
+            deletion_added = true;
+          }
+        } else {
+          nucs.push_back(variant_records[i][j].nuc);
+        }
         continue;
       }
       if(variant_records[i][j].position_half_normal_upper){
