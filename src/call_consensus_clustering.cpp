@@ -52,6 +52,16 @@ void assign_variants_position(std::vector<variant> &variants, std::vector<consen
       nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
       span = (uint32_t)nuc.size();
     }
+    //no population credibly carries this allele, so the position is unresolved in every
+    //genome, not just the ones it was assigned to
+    if(variants[i].wide_sd){
+      for(uint32_t k=0; k < all_consensus_seqs.size(); k++){
+        for(uint32_t z=0; z < span; z++){
+          all_consensus_seqs[k].mark_ambiguous(variants[i].position + z);
+        }
+      }
+      continue;
+    }
     for(uint32_t j=0; j < variants[i].consensus_numbers.size(); j++){
       uint32_t k = variants[i].consensus_numbers[j];
       for(uint32_t z=0; z < span; z++){

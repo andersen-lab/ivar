@@ -414,6 +414,27 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound, doub
   }
 }
 
+//Pruning a component renormalizes its variants' posteriors onto the survivors, which can
+//hand a variant a confident assignment to a component it sits nowhere near. The ambiguity
+//test only compares components against each other, so nothing else catches this.
+//Runs after overwrite_cluster_assigned, so cluster_assigned indexes eff_means/eff_vars.
+void flag_wide_sd_variants(std::vector<variant> &variants, const std::vector<double> &eff_means,
+                           const std::vector<double> &eff_vars, const std::vector<double> &unrefined_means){
+  for(auto &v : variants){
+    //half normals keep their model space label, and are exempt by design
+    if(v.half_normal_upper || v.half_normal_lower) continue;
+    if(v.cluster_assigned < 0 || (size_t)v.cluster_assigned >= eff_means.size()) continue;
+    size_t c = (size_t)v.cluster_assigned;
+    if(c >= eff_vars.size() || eff_vars[c] <= 0) continue;
+    //the boundary rescue moved this mean but not its variance, so the two no longer describe
+    //the same component and the distance would be meaningless
+    if(eff_means[c] != unrefined_means[c]) continue;
+    if(std::abs(v.gapped_freq - eff_means[c]) > WIDE_SD_THRESHOLD * std::sqrt(eff_vars[c])){
+      v.wide_sd = true;
+    }
+  }
+}
+
 void write_single_cluster_output(std::string output_prefix){
   std::ofstream out(output_prefix + "_gmm_1d_results.txt");
   out << "Components\tDistinct_Components\tMeans\tVariances\tWeights\tEffective_Means\tEffective_Variances\tEffective_Weights\tSolution_Sets\tAmbiguous_Populations\tAmbiguous_Positions\n";
@@ -555,6 +576,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   
   subset_sum_solver solver(eff_means, subset_sum_solver::UNIT_SUM_ERROR, invariant_threshold);
   bool solved = solver.solve();
+  //eff_vars still describes the pre-rescue means, so keep a copy to tell which
+  //components the rescue moved out from under their variance
+  std::vector<double> unrefined_means = eff_means;
   //the boundary rescue may have refined a mean, and downstream matching against the
   //solution is exact equality, so adopt the refined means
   eff_means = solver.refined_means();
@@ -590,6 +614,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         v.probabilities = eff_proba;
       }
       variant_assigner(solution_sets[0], eff_means, 2.0).assign(base_variants);
+      flag_wide_sd_variants(base_variants, eff_means, eff_vars, unrefined_means);
 
       //collect the ambiguous positions per genome. deletions span several
       //positions in the consensus but only the start is recorded here.

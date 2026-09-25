@@ -33,7 +33,7 @@ void read_consensus(std::vector<std::pair<std::string, std::string>> &sequences,
 
 int main() {
   std::string prefix = "/tmp/consensus";
-  int num_tests = 5;
+  int num_tests = 6;
   int success = 0;
 
   uint32_t min_depth = 5;
@@ -288,6 +288,54 @@ int main() {
     } else {
       std::cerr << "upper half normal deletion written as "
                 << (seqs.empty() ? "<none>" : seqs[0].second) << std::endl;
+    }
+  }
+
+  // TEST 6 - a wide_sd variant sits too far from the cluster it was assigned to for any
+  // population to credibly carry it, so its position is N in every genome, including ones
+  // it was never assigned to. A deletion Ns its whole span.
+  {
+    variant v_wide;
+    v_wide.position = 5;
+    v_wide.nuc = "A";
+    v_wide.consensus_numbers = {2}; //assigned to genome 2 only
+    v_wide.wide_sd = true;
+
+    variant v_ok;
+    v_ok.position = 8;
+    v_ok.nuc = "G";
+    v_ok.consensus_numbers = {1}; //fits its cluster, must keep its base
+
+    variant v_wide_del;
+    v_wide_del.position = 3;
+    v_wide_del.nuc = "-TA"; //spans positions 3 and 4
+    v_wide_del.consensus_numbers = {0};
+    v_wide_del.wide_sd = true;
+
+    std::vector<variant> wide_variants = {v_wide, v_ok, v_wide_del};
+    std::vector<consensus_sequence> wide_seqs;
+    for(uint32_t i=0; i < 4; i++){
+      wide_seqs.emplace_back(10);
+    }
+    assign_variants_position(wide_variants, wide_seqs);
+    for(uint32_t i=0; i < wide_seqs.size(); i++){
+      wide_seqs[i].process_variant_assignments();
+      wide_seqs[i].get_consensus(i);
+    }
+
+    bool n_everywhere = true;
+    for(uint32_t i=0; i < wide_seqs.size(); i++){
+      if(wide_seqs[i].get_base(5) != "N") n_everywhere = false;
+      //the deletion spans 3-4, so both are unresolved in every genome
+      if(wide_seqs[i].get_base(3) != "N" || wide_seqs[i].get_base(4) != "N") n_everywhere = false;
+    }
+    bool unaffected_kept = wide_seqs[1].get_base(8) == "G";
+
+    if(n_everywhere && unaffected_kept){
+      success++;
+    } else {
+      std::cerr << "TEST 6 failed, n_everywhere " << n_everywhere
+                << " genome 1 pos 8 = " << wide_seqs[1].get_base(8) << std::endl;
     }
   }
 
