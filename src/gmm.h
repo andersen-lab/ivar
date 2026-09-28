@@ -43,7 +43,7 @@ struct variant {
   bool qual_flag=false; //quality is below threshold
   bool outside_freq_range=false; //outside of useful frequency range for model
   bool cluster_outlier=false; //is an outlier for the cluster assigned
-  bool wide_sd=false; //further than WIDE_SD_THRESHOLD sds from the cluster it was assigned to
+  bool freq_outlier=false; //further than the freq outlier threshold from the cluster it was assigned to
   bool overlapped_deletion=false; //minor deletion overlapping a more abundant deletion at the same site
   bool imbalance=false;
   bool position_conflict=false; //multiple variants at this position assigned to the same cluster
@@ -53,15 +53,23 @@ struct variant {
 
 extern const double DEFAULT_AMPLICON_STDEV;
 
-//a variant further than this many sds from its assigned cluster is not a credible
+//a variant further than this in raw frequency from its assigned cluster is not a credible
 //member of it, so the position is called N rather than given a base
-static constexpr double WIDE_SD_THRESHOLD = 3.0;
+extern const double DEFAULT_FREQ_OUTLIER_THRESHOLD;
 
-void flag_wide_sd_variants(std::vector<variant> &variants, const std::vector<double> &eff_means,
-                           const std::vector<double> &eff_vars, const std::vector<double> &unrefined_means);
+void flag_freq_outlier_variants(std::vector<variant> &variants, const std::vector<double> &eff_means,
+                                double threshold);
 
 void split(std::string &s, char delim, std::vector<std::string> &elems);
-std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, double default_threshold, uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior, double half_normal_covariance_prior, double min_cluster_fraction = 0.10, uint32_t min_cluster_points = 0, double amplicon_stdev = DEFAULT_AMPLICON_STDEV);
+//proba and all_labels are model space and parallel to variants; pass them empty when the
+//model was never fitted
+void write_variant_details(const std::vector<variant> &variants, std::string output_prefix,
+                           const std::vector<double> &eff_means, const std::vector<double> &model_means,
+                           const std::vector<int> &component_indices,
+                           const std::vector<std::vector<double>> &proba,
+                           const std::vector<int> &all_labels, const std::string &stage);
+
+std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, double default_threshold, uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior, double half_normal_covariance_prior, double min_cluster_fraction = 0.10, uint32_t min_cluster_points = 0, double amplicon_stdev = DEFAULT_AMPLICON_STDEV, bool dump_variants = false, double freq_outlier_threshold = DEFAULT_FREQ_OUTLIER_THRESHOLD);
 void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold, double invariant_threshold);
 std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector);
 void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced);

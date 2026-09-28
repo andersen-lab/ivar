@@ -58,6 +58,8 @@ struct args_t {
   double gmm_min_cluster_fraction; // -F
   uint32_t gmm_min_cluster_points; // -P
   double amplicon_stdev;         // -A
+  bool dump_variants;            // -V
+  double freq_outlier_threshold; // -W
 } g_args;
 
 void print_usage() {
@@ -104,12 +106,20 @@ void print_contam_usage() {
          "                 is set (Default: 0.10)\n"
          "           -P    Minimum points per cluster; clusters with fewer than\n"
          "                 this many frequencies are pruned. If set (>0),\n"
-         "                 overrides -F (Default: 0, unset)\n\n"
+         "                 overrides -F (Default: 0, unset)\n"
+         "           -W    A variant further than this from the mean of the cluster\n"
+         "                 it was assigned to is not a credible member of it, so the\n"
+         "                 position is called N in every genome. Raw frequency, not\n"
+         "                 standard deviations. Set to 1 to disable (Default: 0.10)\n\n"
          "Amplicon Options   Description\n"
          "           -A    Weighted standard deviation of a variant's per-amplicon\n"
          "                 frequencies above which the position is masked to N.\n"
          "                 Requires AMP_FREQ/AMP_DEPTH columns. Default 2.0 is\n"
-         "                 unreachable, so masking is off unless this is set.\n";
+         "                 unreachable, so masking is off unless this is set.\n\n"
+         "Debug Options      Description\n"
+         "           -V    Write <prefix>_variant_details.txt, one row per variant\n"
+         "                 with its cluster assignment, posteriors and consensus\n"
+         "                 flags. Written even when clustering finds no solution.\n";
 }
 
 void print_trim_usage() {
@@ -328,7 +338,7 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
-static const char *contam_opt_str = "p:s:t:m:q:N:I:C:H:M:F:P:A:h?";
+static const char *contam_opt_str = "p:s:t:m:q:N:I:C:H:M:F:P:A:VW:h?";
 
 std::string get_filename_without_extension(std::string f, std::string ext) {
   if (ext.length() > f.length())  // If extension longer than filename
@@ -385,6 +395,8 @@ int main(int argc, char *argv[]) {
     g_args.gmm_min_cluster_fraction = 0.10;
     g_args.gmm_min_cluster_points = 0;
     g_args.amplicon_stdev = DEFAULT_AMPLICON_STDEV;
+    g_args.dump_variants = false;
+    g_args.freq_outlier_threshold = DEFAULT_FREQ_OUTLIER_THRESHOLD;
     opt = getopt(argc, argv, contam_opt_str);
     while (opt != -1) {
       switch (opt) {
@@ -427,6 +439,12 @@ int main(int argc, char *argv[]) {
         case 'A':
           g_args.amplicon_stdev = std::stod(optarg);
           break;
+        case 'V':
+          g_args.dump_variants = true;
+          break;
+        case 'W':
+          g_args.freq_outlier_threshold = std::stod(optarg);
+          break;
         case 'h':
         case '?':
           print_contam_usage();
@@ -438,7 +456,7 @@ int main(int argc, char *argv[]) {
     if (!g_args.variants.empty() && !g_args.prefix.empty()) {
       std::vector<double> solution;
       std::vector<double> means;
-      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.min_threshold, g_args.gmm_n, g_args.gmm_invariant, g_args.gmm_cov_prior, g_args.gmm_mean_prior, g_args.gmm_half_normal_cov_prior, g_args.gmm_min_cluster_fraction, g_args.gmm_min_cluster_points, g_args.amplicon_stdev);
+      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.min_threshold, g_args.gmm_n, g_args.gmm_invariant, g_args.gmm_cov_prior, g_args.gmm_mean_prior, g_args.gmm_half_normal_cov_prior, g_args.gmm_min_cluster_fraction, g_args.gmm_min_cluster_points, g_args.amplicon_stdev, g_args.dump_variants, g_args.freq_outlier_threshold);
       cluster_consensus(variants, g_args.prefix, g_args.min_threshold, g_args.min_depth, g_args.min_qual, solution, means);
     }
     res = 0;

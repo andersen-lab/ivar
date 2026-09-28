@@ -5,6 +5,8 @@
 #include "saga.h"
 #include "call_consensus_clustering.h"
 #include <fstream>
+#include <sstream>
+#include <iomanip>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -15,6 +17,8 @@
 //masked. Defaults to 2.0, which is unreachable for frequencies bounded in [0,1], so
 //amplicon masking is off unless a threshold is passed
 const double DEFAULT_AMPLICON_STDEV = 2.0;
+
+const double DEFAULT_FREQ_OUTLIER_THRESHOLD = 0.10;
 
 static double weighted_standard_deviation(const std::vector<double> &values, const std::vector<uint32_t> &weights){
   double weighted_sum = 0.0, total_weight = 0.0;
@@ -417,22 +421,103 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound, doub
 //Pruning a component renormalizes its variants' posteriors onto the survivors, which can
 //hand a variant a confident assignment to a component it sits nowhere near. The ambiguity
 //test only compares components against each other, so nothing else catches this.
-//Runs after overwrite_cluster_assigned, so cluster_assigned indexes eff_means/eff_vars.
-void flag_wide_sd_variants(std::vector<variant> &variants, const std::vector<double> &eff_means,
-                           const std::vector<double> &eff_vars, const std::vector<double> &unrefined_means){
+//Runs after overwrite_cluster_assigned, so cluster_assigned indexes eff_means.
+void flag_freq_outlier_variants(std::vector<variant> &variants, const std::vector<double> &eff_means,
+                                double threshold){
   for(auto &v : variants){
-    //half normals keep their model space label, and are exempt by design
-    if(v.half_normal_upper || v.half_normal_lower) continue;
+    //the half normals carry no density out here (gmm_1d.cpp:206), so these fall back to the
+    //nearest real population and the distance to it means nothing
+    if(v.outside_freq_range) continue;
     if(v.cluster_assigned < 0 || (size_t)v.cluster_assigned >= eff_means.size()) continue;
-    size_t c = (size_t)v.cluster_assigned;
-    if(c >= eff_vars.size() || eff_vars[c] <= 0) continue;
-    //the boundary rescue moved this mean but not its variance, so the two no longer describe
-    //the same component and the distance would be meaningless
-    if(eff_means[c] != unrefined_means[c]) continue;
-    if(std::abs(v.gapped_freq - eff_means[c]) > WIDE_SD_THRESHOLD * std::sqrt(eff_vars[c])){
-      v.wide_sd = true;
+    if(std::abs(v.gapped_freq - eff_means[(size_t)v.cluster_assigned]) > threshold){
+      v.freq_outlier = true;
     }
   }
+}
+
+static std::string join_doubles(const std::vector<double> &v){
+  std::ostringstream o;
+  o << "[";
+  for(size_t i=0; i < v.size(); i++){
+    if(i) o << ",";
+    o << v[i];
+  }
+  o << "]";
+  return o.str();
+}
+
+static std::string join_uints(const std::vector<uint32_t> &v){
+  std::ostringstream o;
+  o << "[";
+  for(size_t i=0; i < v.size(); i++){
+    if(i) o << ",";
+    o << v[i];
+  }
+  o << "]";
+  return o.str();
+}
+
+//variant.probabilities is only renormalized on the solved path, so recompute here from proba
+//to keep every row in the same space no matter which call site emitted it
+void write_variant_details(const std::vector<variant> &variants, std::string output_prefix,
+                           const std::vector<double> &eff_means, const std::vector<double> &model_means,
+                           const std::vector<int> &component_indices,
+                           const std::vector<std::vector<double>> &proba,
+                           const std::vector<int> &all_labels, const std::string &stage){
+  std::ofstream out(output_prefix + "_variant_details.txt");
+  if(!out.is_open()){
+    std::cerr << "Failed to open variant detail file: " << output_prefix << std::endl;
+    return;
+  }
+  out << std::setprecision(10);
+  out << "POS\tALLELE\tGAPPED_FREQ\tGAPPED_DEPTH\tTOTAL_DEPTH\tQUAL\tSTAGE\tCLUSTER_ASSIGNED\t"
+      << "CLUSTER_MEAN\tMODEL_COMPONENT_MEAN\tEFFECTIVE_MEANS\tPOSTERIORS\t"
+      << "CONSENSUS_NUMBERS\tAMBIGUOUS_NUMBERS\tFREQ_OUTLIER\tHALF_NORMAL_UPPER\tHALF_NORMAL_LOWER\t"
+      << "POSITION_MASKED\tAMPLICON_MASKED\tDEPTH_FLAG\tQUAL_FLAG\tOUTSIDE_FREQ_RANGE\t"
+      << "OVERLAPPED_DELETION\tRESOLVED\n";
+
+  std::string eff_means_str = join_doubles(eff_means);
+  for(size_t i=0; i < variants.size(); i++){
+    const variant &v = variants[i];
+    std::string posteriors = "NA", model_mean = "NA";
+    if(i < proba.size() && !component_indices.empty()){
+      std::vector<double> row;
+      double sum = 0.0;
+      for(int ci : component_indices){
+        if(ci >= 0 && (size_t)ci < proba[i].size()){
+          row.push_back(proba[i][ci]);
+          sum += proba[i][ci];
+        }
+      }
+      if(sum > 0.0){
+        for(auto &p : row) p /= sum;
+      }
+      posteriors = join_doubles(row);
+    }
+    //out here predict cannot reach the half normal (gmm_1d.cpp:206), so every label and
+    //assignment is a fallback to the nearest real component and means nothing
+    if(!v.outside_freq_range && i < all_labels.size() && all_labels[i] >= 0
+       && (size_t)all_labels[i] < model_means.size()){
+      std::ostringstream m; m << model_means[all_labels[i]]; model_mean = m.str();
+    }
+    std::string cluster_mean = "NA";
+    std::string cluster_assigned = "NA";
+    if(!v.outside_freq_range){
+      std::ostringstream c; c << v.cluster_assigned; cluster_assigned = c.str();
+      if(v.cluster_assigned >= 0 && (size_t)v.cluster_assigned < eff_means.size()){
+        std::ostringstream m; m << eff_means[v.cluster_assigned]; cluster_mean = m.str();
+      }
+    }
+    out << v.position << "\t" << v.nuc << "\t" << v.gapped_freq << "\t" << v.gapped_depth << "\t"
+        << v.total_depth << "\t" << v.qual << "\t" << stage << "\t" << cluster_assigned << "\t"
+        << cluster_mean << "\t" << model_mean << "\t" << eff_means_str << "\t" << posteriors
+        << "\t" << join_uints(v.consensus_numbers) << "\t" << join_uints(v.ambiguous_numbers)
+        << "\t" << v.freq_outlier << "\t" << v.half_normal_upper << "\t" << v.half_normal_lower << "\t"
+        << v.position_masked << "\t" << v.amplicon_masked << "\t" << v.depth_flag << "\t"
+        << v.qual_flag << "\t" << v.outside_freq_range << "\t" << v.overlapped_deletion << "\t"
+        << v.resolved << "\n";
+  }
+  out.close();
 }
 
 void write_single_cluster_output(std::string output_prefix){
@@ -445,7 +530,7 @@ void write_single_cluster_output(std::string output_prefix){
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, \
                               std::vector<double> &solution, std::vector<double> &means, \
                               double default_threshold, \
-                              uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior, double half_normal_covariance_prior, double min_cluster_fraction, uint32_t min_cluster_points, double amplicon_stdev){
+                              uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior, double half_normal_covariance_prior, double min_cluster_fraction, uint32_t min_cluster_points, double amplicon_stdev, bool dump_variants, double freq_outlier_threshold){
   uint32_t round_val = 4;
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
@@ -469,6 +554,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   if(model_variants.size() <= 1){
     call_majority_consensus(base_variants, output_prefix, default_threshold);
     write_single_cluster_output(output_prefix);
+    if(dump_variants){
+      write_variant_details(base_variants, output_prefix, {}, {}, {}, {}, {}, "too_few_variants");
+    }
     base_variants.clear();
     return(base_variants);
   }
@@ -507,7 +595,16 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   }
   std::cerr << "\n";
 
-  std::vector<int> component_indices = model.get_effective_components(labels);
+  //solver_components excludes the half normals; component_indices appends them, so
+  //solver_components stays a prefix and existing indices keep their meaning
+  std::vector<int> solver_components = model.get_effective_components(labels);
+  std::vector<int> component_indices = solver_components;
+  for(int k : model.get_invariant_components(labels)){
+    if(std::find(component_indices.begin(), component_indices.end(), k) == component_indices.end()){
+      component_indices.push_back(k);
+    }
+  }
+  std::vector<double> solver_means = model.get_effective_means(solver_components);
   std::cerr << "VB effective components: " << component_indices.size() << "\n";
   std::cerr << "VB effective means: ";
     std::vector<double> eff_means = model.get_effective_means(component_indices);
@@ -542,7 +639,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //half normals. an unrestricted argmax can land a variant on a discarded component, leaving it
   //with no consensus genome. min_cluster_fraction is not re-applied here because all_freqs is
   //mostly reference alleles, so a point count threshold over it is meaningless
-  std::vector<int> all_labels = model.predict(all_freqs, component_indices);
+  //solver_components, not component_indices: adding the half normals here would widen the
+  //candidate set and let the heavier one win on weight rather than on distance
+  std::vector<int> all_labels = model.predict(all_freqs, solver_components);
   
   //gets the posterior probability per variant
   std::vector<std::vector<double>> proba = model.predict_proba(all_freqs);
@@ -555,13 +654,12 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //take the model labels and assign them to the variants
   for(uint32_t i=0; i < all_labels.size(); i++){
     base_variants[i].cluster_assigned = all_labels[i];
-    if(!base_variants[i].half_normal_upper && !base_variants[i].half_normal_lower) {
-      base_variants[i].probabilities = proba[i];
-    }
-    if(base_variants[i].gapped_freq > invariant_threshold){
+    base_variants[i].probabilities = proba[i];
+    //inclusive, to match how parse_internal_variants sets outside_freq_range
+    if(base_variants[i].gapped_freq >= invariant_threshold){
       base_variants[i].half_normal_upper = true;
       base_variants[i].half_normal_lower = false;
-    } else if(base_variants[i].gapped_freq < 1-invariant_threshold){
+    } else if(base_variants[i].gapped_freq <= 1-invariant_threshold){
       base_variants[i].half_normal_lower = true;
       base_variants[i].half_normal_upper = false;
     } else if(all_labels[i] == n-1){
@@ -574,14 +672,13 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
 
   }
   
-  subset_sum_solver solver(eff_means, subset_sum_solver::UNIT_SUM_ERROR, invariant_threshold);
+  subset_sum_solver solver(solver_means, subset_sum_solver::UNIT_SUM_ERROR, invariant_threshold);
   bool solved = solver.solve();
-  //eff_vars still describes the pre-rescue means, so keep a copy to tell which
-  //components the rescue moved out from under their variance
-  std::vector<double> unrefined_means = eff_means;
   //the boundary rescue may have refined a mean, and downstream matching against the
-  //solution is exact equality, so adopt the refined means
-  eff_means = solver.refined_means();
+  //solution is exact equality, so adopt the refined means. copy as a prefix, since the
+  //solver does not own the appended half normals
+  solver_means = solver.refined_means();
+  std::copy(solver_means.begin(), solver_means.end(), eff_means.begin());
   std::vector<std::vector<double>> solution_sets = solver.get_solution_sets();
 
   //positions left as N by a peak with >1 decomposition into the solution,
@@ -591,13 +688,18 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   if(solved){
     if(solution_sets.size() > 1){
       call_majority_consensus(base_variants, output_prefix, default_threshold);
+      if(dump_variants){
+        write_variant_details(base_variants, output_prefix, eff_means, model_means,
+                              component_indices, proba, all_labels, "multiple_solutions");
+      }
       base_variants.clear();
     } else{
       variant_assigner::overwrite_cluster_assigned(base_variants, eff_means, model_means);
       
-      //recalculate probabilities based on the new cluster assignments and only the effective means
+      //recalculate probabilities over the components a variant can actually be assigned to,
+      //which includes the half normals
       for(auto &v : base_variants){
-        if(v.half_normal_upper || v.half_normal_lower || v.probabilities.empty()) continue;
+        if(v.probabilities.empty()) continue;
         std::vector<double> eff_proba;
         double sum = 0.0;
         for(int ci : component_indices){
@@ -613,8 +715,19 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         }
         v.probabilities = eff_proba;
       }
-      variant_assigner(solution_sets[0], eff_means, 2.0).assign(base_variants);
-      flag_wide_sd_variants(base_variants, eff_means, eff_vars, unrefined_means);
+      //a variant inside the invariant band can be won by a half normal. outside the band the
+      //frequency test above has already decided, and must keep precedence: the half normals
+      //carry no density there (gmm_1d.cpp:206)
+      for(auto &v : base_variants){
+        if(v.half_normal_upper || v.half_normal_lower || v.probabilities.empty()) continue;
+        size_t best = std::distance(v.probabilities.begin(),
+                                    std::max_element(v.probabilities.begin(), v.probabilities.end()));
+        if(best < solver_means.size()) continue;
+        if(eff_means[best] > 0.5) v.half_normal_upper = true;
+        else                      v.half_normal_lower = true;
+      }
+      variant_assigner(solution_sets[0], solver_means, 2.0).assign(base_variants);
+      flag_freq_outlier_variants(base_variants, eff_means, freq_outlier_threshold);
 
       //collect the ambiguous positions per genome. deletions span several
       //positions in the consensus but only the start is recorded here.
@@ -634,13 +747,21 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       amplicon_specific_cluster_assignment(base_variants, model, component_indices);
       //write the amplicon flags based on cluster agreement
       rewrite_position_masking(base_variants);
+      if(dump_variants){
+        write_variant_details(base_variants, output_prefix, eff_means, model_means,
+                              component_indices, proba, all_labels, "solved");
+      }
 
       solution = solution_sets[0];
     }
   } else {
     call_majority_consensus(base_variants, output_prefix, default_threshold);
+    if(dump_variants){
+      write_variant_details(base_variants, output_prefix, eff_means, model_means,
+                            component_indices, proba, all_labels, "no_solution");
+    }
     base_variants.clear();
-  }  
+  }
 
   //output the clustering information
   std::ofstream out(output_prefix + "_gmm_1d_results.txt");

@@ -264,7 +264,6 @@ void variant_assigner::overwrite_cluster_assigned(std::vector<variant> &variants
                                                   const std::vector<double> &eff_means,
                                                   const std::vector<double> &means){
   for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].half_normal_upper || variants[i].half_normal_lower) continue;
     uint32_t cluster_assigned = variants[i].cluster_assigned;
     double mean = means[cluster_assigned];
     // Use nearest-match instead of exact equality to handle floating-point
@@ -326,6 +325,8 @@ void variant_assigner::assign(std::vector<variant> &variants) const {
 
   //check if the variant corresponds to an unresolved cluster
   for(uint32_t i=0; i < variants.size(); i++){
+    //cluster_assigned can index a half normal, which sits past the solution means
+    if(variants[i].cluster_assigned < 0 || (size_t)variants[i].cluster_assigned >= means.size()) continue;
     auto it = std::find(unresolved.begin(), unresolved.end(), means[variants[i].cluster_assigned]);
     if(it != unresolved.end()){
       variants[i].resolved = false;
@@ -350,7 +351,7 @@ void variant_assigner::assign(std::vector<variant> &variants) const {
     std::vector<uint32_t> top_clusters;
     if(!variants[i].probabilities.empty()){
       double best_probability = *std::max_element(variants[i].probabilities.begin(), variants[i].probabilities.end());
-      for(uint32_t c=0; c < variants[i].probabilities.size(); c++){
+      for(uint32_t c=0; c < variants[i].probabilities.size() && c < means.size(); c++){
         if(variants[i].probabilities[c] > best_probability / threshold){
           top_clusters.push_back(c);
         }
