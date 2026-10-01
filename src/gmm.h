@@ -45,6 +45,8 @@ struct variant {
   bool cluster_outlier=false; //is an outlier for the cluster assigned
   bool freq_outlier=false; //further than the freq outlier threshold from the cluster it was assigned to
   bool overlapped_deletion=false; //minor deletion overlapping a more abundant deletion at the same site
+  bool ref_allele=false; //REF == ALT row
+  bool deletion_span_duplicate=false; //reference row inside an accepted deletion, left out of the fit so the deletion counts once
   bool imbalance=false;
   bool position_conflict=false; //multiple variants at this position assigned to the same cluster
   std::vector<double> probabilities;

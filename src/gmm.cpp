@@ -290,6 +290,7 @@ void parse_internal_variants(std::string filename,
     };
     variant tmp;
     tmp.nuc = field("ALT");
+    tmp.ref_allele = (tmp.nuc == field("REF"));
     tmp.position = std::stoi(field("POS"));
     //adjust for the -1 of variant files for deletions
     auto it = std::find(tmp.nuc.begin(), tmp.nuc.end(), '-');
@@ -375,6 +376,7 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound, doub
   });
 
   std::vector<std::pair<uint32_t, uint32_t>> accepted;
+  std::vector<del_info> accepted_dels;
   for (const auto& d : dels) {
     bool overlaps = false;
     for (const auto& [s, e] : accepted) {
@@ -387,6 +389,7 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound, doub
       variants[d.idx].overlapped_deletion = true;
     } else {
       accepted.push_back({d.start, d.end});
+      accepted_dels.push_back(d);
     }
   }
 
@@ -414,6 +417,31 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound, doub
     if (variants[i].gapped_freq + it->second >= invariant_upper_bound) {
       variants[i].half_normal_upper = true;
       variants[i].outside_freq_range = true;
+    }
+  }
+
+  // Every base under a deletion writes a reference row at ~1 - deletion freq, so one
+  // event would enter the fit once per deleted base. Keep only the median reference row
+  // of each accepted deletion for fitting; non-reference variants in the span still count.
+  // Only deletions inside the model range: a noise-level deletion does not depress the
+  // reference rows under it, so collapsing there would merge unrelated sites.
+  for (const auto& d : accepted_dels) {
+    if (variants[d.idx].outside_freq_range) continue;
+    uint32_t s = d.start, e = d.end;
+    std::vector<uint32_t> span_refs;
+    for (uint32_t i = 0; i < variants.size(); i++) {
+      const variant &v = variants[i];
+      if (!v.ref_allele || v.position < s || v.position > e) continue;
+      if (v.depth_flag || v.qual_flag || v.outside_freq_range) continue;
+      span_refs.push_back(i);
+    }
+    if (span_refs.size() < 2) continue;
+    auto mid = span_refs.begin() + span_refs.size() / 2;
+    std::nth_element(span_refs.begin(), mid, span_refs.end(), [&](uint32_t a, uint32_t b) {
+      return variants[a].gapped_freq < variants[b].gapped_freq;
+    });
+    for (uint32_t idx : span_refs) {
+      if (idx != *mid) variants[idx].deletion_span_duplicate = true;
     }
   }
 }
@@ -542,7 +570,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<double> all_freqs;
   for(uint32_t i=0; i < base_variants.size(); i++){
     all_freqs.push_back(base_variants[i].gapped_freq);
-    if(!base_variants[i].depth_flag && !base_variants[i].qual_flag && !base_variants[i].outside_freq_range && !base_variants[i].overlapped_deletion){
+    if(!base_variants[i].depth_flag && !base_variants[i].qual_flag && !base_variants[i].outside_freq_range && !base_variants[i].overlapped_deletion && !base_variants[i].deletion_span_duplicate){
       model_variants.push_back(base_variants[i]);
       model_freqs.push_back(base_variants[i].gapped_freq);
       //std::cerr << base_variants[i].nuc << " " << base_variants[i].position << " " << base_variants[i].gapped_freq << "\n";

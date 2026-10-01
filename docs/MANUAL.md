@@ -167,6 +167,10 @@ GMM Prior Options  Description
            -M    Mean precision prior (Default: 0.5)
            -F    Minimum cluster fraction; clusters with fewer than
                  this fraction of the data are pruned (Default: 0.10)
+           -W    A variant further than this from the mean of the cluster
+                 it was assigned to is not a credible member of it, so the
+                 position is called N in every genome. Raw frequency, not
+                 standard deviations. Set to 1 to disable (Default: 0.10)
 ```
 
 Example Usage:
