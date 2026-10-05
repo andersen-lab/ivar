@@ -43,7 +43,7 @@ struct variant {
   bool qual_flag=false; //quality is below threshold
   bool outside_freq_range=false; //outside of useful frequency range for model
   bool cluster_outlier=false; //is an outlier for the cluster assigned
-  bool freq_outlier=false; //further than the freq outlier threshold from the cluster it was assigned to
+  bool freq_outlier=false; //further than the freq outlier threshold sds from the cluster it was assigned to
   bool overlapped_deletion=false; //minor deletion overlapping a more abundant deletion at the same site
   bool ref_allele=false; //REF == ALT row
   bool deletion_span_duplicate=false; //reference row inside an accepted deletion, left out of the fit so the deletion counts once
@@ -55,11 +55,12 @@ struct variant {
 
 extern const double DEFAULT_AMPLICON_STDEV;
 
-//a variant further than this in raw frequency from its assigned cluster is not a credible
-//member of it, so the position is called N rather than given a base
+//a variant further than this many sds (sqrt of the component variance) from its assigned
+//cluster is not a credible member of it, so the position is called N rather than given a base
 extern const double DEFAULT_FREQ_OUTLIER_THRESHOLD;
 
 void flag_freq_outlier_variants(std::vector<variant> &variants, const std::vector<double> &eff_means,
+                                const std::vector<double> &eff_vars, const std::vector<double> &unrefined_means,
                                 double threshold);
 
 void split(std::string &s, char delim, std::vector<std::string> &elems);

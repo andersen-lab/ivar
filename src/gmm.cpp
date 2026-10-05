@@ -18,7 +18,7 @@
 //amplicon masking is off unless a threshold is passed
 const double DEFAULT_AMPLICON_STDEV = 2.0;
 
-const double DEFAULT_FREQ_OUTLIER_THRESHOLD = 0.10;
+const double DEFAULT_FREQ_OUTLIER_THRESHOLD = 3.0;
 
 static double weighted_standard_deviation(const std::vector<double> &values, const std::vector<uint32_t> &weights){
   double weighted_sum = 0.0, total_weight = 0.0;
@@ -449,15 +449,23 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound, doub
 //Pruning a component renormalizes its variants' posteriors onto the survivors, which can
 //hand a variant a confident assignment to a component it sits nowhere near. The ambiguity
 //test only compares components against each other, so nothing else catches this.
-//Runs after overwrite_cluster_assigned, so cluster_assigned indexes eff_means.
+//Runs after overwrite_cluster_assigned, so cluster_assigned indexes eff_means/eff_vars.
+//threshold is in sds. half normals are tested too: their mean is pinned at I or 1-I and
+//their variance is their own, so the distance in sds is just as meaningful.
 void flag_freq_outlier_variants(std::vector<variant> &variants, const std::vector<double> &eff_means,
+                                const std::vector<double> &eff_vars, const std::vector<double> &unrefined_means,
                                 double threshold){
   for(auto &v : variants){
     //the half normals carry no density out here (gmm_1d.cpp:206), so these fall back to the
     //nearest real population and the distance to it means nothing
     if(v.outside_freq_range) continue;
     if(v.cluster_assigned < 0 || (size_t)v.cluster_assigned >= eff_means.size()) continue;
-    if(std::abs(v.gapped_freq - eff_means[(size_t)v.cluster_assigned]) > threshold){
+    size_t c = (size_t)v.cluster_assigned;
+    if(c >= eff_vars.size() || eff_vars[c] <= 0) continue;
+    //the boundary rescue moved this mean but not its variance, so the two no longer describe
+    //the same component and the distance would be meaningless
+    if(c >= unrefined_means.size() || eff_means[c] != unrefined_means[c]) continue;
+    if(std::abs(v.gapped_freq - eff_means[c]) > threshold * std::sqrt(eff_vars[c])){
       v.freq_outlier = true;
     }
   }
@@ -702,6 +710,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   
   subset_sum_solver solver(solver_means, subset_sum_solver::UNIT_SUM_ERROR, invariant_threshold);
   bool solved = solver.solve();
+  //eff_vars still describes the pre-rescue means, so keep a copy to tell which
+  //components the rescue moved out from under their variance
+  std::vector<double> unrefined_means = eff_means;
   //the boundary rescue may have refined a mean, and downstream matching against the
   //solution is exact equality, so adopt the refined means. copy as a prefix, since the
   //solver does not own the appended half normals
@@ -755,7 +766,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
         else                      v.half_normal_lower = true;
       }
       variant_assigner(solution_sets[0], solver_means, 2.0).assign(base_variants);
-      flag_freq_outlier_variants(base_variants, eff_means, freq_outlier_threshold);
+      flag_freq_outlier_variants(base_variants, eff_means, eff_vars, unrefined_means, freq_outlier_threshold);
 
       //collect the ambiguous positions per genome. deletions span several
       //positions in the consensus but only the start is recorded here.
