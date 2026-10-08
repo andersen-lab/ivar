@@ -44,8 +44,8 @@ int main() {
   uint32_t n = 4;
 
   //TEST 1 - manually currated data
-  std::string var_filename = "../data/version_bump_tests/vbump_consensus_var.txt";
-  std::string consensus_filename = "../data/version_bump_tests/vbump_consensus_ivar.fa";
+  std::string var_filename = "../../data/version_bump_tests/vbump_consensus_var.txt";
+  std::string consensus_filename = "../../data/version_bump_tests/vbump_consensus_ivar.fa";
 
   std::vector<double> solution;
   std::vector<double> means;
