@@ -142,10 +142,6 @@ add_executable(check_bootstrap_variants
         test_bootstrap_variants.cpp ../src/bootstrap_variants.cpp ../src/multinomial_sampler.cpp
 )
 
-add_executable(check_bd_threshold
-        test_bd_threshold.cpp ../src/gmm_1d.cpp ../src/gaussian_sampler.cpp
-)
-
 set(ALL_TEST_EXECUTABLES check_primer_trim
         check_trim
         check_quality_trim
@@ -179,7 +175,6 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_gaussian_sampler
         check_multinomial_sampler
         check_bootstrap_variants
-        check_bd_threshold
 )
 
 if(HTSLIB_PREFIX)
