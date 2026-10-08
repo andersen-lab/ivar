@@ -95,6 +95,7 @@ void consensus_sequence::get_consensus(uint32_t n){
     std::vector<string> nucs; //all the possible nucs here?
     bool deletion_added = false;
     std::string insertion;
+    double insertion_freq = -1.0; //-1 not 0: gapped_freq defaults to 0
     for(uint32_t j=0; j < variant_records[i].size(); j++){
       /*if(i == test_position){
         std::cerr << "\nconsensus " << n << " position " << i+1 << " nuc " << variant_records[i][j].nuc << " freq " << variant_records[i][j].gapped_freq << std::endl;
@@ -107,9 +108,22 @@ void consensus_sequence::get_consensus(uint32_t n){
       }*/
 
       bool has_insertion = variant_records[i][j].nuc.find('+') != std::string::npos;
-        if(has_insertion){
-          insertion = variant_records[i][j].nuc;
-          insertion.erase(std::remove(insertion.begin(), insertion.end(), '+'), insertion.end());
+      if(has_insertion){
+        const variant &v = variant_records[i][j];
+        if(v.qual_flag || v.depth_flag || v.half_normal_lower) continue;
+        std::string candidate = v.nuc;
+        candidate.erase(std::remove(candidate.begin(), candidate.end(), '+'), candidate.end());
+        //keep the best supported, ties broken on length then lexically
+        if(v.gapped_freq > insertion_freq ||
+           (v.gapped_freq == insertion_freq &&
+            (candidate.size() > insertion.size() ||
+             (candidate.size() == insertion.size() && candidate < insertion)))){
+          insertion = candidate;
+          insertion_freq = v.gapped_freq;
+        }
+        //an insertion rides along with the base called here, it is not an allele
+        //of its own - letting "+..." reach nucs masks the position via gt2iupac
+        continue;
       }
 
       //if we have one assigned to the upper half normal, we go with that and ignore the rest
@@ -162,7 +176,7 @@ void consensus_sequence::get_consensus(uint32_t n){
       for(uint32_t j=1; j < nucs.size(); j++){
         combined = gt2iupac(combined, nucs[j][0]);
       }
-      sequence[i] = std::string(1, combined);
+      sequence[i] = std::string(1, combined) + insertion;
     }
   }
 }
