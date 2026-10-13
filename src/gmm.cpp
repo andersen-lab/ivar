@@ -110,37 +110,6 @@ void rewrite_position_masking(std::vector<variant> &variants){
   propagate_amplicon_masking(variants);
 }
 
-uint32_t find_max_frequency_count(const std::vector<uint32_t>& nums) {
-  std::unordered_map<uint32_t, uint32_t> frequency_map;
-  uint32_t max_count = 0;
-  for (const auto& num : nums) {
-      frequency_map[num]++;
-      if (frequency_map[num] > max_count) {
-          max_count = frequency_map[num];
-      }
-  }
-  return max_count;
-}
-
-std::vector<std::vector<double>> transpose_vector(const std::vector<std::vector<double>>& input_vector) {
-  std::vector<std::vector<double>> transposed_vector;
-  // Check if the input vector is not empty
-  if (!input_vector.empty() && !input_vector[0].empty()) {
-    size_t rows = input_vector.size();
-    size_t cols = input_vector[0].size();
-    // Resize the transposed vector
-    transposed_vector.resize(cols, std::vector<double>(rows));
-
-    // Transpose the matrix
-    for (size_t i = 0; i < rows; ++i) {
-      for (size_t j = 0; j < cols; ++j) {
-        transposed_vector[j][i] = input_vector[i][j];
-      }
-    }
-  }
-  return transposed_vector;
-}
-
 void split(std::string &s, char delim, std::vector<std::string> &elems){
     std::stringstream ss;
     ss.str(s);
@@ -335,16 +304,6 @@ void parse_internal_variants(std::string filename,
       tmp.outside_freq_range = false;
     }
     variants.push_back(std::move(tmp));
-  }
-}
-
-void set_insertion_flags(std::vector<variant> &variants){
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].depth_flag) continue;
-    bool found = std::find(variants[i].nuc.begin(), variants[i].nuc.end(), '+') != variants[i].nuc.end();
-    if(found){
-      //variants[i].include_clustering = false;
-    }
   }
 }
 
