@@ -22,6 +22,10 @@ add_executable(check_quality_trim
         test_quality_trim.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
+add_executable(check_quality_trim_unpaired
+        test_quality_trim_unpaired.cpp ../src/trim_primer_quality.cpp ../src/primer_bed.cpp ../src/interval_tree.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
+)
+
 add_executable(check_consensus
         test_call_consensus_from_plup.cpp ../src/call_consensus_pileup.cpp ../src/allele_functions.cpp
 )
@@ -48,6 +52,10 @@ add_executable(check_consensus_seq_id
 
 add_executable(check_variants
         test_variants.cpp ../src/call_variants.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
+)
+
+add_executable(check_variants_reverse_strand
+        test_variants_reverse_strand.cpp ../src/call_variants.cpp ../src/allele_functions.cpp ../src/parse_gff.cpp ../src/ref_seq.cpp
 )
 
 add_executable(check_variants_2
@@ -129,6 +137,7 @@ add_executable(check_amplicon_masking
 set(ALL_TEST_EXECUTABLES check_primer_trim
         check_trim
         check_quality_trim
+        check_quality_trim_unpaired
         check_consensus
         check_allele_depth
         check_consensus_threshold
@@ -142,6 +151,7 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_getmasked
         check_removereads
         check_variants
+        check_variants_reverse_strand
         check_variants_2
         check_common_variants
         check_unpaired_trim
