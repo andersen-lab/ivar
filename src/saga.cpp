@@ -42,6 +42,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   sam_hdr_t *header = sam_hdr_read(in);
   if (header == NULL) {
     std::cerr << "Unable to read header from input file." << std::endl;
+    sam_close(in);
     return -1;
   }
   // Initiate the alignment record
@@ -64,16 +65,16 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   const std::string ref_name = (std::string)header->target_name[tid];
   bam_destroy1(aln);
   bam_hdr_destroy(header);
+  sam_close(in);
 
   //Initiate variants
   variant_caller vc(min_qual, min_depth, ref_file, gff_path);
   if(!vc.initialize_region(ref_name)) {
     std::cerr << "Unable to initialize region " << ref_name << std::endl;
-    return 0;
+    return -1;
   }
   vc.set_amplicons(amplicons);
 
-  sam_close(in);
   in = sam_open(bam.c_str(), "r");
   header = sam_hdr_read(in);
   aln = bam_init1();
