@@ -533,7 +533,6 @@ int main(int argc, char *argv[]) {
     }
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
     res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
-                               cl_cmd.str(),
                                g_args.primer_pair_file, g_args.primer_offset, g_args.min_depth, g_args.min_qual, g_args.ref, g_args.gff);
     }
 

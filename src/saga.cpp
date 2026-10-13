@@ -8,13 +8,12 @@
 #include "variant_caller.h"
 
 //first main function call
-int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std::string cmd, std::string pair_info, int32_t primer_offset, uint32_t min_depth, uint8_t min_qual, std::string ref_file, std::string gff_path){
+int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std::string pair_info, int32_t primer_offset, uint32_t min_depth, uint8_t min_qual, std::string ref_file, std::string gff_path){
   if(ref_file.empty()){
     std::cerr << "Please provide reference." << std::endl;
     exit(1);
   }
 
-  int retval = 0;
   std::vector<primer> primers;
   if (!bed.empty()) {
     primers = populate_from_file(bed, primer_offset);
@@ -50,10 +49,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   }
   // Initiate the alignment record
   bam1_t *aln = bam_init1();
-  cigar_ t;
-  init_cigar(&t);
-  std::vector<primer>::iterator cit;
-  std::vector<bam1_t *> alns;
 
   //iterate through reads
   in = sam_open(bam.c_str(), "r");
@@ -131,5 +126,5 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   bam_destroy1(aln);
   bam_hdr_destroy(header);
   sam_close(in);
-  return(retval);
+  return 0;
 }
