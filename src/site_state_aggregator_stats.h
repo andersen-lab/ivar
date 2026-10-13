@@ -11,10 +11,6 @@ struct amplicon_variation_data {
   std::vector<ITNode*> amplicons;
 
   int num_amplicons = 0;
-
-  bool has_variation() const {
-    return num_amplicons > 1;
-  }
 };
 
 class site_state_aggregator_stats {
@@ -38,10 +34,6 @@ class site_state_aggregator_stats {
   }
 
   void add_site(site_state &ss);
-
-  std::vector<site_amplicon_aggregator_stats> get_amplicon_stats() const {
-    return site_state_amplicon_stats;
-  }
 
   void accumulate_amplicon_depths(std::unordered_map<ITNode*, uint32_t>& amp_depths) const;
   amplicon_variation_data calculate_amplicon_variation(const std::unordered_map<ITNode*, uint32_t>& amp_depths) const;

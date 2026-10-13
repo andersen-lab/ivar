@@ -48,14 +48,6 @@ uint8_t site_aggregator_stats::get_mean_quality(const std::string &state) const 
   return 0; // TODO: Add an explicit indication of null
 }
 
-double site_aggregator_stats::get_frequency(const std::string &state, uint32_t total_depth) const {
-  const site_state_aggregator_stats* ss_stats = get_site_state_aggregator_stats(state);
-  if (ss_stats != nullptr) {
-    return ss_stats->get_depth() / static_cast<double>(total_depth);
-  }
-  return 0;
-}
-
 // Ungapped depth
 uint32_t site_aggregator_stats::get_total_depth() const {
   uint32_t total_depth = 0;
@@ -66,14 +58,6 @@ uint32_t site_aggregator_stats::get_total_depth() const {
     total_depth += sit.get_depth();
   }
   return total_depth;
-}
-
-double site_aggregator_stats::get_gapped_frequency(const std::string &state, uint32_t total_gapped_depth) const {
-  const site_state_aggregator_stats* ss_stats = get_site_state_aggregator_stats(state);
-  if (ss_stats != nullptr) {
-    return ss_stats->get_depth() / static_cast<double>(total_gapped_depth);
-  }
-  return 0;
 }
 
 // Gapped depth

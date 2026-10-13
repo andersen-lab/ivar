@@ -32,14 +32,8 @@ class site_aggregator_stats {
   // Get mean quality for a given state
   uint8_t get_mean_quality(const std::string &state) const;
 
-  // Get frequency for a given state
-  double get_frequency(const std::string &state, uint32_t total_depth) const;
-
   // Get total depth across all states
   uint32_t get_total_depth() const;
-
-  // Get gapped frequency for a given state
-  double get_gapped_frequency(const std::string &state, uint32_t total_gapped_depth) const;
 
   // Get total gapped depth across all states at a coordinate
   uint32_t get_total_gapped_depth() const;
