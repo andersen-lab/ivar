@@ -12,7 +12,6 @@ class gmm_1d {
   // From https://learn.microsoft.com/en-us/cpp/c-runtime-library/math-constants
   static constexpr double PI =	3.14159265358979323846;
   static constexpr double DEFAULT_VAR_FLOOR = 1e-3;
-  static constexpr double MIN_BD_THRESHOLD = 1.0; // -log(d*) roughly based on Hennig et al. 2010s
   static constexpr double TOLERANCE = 1e-3;
   static constexpr double REG_TERM = 1e-6;
   static constexpr int MAX_ITER = 1000;
@@ -106,8 +105,6 @@ class gmm_1d {
 
   static void logit_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
   static void sigmoid_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
-  static double calculate_bhattacharyya_distance_1d(double mu1, double v1, double mu2, double v2);
-  int get_distinct_components_count(const std::vector<uint32_t>& sites, double min_bd_threshold);
 
   std::vector<double> get_weights() const { return weights_; }
   std::vector<double> get_means() const { return means_; }

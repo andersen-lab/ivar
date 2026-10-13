@@ -9,7 +9,6 @@
 
 constexpr double gmm_1d::PI;
 constexpr double gmm_1d::DEFAULT_VAR_FLOOR;
-constexpr double gmm_1d::MIN_BD_THRESHOLD;
 
 double gmm_1d::log_normal_1d(double x, double mu, double var) {
   return -0.5 * (std::log(2 * PI * var) + std::pow(x - mu, 2) / var);
@@ -745,113 +744,6 @@ void gmm_1d::sigmoid_transform(const std::vector<double>& x, std::vector<double>
     double s = 1.0 / (1.0 + std::exp(-x[i]));
     transformed_x[i] = std::min(std::max(s, eps), 1.0 - eps);
   }
-}
-
-// https://en.wikipedia.org/wiki/Bhattacharyya_distance
-double gmm_1d::calculate_bhattacharyya_distance_1d(double mu1, double v1, double mu2, double v2) {
-  v1 = std::max(v1, 1e-300);
-  v2 = std::max(v2, 1e-300);
-  const double term1 = 0.25 * std::log(0.25 * (v1 / v2 + v2 / v1 + 2.0));
-  const double term2 = (mu1 - mu2) * (mu1 - mu2) / (4.0 * (v1 + v2));
-  return term1 + term2;
-}
-
-// Based on Hennig et al. 2010
-// https://doi.org/10.1007/s11634-010-0058-3
-int gmm_1d::get_distinct_components_count(const std::vector<uint32_t>& sites, double min_bd_threshold) {
-  const int G = n_components;
-  if (G <= 0) return 0;
-
-  // Get minimum number of components from site constraint
-  int m_max = 0;
-  {
-    std::vector<uint32_t> s = sites;
-    std::sort(s.begin(), s.end());
-    int run = 0;
-    for (size_t i = 0; i < s.size(); ++i) {
-      if (i == 0 || s[i] == s[i - 1]) {
-        run++;
-      } else {
-        m_max = std::max(m_max, run);
-        run = 1;
-      }
-    }
-    if (!s.empty())
-      m_max = std::max(m_max, run);
-  }
-
-  std::vector<std::vector<int>> clusters(G);
-  for (int g = 0; g < G; ++g)
-    clusters[g].push_back(g);
-
-  // BD distance matrix
-  std::vector<std::vector<double>> dist_matrix(G, std::vector<double>(G));
-  for (int i = 0; i < G; ++i) {
-    for (int j = 0; j < G; ++j) {
-      if (i == j) {
-        dist_matrix[i][j] = 0.0;
-      } else {
-        dist_matrix[i][j] = calculate_bhattacharyya_distance_1d(
-            means_[i], variances_[i], means_[j], variances_[j]
-        );
-      }
-    }
-  }
-
-  // Agglomerative clustering but merge closest clusters first
-  while (clusters.size() > 1) {
-    double min_dist = std::numeric_limits<double>::infinity();
-    int merge_i = -1, merge_j = -1;
-
-    for (int i = 0; i < clusters.size(); ++i) {
-      for (int j = i + 1; j < clusters.size(); ++j) {
-        double cluster_dist = std::numeric_limits<double>::infinity();
-        for (int ci : clusters[i]) {
-          for (int cj : clusters[j]) {
-            cluster_dist = std::min(cluster_dist, dist_matrix[ci][cj]);
-          }
-        }
-
-        if (cluster_dist < min_dist) {
-          min_dist = cluster_dist;
-          merge_i = i;
-          merge_j = j;
-        }
-      }
-    }
-
-    // Stop if minimum distance across all clusters exceeds threshold
-    if (min_dist >= min_bd_threshold) {
-      break;
-    }
-
-    // Merge cluster j into cluster i
-    clusters[merge_i].insert(
-        clusters[merge_i].end(),
-        clusters[merge_j].begin(),
-        clusters[merge_j].end()
-    );
-
-    clusters.erase(clusters.begin() + merge_j);
-  }
-
-  std::vector<double> m_sigmoid(means_.size());
-  sigmoid_transform(means_, m_sigmoid);
-
-  for (int c = 0; c < clusters.size(); ++c) {
-
-    int rep = clusters[c][0];
-    double max_w = weights_[rep];
-
-    for (int g : clusters[c]) {
-      if (weights_[g] > max_w) {
-        max_w = weights_[g];
-        rep = g;
-      }
-    }
-  }
-
-  return clusters.size();
 }
 
 std::vector<int> gmm_1d::get_effective_components(std::vector<int> labels) const {
