@@ -7,19 +7,6 @@
 #include <string>
 #include <vector>
 
-std::vector<allele> populate_basic_alleles(){
-    std::vector<allele> ad;
-    std::vector<std::string> nts = { "A", "C", "G", "T"};
-    for(uint32_t i =0; i < nts.size(); i++){
-        allele tmp;
-        tmp.depth = 0;
-        tmp.nuc = nts[i];
-        tmp.mean_qual = 0;
-        ad.push_back(tmp);
-    }
-    return(ad);
-}
-
 void print_allele_depths(std::vector<allele> ad) {
   std::cout << "AD Size: " << ad.size() << " " << std::endl;
   for (std::vector<allele>::iterator it = ad.begin(); it != ad.end(); ++it) {

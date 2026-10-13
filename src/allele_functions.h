@@ -34,5 +34,4 @@ int find_ref_in_allele(std::vector<allele> ad, char ref);
 char gt2iupac(char a, char b);
 char codon2aa(char n1, char n2, char n3);
 uint32_t sum_allele_depths(std::vector<allele> test);
-std::vector<allele> populate_basic_alleles();
 #endif
