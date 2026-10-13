@@ -5,14 +5,6 @@
 IntervalTree::IntervalTree() { _root = NULL; }
 
 
-bool node_compare(ITNode *node1, ITNode *node2){
-  bool found = false;
-  if(node1->data->low == node2->data->low && node1->data->high == node2->data->high){
-    found = true;
-  }
-  return(found);
-}
-
 void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes) {
   if (root == NULL) return;
 

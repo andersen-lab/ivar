@@ -107,6 +107,5 @@ class IntervalTree {
 };
 
 int unpaired_primers(ITNode *root, primer prim);
-bool node_compare(ITNode *node1, ITNode *node2);
 IntervalTree populate_amplicons(std::string pair_info_file, std::vector<primer> &primers);
 #endif
