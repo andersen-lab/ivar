@@ -123,19 +123,7 @@ add_executable(check_site_state_aggregator_stats
 )
 
 add_executable(check_amplicon_masking
-        test_amplicon_masking.cpp ../src/gmm_1d.cpp ../src/bootstrap_variants.cpp ../src/multinomial_sampler.cpp ../src/solve_clustering.cpp ../src/gmm.cpp ../src/call_consensus_clustering.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp
-)
-
-add_executable(check_gaussian_sampler
-        test_gaussian_sampler.cpp ../src/gaussian_sampler.cpp
-)
-
-add_executable(check_multinomial_sampler
-        test_multinomial_sampler.cpp ../src/multinomial_sampler.cpp
-)
-
-add_executable(check_bootstrap_variants
-        test_bootstrap_variants.cpp ../src/bootstrap_variants.cpp ../src/multinomial_sampler.cpp
+        test_amplicon_masking.cpp ../src/gmm_1d.cpp ../src/solve_clustering.cpp ../src/gmm.cpp ../src/call_consensus_clustering.cpp ../src/allele_functions.cpp ../src/interval_tree.cpp ../src/primer_bed.cpp
 )
 
 set(ALL_TEST_EXECUTABLES check_primer_trim
@@ -167,9 +155,6 @@ set(ALL_TEST_EXECUTABLES check_primer_trim
         check_site_amplicon_aggregator_stats
         check_site_state_aggregator_stats
         check_amplicon_masking
-        check_gaussian_sampler
-        check_multinomial_sampler
-        check_bootstrap_variants
 )
 
 if(HTSLIB_PREFIX)
