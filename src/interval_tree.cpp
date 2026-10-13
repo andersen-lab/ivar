@@ -23,18 +23,6 @@ void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upp
 }
 
 
-int IntervalTree::unpaired_primers(ITNode *root, primer prim){
-  if (root==NULL) return 0;
-  char strand = prim.get_strand();
-  if (strand == '+' && ((int)prim.get_start() == root->data->low)){
-    return 1;
-  } else if (strand == '-' && ((int)prim.get_end()+1 == root->data->high)){
-    return 1;
-  }
-  int ret = unpaired_primers(root->right, prim);
-  return ret;
-}
-
 // [Deprecated] Use insert_node_balanced()
 // A utility function to insert a new Interval Search Tree Node
 // This is similar to BST Insert.  Here the low value of interval
@@ -144,12 +132,6 @@ IntervalTree populate_amplicons(std::string pair_info_file, std::vector<primer> 
     }
   }
   return tree;
-}
-
-void IntervalTree::print_amplicons(ITNode *root){
-  if (root==NULL) return;
-  std::cout << "\nLow:" << root->data->low << " High: " << root->data->high << std::endl;
-  print_amplicons(root->right);
 }
 
 // node is right unbalanced

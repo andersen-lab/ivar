@@ -86,26 +86,20 @@ class IntervalTree {
   bool is_interval_contained(ITNode *root, Interval data);
   void inOrder(ITNode *root);
   std::string pre_order_with_level(ITNode *root, int level);
-  void print_amplicons(ITNode *root);
   void get_max_pos(ITNode *root);
-  int unpaired_primers(ITNode *root, primer prim);
   void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes);
 
  public:
   IntervalTree();
   uint32_t max_pos=0;
-  std::vector<std::vector<uint32_t>> overlaps;
 
   void insert(Interval data) { _root = insert_node_balanced(_root, data); }
   bool is_interval_contained(Interval data) { return is_interval_contained(_root, data); }
   void inOrder() { inOrder(_root); }
   std::string pre_order_with_level() { return pre_order_with_level(_root, 0); }
-  void print_amplicons() {print_amplicons(_root);}
   void get_max_pos() {get_max_pos(_root);}
-  int unpaired_primers(primer prim) { return unpaired_primers(_root, prim);}
   void find_read_amplicon(uint32_t lower, uint32_t upper, std::vector<ITNode*>&nodes) {find_read_amplicon(_root, lower, upper, nodes);}
 };
 
-int unpaired_primers(ITNode *root, primer prim);
 IntervalTree populate_amplicons(std::string pair_info_file, std::vector<primer> &primers);
 #endif
