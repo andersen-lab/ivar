@@ -459,7 +459,7 @@ int main(int argc, char *argv[]) {
       std::vector<double> solution;
       std::vector<double> means;
       std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.min_threshold, g_args.gmm_n, g_args.gmm_invariant, g_args.gmm_cov_prior, g_args.gmm_mean_prior, g_args.gmm_half_normal_cov_prior, g_args.gmm_min_cluster_fraction, g_args.gmm_min_cluster_points, g_args.amplicon_stdev, g_args.dump_variants, g_args.freq_outlier_threshold);
-      cluster_consensus(variants, g_args.prefix, g_args.min_threshold, g_args.min_depth, g_args.min_qual, solution, means);
+      cluster_consensus(variants, g_args.prefix, solution);
     }
     res = 0;
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");

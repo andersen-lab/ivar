@@ -154,7 +154,7 @@ int main() {
   }
 
   if(!variants.empty()) {
-    cluster_consensus(variants, prefix, default_threshold, min_depth, min_qual, solution, means);
+    cluster_consensus(variants, prefix, solution);
   }
 
   // TEST 1 assertion disabled: the stored ground truth encodes the pre-change

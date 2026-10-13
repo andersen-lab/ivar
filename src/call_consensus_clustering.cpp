@@ -324,11 +324,7 @@ void consensus_sequence::write_consensus_to_file(std::string consensus_filename)
 
 void cluster_consensus(std::vector<variant> variants, \
                       std::string clustering_file, \
-                      double default_threshold, \
-                      uint32_t min_depth, \
-                      uint8_t min_qual, \
-                      std::vector<double> solution, \
-                      std::vector<double> means){
+                      std::vector<double> solution){
   std::cerr << "calling consensus" << std::endl;
   if(variants.size() == 0){
     return;
