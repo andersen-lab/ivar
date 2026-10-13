@@ -51,10 +51,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   bam1_t *aln = bam_init1();
 
   //iterate through reads
-  in = sam_open(bam.c_str(), "r");
-  header = sam_hdr_read(in);
-  aln = bam_init1();
-
   uint32_t last_position=0;
   int tid=0;
   while (sam_read1(in, header, aln) >= 0) {
