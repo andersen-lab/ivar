@@ -86,18 +86,15 @@ class IntervalTree {
   bool is_interval_contained(ITNode *root, Interval data);
   void inOrder(ITNode *root);
   std::string pre_order_with_level(ITNode *root, int level);
-  void get_max_pos(ITNode *root);
   void find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upper, std::vector<ITNode*> &nodes);
 
  public:
   IntervalTree();
-  uint32_t max_pos=0;
 
   void insert(Interval data) { _root = insert_node_balanced(_root, data); }
   bool is_interval_contained(Interval data) { return is_interval_contained(_root, data); }
   void inOrder() { inOrder(_root); }
   std::string pre_order_with_level() { return pre_order_with_level(_root, 0); }
-  void get_max_pos() {get_max_pos(_root);}
   void find_read_amplicon(uint32_t lower, uint32_t upper, std::vector<ITNode*>&nodes) {find_read_amplicon(_root, lower, upper, nodes);}
 };
 

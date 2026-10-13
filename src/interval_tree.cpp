@@ -87,14 +87,6 @@ bool IntervalTree::is_interval_contained(ITNode *root, Interval i) {
   return is_interval_contained(root->right, i);
 }
 
-void IntervalTree::get_max_pos(ITNode *root){
-  if (root == NULL) return;
-  if (root->data->high > (int)max_pos) {
-    max_pos = (uint32_t) root->data->high;
-  }
-  get_max_pos(root->right);
-}
-
 // A helper function for inorder traversal of the tree
 void IntervalTree::inOrder(ITNode *root) {
   if (root == NULL) return;

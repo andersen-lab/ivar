@@ -21,9 +21,6 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   IntervalTree amplicons;
   if (!pair_info.empty() && !primers.empty()) {
     amplicons = populate_amplicons(pair_info, primers);
-    amplicons.inOrder();
-    amplicons.get_max_pos();
-    std::cerr << "Maximum position " << amplicons.max_pos << std::endl;
   } else{
     std::cerr << "Amplicon specific measurements will not be calculated." << std::endl;
   }
