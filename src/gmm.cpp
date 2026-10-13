@@ -1,6 +1,5 @@
 #include "gmm_1d.h"
 #include "solve_clustering.h"
-#include "genomic_position.h"
 #include "gmm.h"
 #include "saga.h"
 #include "call_consensus_clustering.h"

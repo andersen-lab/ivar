@@ -13,7 +13,6 @@
 #include "../src/call_consensus_clustering.h"
 #include "../src/allele_functions.h"
 #include "../src/parse_gff.h"
-#include "../src/genomic_position.h"
 
 variant find_identical_variant(variant search_var, std::vector<variant> all_variants){
   variant null;
