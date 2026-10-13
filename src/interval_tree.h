@@ -21,7 +21,6 @@ class Interval{
 // A node in IntervalTree
 class ITNode {
  public:
-  void set_haplotypes(primer prim);
   Interval *data; // pointer to node's interval data object
   ITNode *left, *right; // pointer to node's left & right child node objects
   int max;
