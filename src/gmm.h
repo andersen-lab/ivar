@@ -12,7 +12,6 @@ struct variant {
   double qual;
   double freq;
   double gapped_freq = 0;
-  double logit = 0;
   int cluster_assigned = -1;
   bool version_1_var=false;
   bool half_normal_upper = false;
@@ -42,12 +41,10 @@ struct variant {
   bool depth_flag=false; //depth is below the threshold
   bool qual_flag=false; //quality is below threshold
   bool outside_freq_range=false; //outside of useful frequency range for model
-  bool cluster_outlier=false; //is an outlier for the cluster assigned
   bool freq_outlier=false; //further than the freq outlier threshold sds from the cluster it was assigned to
   bool overlapped_deletion=false; //minor deletion overlapping a more abundant deletion at the same site
   bool ref_allele=false; //REF == ALT row
   bool deletion_span_duplicate=false; //reference row inside an accepted deletion, left out of the fit so the deletion counts once
-  bool imbalance=false;
   bool position_conflict=false; //multiple variants at this position assigned to the same cluster
   std::vector<double> probabilities;
 
