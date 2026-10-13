@@ -103,8 +103,6 @@ class gmm_1d {
   void set_min_cluster_points(uint32_t n) { min_cluster_points_ = n; }
   uint32_t get_min_cluster_points() const { return min_cluster_points_; }
 
-  static void logit_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
-  static void sigmoid_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps = 1e-6);
 
   std::vector<double> get_weights() const { return weights_; }
   std::vector<double> get_means() const { return means_; }

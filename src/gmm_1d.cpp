@@ -727,25 +727,6 @@ std::vector<std::vector<double>> gmm_1d::predict_proba(const std::vector<double>
   return proba;
 }
 
-void gmm_1d::logit_transform(const std::vector<double> &x, std::vector<double> &transformed_x, double eps) {
-  const size_t n = x.size();
-  transformed_x.resize(n);
-
-  for (size_t i = 0; i < n; ++i) {
-    double v = x[i];
-    v = std::min(std::max(v, eps), 1.0 - eps);
-    transformed_x[i] = std::log(v / (1.0 - v));
-  }
-}
-
-void gmm_1d::sigmoid_transform(const std::vector<double>& x, std::vector<double>& transformed_x, double eps) {
-  transformed_x.resize(x.size());
-  for (size_t i = 0; i < x.size(); ++i) {
-    double s = 1.0 / (1.0 + std::exp(-x[i]));
-    transformed_x[i] = std::min(std::max(s, eps), 1.0 - eps);
-  }
-}
-
 std::vector<int> gmm_1d::get_effective_components(std::vector<int> labels) const {
   std::vector<int> tmp = labels;
   std::sort(tmp.begin(), tmp.end());
