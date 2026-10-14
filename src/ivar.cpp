@@ -462,7 +462,6 @@ int main(int argc, char *argv[]) {
       cluster_consensus(variants, g_args.prefix, solution);
     }
     res = 0;
-    g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
   }
 
   //ivar variants
