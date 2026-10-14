@@ -11,7 +11,7 @@ int check_failure(char n1, char n2, char n3, char *codon, int pos) {
 
 int main() {
   int num_success = 0;
-  ref_antd refantd("../data/db/test_ref.fa", "../data/test.gff");
+  ref_antd refantd("../../data/db/test_ref.fa", "../../data/test.gff");
   std::vector<gff3_feature> g = refantd.get_gff_features();
   char *codon = new char[3];
   codon = refantd.get_codon(30, "test", g.at(2));
