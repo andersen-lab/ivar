@@ -493,47 +493,6 @@ bool gmm_1d::fit(const std::vector<double>& x) {
   }
   std::cerr << std::endl;
 
-  //variance of the points nearest each seed, in the same order as the seeds above
-  std::vector<int> seed_labels(x.size(), 0);
-  for(size_t i=0; i < x.size(); i++){
-    int best = 0;
-    double best_d = (x[i] - x[seed_indices[0]]) * (x[i] - x[seed_indices[0]]);
-    for(size_t k=1; k < seed_indices.size(); k++){
-      double d = (x[i] - x[seed_indices[k]]) * (x[i] - x[seed_indices[k]]);
-      if(d < best_d){
-        best_d = d;
-        best = (int)k;
-      }
-    }
-    seed_labels[i] = best;
-  }
-  std::cerr << "Kmeans variances: ";
-  double max_var = 0.0;
-  for(size_t k=0; k < seed_indices.size(); k++){
-    double sum = 0.0;
-    uint32_t n = 0;
-    for(size_t i=0; i < x.size(); i++){
-      if(seed_labels[i] == (int)k){
-        sum += x[i];
-        n++;
-      }
-    }
-    double var = 0.0;
-    if(n > 0){
-      double mean = sum / n;
-      for(size_t i=0; i < x.size(); i++){
-        if(seed_labels[i] == (int)k){
-          var += (x[i] - mean) * (x[i] - mean);
-        }
-      }
-      var /= n;
-    }
-    if(var > max_var) max_var = var;
-    std::cerr << var << ", ";
-  }
-  std::cerr << std::endl;
-  std::cerr << "Kmeans max variance: " << std::round(max_var * 100000.0) / 100000.0 << std::endl;
-
   // Set mean prior from kmeans for gaussian components
   for (int k = 0; k < n_gaussian; k++) {
     mean_prior_[k] = x[seed_indices[k]];
@@ -771,7 +730,6 @@ std::vector<int> gmm_1d::get_invariant_components(std::vector<int> labels) const
   result.reserve(tmp.size());
 
   if(use_half_normal_for_noise_) {
-    int n_half_normal = 0;
     for (int x : tmp) {
       if (result.empty() || x != result.back()) {
         if(is_half_normal_component(x)) {
@@ -793,7 +751,6 @@ std::vector<double> gmm_1d::get_invariant_component_variances(std::vector<int> l
   result.reserve(tmp.size());
 
   if(use_half_normal_for_noise_) {
-    int n_half_normal = 0;
     for (int x : tmp) {
       if (result.empty() || x != result.back()) {
         if(is_half_normal_component(x)) {
@@ -814,7 +771,6 @@ std::vector<double> gmm_1d::get_invariant_component_weights(std::vector<int> lab
   result.reserve(tmp.size());
 
   if(use_half_normal_for_noise_) {
-    int n_half_normal = 0;
     for (int x : tmp) {
       if (result.empty() || x != result.back()) {
         if(is_half_normal_component(x)) {
