@@ -82,7 +82,6 @@ class IntervalTree {
   ITNode* right_rotate(ITNode *y);
   ITNode* insert_node_balanced(ITNode *node, Interval data);
 
-  void insert(ITNode *root, Interval data);
   bool is_interval_contained(ITNode *root, Interval data);
   void inOrder(ITNode *root);
   std::string pre_order_with_level(ITNode *root, int level);

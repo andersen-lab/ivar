@@ -23,44 +23,6 @@ void IntervalTree::find_read_amplicon(ITNode *root, uint32_t lower, uint32_t upp
 }
 
 
-// [Deprecated] Use insert_node_balanced()
-// A utility function to insert a new Interval Search Tree Node
-// This is similar to BST Insert.  Here the low value of interval
-// is used tomaintain BST property
-void IntervalTree::insert(ITNode *root, Interval data) {
-  // Base case: Tree is empty, new node becomes root
-  if (root == NULL) {
-    root = new ITNode(data);
-    _root = root;
-  } else {
-    // Get low value of interval at root
-    int l = root->data->low;
-    // If root's low value is greater, then new interval goes to
-    // left subtree
-    if (data.low < l) {
-      if (!root->left) {
-        ITNode *tmpNode = new ITNode(data);
-        // std::cout << data.low << ":" << data.high << "->insertLeft" <<
-        // std::endl;
-        root->left = tmpNode;
-      } else {
-        insert(root->left, data);
-      }
-    } else {
-      if (!root->right) {
-        ITNode *tmpNode = new ITNode(data);
-        // std::cout << data.low << ":" << data.high << "->insertRight" <<
-        // std::endl;
-        root->right = tmpNode;
-      } else {
-        insert(root->right, data);
-      }
-    }
-  }
-  // update max value of ancestor node
-  if (root->max < data.high) root->max = data.high;
-}
-
 // A utility function to check if the 1st interval envelops the second
 bool check_interval_contained(Interval i1, Interval i2) {
   if (i1.low <= i2.low && i1.high >= i2.high) return true;
