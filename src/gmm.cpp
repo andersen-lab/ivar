@@ -754,7 +754,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   out << "[";
     for (size_t j = 0; j < model_means.size(); j++) {
       out << model_means[j];
-      if (j < means.size() - 1) out << ",";
+      if (j < model_means.size() - 1) out << ",";
     }
   out << "]";
   out << "\t";
