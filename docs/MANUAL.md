@@ -8,8 +8,8 @@ Available Commands
 | Command | Description |
 |:--------|:------------|
 | trim | Trim reads in aligned BAM |
-| variants | (EXPERIMENTAL) Call variants read by read as preprocessing for `consensus` |
-| consensus | (EXPERIMENTAL) Estimate the number of populations in a sample |
+| variants | (EXPERIMENTAL) Call variants read by read from an aligned BAM file, as input for `consensus` |
+| consensus | (EXPERIMENTAL) Call one consensus per population in a mixed sample |
 | variants_pileup | Call variants from aligned BAM file |
 | filtervariants | Filter variants across replicates or multiple samples aligned using the same reference |
 | consensus_pileup | Call consensus from aligned BAM file |
@@ -97,25 +97,29 @@ Puerto	1054	1076	400_3_out_R*	60	-
 
 **Note: This feature is under active development and not completely validated yet.**
 
-`ivar variants` is a variant caller, like `ivar variants_pileup` — it produces the same kind of per-site REGION/POS/REF/ALT allele table — but instead of reading text output piped in from `samtools mpileup`, it works directly off an aligned, sorted BAM file and aggregates nucleotide states **read by read** (merging overlapping mate-pair information for paired reads). If a primer BED file (`-b`) and primer pair file (`-f`) are both supplied, reads are additionally assigned to amplicons so that per-amplicon depth and frequency statistics can be calculated; without both files, amplicon-specific measurements are skipped.
+`ivar variants` is a variant caller, like `ivar variants_pileup` — it produces the same kind of allele table — but instead of reading text output piped in from `samtools mpileup`, it works directly off an aligned BAM file and aggregates nucleotide states **read by read** (merging overlapping mate-pair information for paired reads). If a primer BED file (`-b`) and primer pair file (`-f`) are both supplied, reads are additionally assigned to amplicons so that per-amplicon depth and frequency statistics can be calculated; without both files, amplicon-specific measurements are skipped.
 
-`ivar variants` is the preprocessing step for `ivar consensus`: its output carries the extra per-amplicon columns (flux/masking flags, per-amplicon frequencies) that `ivar consensus`'s clustering model uses to distinguish real minor populations from amplicon artifacts.
+`ivar variants` is the preprocessing step for `ivar consensus`: its output adds gapped frequencies and per-amplicon frequencies and depths, which `ivar consensus` uses to distinguish real minor populations from amplicon artifacts.
 
 Command:
 ```
 ivar variants
 
-Usage: ivar variants -i <input.bam> -r <reference.fa> -p <prefix> [-b <primers.bed>] [-f <primer_pairs.tsv>] [-x <primer-offset>]
+Usage: ivar variants -i <input.bam> -r <reference-fasta> -p <prefix> [-b <primers.bed>] [-f <primer_pairs.tsv>] [-x <primer-offset>] [-m <minimum depth>] [-q <min-quality>] [-g GFF file]
 
 Input Options    Description
-           -i    (Required) Sorted BAM file with aligned reads to call variants from
-           -r    (Required) Reference FASTA file used for alignment
-           -b    BED file with primer sequences and positions. Must be supplied along with -f to calculate per-amplicon statistics
-           -f    Primer pair information file containing left and right primer names for the same amplicon separated by a tab. Must be supplied along with -b to calculate per-amplicon statistics
-           -x    Primer position offset (Default: 0), used the same way as in `ivar trim`
+           -i    (Required) BAM file, with aligned reads, to call variants read by read
+           -b    BED file with primer sequences and positions.
+           -f    Primer pair information file containing left and right primer names for the same amplicon separated by a tab.
+                 If provided along with -b, reads are assigned to amplicons so per-amplicon depth and frequency statistics can be calculated; without both files, amplicon-specific measurements are skipped.
+           -x    Primer position offset, used when assigning reads to amplicons (Default: 0)
+           -m    Minimum read depth including deletions (Default: 10)
+           -q    Minimum base quality to count a base (Default: 20). Indels are always counted.
+           -r    (Required) Reference file used for alignment.
+           -g    GFF3 file of open reading frames for amino acid translation. A position in several CDSs gets one comma separated entry per feature.
 
 Output Options   Description
-           -p    Prefix for the output variant table
+           -p    (Required) Prefix for the output file
 ```
 
 Example Usage:
@@ -123,54 +127,71 @@ Example Usage:
 ivar variants -i test.trimmed.bam -r test_reference.fa -b test_primers.bed -f pair_information.tsv -p test.saga
 ```
 
-The command above will produce `test.saga.txt`, a tab separated file with the same REGION/POS/REF/ALT/depth/quality/frequency/amino-acid-translation columns as `ivar variants_pileup` (see the field descriptions in the "Call variants with iVar" section below), plus the following additional columns used by `ivar consensus`:
+The command above will produce `test.saga.txt`, a tab separated file with the same columns as `ivar variants_pileup` (see the field descriptions in the "Call variants with iVar" section below), with these differences:
+
+* `REF_RV`, `ALT_RV`, `PVAL` and `PASS` are left empty.
+* A position that falls in more than one CDS has a single row, with one comma separated entry per GFF feature in each amino acid column. `ivar variants_pileup` writes one row per feature instead.
+
+It also has the following additional columns, used by `ivar consensus`:
 
 | Field | Description |
 |:------|:------------|
-| POS\_AA | Codon position of the variant within the translated amino acid |
-| GAPPED\_FREQ | Frequency of the alternate base including gapped (deletion) reads in the depth |
-| GAPPED\_DEPTH | Total depth at the position including gaps |
-| FLAGGED\_POS | Whether the position has been flagged as problematic |
-| AMP\_MASKED | Whether the variant has been masked due to amplicon-level issues |
-| STD\_DEV | Standard deviation of the alternate allele frequency across amplicons covering the position |
-| AMP\_FREQ | Per-amplicon frequencies of the alternate allele |
-| AMP\_NUMBERS | Amplicon numbers covering the position |
+| GAPPED\_FREQ | Frequency of the allele with deletions counted in the depth |
+| GAPPED\_DEPTH | Total depth at the position with deletions counted |
+| AMP\_NUMBERS | Amplicons covering the position, as `start-end`, comma separated |
+| AMP\_FREQ | Frequency of the allele on each amplicon, in the same order as AMP\_NUMBERS |
+| AMP\_DEPTH | Depth of each amplicon at the position, in the same order as AMP\_NUMBERS |
 
 (Experimental) Population-specific consensus calling for mixed samples with iVar
 ----
 
 **Note: This feature is under active development and not completely validated yet.**
 
-`ivar consensus` is a population-specific consensus caller for mixed samples. It estimates how many distinct populations (e.g. co-infecting strains, mixed samples, or cross-contamination) are present in a sample by fitting a Gaussian Mixture Model (GMM) to the allele frequencies reported in a variants `.tsv` file, then uses the fitted populations to call a separate consensus sequence for each one. This file is normally the output of `ivar variants`, which preprocesses the BAM read by read and supplies amplicon-specific statistics; a plain `ivar variants_pileup` `.tsv` also works as input, but without those extra columns the model has less information to separate real minor populations from amplicon noise. Each fitted Gaussian component corresponds to a candidate population frequency, and low-weight components (below the minimum cluster fraction) are pruned. Variants with a frequency above the invariant threshold (or below `1 - invariant threshold`) are modeled separately with a half-normal distribution, to handle alleles belonging to all populations (frequency close to 1.0) and noise (frequency close to 0) rather than folding them into a population-frequency cluster. Once the population frequencies (effective means) have been estimated, iVar searches for a subset of those means that sum to ~1 (a "solution set") in order to group the underlying variants into a consensus sequence per estimated population.
+`ivar consensus` is a population-specific consensus caller for mixed samples. It estimates how many distinct populations (e.g. co-infecting strains, mixed samples, or cross-contamination) are present in a sample by fitting a Gaussian Mixture Model (GMM) to the allele frequencies reported by `ivar variants`, then uses the fitted populations to call a separate consensus sequence for each one. Each fitted Gaussian component corresponds to a candidate population frequency, and components with too few points (below the minimum cluster fraction, `-F`, or minimum points per cluster, `-P`) are pruned. Variants with a frequency at or above the invariant threshold (or at or below `1 - invariant threshold`) are modeled separately with a half-normal distribution, to handle alleles belonging to all populations (frequency close to 1.0) and noise (frequency close to 0) rather than folding them into a population-frequency cluster. Once the population frequencies (effective means) have been estimated, iVar searches for a subset of those means that sum to ~1 (a "solution set") in order to group the underlying variants into a consensus sequence per estimated population.
+
+The input must be the output of `ivar variants`. A `ivar variants_pileup` `.tsv` file has no `GAPPED_FREQ` or `GAPPED_DEPTH` columns, so every variant fails the depth filter and the result is a consensus of all `N`.
 
 Command:
 ```
 ivar consensus
+
 Usage: ivar consensus -s <variants.tsv> -p <prefix> [options]
 
-Required Options Description
-           -s    Variants TSV file produced by ivar variants (or ivar variants_pileup)
-           -p    Prefix for output files
-
 Input Options    Description
-           -t    Minimum frequency threshold (Default: 0)
-           -m    Minimum read depth (Default: 10)
-           -q    Minimum quality score threshold to count base (Default: 20)
+           -s    (Required) Variants file produced by ivar variants
+           -t    Frequency threshold for the fallback consensus (Default: 0)
+           -m    Minimum read depth including deletions (Default: 10)
+           -q    Minimum mean quality score of the variant (Default: 20)
 
 GMM Prior Options  Description
            -N    Number of Gaussian components (Default: 12)
            -I    Invariant frequency threshold; variants above this
                  value are modeled with a half-normal (Default: 0.97)
-           -C    Covariance prior (Default: 0.0)
+           -C    Covariance prior (Default: sample variance of the
+                 frequencies used for clustering)
            -H    Half-normal covariance prior; applies to the
-                 half-normal noise components (Default: 0.0)
+                 half-normal noise components (Default: sample
+                 variance of the frequencies used for clustering)
            -M    Mean precision prior (Default: 0.5)
-           -F    Minimum cluster fraction; clusters with fewer than
-                 this fraction of the data are pruned (Default: 0.10)
-           -W    A variant further than this from the mean of the cluster
-                 it was assigned to is not a credible member of it, so the
-                 position is called N in every genome. Raw frequency, not
-                 standard deviations. Set to 1 to disable (Default: 0.10)
+           -F    Minimum fraction of points per cluster; ignored if
+                 -P is set (Default: 0.10)
+           -P    Minimum points per cluster; overrides -F when > 0
+                 (Default: 0)
+           -W    Maximum standard deviations a variant can be from its
+                 cluster mean before the position is called N
+                 (Default: 3.0)
+
+Amplicon Options   Description
+           -A    Maximum weighted standard deviation of a variant's
+                 per-amplicon frequencies before the position is called
+                 N (Default: 2.0, which disables it)
+
+Debug Options      Description
+           -V    Write per-variant details to
+                 <prefix>_variant_details.txt
+
+Output Options     Description
+           -p    (Required) Prefix for output files
 ```
 
 Example Usage:
@@ -179,12 +200,14 @@ ivar variants -i test.trimmed.bam -r test_reference.fa -b test_primers.bed -f pa
 ivar consensus -s test.saga.txt -p test.contam
 ```
 
-The command above will produce two output files:
+The command above will produce the following output files:
 
-* `test.contam_gmm_1d_results.txt` - The parameters of the fitted mixture model: the number of components requested, the number of effective (non-pruned) components, and the means, variances and weights of both the full model and the effective components, along with any subset of effective means found to sum to ~1 (`Solution_Sets`).
-* `test.contam.fa` - A FASTA file with one consensus sequence per estimated population, with headers in the format `test.contam_cluster_<N>`.
+* `test.contam.fa` - A FASTA file with one consensus sequence per estimated population, largest population first, with headers in the format `test.contam_cluster_<abundance>` (e.g. `test.contam_cluster_0.800000`).
+* `test.contam_threshold.fa` - Written instead of `test.contam.fa` when there are too few variants to cluster or clustering does not find a single solution. It holds one consensus called with the frequency threshold `-t`, with the header `test.contam_<threshold>_threshold`.
+* `test.contam_gmm_1d_results.txt` - The parameters of the fitted mixture model: the number of components requested, the number of effective (non-pruned) components, the means, variances and weights of both the full model and the effective components, any subset of effective means found to sum to ~1 (`Solution_Sets`), and the populations and positions left ambiguous (`Ambiguous_Populations`, `Ambiguous_Positions`).
+* `test.contam_variant_details.txt` - Only written with `-V`: one row per variant with its cluster assignment, posteriors and consensus flags.
 
-**Note**: This command consumes the output of `ivar variants` (or `ivar variants_pileup`), so variants must first be called for the sample. The GMM prior options default to values tuned for spike-in/mixed-population controls and may need adjustment depending on sample composition.
+**Note**: This command consumes the output of `ivar variants`, so variants must first be called for the sample. The GMM prior options default to values tuned for spike-in/mixed-population controls and may need adjustment depending on sample composition.
 
 Call variants with iVar
 ----
