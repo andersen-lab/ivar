@@ -153,32 +153,6 @@ std::vector<std::string> split_csv_string(const std::string& input) {
     return result;
 }
 
-void set_advanced_freq_range_flags(std::vector<variant> &variants, uint32_t max_pos, double lower_bound) {
-  std::unordered_map<uint32_t, std::vector<variant>> variants_by_pos;
-  for (auto &var : variants) {
-    variants_by_pos[var.position].push_back(var);
-  }
-
-  for (auto &[pos, vec] : variants_by_pos) {
-    if (pos >= max_pos) continue;
-
-    double total_noise = 0.0;
-    for (const auto &v : vec) {
-      if (v.outside_freq_range) {
-        total_noise += v.gapped_freq;
-      }
-    }
-
-    if (total_noise < lower_bound) continue;
-
-    for (auto &v : vec) {
-      if (!v.outside_freq_range && (1.0 - v.gapped_freq) >= total_noise && v.gapped_freq > 0.5) {
-        v.outside_freq_range = true;
-      }
-    }
-  }
-}
-
 bool is_empty_field(const std::string& val) {
     if (val.empty()) return true;
 
@@ -197,21 +171,6 @@ bool is_empty_field(const std::string& val) {
         return true;
 
     return false;
-}
-
-void set_freq_range_flags(std::vector<variant> &variants, double lower_bound, double upper_bound, bool advanced){
-  uint32_t max_pos = 0;
-  for(uint32_t i=0; i < variants.size(); i++){
-    if(variants[i].position > max_pos) max_pos = variants[i].position;
-    if(variants[i].gapped_freq <= lower_bound || variants[i].gapped_freq >= upper_bound){
-      variants[i].outside_freq_range = true;
-    } else {
-      variants[i].outside_freq_range = false;
-    }
-  }
-  if(advanced){
-    set_advanced_freq_range_flags(variants, max_pos, lower_bound);
-  }
 }
 
 void parse_internal_variants(std::string filename, 
@@ -404,6 +363,28 @@ void set_deletion_flags(std::vector<variant> &variants, double lower_bound, doub
   }
 }
 
+//treat an allele as invariant when noise-level alleles at its position account for the rest
+void flag_noise_explained_variants(std::vector<variant> &variants, double invariant_threshold){
+  double noise_upper_bound = 1.0 - invariant_threshold;
+  std::unordered_map<uint32_t, double> noise_freq;
+  for (const auto &v : variants) {
+    if (v.depth_flag || v.gapped_freq > noise_upper_bound) continue;
+    if (v.nuc.find('+') != std::string::npos) continue;
+    noise_freq[v.position] += v.gapped_freq;
+  }
+
+  for (auto &v : variants) {
+    if (v.depth_flag || v.outside_freq_range) continue;
+    if (v.nuc.find('+') != std::string::npos) continue;
+    auto it = noise_freq.find(v.position);
+    if (it == noise_freq.end()) continue;
+    if (v.gapped_freq + it->second >= invariant_threshold) {
+      v.half_normal_upper = true;
+      v.outside_freq_range = true;
+    }
+  }
+}
+
 //Pruning a component renormalizes its variants' posteriors onto the survivors, which can
 //hand a variant a confident assignment to a component it sits nowhere near. The ambiguity
 //test only compares components against each other, so nothing else catches this.
@@ -530,6 +511,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
   flag_amplicon_variation(base_variants, amplicon_stdev);
   set_deletion_flags(base_variants, 0.001, 1.0 - invariant_threshold);
+  flag_noise_explained_variants(base_variants, invariant_threshold);
 
   std::vector<variant> model_variants;
   std::vector<double> model_freqs;
