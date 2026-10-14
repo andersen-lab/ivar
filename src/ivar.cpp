@@ -70,8 +70,10 @@ void print_usage() {
          "\n"
          "        Command       Description\n"
          "           trim       Trim reads in aligned BAM file\n"
-         "      consensus       Estimate the number of populations in a sample\n"
-         "       variants       Call consensus with an automated threshold\n"
+         "      consensus       Call one consensus per population in a mixed "
+         "sample from `ivar variants` output\n"
+         "       variants       Call variants read by read from an aligned "
+         "BAM file, as input for `ivar consensus`\n"
          "variants_pileup       Call variants from aligned BAM file\n"
          " filtervariants       Filter variants across replicates or samples\n"
          "consensus_pileup      Call consensus from aligned BAM file\n"
@@ -86,42 +88,37 @@ void print_usage() {
 void print_contam_usage() {
   std::cout
       << "Usage: ivar consensus -s <variants.tsv> -p <prefix> [options]\n\n"
-         "Required Options Description\n"
-         "           -s    Variants TSV file produced by ivar variants\n"
-         "           -p    Prefix for output files\n\n"
          "Input Options    Description\n"
-         "           -t    Minimum frequency threshold (Default: 0)\n"
-         "           -m    Minimum read depth (Default: 10)\n"
-         "           -q    Minimum quality score threshold to count base (Default: 20)\n\n"
+         "           -s    (Required) Variants file produced by ivar variants\n"
+         "           -t    Frequency threshold for the fallback consensus (Default: 0)\n"
+         "           -m    Minimum read depth including deletions (Default: 10)\n"
+         "           -q    Minimum mean quality score of the variant (Default: 20)\n\n"
          "GMM Prior Options  Description\n"
          "           -N    Number of Gaussian components (Default: 12)\n"
          "           -I    Invariant frequency threshold; variants above this\n"
          "                 value are modeled with a half-normal (Default: 0.97)\n"
-         "           -C    Covariance prior (Default: 0.0)\n"
+         "           -C    Covariance prior (Default: sample variance of the\n"
+         "                 frequencies used for clustering)\n"
          "           -H    Half-normal covariance prior; applies to the\n"
-         "                 half-normal noise components (Default: 0.0)\n"
+         "                 half-normal noise components (Default: sample\n"
+         "                 variance of the frequencies used for clustering)\n"
          "           -M    Mean precision prior (Default: 0.5)\n"
-         "           -F    Minimum cluster fraction; clusters with fewer than\n"
-         "                 this fraction of the data are pruned; ignored if -P\n"
-         "                 is set (Default: 0.10)\n"
-         "           -P    Minimum points per cluster; clusters with fewer than\n"
-         "                 this many frequencies are pruned. If set (>0),\n"
-         "                 overrides -F (Default: 0, unset)\n"
-         "           -W    A variant more than this many standard deviations (sqrt\n"
-         "                 of the cluster variance) from the mean of the cluster it\n"
-         "                 was assigned to is not a credible member of it, so the\n"
-         "                 position is called N in every genome. Applies to half\n"
-         "                 normal assignments too. A large value (e.g. 1e9)\n"
-         "                 disables it (Default: 3.0)\n\n"
+         "           -F    Minimum fraction of points per cluster; ignored if\n"
+         "                 -P is set (Default: 0.10)\n"
+         "           -P    Minimum points per cluster; overrides -F when > 0\n"
+         "                 (Default: 0)\n"
+         "           -W    Maximum standard deviations a variant can be from its\n"
+         "                 cluster mean before the position is called N\n"
+         "                 (Default: 3.0)\n\n"
          "Amplicon Options   Description\n"
-         "           -A    Weighted standard deviation of a variant's per-amplicon\n"
-         "                 frequencies above which the position is masked to N.\n"
-         "                 Requires AMP_FREQ/AMP_DEPTH columns. Default 2.0 is\n"
-         "                 unreachable, so masking is off unless this is set.\n\n"
+         "           -A    Maximum weighted standard deviation of a variant's\n"
+         "                 per-amplicon frequencies before the position is called\n"
+         "                 N (Default: 2.0, which disables it)\n\n"
          "Debug Options      Description\n"
-         "           -V    Write <prefix>_variant_details.txt, one row per variant\n"
-         "                 with its cluster assignment, posteriors and consensus\n"
-         "                 flags. Written even when clustering finds no solution.\n";
+         "           -V    Write per-variant details to\n"
+         "                 <prefix>_variant_details.txt\n\n"
+         "Output Options     Description\n"
+         "           -p    (Required) Prefix for output files\n";
 }
 
 void print_trim_usage() {
@@ -158,12 +155,12 @@ void print_trim_usage() {
 
 void print_saga_usage() {
   std::cout
-      << "Usage: ivar variants -i <input.bam> -p <prefix> [-b <primers.bed>] "
-         "[-f <primer_pairs.tsv>] [-x <primer-offset>] [-m <minimum depth>] "
-         "[-q <min-quality>] [-r <reference-fasta>] [-g GFF file]\n\n"
+      << "Usage: ivar variants -i <input.bam> -r <reference-fasta> -p <prefix> "
+         "[-b <primers.bed>] [-f <primer_pairs.tsv>] [-x <primer-offset>] "
+         "[-m <minimum depth>] [-q <min-quality>] [-g GFF file]\n\n"
          "Input Options    Description\n"
-         "           -i    BAM file, with aligned reads, to call variants "
-         "read by read. If not specified will use standard in\n"
+         "           -i    (Required) BAM file, with aligned reads, to call "
+         "variants read by read\n"
          "           -b    BED file with primer sequences and positions.\n"
          "           -f    Primer pair information file containing left and "
          "right primer names for the same amplicon separated by a tab.\n"
@@ -171,21 +168,17 @@ void print_saga_usage() {
          "amplicons so per-amplicon depth and frequency statistics can be "
          "calculated; without both files, amplicon-specific measurements are "
          "skipped.\n"
-         "           -x    Primer position offset (Default: 0). Reads that "
-         "occur at the specified offset positions relative to primer "
-         "positions will also be considered trimmed.\n"
-         "           -m    Minimum read depth to call variants (Default: 10)\n"
-         "           -q    Minimum quality score threshold to count base "
-         "(Default: 20). Insertions, deletions and gaps carry no base quality "
-         "and are always counted.\n"
-         "           -r    Reference file used for alignment.\n"
-         "           -g    A GFF file in the GFF3 format can be supplied to "
-         "specify coordinates of open reading frames (ORFs). In absence of GFF "
-         "file, amino acid translation will not be done. Where a position falls "
-         "in more than one CDS, the amino acid columns hold one comma separated "
+         "           -x    Primer position offset, used when assigning reads "
+         "to amplicons (Default: 0)\n"
+         "           -m    Minimum read depth including deletions (Default: 10)\n"
+         "           -q    Minimum base quality to count a base (Default: 20). "
+         "Indels are always counted.\n"
+         "           -r    (Required) Reference file used for alignment.\n"
+         "           -g    GFF3 file of open reading frames for amino acid "
+         "translation. A position in several CDSs gets one comma separated "
          "entry per feature.\n\n"
          "Output Options   Description\n"
-         "           -p    Prefix for the output files\n";
+         "           -p    (Required) Prefix for the output file\n";
 }
 
 void print_variants_usage() {
@@ -455,12 +448,14 @@ int main(int argc, char *argv[]) {
       }
       opt = getopt(argc, argv, contam_opt_str);
     }
-    if (!g_args.variants.empty() && !g_args.prefix.empty()) {
-      std::vector<double> solution;
-      std::vector<double> means;
-      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.min_threshold, g_args.gmm_n, g_args.gmm_invariant, g_args.gmm_cov_prior, g_args.gmm_mean_prior, g_args.gmm_half_normal_cov_prior, g_args.gmm_min_cluster_fraction, g_args.gmm_min_cluster_points, g_args.amplicon_stdev, g_args.dump_variants, g_args.freq_outlier_threshold);
-      cluster_consensus(variants, g_args.prefix, solution);
+    if (g_args.variants.empty() || g_args.prefix.empty()) {
+      print_contam_usage();
+      return -1;
     }
+    std::vector<double> solution;
+    std::vector<double> means;
+    std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.min_threshold, g_args.gmm_n, g_args.gmm_invariant, g_args.gmm_cov_prior, g_args.gmm_mean_prior, g_args.gmm_half_normal_cov_prior, g_args.gmm_min_cluster_fraction, g_args.gmm_min_cluster_points, g_args.amplicon_stdev, g_args.dump_variants, g_args.freq_outlier_threshold);
+    cluster_consensus(variants, g_args.prefix, solution);
     res = 0;
   }
 
@@ -516,6 +511,10 @@ int main(int argc, char *argv[]) {
                    "through standard input"
                 << std::endl
                 << std::endl;
+      print_saga_usage();
+      return -1;
+    }
+    if (g_args.prefix.empty()) {
       print_saga_usage();
       return -1;
     }
