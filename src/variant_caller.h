@@ -38,7 +38,6 @@ class variant_caller {
     return parse_read(read, ref_name, read_site_states);
   };
   void set_amplicons(IntervalTree &amps);
-  void set_refantd(ref_antd &ref);
   void add_variants(std::vector<site_state> &read_site_states);
   void assign_amplicon_to_read(uint32_t lower, uint32_t upper, std::vector<site_state> &read_site_states);
   void merge_reads(std::vector<site_state> &read_site_states_one, std::vector<site_state> &read_site_states_two, std::vector<site_state> &merged_site_states);

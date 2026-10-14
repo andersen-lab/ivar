@@ -109,10 +109,6 @@ void variant_caller::set_amplicons(IntervalTree &amps) {
   amplicons = amps;
 }
 
-void variant_caller::set_refantd(ref_antd &ref) {
-  refantd = ref;
-}
-
 void variant_caller::add_variants(std::vector<site_state> &read_site_states){
   sa.aggregate(read_site_states);
 }
@@ -243,7 +239,7 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
       cds_features = refantd.query_cds(coord.position);
 
     for(auto const &state_stats: site_stats.get_site_state_stats()) {
-      //TODO: Implement minimum depth and minimum frequency filter
+      //TODO: Implement minimum frequency filter
       const std::string &state = state_stats.get_state();
       if(site_state::is_gap(state))
         continue;
