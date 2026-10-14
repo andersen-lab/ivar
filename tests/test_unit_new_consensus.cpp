@@ -124,9 +124,9 @@ int main() {
     genome1.add_variant(5, v);
   }
   genome0.process_variant_assignments();
-  genome0.get_consensus(0);
+  genome0.get_consensus();
   genome1.process_variant_assignments();
-  genome1.get_consensus(1);
+  genome1.get_consensus();
 
   // TEST 1 - genome 0 (the dominant/majority genome) should show the deletion
   // at position 2 and "A" everywhere else.
@@ -300,9 +300,9 @@ int main() {
   }
 
     genome0.process_variant_assignments();
-    genome0.get_consensus(2);
+    genome0.get_consensus();
     genome1.process_variant_assignments();
-    genome1.get_consensus(3);
+    genome1.get_consensus();
 
     // TEST 3 - genome 0: plain "A" at every position (no insertion, no minor allele).
     {
@@ -481,9 +481,9 @@ int main() {
     }
 
     genome0.process_variant_assignments();
-    genome0.get_consensus(4);
+    genome0.get_consensus();
     genome1.process_variant_assignments();
-    genome1.get_consensus(5);
+    genome1.get_consensus();
 
     // TEST 5 - genome 0: "A" at every position except position 4, where the
     // vaguely-assigned "A"/"C" alleles should combine into IUPAC code "M".

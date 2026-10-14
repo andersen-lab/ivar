@@ -77,7 +77,7 @@ void assign_variants_position(std::vector<variant> &variants, std::vector<consen
   }
 }
 
-void consensus_sequence::get_consensus(uint32_t n){
+void consensus_sequence::get_consensus(){
   uint32_t test_position = 4184-1;
   uint32_t deletion_span; //track deletion spans
   for(uint32_t i=0; i < variant_records.size(); i++){
@@ -97,16 +97,6 @@ void consensus_sequence::get_consensus(uint32_t n){
     std::string insertion;
     double insertion_freq = -1.0; //-1 not 0: gapped_freq defaults to 0
     for(uint32_t j=0; j < variant_records[i].size(); j++){
-      /*if(i == test_position){
-        std::cerr << "\nconsensus " << n << " position " << i+1 << " nuc " << variant_records[i][j].nuc << " freq " << variant_records[i][j].gapped_freq << std::endl;
-        std::cerr << "upper half normal " << variant_records[i][j].half_normal_upper << " lower half normal " << variant_records[i][j].half_normal_lower << std::endl;
-        std::cerr << "assigned deletion " << variant_records[i][j].assigned_deletion << std::endl;
-        for(auto cc : variant_records[i][j].consensus_numbers){
-          std::cerr << cc << " ";
-        }
-        std::cerr << std::endl;
-      }*/
-
       bool has_insertion = variant_records[i][j].nuc.find('+') != std::string::npos;
       if(has_insertion){
         const variant &v = variant_records[i][j];
@@ -351,7 +341,7 @@ void cluster_consensus(std::vector<variant> variants, \
   for(uint32_t i=0; i < all_consensus_seqs.size(); i++){
     all_consensus_seqs[i].set_seq_name(clustering_file + "_cluster_" + std::to_string(solution[i]));
     all_consensus_seqs[i].process_variant_assignments();
-    all_consensus_seqs[i].get_consensus(i);
+    all_consensus_seqs[i].get_consensus();
   }
 
   //write largest-abundance genome first: sort indices by solution value, descending

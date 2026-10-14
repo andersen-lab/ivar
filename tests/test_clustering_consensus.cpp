@@ -139,7 +139,7 @@ int main() {
     assign_variants_position(ambiguity_variants, ambiguity_consensus_seqs);
     for(uint32_t i=0; i < ambiguity_consensus_seqs.size(); i++){
       ambiguity_consensus_seqs[i].process_variant_assignments();
-      ambiguity_consensus_seqs[i].get_consensus(i);
+      ambiguity_consensus_seqs[i].get_consensus();
     }
 
     bool forced_ambiguous = ambiguity_consensus_seqs[3].get_base(5) == "N";
@@ -279,7 +279,7 @@ int main() {
         cs.add_variant(p, v);
       }
     }
-    cs.get_consensus(0);
+    cs.get_consensus();
     std::string out_file = "/tmp/upper_deletion.fa";
     std::ofstream(out_file, std::ios::trunc);
     cs.write_consensus_to_file(out_file);
@@ -322,7 +322,7 @@ int main() {
     assign_variants_position(wide_variants, wide_seqs);
     for(uint32_t i=0; i < wide_seqs.size(); i++){
       wide_seqs[i].process_variant_assignments();
-      wide_seqs[i].get_consensus(i);
+      wide_seqs[i].get_consensus();
     }
 
     bool n_everywhere = true;
