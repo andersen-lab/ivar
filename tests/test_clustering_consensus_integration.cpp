@@ -1,0 +1,155 @@
+#include <iostream>
+#include <vector>
+#include <fstream>
+#include <algorithm>
+#include <limits>
+#include <set>
+#include "../src/gmm.h"
+#include "../src/call_consensus_clustering.h"
+
+void read_consensus(std::vector<std::pair<std::string, std::string>> &sequences, std::string filename){
+  std::ifstream file(filename);
+  std::string sequence;
+  std::string name;
+  std::string tmp;
+  while (std::getline(file, tmp)) {
+    if (tmp.find(">") != std::string::npos){
+      if(sequence.size() > 0){
+        std::transform(sequence.begin(), sequence.end(), sequence.begin(),[](unsigned char c) { return std::toupper(c); });
+        sequences.emplace_back(name, sequence);
+      }
+      name = tmp;
+      sequence.clear();
+      continue;
+    }
+    sequence += tmp;
+  }
+  if(sequence.size() > 0){
+    sequences.emplace_back(name, sequence);
+  }
+}
+
+int main() {
+  std::string prefix = "/tmp/consensus_integration";
+  int num_tests = 1;
+  int success = 0;
+
+  uint32_t min_depth = 5;
+  uint8_t min_qual = 20;
+  double default_threshold = 0.5;
+  double invariant_threshold = 0.97;
+
+  uint32_t n = 4;
+
+  //TEST 1 - full consensus against manually currated ground truth
+  std::string var_filename = "../../data/version_bump_tests/vbump_consensus_var.txt";
+  std::string consensus_filename = "../../data/version_bump_tests/vbump_consensus_ivar.fa";
+
+  std::vector<double> solution;
+  std::vector<double> means;
+  std::vector<variant> variants = gmm_model(var_filename, prefix, min_depth, min_qual, solution, means, default_threshold, n, invariant_threshold, 1e-3, 1e-2, 0.0, 0.05);
+  if(!variants.empty()) {
+    cluster_consensus(variants, prefix, solution);
+  }
+
+  uint32_t min_position = std::numeric_limits<uint32_t>::max();
+  for (const auto& v : variants) {
+    if (v.total_depth > 0 && v.position < min_position)
+      min_position = v.position;
+  }
+
+  std::vector<std::pair<std::string, std::string>> gt_sequences;
+  read_consensus(gt_sequences, consensus_filename);
+  std::string exp_sequence;
+  std::vector<std::pair<std::string, std::string>> exp_sequences;
+  read_consensus(exp_sequences, prefix+".fa");
+
+  // Build a map from trimmed-string index to genomic position accounting for deletions.
+  // Deletions remove characters from the consensus string, so index i in the trimmed
+  // string does NOT equal min_position + i when deletions fall within the range.
+  std::set<uint32_t> deleted_positions;
+  for (const auto& v : variants) {
+    if (v.nuc.find('-') == std::string::npos) continue;
+    std::string nuc = v.nuc;
+    nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
+    for (uint32_t z = 0; z < nuc.size(); z++) {
+      deleted_positions.insert(v.position + z);
+    }
+  }
+  // Build index->genomic mapping: production output (exp_sequences) is no longer
+  // trimmed to min_position, so it starts at genomic position 1. Walk from there,
+  // skip deleted ones, and assign each surviving position to the next string index.
+  std::vector<uint32_t> index_to_genomic;
+  {
+    uint32_t max_pos = 0;
+    for (const auto& v : variants) if (v.position > max_pos) max_pos = v.position;
+    for (uint32_t p = 1; p <= max_pos + 10; p++) {
+      if (deleted_positions.count(p) == 0) {
+        index_to_genomic.push_back(p);
+      }
+    }
+  }
+  // gt_sequences is trimmed and starts at min_position; find where that lands in
+  // the untrimmed exp_sequences index mapping so the two can be compared aligned.
+  uint32_t exp_start = 0;
+  while (exp_start < index_to_genomic.size() && index_to_genomic[exp_start] < min_position) {
+    exp_start++;
+  }
+
+  bool correct = true;
+  for (auto itgt = gt_sequences.begin(), itexp = exp_sequences.begin(); itgt != gt_sequences.end() && itexp != exp_sequences.end(); ++itgt, ++itexp) {
+    uint32_t exp_len = itexp->second.size() > exp_start ? (uint32_t)itexp->second.size() - exp_start : 0;
+    if(exp_len != itgt->second.size()) {
+      correct = false;
+      std::cerr << "not same size gt=" << itgt->second.size() << " exp=" << exp_len << std::endl;
+    }
+    for(uint32_t i=0; i < exp_len && i < itgt->second.size(); i++){
+      char a = itgt->second[i];
+      char b = itexp->second[exp_start + i];
+
+      if(a != b){
+        uint32_t genomic_pos = (exp_start+i < index_to_genomic.size()) ? index_to_genomic[exp_start+i] : (min_position + i);
+        std::cerr << "gt " << a << " exp " << b << " consensus_pos=" << i+1 << " genomic_pos=" << genomic_pos << std::endl;
+        int ctx = 5;
+        std::cerr << "  gt  context: ";
+        for (int c = -ctx; c <= ctx; c++) {
+          int idx = (int)i + c;
+          if (idx < 0 || idx >= (int)itgt->second.size()) std::cerr << '.';
+          else std::cerr << (c == 0 ? '[' : ' ') << itgt->second[idx] << (c == 0 ? ']' : ' ');
+        }
+        std::cerr << std::endl;
+        std::cerr << "  exp context: ";
+        for (int c = -ctx; c <= ctx; c++) {
+          int idx = (int)(exp_start + i) + c;
+          if (idx < 0 || idx >= (int)itexp->second.size()) std::cerr << '.';
+          else std::cerr << (c == 0 ? '[' : ' ') << itexp->second[idx] << (c == 0 ? ']' : ' ');
+        }
+        std::cerr << std::endl;
+        for (const auto& v : variants) {
+          if (v.position == genomic_pos) {
+            std::cerr << "  nuc=" << v.nuc
+                      << " gapped_freq=" << v.gapped_freq
+                      << " gapped_depth=" << v.gapped_depth
+                      << " qual=" << v.qual
+                      << " cluster=" << v.cluster_assigned
+                      << " half_normal_upper=" << v.half_normal_upper
+                      << " half_normal_lower=" << v.half_normal_lower
+                      << " position_masked=" << v.position_masked
+                      << " amplicon_masked=" << v.amplicon_masked
+                      << " depth_flag=" << v.depth_flag
+                      << " qual_flag=" << v.qual_flag
+                      << " outside_freq_range=" << v.outside_freq_range
+                      << " consensus_numbers=[ ";
+            for (auto cn : v.consensus_numbers) std::cerr << cn << " ";
+            std::cerr << "]" << std::endl;
+          }
+        }
+        correct = false;
+      }
+    }
+  }
+  if(correct) success++;
+
+  std::cerr << "num tests " << num_tests << " success " << success << std::endl;
+  return (num_tests == success) ? 0 : -1;
+}
