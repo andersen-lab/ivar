@@ -520,9 +520,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     all_freqs.push_back(base_variants[i].gapped_freq);
     if(!base_variants[i].depth_flag && !base_variants[i].qual_flag && !base_variants[i].outside_freq_range && !base_variants[i].overlapped_deletion && !base_variants[i].deletion_span_duplicate){
       model_variants.push_back(base_variants[i]);
-      model_freqs.push_back(base_variants[i].gapped_freq);
-      //std::cerr << base_variants[i].nuc << " " << base_variants[i].position << " " << base_variants[i].gapped_freq << "\n";
-    }
+      model_freqs.push_back(base_variants[i].gapped_freq);    }
   }
   std::cerr << "Number of frequencies used for clustering: " << model_freqs.size() << "\n";
   
@@ -545,7 +543,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
     n = max_components;
   }
 
-  gmm_1d model(n, 42);  // seed matches bootstrap replicate
+  gmm_1d model(n, 42);
   model.set_use_half_normal_for_noise(true, invariant_threshold);
 
   model.set_covariance_prior(covariance_prior);
