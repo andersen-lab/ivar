@@ -334,16 +334,11 @@ void cluster_consensus(std::vector<variant> variants, \
  
   //find the largest position in the variants file
   uint32_t max_position = 0;
-  uint32_t min_position = 4294967295U;;
   for(auto x : variants){
     if(x.position > max_position){
       max_position = x.position;
     }
-    if(x.position < min_position && x.gapped_depth > 0){
-        min_position = x.position;
-    }
   }
-  bool print = false;
   //initialize a consensus_sequence for each possible population
   std::vector<consensus_sequence> all_consensus_seqs;
   all_consensus_seqs.reserve(solution.size());
