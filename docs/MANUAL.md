@@ -281,7 +281,7 @@ Description
 | ALT\_FREQ | Frequency of alternate base               |
 | TOTAL\_DP | Total depth at position                   |
 | PVAL      | p-value of fisher's exact test            |
-| PASS      | Result of p-value <= 0.05                 |
+| PASS      | Result of p-value <= 0.01                 |
 | GFF\_FEATURE | ID of the GFF feature used for the translation |
 | REF\_CODON | Codong using the reference base |
 | REF\_AA | Amino acid translated from reference codon |
