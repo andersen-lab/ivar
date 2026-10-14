@@ -25,15 +25,8 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
     std::cerr << "Amplicon specific measurements will not be calculated." << std::endl;
   }
   // Read in input file
-  samFile *in;
-
-  if(bam.empty()) {
-    std::cerr << "Reading from stdin" << std::endl;
-    in = sam_open("-", "r");
-  } else {
-    in = sam_open(bam.c_str(), "r");
-    std::cerr << "Reading from " << bam << std::endl;
-  }
+  samFile *in = sam_open(bam.c_str(), "r");
+  std::cerr << "Reading from " << bam << std::endl;
   if (in == NULL) {
     std::cerr << ("Unable to open input file.") << std::endl;
     return -1;

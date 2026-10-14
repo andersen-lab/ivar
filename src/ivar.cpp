@@ -506,10 +506,8 @@ int main(int argc, char *argv[]) {
       }
       opt = getopt(argc, argv, saga_opt_str);
     }
-    if (g_args.bam.empty() && isatty(STDIN_FILENO)) {
-      std::cout << "Please supply a BAM file using -i or supply the input file "
-                   "through standard input"
-                << std::endl
+    if (g_args.bam.empty()) {
+      std::cout << "Please supply a BAM file using -i" << std::endl
                 << std::endl;
       print_saga_usage();
       return -1;
