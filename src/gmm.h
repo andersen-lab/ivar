@@ -71,7 +71,7 @@ void write_variant_details(const std::vector<variant> &variants, std::string out
 
 std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, uint32_t min_depth, uint8_t min_qual, std::vector<double> &solution, std::vector<double> &means, double default_threshold, uint32_t n, double invariant_threshold, double covariance_prior, double mean_precision_prior, double half_normal_covariance_prior, double min_cluster_fraction = 0.10, uint32_t min_cluster_points = 0, double amplicon_stdev = DEFAULT_AMPLICON_STDEV, bool dump_variants = false, double freq_outlier_threshold = DEFAULT_FREQ_OUTLIER_THRESHOLD);
 void parse_internal_variants(std::string filename, std::vector<variant> &base_variants, uint32_t depth_cutoff, uint32_t round_val, uint8_t quality_threshold, double invariant_threshold);
-void set_deletion_flags(std::vector<variant> &variants, double lower_bound, double invariant_lower_bound);
+void set_deletion_flags(std::vector<variant> &variants, double invariant_lower_bound);
 void flag_noise_explained_variants(std::vector<variant> &variants, double invariant_threshold);
 void flag_amplicon_variation(std::vector<variant> &variants, double amplicon_stdev = DEFAULT_AMPLICON_STDEV);
 void propagate_amplicon_masking(std::vector<variant> &variants);

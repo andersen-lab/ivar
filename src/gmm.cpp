@@ -266,7 +266,7 @@ void parse_internal_variants(std::string filename,
   }
 }
 
-void set_deletion_flags(std::vector<variant> &variants, double lower_bound, double invariant_lower_bound){
+void set_deletion_flags(std::vector<variant> &variants, double invariant_lower_bound){
   // Collect all valid deletions with their covered ranges.
   struct del_info {
     uint32_t idx;
@@ -510,7 +510,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
   flag_amplicon_variation(base_variants, amplicon_stdev);
-  set_deletion_flags(base_variants, 0.001, 1.0 - invariant_threshold);
+  set_deletion_flags(base_variants, 1.0 - invariant_threshold);
   flag_noise_explained_variants(base_variants, invariant_threshold);
 
   std::vector<variant> model_variants;
