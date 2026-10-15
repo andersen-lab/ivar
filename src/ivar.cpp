@@ -60,6 +60,7 @@ struct args_t {
   double amplicon_stdev;         // -A
   bool dump_variants;            // -V
   double freq_outlier_threshold; // -W
+  bool threshold_only;           // -T
 } g_args;
 
 void print_usage() {
@@ -92,7 +93,10 @@ void print_contam_usage() {
          "           -s    (Required) Variants file produced by ivar variants\n"
          "           -t    Frequency threshold for the fallback consensus (Default: 0)\n"
          "           -m    Minimum read depth including deletions (Default: 10)\n"
-         "           -q    Minimum mean quality score of the variant (Default: 20)\n\n"
+         "           -q    Minimum mean quality score of a substitution (Default: 20)\n"
+         "           -T    Skip clustering and call a single threshold consensus\n"
+         "                 at -t, written to <prefix>_threshold.fa. Clustering\n"
+         "                 options are ignored\n\n"
          "GMM Prior Options  Description\n"
          "           -N    Number of Gaussian components (Default: 12)\n"
          "           -I    Invariant frequency threshold; variants above this\n"
@@ -333,7 +337,7 @@ static const char *removereads_opt_str = "i:p:t:b:h?";
 static const char *filtervariants_opt_str = "p:t:f:h?";
 static const char *getmasked_opt_str = "i:b:f:p:h?";
 static const char *trimadapter_opt_str = "1:2:p:a:h?";
-static const char *contam_opt_str = "p:s:t:m:q:N:I:C:H:M:F:P:A:VW:h?";
+static const char *contam_opt_str = "p:s:t:m:q:N:I:C:H:M:F:P:A:VW:Th?";
 
 std::string get_filename_without_extension(std::string f, std::string ext) {
   if (ext.length() > f.length())  // If extension longer than filename
@@ -392,6 +396,7 @@ int main(int argc, char *argv[]) {
     g_args.amplicon_stdev = DEFAULT_AMPLICON_STDEV;
     g_args.dump_variants = false;
     g_args.freq_outlier_threshold = DEFAULT_FREQ_OUTLIER_THRESHOLD;
+    g_args.threshold_only = false;
     opt = getopt(argc, argv, contam_opt_str);
     while (opt != -1) {
       switch (opt) {
@@ -440,6 +445,9 @@ int main(int argc, char *argv[]) {
         case 'W':
           g_args.freq_outlier_threshold = std::stod(optarg);
           break;
+        case 'T':
+          g_args.threshold_only = true;
+          break;
         case 'h':
         case '?':
           print_contam_usage();
@@ -452,10 +460,17 @@ int main(int argc, char *argv[]) {
       print_contam_usage();
       return -1;
     }
-    std::vector<double> solution;
-    std::vector<double> means;
-    std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.min_threshold, g_args.gmm_n, g_args.gmm_invariant, g_args.gmm_cov_prior, g_args.gmm_mean_prior, g_args.gmm_half_normal_cov_prior, g_args.gmm_min_cluster_fraction, g_args.gmm_min_cluster_points, g_args.amplicon_stdev, g_args.dump_variants, g_args.freq_outlier_threshold);
-    cluster_consensus(variants, g_args.prefix, solution);
+    if (g_args.threshold_only) {
+      std::vector<variant> variants;
+      parse_internal_variants(g_args.variants, variants, g_args.min_depth, 4, g_args.min_qual,
+                              g_args.gmm_invariant);
+      call_majority_consensus(variants, g_args.prefix, g_args.min_threshold);
+    } else {
+      std::vector<double> solution;
+      std::vector<double> means;
+      std::vector<variant> variants = gmm_model(g_args.variants, g_args.prefix, g_args.min_depth, g_args.min_qual, solution, means, g_args.min_threshold, g_args.gmm_n, g_args.gmm_invariant, g_args.gmm_cov_prior, g_args.gmm_mean_prior, g_args.gmm_half_normal_cov_prior, g_args.gmm_min_cluster_fraction, g_args.gmm_min_cluster_points, g_args.amplicon_stdev, g_args.dump_variants, g_args.freq_outlier_threshold);
+      cluster_consensus(variants, g_args.prefix, solution);
+    }
     res = 0;
   }
 

@@ -161,7 +161,10 @@ Input Options    Description
            -s    (Required) Variants file produced by ivar variants
            -t    Frequency threshold for the fallback consensus (Default: 0)
            -m    Minimum read depth including deletions (Default: 10)
-           -q    Minimum mean quality score of the variant (Default: 20)
+           -q    Minimum mean quality score of a substitution (Default: 20)
+           -T    Skip clustering and call a single threshold consensus
+                 at -t, written to <prefix>_threshold.fa. Clustering
+                 options are ignored
 
 GMM Prior Options  Description
            -N    Number of Gaussian components (Default: 12)
@@ -206,6 +209,8 @@ The command above will produce the following output files:
 * `test.contam_threshold.fa` - Written instead of `test.contam.fa` when there are too few variants to cluster or clustering does not find a single solution. It holds one consensus called with the frequency threshold `-t`, with the header `test.contam_<threshold>_threshold`.
 * `test.contam_gmm_1d_results.txt` - The parameters of the fitted mixture model: the number of components requested, the number of effective (non-pruned) components, the means, variances and weights of both the full model and the effective components, any subset of effective means found to sum to ~1 (`Solution_Sets`), and the populations and positions left ambiguous (`Ambiguous_Populations`, `Ambiguous_Positions`).
 * `test.contam_variant_details.txt` - Only written with `-V`: one row per variant with its cluster assignment, posteriors and consensus flags.
+
+With `-T`, clustering is skipped and only `test.contam_threshold.fa` is written: one consensus called at the frequency threshold `-t`, the same way `ivar consensus_pileup` calls it.
 
 **Note**: This command consumes the output of `ivar variants`, so variants must first be called for the sample. The GMM prior options default to values tuned for spike-in/mixed-population controls and may need adjustment depending on sample composition.
 

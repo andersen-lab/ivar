@@ -32,7 +32,7 @@ void read_consensus(std::vector<std::pair<std::string, std::string>> &sequences,
 
 int main() {
   std::string prefix = "/tmp/consensus_integration";
-  int num_tests = 1;
+  int num_tests = 2;
   int success = 0;
 
   uint32_t min_depth = 10;
@@ -114,6 +114,44 @@ int main() {
     }
   }
   if(correct) success++;
+
+  //TEST 2 - the threshold consensus that consensus -T calls, against the consensus_pileup
+  //consensus made at the same threshold. Majority against majority, so they should match exactly
+  {
+    std::string threshold_prefix = "/tmp/consensus_integration_T";
+    std::remove((threshold_prefix + "_threshold.fa").c_str());
+    std::vector<variant> threshold_variants;
+    parse_internal_variants(var_filename, threshold_variants, min_depth, 4, min_qual, invariant_threshold);
+    call_majority_consensus(threshold_variants, threshold_prefix, 0.75);
+
+    std::vector<std::pair<std::string, std::string>> gt_threshold;
+    read_consensus(gt_threshold, consensus_filename);
+    std::vector<std::pair<std::string, std::string>> exp_threshold;
+    read_consensus(exp_threshold, threshold_prefix + "_threshold.fa");
+
+    bool threshold_correct = true;
+    if(gt_threshold.empty() || exp_threshold.empty()){
+      std::cerr << "TEST 2 nothing to compare: expected " << gt_threshold.size()
+                << " sequences, produced " << exp_threshold.size() << std::endl;
+      threshold_correct = false;
+    } else {
+      std::string gt = gt_threshold[0].second;
+      std::string exp = exp_threshold[0].second;
+      gt.erase(gt.find_last_not_of('N') + 1);
+      exp.erase(exp.find_last_not_of('N') + 1);
+      if(gt.size() != exp.size()){
+        threshold_correct = false;
+        std::cerr << "TEST 2 length differs: expected " << gt.size() << " produced " << exp.size() << std::endl;
+      }
+      for(size_t i = 0; i < std::min(gt.size(), exp.size()); i++){
+        if(gt[i] != exp[i]){
+          threshold_correct = false;
+          std::cerr << "TEST 2 consensus position " << i+1 << ": expected " << gt[i] << " produced " << exp[i] << std::endl;
+        }
+      }
+    }
+    if(threshold_correct) success++;
+  }
 
   std::cerr << "num tests " << num_tests << " success " << success << std::endl;
   return (num_tests == success) ? 0 : -1;

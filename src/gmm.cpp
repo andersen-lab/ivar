@@ -252,7 +252,9 @@ void parse_internal_variants(std::string filename,
     } else {
       tmp.depth_flag = false;
     }
-    if(tmp.qual < compare_quality){
+    //indels carry no base quality, so like update_allele_depth only substitutions are judged on it
+    bool is_indel = tmp.nuc.find('+') != std::string::npos || tmp.nuc.find('-') != std::string::npos;
+    if(!is_indel && tmp.qual < compare_quality){
       tmp.qual_flag = true;
     } else {
       tmp.qual_flag = false;
