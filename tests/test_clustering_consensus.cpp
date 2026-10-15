@@ -238,6 +238,186 @@ int main() {
     }
   }
 
+  // THIRD SCENARIO (TESTs 10, 11, 12, 13, 14, 15 and 16) - flag_noise_explained_variants moves an
+  // allele to the upper half normal when its frequency plus the noise at its position reaches the
+  // invariant threshold. Noise is any noise level allele recorded at the position, plus noise level
+  // deletions spanning it; insertions and depth flagged rows are not noise
+  {
+    //TEST 10 - substitution noise
+    variant a10;
+    a10.position = 10;
+    a10.nuc = "A";
+    a10.gapped_freq = 0.96;
+
+    variant c10;
+    c10.position = 10;
+    c10.nuc = "C";
+    c10.gapped_freq = 0.02;
+    c10.outside_freq_range = true;
+
+    variant g10;
+    g10.position = 10;
+    g10.nuc = "G";
+    g10.gapped_freq = 0.02;
+    g10.outside_freq_range = true;
+
+    //TEST 11 - near miss
+    variant a20;
+    a20.position = 20;
+    a20.nuc = "A";
+    a20.gapped_freq = 0.90;
+
+    variant c20;
+    c20.position = 20;
+    c20.nuc = "C";
+    c20.gapped_freq = 0.02;
+    c20.outside_freq_range = true;
+
+    //TEST 12 - a noise deletion counts at its first base
+    variant a30;
+    a30.position = 30;
+    a30.nuc = "A";
+    a30.gapped_freq = 0.96;
+
+    variant del30;
+    del30.position = 30;
+    del30.nuc = "-TT"; //spans 30-31
+    del30.gapped_freq = 0.02;
+    del30.outside_freq_range = true;
+
+    //TEST 13 - a noise deletion counts at its later bases, and not past its end
+    variant del40;
+    del40.position = 40;
+    del40.nuc = "-GGG"; //spans 40-42
+    del40.gapped_freq = 0.02;
+    del40.outside_freq_range = true;
+
+    variant ref41;
+    ref41.position = 41;
+    ref41.nuc = "G";
+    ref41.ref_allele = true;
+    ref41.gapped_freq = 0.96;
+
+    variant ref43;
+    ref43.position = 43;
+    ref43.nuc = "C";
+    ref43.ref_allele = true;
+    ref43.gapped_freq = 0.96;
+
+    //TEST 14 - an insertion is not noise
+    variant a50;
+    a50.position = 50;
+    a50.nuc = "A";
+    a50.gapped_freq = 0.95;
+
+    variant ins50;
+    ins50.position = 50;
+    ins50.nuc = "+TT";
+    ins50.gapped_freq = 0.02;
+    ins50.outside_freq_range = true;
+
+    //TEST 15 - a depth flagged row is not noise
+    variant a60;
+    a60.position = 60;
+    a60.nuc = "A";
+    a60.gapped_freq = 0.95;
+
+    variant c60;
+    c60.position = 60;
+    c60.nuc = "C";
+    c60.gapped_freq = 0.02;
+    c60.outside_freq_range = true;
+    c60.depth_flag = true;
+
+    std::vector<variant> noise_variants = {a10, c10, g10,
+                                           a20, c20,
+                                           a30, del30,
+                                           del40, ref41, ref43,
+                                           a50, ins50,
+                                           a60, c60};
+    flag_noise_explained_variants(noise_variants, 0.97);
+
+    //TEST 10 - 0.96 plus 0.04 of substitution noise reaches the threshold
+    {
+      bool pass = true;
+      pass &= check_flag(3, "a10", "half_normal_upper", noise_variants[0].half_normal_upper, true);
+      pass &= check_flag(3, "a10", "outside_freq_range", noise_variants[0].outside_freq_range, true);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 11 - 0.90 plus 0.02 of noise falls short
+    {
+      bool pass = true;
+      pass &= check_flag(3, "a20", "half_normal_upper", noise_variants[3].half_normal_upper, false);
+      pass &= check_flag(3, "a20", "outside_freq_range", noise_variants[3].outside_freq_range, false);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 12 - the noise deletion counts at its first base
+    {
+      bool pass = true;
+      pass &= check_flag(3, "a30", "half_normal_upper", noise_variants[5].half_normal_upper, true);
+      pass &= check_flag(3, "a30", "outside_freq_range", noise_variants[5].outside_freq_range, true);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 13 - the noise deletion counts inside its span, but not past its end
+    {
+      bool pass = true;
+      pass &= check_flag(3, "ref41", "half_normal_upper", noise_variants[8].half_normal_upper, true);
+      pass &= check_flag(3, "ref41", "outside_freq_range", noise_variants[8].outside_freq_range, true);
+      pass &= check_flag(3, "ref43", "half_normal_upper", noise_variants[9].half_normal_upper, false);
+      pass &= check_flag(3, "ref43", "outside_freq_range", noise_variants[9].outside_freq_range, false);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 14 - the insertion is not counted as noise
+    {
+      bool pass = true;
+      pass &= check_flag(3, "a50", "half_normal_upper", noise_variants[10].half_normal_upper, false);
+      pass &= check_flag(3, "a50", "outside_freq_range", noise_variants[10].outside_freq_range, false);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 15 - the depth flagged row is not counted as noise
+    {
+      bool pass = true;
+      pass &= check_flag(3, "a60", "half_normal_upper", noise_variants[12].half_normal_upper, false);
+      pass &= check_flag(3, "a60", "outside_freq_range", noise_variants[12].outside_freq_range, false);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 16 - frequency plus noise exactly at the threshold is flagged. Run on its own with
+    //values binary represents exactly, so the sum lands on the threshold with no rounding
+    {
+      variant a_exact;
+      a_exact.position = 10;
+      a_exact.nuc = "A";
+      a_exact.gapped_freq = 0.75;
+
+      variant c_exact;
+      c_exact.position = 10;
+      c_exact.nuc = "C";
+      c_exact.gapped_freq = 0.125; //at the noise ceiling, 1 - 0.875
+      c_exact.outside_freq_range = true;
+
+      std::vector<variant> exact_variants = {a_exact, c_exact};
+      flag_noise_explained_variants(exact_variants, 0.875);
+
+      bool pass = true;
+      pass &= check_flag(3, "a_exact", "half_normal_upper", exact_variants[0].half_normal_upper, true);
+      pass &= check_flag(3, "a_exact", "outside_freq_range", exact_variants[0].outside_freq_range, true);
+      num_tests++;
+      if (pass) success++;
+    }
+  }
+
   std::cerr << "num tests " << num_tests << " success " << success << std::endl;
   return (num_tests == success) ? 0 : -1;
 }
