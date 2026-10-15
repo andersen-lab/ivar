@@ -52,10 +52,29 @@ void assign_variants_position(std::vector<variant> &variants, std::vector<consen
       nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
       span = (uint32_t)nuc.size();
     }
+    if(variants[i].freq_outlier && variants[i].nuc.find('+') != std::string::npos){
+      continue;
+    }
     //no population credibly carries this allele, so the position is unresolved in every
     //genome, not just the ones it was assigned to
     if(variants[i].freq_outlier){
       for(uint32_t k=0; k < all_consensus_seqs.size(); k++){
+        for(uint32_t z=0; z < span; z++){
+          all_consensus_seqs[k].mark_ambiguous(variants[i].position + z);
+        }
+      }
+      continue;
+    }
+    if(variants[i].qual_flag || variants[i].depth_flag){
+      if(variants[i].nuc.find('+') != std::string::npos){
+        continue;
+      }
+      for(uint32_t k : variants[i].consensus_numbers){
+        for(uint32_t z=0; z < span; z++){
+          all_consensus_seqs[k].mark_ambiguous(variants[i].position + z);
+        }
+      }
+      for(uint32_t k : variants[i].ambiguous_numbers){
         for(uint32_t z=0; z < span; z++){
           all_consensus_seqs[k].mark_ambiguous(variants[i].position + z);
         }
