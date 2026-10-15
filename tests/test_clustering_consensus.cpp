@@ -1,7 +1,9 @@
 //misc. unit tests for clustering code
 #include <iostream>
 #include <vector>
+#include <cmath>
 #include "../src/gmm.h"
+#include "../src/gmm_1d.h"
 #include "../src/call_consensus_clustering.h"
 
 //prints mismatches in the same format as test_unit_new_consensus
@@ -413,6 +415,97 @@ int main() {
       bool pass = true;
       pass &= check_flag(3, "a_exact", "half_normal_upper", exact_variants[0].half_normal_upper, true);
       pass &= check_flag(3, "a_exact", "outside_freq_range", exact_variants[0].outside_freq_range, true);
+      num_tests++;
+      if (pass) success++;
+    }
+  }
+
+  // FOURTH SCENARIO (TESTs 17, 18, 19, 20 and 21) - gmm_1d::predict prunes a gaussian component holding
+  // fewer than -P points (or, when -P is 0, less than -F of the data), moving its points to their
+  // next best component. The half normals are never pruned. One fit, reused for every test
+  {
+    //0.5 is the tiny cluster to prune; 0.04 sits in the left half normal's support
+    std::vector<double> x;
+    for(int i=0; i < 20; i++) x.push_back(0.285 + i * 0.03 / 19);  //indices 0-19, evenly over 0.285-0.315
+    for(int i=0; i < 2; i++) x.push_back(0.5);   //indices 20-21
+    for(int i=0; i < 20; i++) x.push_back(0.685 + i * 0.03 / 19);  //indices 22-41, evenly over 0.685-0.715
+    for(int i=0; i < 1; i++) x.push_back(0.04);  //indices 42-43
+    const uint32_t i03 = 0, i05 = 20, i07 = 22, i004 = 42;
+
+    uint32_t n = 5; //4 gaussians plus the two half normals
+    gmm_1d model(n, 42);
+    model.set_use_half_normal_for_noise(true, 0.97);
+    model.set_covariance_prior(1e-4);
+    model.set_mean_precision_prior(1e-2);
+    model.set_half_normal_covariance_prior(1e-4);
+    model.fit(x);
+    const int left_half_normal = n - 2;
+
+    //TEST 17 - the fit places a gaussian at each of 0.3, 0.5 and 0.7
+    {
+      std::vector<double> means = model.get_means();
+      auto has_mean = [&](double target){
+        for(double m : means){
+          if(std::abs(m - target) < 1e-3) return true;
+        }
+        return false;
+      };
+      bool pass = true;
+      pass &= check_flag(4, "mean 0.3", "fitted", has_mean(0.3), true);
+      pass &= check_flag(4, "mean 0.5", "fitted", has_mean(0.5), true);
+      pass &= check_flag(4, "mean 0.7", "fitted", has_mean(0.7), true);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 18 - with no pruning, the 0.5 points have their own label and the 0.04 points are in the
+    //left half normal
+    {
+      model.set_min_cluster_points(0);
+      model.set_min_cluster_fraction(0.0);
+      std::vector<int> labels = model.predict(x);
+      bool pass = true;
+      pass &= check_flag(4, "0.5", "own label", labels[i05] != labels[i03] && labels[i05] != labels[i07], true);
+      pass &= check_flag(4, "0.04", "in left half normal", labels[i004] == left_half_normal, true);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 19 - -P 3 prunes the 0.5 cluster into a big group, the big groups stay apart, and the left
+    //half normal survives with fewer than 3 points
+    {
+      model.set_min_cluster_points(3);
+      model.set_min_cluster_fraction(0.0);
+      std::vector<int> labels = model.predict(x);
+      bool pass = true;
+      pass &= check_flag(4, "0.5", "joined a big group", labels[i05] == labels[i03] || labels[i05] == labels[i07], true);
+      pass &= check_flag(4, "0.3 and 0.7", "distinct", labels[i03] != labels[i07], true);
+      pass &= check_flag(4, "0.04", "in left half normal", labels[i004] == left_half_normal, true);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 20 - -F 0.10 prunes the same way when -P is 0 (2 of 44 points is under 10%, 20 is not)
+    {
+      model.set_min_cluster_points(0);
+      model.set_min_cluster_fraction(0.10);
+      std::vector<int> labels = model.predict(x);
+      bool pass = true;
+      pass &= check_flag(4, "0.5", "joined a big group", labels[i05] == labels[i03] || labels[i05] == labels[i07], true);
+      pass &= check_flag(4, "0.3 and 0.7", "distinct", labels[i03] != labels[i07], true);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 21 - -P overrides -F: -F 0.5 alone would prune both big groups (20 of 44 is under 50%),
+    //but with -P 3 only the 0.5 cluster is pruned
+    {
+      model.set_min_cluster_points(3);
+      model.set_min_cluster_fraction(0.5);
+      std::vector<int> labels = model.predict(x);
+      bool pass = true;
+      pass &= check_flag(4, "0.5", "joined a big group", labels[i05] == labels[i03] || labels[i05] == labels[i07], true);
+      pass &= check_flag(4, "0.3 and 0.7", "distinct", labels[i03] != labels[i07], true);
       num_tests++;
       if (pass) success++;
     }
