@@ -5,6 +5,7 @@
 #include "../src/gmm.h"
 #include "../src/gmm_1d.h"
 #include "../src/call_consensus_clustering.h"
+#include "../src/solve_clustering.h"
 
 //prints mismatches in the same format as test_unit_new_consensus
 bool check_flag(uint32_t scenario, std::string variant_name, std::string flag_name, bool actual, bool expected){
@@ -581,6 +582,52 @@ int main() {
       flag_freq_outlier_variants(exact_variants, exact_means, exact_vars, exact_means, 1.0);
 
       bool pass = check_flag(5, "at_cutoff", "freq_outlier", exact_variants[0].freq_outlier, false);
+      num_tests++;
+      if (pass) success++;
+    }
+  }
+
+  // SIXTH SCENARIO (TESTs 27 and 28) - variant_assigner::assign puts an upper half normal variant in
+  // every genome and a lower half normal variant in none, whatever cluster or posteriors it carries
+  {
+    std::vector<double> solution = {0.2, 0.8};
+    std::vector<double> means = {0.2, 0.8}; //cluster 0 is genome 0, cluster 1 is genome 1
+
+    variant v_upper;
+    v_upper.half_normal_upper = true;
+    v_upper.cluster_assigned = 0;
+    v_upper.probabilities = {0.9, 0.1}; //would reach genome 0 only without the flag
+
+    variant v_lower;
+    v_lower.half_normal_lower = true;
+    v_lower.cluster_assigned = 1;
+    v_lower.probabilities = {0.1, 0.9}; //would reach genome 1 only without the flag
+
+    variant v_normal;
+    v_normal.cluster_assigned = 0;
+    v_normal.probabilities = {0.9, 0.1}; //control, routed by its posteriors
+
+    std::vector<variant> assign_variants = {v_upper, v_lower, v_normal};
+    variant_assigner(solution, means, 2.0).assign(assign_variants);
+
+    //TEST 27 - the upper half normal variant reaches every genome, while the control with the same
+    //posteriors reaches genome 0 only
+    {
+      bool pass = true;
+      pass &= check_flag(6, "v_upper", "in every genome",
+                         assign_variants[0].consensus_numbers == std::vector<uint32_t>{0, 1}, true);
+      pass &= check_flag(6, "v_upper", "no ambiguous genomes", assign_variants[0].ambiguous_numbers.empty(), true);
+      pass &= check_flag(6, "v_normal", "in genome 0 only",
+                         assign_variants[2].consensus_numbers == std::vector<uint32_t>{0}, true);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 28 - the lower half normal variant reaches no genome
+    {
+      bool pass = true;
+      pass &= check_flag(6, "v_lower", "no confirmed genomes", assign_variants[1].consensus_numbers.empty(), true);
+      pass &= check_flag(6, "v_lower", "no ambiguous genomes", assign_variants[1].ambiguous_numbers.empty(), true);
       num_tests++;
       if (pass) success++;
     }
