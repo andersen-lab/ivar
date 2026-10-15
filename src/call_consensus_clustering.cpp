@@ -10,14 +10,16 @@
 #include <algorithm>
 #include <numeric>
 
-consensus_sequence build_majority_consensus(const std::vector<variant> &variants, double threshold){
+void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold){
+  std::cerr << "in majority consensus call" << std::endl;
   uint32_t max_position = 0;
-  for(const auto &x : variants){
+  for(auto x : variants){
     if(x.position > max_position){
       max_position = x.position;
     }
   }
-  consensus_sequence cs(max_position);
+  consensus_sequence cs(max_position); 
+  std::vector<consensus_sequence> all_consensus_seqs = {cs};
   //a majority consensus votes over every record, so don't filter on consensus_numbers
   //the way assign_variants_position does
   for(uint32_t i=0; i < variants.size(); i++){
@@ -28,21 +30,15 @@ consensus_sequence build_majority_consensus(const std::vector<variant> &variants
       span = (uint32_t)nuc.size();
     }
     for(uint32_t z=0; z < span && variants[i].position + z <= max_position; z++){
-      cs.add_variant(variants[i].position + z, variants[i]);
+      all_consensus_seqs[0].add_variant(variants[i].position + z, variants[i]);
     }
   }
-  cs.process_variant_assignments();
-  cs.get_majority_consensus(threshold);
-  return cs;
-}
-
-void call_majority_consensus(std::vector<variant> variants, std::string clustering_file, double default_threshold){
-  std::cerr << "in majority consensus call" << std::endl;
-  consensus_sequence cs = build_majority_consensus(variants, default_threshold);
-  cs.set_seq_name(clustering_file + "_" + std::to_string(default_threshold) + "_threshold");
+  all_consensus_seqs[0].set_seq_name(clustering_file + "_" + std::to_string(default_threshold) + "_threshold");
+  all_consensus_seqs[0].process_variant_assignments();
+  all_consensus_seqs[0].get_majority_consensus(default_threshold);
   std::string consensus_filename = clustering_file + "_threshold.fa";
   std::ofstream(consensus_filename, std::ios::trunc); //start each run from an empty file, since write_consensus_to_file appends
-  cs.write_consensus_to_file(consensus_filename);
+  all_consensus_seqs[0].write_consensus_to_file(consensus_filename);
 }
 
 void assign_variants_position(std::vector<variant> &variants, std::vector<consensus_sequence> &all_consensus_seqs){
