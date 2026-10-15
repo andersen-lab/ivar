@@ -251,6 +251,41 @@ int main() {
           read_sequence(clustering_file + "_threshold.fa"), num_tests, success);
   }
 
+  // TEST 10 - every allele is counted and the total still falls short of the threshold
+  {
+    std::vector<variant> v = {make_variant(1, "A", 0.50), make_variant(1, "C", 0.30)};
+    call_majority_consensus(v, clustering_file, 0.90);
+    check("TEST 10 total below threshold is N", "N",
+          read_sequence(clustering_file + "_threshold.fa"), num_tests, success);
+  }
+
+  // TEST 11 - a deletion needed alongside a base to reach the threshold can't be combined
+  {
+    std::vector<variant> v = {make_variant(1, "A", 0.60), make_variant(1, "-T", 0.35)};
+    call_majority_consensus(v, clustering_file, 0.90);
+    check("TEST 11 deletion mixed with a base is N", "N",
+          read_sequence(clustering_file + "_threshold.fa"), num_tests, success);
+  }
+
+  // TEST 12 - a quality flagged substitution doesn't count toward the threshold. Counted,
+  // A and C would reach 0.95 and give M
+  {
+    variant blocked_qual = make_variant(1, "C", 0.35);
+    blocked_qual.qual_flag = true;
+    std::vector<variant> v = {make_variant(1, "A", 0.60), blocked_qual};
+    call_majority_consensus(v, clustering_file, 0.90);
+    check("TEST 12 quality flagged substitution ignored", "N",
+          read_sequence(clustering_file + "_threshold.fa"), num_tests, success);
+  }
+
+  // TEST 13 - a threshold of 0 calls only the most common allele
+  {
+    std::vector<variant> v = {make_variant(1, "A", 0.60), make_variant(1, "C", 0.40)};
+    call_majority_consensus(v, clustering_file, 0.0);
+    check("TEST 13 threshold 0 calls the majority allele", "A",
+          read_sequence(clustering_file + "_threshold.fa"), num_tests, success);
+  }
+
   std::cerr << "num tests " << num_tests << " success " << success << std::endl;
   return (num_tests == success) ? 0 : -1;
 }
