@@ -96,6 +96,9 @@ int main() {
     std::string exp = exp_sequences[0].second;
     gt.erase(gt.find_last_not_of('N') + 1);
     exp.erase(exp.find_last_not_of('N') + 1);
+    //the low depth site (genome position 1624) is the last covered base, so a correct N there is
+    //stripped with the trailing N and can't be seen; a failed depth filter only shows up as a
+    //length difference. Minimum depth is unit tested in test_unit_new_consensus
     //genome position 990 is the designed amplicon failure: the pileup consensus calls it M, the
     //cluster consensus N. Consensus position 987, after the 3 bp deletion at 600-602
     std::set<size_t> excluded = {987};
