@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <limits>
 #include <set>
+#include <cstdio>
 #include "../src/gmm.h"
 #include "../src/call_consensus_clustering.h"
 
@@ -39,112 +40,71 @@ int main() {
   double default_threshold = 0.5;
   double invariant_threshold = 0.97;
 
-  uint32_t n = 4;
+  uint32_t n = 6;
 
   //TEST 1 - full consensus against manually currated ground truth
-  std::string var_filename = "../../data/version_bump_tests/vbump_consensus_var.txt";
-  std::string consensus_filename = "../../data/version_bump_tests/vbump_consensus_ivar.fa";
+  std::string var_filename = "../../data/version_bump_tests/vbump_mixture_var.txt";
+  std::string consensus_filename = "../../data/version_bump_tests/vbump_mixture_ivar.fa";
+
+  double covariance_prior = 1e-3;
+  double mean_precision_prior = 1e-2;
+  double half_normal_covariance_prior = 1e-3;
+  double min_cluster_fraction = 0.05;
+  uint32_t min_cluster_points = 0;
+  double amplicon_stdev = DEFAULT_AMPLICON_STDEV;
+  bool dump_variants = false;
+  double freq_outlier_threshold = DEFAULT_FREQ_OUTLIER_THRESHOLD;
+
+  //clear output from any earlier run, so only this run's files can be compared
+  std::remove((prefix + ".fa").c_str());
+  std::remove((prefix + "_threshold.fa").c_str());
+  std::remove((prefix + "_gmm_1d_results.txt").c_str());
 
   std::vector<double> solution;
   std::vector<double> means;
-  std::vector<variant> variants = gmm_model(var_filename, prefix, min_depth, min_qual, solution, means, default_threshold, n, invariant_threshold, 1e-3, 1e-2, 0.0, 0.05);
+  std::vector<variant> variants = gmm_model(var_filename, prefix, min_depth, min_qual, solution, means, default_threshold,
+                                            n, invariant_threshold, covariance_prior, mean_precision_prior,
+                                            half_normal_covariance_prior, min_cluster_fraction, min_cluster_points,
+                                            amplicon_stdev, dump_variants, freq_outlier_threshold);
+  std::cerr << "effective means:";
+  for(double m : means){
+    std::cerr << " " << m;
+  }
+  std::cerr << std::endl;
   if(!variants.empty()) {
     cluster_consensus(variants, prefix, solution);
   }
-
-  uint32_t min_position = std::numeric_limits<uint32_t>::max();
-  for (const auto& v : variants) {
-    if (v.total_depth > 0 && v.position < min_position)
-      min_position = v.position;
-  }
-
   std::vector<std::pair<std::string, std::string>> gt_sequences;
   read_consensus(gt_sequences, consensus_filename);
-  std::string exp_sequence;
   std::vector<std::pair<std::string, std::string>> exp_sequences;
   read_consensus(exp_sequences, prefix+".fa");
 
-  // Build a map from trimmed-string index to genomic position accounting for deletions.
-  // Deletions remove characters from the consensus string, so index i in the trimmed
-  // string does NOT equal min_position + i when deletions fall within the range.
-  std::set<uint32_t> deleted_positions;
-  for (const auto& v : variants) {
-    if (v.nuc.find('-') == std::string::npos) continue;
-    std::string nuc = v.nuc;
-    nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
-    for (uint32_t z = 0; z < nuc.size(); z++) {
-      deleted_positions.insert(v.position + z);
-    }
-  }
-  // Build index->genomic mapping: production output (exp_sequences) is no longer
-  // trimmed to min_position, so it starts at genomic position 1. Walk from there,
-  // skip deleted ones, and assign each surviving position to the next string index.
-  std::vector<uint32_t> index_to_genomic;
-  {
-    uint32_t max_pos = 0;
-    for (const auto& v : variants) if (v.position > max_pos) max_pos = v.position;
-    for (uint32_t p = 1; p <= max_pos + 10; p++) {
-      if (deleted_positions.count(p) == 0) {
-        index_to_genomic.push_back(p);
-      }
-    }
-  }
-  // gt_sequences is trimmed and starts at min_position; find where that lands in
-  // the untrimmed exp_sequences index mapping so the two can be compared aligned.
-  uint32_t exp_start = 0;
-  while (exp_start < index_to_genomic.size() && index_to_genomic[exp_start] < min_position) {
-    exp_start++;
-  }
-
   bool correct = true;
-  for (auto itgt = gt_sequences.begin(), itexp = exp_sequences.begin(); itgt != gt_sequences.end() && itexp != exp_sequences.end(); ++itgt, ++itexp) {
-    uint32_t exp_len = itexp->second.size() > exp_start ? (uint32_t)itexp->second.size() - exp_start : 0;
-    if(exp_len != itgt->second.size()) {
+  if(variants.empty()){
+    std::cerr << "clustering found no single solution, only the threshold consensus was written" << std::endl;
+    correct = false;
+  }
+  if(gt_sequences.empty() || exp_sequences.empty()){
+    std::cerr << "nothing to compare: expected " << gt_sequences.size()
+              << " sequences, produced " << exp_sequences.size() << std::endl;
+    correct = false;
+  } else {
+    //compare the expected consensus to the most abundant genome, which is written first. The
+    //pileup consensus runs the full reference while the cluster consensus stops at the last
+    //variant, so trailing N (no coverage) is ignored on both
+    std::string gt = gt_sequences[0].second;
+    std::string exp = exp_sequences[0].second;
+    gt.erase(gt.find_last_not_of('N') + 1);
+    exp.erase(exp.find_last_not_of('N') + 1);
+    if(gt != exp){
       correct = false;
-      std::cerr << "not same size gt=" << itgt->second.size() << " exp=" << exp_len << std::endl;
-    }
-    for(uint32_t i=0; i < exp_len && i < itgt->second.size(); i++){
-      char a = itgt->second[i];
-      char b = itexp->second[exp_start + i];
-
-      if(a != b){
-        uint32_t genomic_pos = (exp_start+i < index_to_genomic.size()) ? index_to_genomic[exp_start+i] : (min_position + i);
-        std::cerr << "gt " << a << " exp " << b << " consensus_pos=" << i+1 << " genomic_pos=" << genomic_pos << std::endl;
-        int ctx = 5;
-        std::cerr << "  gt  context: ";
-        for (int c = -ctx; c <= ctx; c++) {
-          int idx = (int)i + c;
-          if (idx < 0 || idx >= (int)itgt->second.size()) std::cerr << '.';
-          else std::cerr << (c == 0 ? '[' : ' ') << itgt->second[idx] << (c == 0 ? ']' : ' ');
+      if(gt.size() != exp.size()){
+        std::cerr << "length differs: expected " << gt.size() << " produced " << exp.size() << std::endl;
+      }
+      for(size_t i = 0; i < std::min(gt.size(), exp.size()); i++){
+        if(gt[i] != exp[i]){
+          std::cerr << "consensus position " << i+1 << ": expected " << gt[i] << " produced " << exp[i] << std::endl;
         }
-        std::cerr << std::endl;
-        std::cerr << "  exp context: ";
-        for (int c = -ctx; c <= ctx; c++) {
-          int idx = (int)(exp_start + i) + c;
-          if (idx < 0 || idx >= (int)itexp->second.size()) std::cerr << '.';
-          else std::cerr << (c == 0 ? '[' : ' ') << itexp->second[idx] << (c == 0 ? ']' : ' ');
-        }
-        std::cerr << std::endl;
-        for (const auto& v : variants) {
-          if (v.position == genomic_pos) {
-            std::cerr << "  nuc=" << v.nuc
-                      << " gapped_freq=" << v.gapped_freq
-                      << " gapped_depth=" << v.gapped_depth
-                      << " qual=" << v.qual
-                      << " cluster=" << v.cluster_assigned
-                      << " half_normal_upper=" << v.half_normal_upper
-                      << " half_normal_lower=" << v.half_normal_lower
-                      << " position_masked=" << v.position_masked
-                      << " amplicon_masked=" << v.amplicon_masked
-                      << " depth_flag=" << v.depth_flag
-                      << " qual_flag=" << v.qual_flag
-                      << " outside_freq_range=" << v.outside_freq_range
-                      << " consensus_numbers=[ ";
-            for (auto cn : v.consensus_numbers) std::cerr << cn << " ";
-            std::cerr << "]" << std::endl;
-          }
-        }
-        correct = false;
       }
     }
   }
