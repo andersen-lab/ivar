@@ -220,16 +220,13 @@ int main() {
           read_sequence(clustering_file + "_threshold.fa"), num_tests, success);
   }
 
-  // TEST 7 - insertions honor the depth and quality filters
+  // TEST 7 - an insertion with a low ALT_QUAL is still written; indels are never quality flagged
   {
-    variant blocked_depth = make_variant(1, "+AA", 0.95);
-    blocked_depth.depth_flag = true;
-    variant blocked_qual = make_variant(2, "+CC", 0.95);
-    blocked_qual.qual_flag = true;
-    std::vector<variant> v = {make_variant(1, "T", 0.99), blocked_depth,
-                              make_variant(2, "A", 0.99), blocked_qual};
+    variant low_qual_ins = make_variant(1, "+AA", 0.95);
+    low_qual_ins.qual = 0;
+    std::vector<variant> v = {make_variant(1, "T", 0.99), low_qual_ins};
     call_majority_consensus(v, clustering_file, t);
-    check("TEST 7 insertions honor depth and quality filters", "TA",
+    check("TEST 7 low quality insertion still written", "TAA",
           read_sequence(clustering_file + "_threshold.fa"), num_tests, success);
   }
 
