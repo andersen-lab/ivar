@@ -511,6 +511,81 @@ int main() {
     }
   }
 
+  // FIFTH SCENARIO (TESTs 22, 23, 24, 25 and 26) - flag_freq_outlier_variants marks a variant
+  // freq_outlier when it sits more than -W standard deviations from the mean of the cluster it was
+  // assigned to. Out of range variants and variants with no valid cluster are skipped
+  {
+    std::vector<double> eff_means = {0.3, 0.7};
+    std::vector<double> eff_vars = {0.0004, 0.0004}; //standard deviation 0.02, so -W 3 is 0.06
+    std::vector<double> unrefined_means = eff_means;
+
+    variant inside;
+    inside.gapped_freq = 0.33; //0.03 from 0.3
+    inside.cluster_assigned = 0;
+
+    variant outside;
+    outside.gapped_freq = 0.40; //0.10 from 0.3
+    outside.cluster_assigned = 0;
+
+    variant out_of_range;
+    out_of_range.gapped_freq = 0.99; //far from 0.3, but outside the model's range
+    out_of_range.cluster_assigned = 0;
+    out_of_range.outside_freq_range = true;
+
+    variant no_cluster;
+    no_cluster.gapped_freq = 0.50; //far from both clusters, but assigned to none
+    no_cluster.cluster_assigned = -1;
+
+    std::vector<variant> outlier_variants = {inside, outside, out_of_range, no_cluster};
+    flag_freq_outlier_variants(outlier_variants, eff_means, eff_vars, unrefined_means, 3.0);
+
+    //TEST 22 - a variant inside the cutoff is not an outlier
+    {
+      bool pass = check_flag(5, "inside", "freq_outlier", outlier_variants[0].freq_outlier, false);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 23 - a variant past the cutoff is an outlier
+    {
+      bool pass = check_flag(5, "outside", "freq_outlier", outlier_variants[1].freq_outlier, true);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 24 - an out of range variant is skipped, however far it is
+    {
+      bool pass = check_flag(5, "out_of_range", "freq_outlier", outlier_variants[2].freq_outlier, false);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 25 - a variant with no valid cluster is skipped
+    {
+      bool pass = check_flag(5, "no_cluster", "freq_outlier", outlier_variants[3].freq_outlier, false);
+      num_tests++;
+      if (pass) success++;
+    }
+
+    //TEST 26 - a variant exactly at the cutoff is not an outlier, the rule is strictly greater than.
+    //Run on its own with values binary represents exactly, so the distance lands on the cutoff
+    {
+      std::vector<double> exact_means = {0.25};
+      std::vector<double> exact_vars = {0.0625}; //standard deviation 0.25
+
+      variant at_cutoff;
+      at_cutoff.gapped_freq = 0.5; //exactly 0.25 from the mean
+      at_cutoff.cluster_assigned = 0;
+
+      std::vector<variant> exact_variants = {at_cutoff};
+      flag_freq_outlier_variants(exact_variants, exact_means, exact_vars, exact_means, 1.0);
+
+      bool pass = check_flag(5, "at_cutoff", "freq_outlier", exact_variants[0].freq_outlier, false);
+      num_tests++;
+      if (pass) success++;
+    }
+  }
+
   std::cerr << "num tests " << num_tests << " success " << success << std::endl;
   return (num_tests == success) ? 0 : -1;
 }
