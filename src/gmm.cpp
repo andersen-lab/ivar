@@ -266,7 +266,7 @@ void parse_internal_variants(std::string filename,
   }
 }
 
-void set_deletion_flags(std::vector<variant> &variants, double invariant_lower_bound){
+void set_deletion_flags(std::vector<variant> &variants){
   // Collect all valid deletions with their covered ranges.
   struct del_info {
     uint32_t idx;
@@ -310,33 +310,6 @@ void set_deletion_flags(std::vector<variant> &variants, double invariant_lower_b
     }
   }
 
-  // Accumulate gap signal from sub-threshold deletions so that variants whose
-  // reduced gapped_freq is fully explained by noise-level deletions are treated
-  // as invariant rather than assigned to a single cluster.
-  std::unordered_map<uint32_t, double> sub_threshold_del_freq;
-  for (uint32_t i = 0; i < variants.size(); i++) {
-    if (variants[i].depth_flag) continue;
-    if (variants[i].nuc.find('-') == std::string::npos) continue;
-    if (!variants[i].outside_freq_range) continue;
-    if (variants[i].gapped_freq > invariant_lower_bound) continue;
-    std::string nuc = variants[i].nuc;
-    nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
-    for (uint32_t j = 1; j < nuc.size(); j++) {
-      sub_threshold_del_freq[variants[i].position + j] += variants[i].gapped_freq;
-    }
-  }
-
-  double invariant_upper_bound = 1.0 - invariant_lower_bound;
-  for (uint32_t i = 0; i < variants.size(); i++) {
-    if (variants[i].outside_freq_range) continue;
-    auto it = sub_threshold_del_freq.find(variants[i].position);
-    if (it == sub_threshold_del_freq.end()) continue;
-    if (variants[i].gapped_freq + it->second >= invariant_upper_bound) {
-      variants[i].half_normal_upper = true;
-      variants[i].outside_freq_range = true;
-    }
-  }
-
   // Every base under a deletion writes a reference row at ~1 - deletion freq, so one
   // event would enter the fit once per deleted base. Keep only the median reference row
   // of each accepted deletion for fitting; non-reference variants in the span still count.
@@ -363,7 +336,8 @@ void set_deletion_flags(std::vector<variant> &variants, double invariant_lower_b
   }
 }
 
-//treat an allele as invariant when noise-level alleles at its position account for the rest
+//treat an allele as invariant when noise-level alleles at its position, and noise-level deletions
+//spanning it, account for the rest
 void flag_noise_explained_variants(std::vector<variant> &variants, double invariant_threshold){
   double noise_upper_bound = 1.0 - invariant_threshold;
   std::unordered_map<uint32_t, double> noise_freq;
@@ -371,6 +345,14 @@ void flag_noise_explained_variants(std::vector<variant> &variants, double invari
     if (v.depth_flag || v.gapped_freq > noise_upper_bound) continue;
     if (v.nuc.find('+') != std::string::npos) continue;
     noise_freq[v.position] += v.gapped_freq;
+    //a deletion is recorded at its first base, so carry it over the rest of its span
+    if (v.nuc.find('-') != std::string::npos) {
+      std::string nuc = v.nuc;
+      nuc.erase(std::remove(nuc.begin(), nuc.end(), '-'), nuc.end());
+      for (uint32_t j = 1; j < nuc.size(); j++) {
+        noise_freq[v.position + j] += v.gapped_freq;
+      }
+    }
   }
 
   for (auto &v : variants) {
@@ -510,8 +492,8 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   std::vector<variant> base_variants;
   parse_internal_variants(prefix, base_variants, min_depth, round_val, min_qual, invariant_threshold);
   flag_amplicon_variation(base_variants, amplicon_stdev);
-  set_deletion_flags(base_variants, 1.0 - invariant_threshold);
   flag_noise_explained_variants(base_variants, invariant_threshold);
+  set_deletion_flags(base_variants);
 
   std::vector<variant> model_variants;
   std::vector<double> model_freqs;

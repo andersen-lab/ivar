@@ -264,20 +264,20 @@ void consensus_sequence::get_majority_consensus(double threshold){
 void consensus_sequence::process_variant_assignments(){
   //flag positions where deletion overlap, and where we have an upper half normal assignment
   for(uint32_t i=0; i < variant_records.size(); i++){
-    bool position_half_normal_upper = false;
+    //anything in the upper half normal wins the position, whatever order the records are in
+    bool position_half_normal_upper = std::any_of(variant_records[i].begin(), variant_records[i].end(),
+                                                  [](const variant &v){ return v.half_normal_upper; });
     bool is_del = false;
     uint32_t deletion_span = 0;
-
-    for(uint32_t j=0; j < variant_records[i].size(); j++){
-      if(variant_records[i][j].half_normal_upper){
-        position_half_normal_upper = true;
-        break;
-      }
-      if(variant_records[i][j].nuc.find('-') != std::string::npos){
+    for(const auto &v : variant_records[i]){
+      if(v.nuc.find('-') == std::string::npos) continue;
+      //copies sit at every covered position, so stamp only up to the deletion's real end
+      uint32_t del_end = v.position - 1 + (v.nuc.size() - 1);
+      if(del_end > i){
         is_del = true;
-        deletion_span = variant_records[i][j].nuc.size()-1;
-        break;
+        deletion_span = del_end - i;
       }
+      break;
     }
 
     for(auto &v : variant_records[i]){
