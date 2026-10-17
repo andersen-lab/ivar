@@ -8,7 +8,7 @@
 #include "variant_caller.h"
 
 //first main function call
-int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std::string pair_info, int32_t primer_offset, uint32_t min_depth, uint8_t min_qual, std::string ref_file, std::string gff_path){
+int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std::string pair_info, int32_t primer_offset, uint32_t min_depth, uint8_t min_qual, double min_freq, std::string ref_file, std::string gff_path){
   if(ref_file.empty()){
     std::cerr << "Please provide reference." << std::endl;
     exit(1);
@@ -61,7 +61,7 @@ int preprocess_reads(std::string bam, std::string bed, std::string bam_out, std:
   sam_close(in);
 
   //Initiate variants
-  variant_caller vc(min_qual, min_depth, ref_file, gff_path);
+  variant_caller vc(min_qual, min_depth, min_freq, ref_file, gff_path);
   if(!vc.initialize_region(ref_name)) {
     std::cerr << "Unable to initialize region " << ref_name << std::endl;
     return -1;

@@ -28,9 +28,10 @@ const std::string variant_caller::FILE_HEADER="REGION\t"
     "AMP_DEPTH\n";
 const std::string variant_caller::DELIMITER = "\t";
 
-variant_caller::variant_caller(uint8_t min_qual, uint32_t min_depth, std::string ref_path, std::string gff_path)
+variant_caller::variant_caller(uint8_t min_qual, uint32_t min_depth, double min_freq, std::string ref_path, std::string gff_path)
     : min_qual(min_qual),
       min_depth(min_depth),
+      min_freq(min_freq),
       refantd(ref_path, gff_path) {
 }
 
@@ -239,9 +240,14 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
       cds_features = refantd.query_cds(coord.position);
 
     for(auto const &state_stats: site_stats.get_site_state_stats()) {
-      //TODO: Implement minimum frequency filter
       const std::string &state = state_stats.get_state();
       if(site_state::is_gap(state))
+        continue;
+
+      // Filter on GAPPED_FREQ, the frequency the GMM clusters on. REF rows are filtered too
+      const uint32_t gapped_den = site_state::is_deletion(state) ? total_gapped_depth_del : total_gapped_depth;
+      const double gapped_freq = gapped_den ? state_stats.get_depth() / static_cast<double>(gapped_den) : 0.0;
+      if(gapped_freq < min_freq)
         continue;
 
       file << ref_name << DELIMITER; // region
@@ -274,13 +280,8 @@ void variant_caller::write_to_file(std::string output_path, std::string ref_name
         std::vector<codon_annotation> anns = refantd.annotate_codon(ref_name, coord.position, state[0], cds_features);
         write_codon_columns(file, anns);
       }
-      if(site_state::is_deletion(state)){
-        file << state_stats.get_depth() / static_cast<double>(total_gapped_depth_del) << DELIMITER; // GAPPED_FREQ
-        file << total_gapped_depth_del << DELIMITER; // GAPPED_DEPTH
-      } else {
-        file << state_stats.get_depth() / static_cast<double>(total_gapped_depth) << DELIMITER; // GAPPED_FREQ
-        file << total_gapped_depth << DELIMITER; // GAPPED_DEPTH
-      }
+      file << gapped_freq << DELIMITER; // GAPPED_FREQ
+      file << gapped_den << DELIMITER; // GAPPED_DEPTH
 
       // Raw per-amplicon observations; flux and masking are derived downstream
       amplicon_variation_data av_data = state_stats.calculate_amplicon_variation(

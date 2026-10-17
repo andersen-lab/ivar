@@ -161,7 +161,8 @@ void print_saga_usage() {
   std::cout
       << "Usage: ivar variants -i <input.bam> -r <reference-fasta> -p <prefix> "
          "[-b <primers.bed>] [-f <primer_pairs.tsv>] [-x <primer-offset>] "
-         "[-m <minimum depth>] [-q <min-quality>] [-g GFF file]\n\n"
+         "[-m <minimum depth>] [-q <min-quality>] [-t <min-frequency-threshold>] "
+         "[-g GFF file]\n\n"
          "Input Options    Description\n"
          "           -i    (Required) BAM file, with aligned reads, to call "
          "variants read by read\n"
@@ -177,6 +178,8 @@ void print_saga_usage() {
          "           -m    Minimum read depth including deletions (Default: 10)\n"
          "           -q    Minimum base quality to count a base (Default: 20). "
          "Indels are always counted.\n"
+         "           -t    Minimum frequency (0 - 1, measured on gapped depth) "
+         "to report an allele, including the reference allele (Default: 0.03)\n"
          "           -r    (Required) Reference file used for alignment.\n"
          "           -g    GFF3 file of open reading frames for amino acid "
          "translation. A position in several CDSs gets one comma separated "
@@ -330,7 +333,7 @@ void print_version_info() {
 }
 
 static const char *trim_opt_str = "i:b:f:x:p:m:q:s:r:ekh?";
-static const char *saga_opt_str = "i:b:f:x:p:m:q:r:g:h?";
+static const char *saga_opt_str = "i:b:f:x:p:m:q:t:r:g:h?";
 static const char *variants_opt_str = "p:t:q:m:r:g:Gh?";
 static const char *consensus_opt_str = "i:p:q:t:c:m:n:kh?";
 static const char *removereads_opt_str = "i:p:t:b:h?";
@@ -481,6 +484,7 @@ int main(int argc, char *argv[]) {
     g_args.primer_offset = 0;
     g_args.min_depth = 10;
     g_args.min_qual = 20;
+    g_args.min_threshold = 0.03;
     g_args.ref = "";
     g_args.gff = "";
     opt = getopt(argc, argv, saga_opt_str);
@@ -506,6 +510,9 @@ int main(int argc, char *argv[]) {
           break;
         case 'q':
           g_args.min_qual = std::stoi(optarg);
+          break;
+        case 't':
+          g_args.min_threshold = atof(optarg);
           break;
         case 'r':
           g_args.ref = optarg;
@@ -543,8 +550,12 @@ int main(int argc, char *argv[]) {
       return -1;
     }
     g_args.prefix = get_filename_without_extension(g_args.prefix, ".bam");
+    g_args.min_threshold =
+        (g_args.min_threshold < 0 || g_args.min_threshold > 1)
+            ? 0.03
+            : g_args.min_threshold;
     res = preprocess_reads(g_args.bam, g_args.bed, g_args.prefix,
-                               g_args.primer_pair_file, g_args.primer_offset, g_args.min_depth, g_args.min_qual, g_args.ref, g_args.gff);
+                               g_args.primer_pair_file, g_args.primer_offset, g_args.min_depth, g_args.min_qual, g_args.min_threshold, g_args.ref, g_args.gff);
     }
 
   // ivar trim

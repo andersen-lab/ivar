@@ -18,6 +18,7 @@ class variant_caller {
   };
   uint8_t min_qual;
   uint32_t min_depth;
+  double min_freq;
   ref_antd refantd;
   IntervalTree amplicons;
   site_aggregator sa;
@@ -29,7 +30,7 @@ class variant_caller {
   void write_codon_columns(std::ofstream &file, const std::vector<codon_annotation> &anns);
 
  public:
-  variant_caller(uint8_t min_qual, uint32_t min_depth, std::string ref_path, std::string gff_path = "");
+  variant_caller(uint8_t min_qual, uint32_t min_depth, double min_freq, std::string ref_path, std::string gff_path = "");
   bool initialize_region(std::string region);
   ~variant_caller();
   bool parse_read(const bam1_t* read, std::string ref_name, std::vector<site_state> &read_site_states);
