@@ -11,7 +11,6 @@
 #include <set>
 
 constexpr double subset_sum_solver::SUBSET_SUM_ERROR;
-constexpr double subset_sum_solver::MAJOR_MEAN_FLOOR;
 constexpr double subset_sum_solver::UNIT_SUM_ERROR;
 constexpr double variant_assigner::PEAK_COLLISION_TOLERANCE;
 constexpr double variant_assigner::COMBINATION_MIN_MEAN;
@@ -40,11 +39,9 @@ static std::vector<std::vector<double>> enumerate_combinations(const std::vector
 
 // ---------------------------------------------------------------- subset_sum_solver
 
-subset_sum_solver::subset_sum_solver(std::vector<double> means, double unit_sum_error, double invariant_threshold)
+subset_sum_solver::subset_sum_solver(std::vector<double> means, double unit_sum_error)
   : means(means),
-    unit_sum_error(unit_sum_error),
-    invariant_mean(invariant_threshold),
-    boundary_mean(1.0 - invariant_threshold) {}
+    unit_sum_error(unit_sum_error) {}
 
 double subset_sum_solver::find_nearest_distance(const std::vector<double> &all_sums, double value) {
   double min_distance = std::numeric_limits<double>::max();
@@ -116,46 +113,12 @@ std::vector<std::vector<double>> subset_sum_solver::find_solutions() const {
   return final_results;
 }
 
-//returns the indices it found rather than discarding them, so detection and
-//application cannot drift apart. gmm_1d pins the half normal means to exactly
-//1-invariant_threshold and invariant_threshold (gmm_1d.cpp:306) and
-//get_effective_means copies them untransformed, so these comparisons are exact
-bool subset_sum_solver::find_boundary_rescue(int &boundary_idx, int &major_idx) const {
-  boundary_idx = -1;
-  major_idx = -1;
-  if (means.size() != 2) return false;
-  for (int i = 0; i < 2; ++i) {
-    if (means[i] == boundary_mean)
-      boundary_idx = i;
-    else if (means[i] > MAJOR_MEAN_FLOOR && means[i] != invariant_mean)
-      major_idx = i;
-  }
-  return (boundary_idx >= 0 && major_idx >= 0);
-}
-
-// Rescue: 2 effective means, one absorbed at the lower half normal boundary
-// (1-invariant_threshold) and one major peak above MAJOR_MEAN_FLOOR that is not the
-// invariant peak. Infer the minor frequency as the complement of the major mean and
-// treat as a valid 2-population solution.
-bool subset_sum_solver::apply_boundary_rescue(){
-  int boundary_idx = -1, major_idx = -1;
-  if(!find_boundary_rescue(boundary_idx, major_idx)) return false;
-
-  double inferred_minor = 1.0 - means[major_idx];
-  std::cerr << "Rescue: lower boundary absorbed minor population; "
-            << "inferred complement = " << inferred_minor << "\n";
-  //the same double lands in both, which downstream exact-equality matching needs
-  means[boundary_idx] = inferred_minor;
-  solution_sets.push_back({means[major_idx], inferred_minor});
-  return true;
-}
-
 bool subset_sum_solver::solve(){
   //gives all solutions that sum to 1
   std::vector<std::vector<double>> solutions = find_solutions();
   if(solutions.size() == 0){
     std::cerr << "no solutions found" << std::endl;
-    return apply_boundary_rescue();
+    return false;
   }
 
   std::vector<double> non_subset_means;
@@ -268,8 +231,7 @@ void variant_assigner::overwrite_cluster_assigned(std::vector<variant> &variants
     double mean = means[cluster_assigned];
     // Use nearest-match instead of exact equality to handle floating-point
     // precision differences between model_means and eff_means. Labels are now
-    // restricted to the effective set, so every mean resolves at distance 0 except
-    // one refined by the boundary rescue, which matches no model mean at all.
+    // restricted to the effective set, so every mean resolves at distance 0.
     uint32_t best_index = 0;
     double best_dist = std::abs(eff_means[0] - mean);
     for(uint32_t j = 1; j < eff_means.size(); j++){

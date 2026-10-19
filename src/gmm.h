@@ -56,8 +56,7 @@ extern const double DEFAULT_AMPLICON_STDEV;
 extern const double DEFAULT_FREQ_OUTLIER_THRESHOLD;
 
 void flag_freq_outlier_variants(std::vector<variant> &variants, const std::vector<double> &eff_means,
-                                const std::vector<double> &eff_vars, const std::vector<double> &unrefined_means,
-                                double threshold);
+                                const std::vector<double> &eff_vars, double threshold);
 
 void split(std::string &s, char delim, std::vector<std::string> &elems);
 //proba and all_labels are model space and parallel to variants; pass them empty when the

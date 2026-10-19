@@ -13,12 +13,11 @@ int main() {
   int success = 0;
 
   const double error = 0.10;
-  const double invariant_threshold = 0.97; //matches the -I default in ivar.cpp
 
   //TEST 1 - Since our error is 0.10 we should be able to find a solution for means 0.11 and 0.80
   std::vector<double> means = {0.11, 0.80};
   std::vector<std::vector<double>> solution_sets;
-  subset_sum_solver solver1(means, error, invariant_threshold);
+  subset_sum_solver solver1(means, error);
   bool solution_status = solver1.solve();
   solution_sets = solver1.get_solution_sets();
   num_tests++;
@@ -32,7 +31,7 @@ int main() {
   means.clear();
   solution_sets.clear();
   means = {0.10, 0.80};
-  subset_sum_solver solver2(means, error, invariant_threshold);
+  subset_sum_solver solver2(means, error);
   solution_status = solver2.solve();
   solution_sets = solver2.get_solution_sets();
   num_tests++;
@@ -47,7 +46,7 @@ int main() {
   means.clear();
   solution_sets.clear();
   means = {0.10, 0.20, 0.30, 0.40, 0.50};
-  subset_sum_solver solver3(means, error, invariant_threshold);
+  subset_sum_solver solver3(means, error);
   solution_status = solver3.solve();
   solution_sets = solver3.get_solution_sets();
   num_tests++;
@@ -57,27 +56,11 @@ int main() {
     std::cerr << "TEST 3 failed, found " << solution_sets.size() << " solutions" << std::endl;
   }
 
-  //TEST 4 - The boundary rescue should infer a lower population if it gets wrapped into the lower half normal
-  //The rescue must also refine the mean to the inferred complement, bit-identical
-  //to the solution entry, since downstream matching is exact equality
-  means.clear();
-  solution_sets.clear();
-  means = {1.0 - invariant_threshold, 0.85}; //gmm_1d pins this peak, don't hand-write 0.03
-  subset_sum_solver solver4(means, error, invariant_threshold);
-  solution_status = solver4.solve();
-  solution_sets = solver4.get_solution_sets();
-  num_tests++;
-  if(solution_sets.size() == 1 && solver4.refined_means()[0] == solution_sets[0][1]) {
-    success++;
-  } else {
-    std::cerr << "TEST 4 failed, found " << solution_sets.size() << " solutions" << std::endl;
-  }
-  
   //TEST 5 - This should have too many solutions and not be solveable
   means.clear();
   solution_sets.clear();
   means = {0.10, 0.12, 0.15, 0.18, 0.20, 0.30, 0.50};
-  subset_sum_solver solver5(means, error, invariant_threshold);
+  subset_sum_solver solver5(means, error);
   solution_status = solver5.solve();
   solution_sets = solver5.get_solution_sets();
   num_tests++;
@@ -91,7 +74,7 @@ int main() {
   means.clear();
   solution_sets.clear();
   means = {0.10, 0.30, 0.50, 0.70};
-  subset_sum_solver solver6(means, error, invariant_threshold);
+  subset_sum_solver solver6(means, error);
   solution_status = solver6.solve();
   solution_sets = solver6.get_solution_sets();
   num_tests++;
@@ -158,7 +141,7 @@ int main() {
   means.clear();
   solution_sets.clear();
   means = {0.15, 0.30, 0.48, 0.55};
-  subset_sum_solver solver7(means, 0.02, invariant_threshold);
+  subset_sum_solver solver7(means, 0.02);
   solution_status = solver7.solve();
   solution_sets = solver7.get_solution_sets();
   num_tests++;

@@ -518,7 +518,6 @@ int main() {
   {
     std::vector<double> eff_means = {0.3, 0.7};
     std::vector<double> eff_vars = {0.0004, 0.0004}; //standard deviation 0.02, so -W 3 is 0.06
-    std::vector<double> unrefined_means = eff_means;
 
     variant inside;
     inside.gapped_freq = 0.33; //0.03 from 0.3
@@ -538,7 +537,7 @@ int main() {
     no_cluster.cluster_assigned = -1;
 
     std::vector<variant> outlier_variants = {inside, outside, out_of_range, no_cluster};
-    flag_freq_outlier_variants(outlier_variants, eff_means, eff_vars, unrefined_means, 3.0);
+    flag_freq_outlier_variants(outlier_variants, eff_means, eff_vars, 3.0);
 
     //TEST 22 - a variant inside the cutoff is not an outlier
     {
@@ -579,7 +578,7 @@ int main() {
       at_cutoff.cluster_assigned = 0;
 
       std::vector<variant> exact_variants = {at_cutoff};
-      flag_freq_outlier_variants(exact_variants, exact_means, exact_vars, exact_means, 1.0);
+      flag_freq_outlier_variants(exact_variants, exact_means, exact_vars, 1.0);
 
       bool pass = check_flag(5, "at_cutoff", "freq_outlier", exact_variants[0].freq_outlier, false);
       num_tests++;

@@ -10,15 +10,9 @@ class subset_sum_solver {
   //and account_for_inferred_means, and is never varied by a caller. TEST 8 exists to
   //keep these two distinct - do not merge them.
   static constexpr double SUBSET_SUM_ERROR = 0.05;
-  //lowest mean that can stand in as the major population in a boundary rescue
-  static constexpr double MAJOR_MEAN_FLOOR = 0.70;
 
-  std::vector<double> means;  //solve() may refine this via the boundary rescue
+  std::vector<double> means;
   double unit_sum_error;
-  //derived from invariant_threshold, not constants - gmm_1d pins the half normal
-  //means to exactly these values (gmm_1d.cpp:306)
-  double invariant_mean;
-  double boundary_mean;
   std::vector<std::vector<double>> solution_sets;
 
   static bool within_error_range(const std::vector<double> &values, double target, double error);
@@ -26,22 +20,15 @@ class subset_sum_solver {
   std::vector<std::vector<double>> find_solutions() const;
   std::vector<std::vector<double>> find_subsets(double target) const;
   bool account_for_inferred_means(const std::vector<double> &candidate) const;
-  bool find_boundary_rescue(int &boundary_idx, int &major_idx) const;
-  bool apply_boundary_rescue();
 
  public:
   //the production unit sum tolerance, named so call sites don't hardcode it. Still
   //passed explicitly, since callers needing another value must be able to say so
   static constexpr double UNIT_SUM_ERROR = 0.10;
 
-  //invariant_threshold comes from the -I flag, so no default here - ivar.cpp is the
-  //only place that value should be spelled
-  subset_sum_solver(std::vector<double> means, double unit_sum_error, double invariant_threshold);
+  subset_sum_solver(std::vector<double> means, double unit_sum_error);
   bool solve();
 
-  //the boundary rescue replaces the absorbed lower boundary mean with the inferred
-  //complement, and callers must adopt it - downstream matching is exact equality
-  const std::vector<double> &refined_means() const { return means; }
   const std::vector<std::vector<double>> &get_solution_sets() const { return solution_sets; }
 };
 
