@@ -12,28 +12,24 @@
 
 constexpr double subset_sum_solver::SUBSET_SUM_ERROR;
 constexpr double subset_sum_solver::UNIT_SUM_ERROR;
-constexpr double variant_assigner::PEAK_COLLISION_TOLERANCE;
-constexpr double variant_assigner::COMBINATION_MIN_MEAN;
 
 //Shared by both classes, so it lives at file scope with internal linkage rather
-//than on either one. Every non-empty subset of `values`, skipping entries below
-//`min_value` - note that is an element floor, not a tolerance.
-static void enumerate_recursive(const std::vector<double> &values, uint32_t index, std::vector<double> &current, std::vector<std::vector<double>> &results, double min_value){
+//than on either one. Every non-empty subset of `values`.
+static void enumerate_recursive(const std::vector<double> &values, uint32_t index, std::vector<double> &current, std::vector<std::vector<double>> &results){
   if (!current.empty()){
     results.push_back(current);
   }
   for (uint32_t i = index; i < values.size(); ++i) {
-    if(values[i] < min_value) continue;
     current.push_back(values[i]);
-    enumerate_recursive(values, i+1, current, results, min_value);
+    enumerate_recursive(values, i+1, current, results);
     current.pop_back();
   }
 }
 
-static std::vector<std::vector<double>> enumerate_combinations(const std::vector<double> &values, double min_value){
+static std::vector<std::vector<double>> enumerate_combinations(const std::vector<double> &values){
   std::vector<double> current;
   std::vector<std::vector<double>> results;
-  enumerate_recursive(values, 0, current, results, min_value);
+  enumerate_recursive(values, 0, current, results);
   return results;
 }
 
@@ -62,7 +58,7 @@ bool subset_sum_solver::within_error_range(const std::vector<double> &values, do
 }
 
 bool subset_sum_solver::account_for_inferred_means(const std::vector<double> &candidate) const {
-  std::vector<std::vector<double>> results = enumerate_combinations(candidate, 0);
+  std::vector<std::vector<double>> results = enumerate_combinations(candidate);
 
   std::vector<double> all_sums;
   for(auto result : results){
@@ -85,7 +81,7 @@ bool subset_sum_solver::account_for_inferred_means(const std::vector<double> &ca
 }
 
 std::vector<std::vector<double>> subset_sum_solver::find_subsets(double target) const {
-  std::vector<std::vector<double>> results = enumerate_combinations(means, 0);
+  std::vector<std::vector<double>> results = enumerate_combinations(means);
   std::vector<std::vector<double>> valid_combinations;
 
   for(uint32_t i=0; i < results.size(); i++){
@@ -97,7 +93,7 @@ std::vector<std::vector<double>> subset_sum_solver::find_subsets(double target) 
 }
 
 std::vector<std::vector<double>> subset_sum_solver::find_solutions() const {
-  std::vector<std::vector<double>> results = enumerate_combinations(means, 0);
+  std::vector<std::vector<double>> results = enumerate_combinations(means);
   //duplicate values in `means` produce equal subsets, so this is not a no-op
   std::sort(results.begin(), results.end());
   results.erase(std::unique(results.begin(), results.end()), results.end());
@@ -169,14 +165,15 @@ std::vector<std::vector<uint32_t>> variant_assigner::find_combination_peaks(std:
   std::vector<std::vector<uint32_t>> cluster_indexes(means.size());
   ambiguous_indexes.assign(means.size(), {});
 
-  std::vector<std::vector<double>> results = enumerate_combinations(solution, COMBINATION_MIN_MEAN);
+  std::vector<std::vector<double>> results = enumerate_combinations(solution);
   std::vector<double> totals;
   for(uint32_t i=0; i < results.size(); i++){
     totals.push_back(std::accumulate(results[i].begin(), results[i].end(), 0.0));
   }
 
   //given a solution and the means, map each peak to every combination of solution
-  //values ("explanation") whose sum lands within PEAK_COLLISION_TOLERANCE of it
+  //values ("explanation") whose sum lands within SUBSET_SUM_ERROR of it. This is the
+  //test the solver used to accept the solution, so every peak has an explanation
   for(uint32_t i=0; i < means.size(); i++){
     double target = means[i];
     auto it = std::find(solution.begin(), solution.end(), target);
@@ -187,16 +184,11 @@ std::vector<std::vector<uint32_t>> variant_assigner::find_combination_peaks(std:
     }
     for(uint32_t r=0; r < results.size(); r++){
       if(results[r].size() < 2) continue; //singletons are covered above
-      if(std::abs(totals[r] - target) >= PEAK_COLLISION_TOLERANCE) continue;
+      if(std::abs(totals[r] - target) >= subset_sum_solver::SUBSET_SUM_ERROR) continue;
       explanations.push_back(members_of(results[r]));
     }
 
-    if(explanations.empty()){
-      //no exact/combination explanation - fall back to nearest total
-      auto nearest = std::min_element(totals.begin(), totals.end(), [target](double a, double b) {return std::abs(a - target) < std::abs(b - target);});
-      uint32_t index = std::distance(totals.begin(), nearest);
-      explanations.push_back(members_of(results[index]));
-    }
+    if(explanations.empty()) continue;
 
     if(explanations.size() == 1){
       cluster_indexes[i] = explanations[0];

@@ -64,7 +64,7 @@ int main() {
   solution_status = solver5.solve();
   solution_sets = solver5.get_solution_sets();
   num_tests++;
-  if(solution_sets.size() == 3) {
+  if(solution_sets.size() == 2) {
     success++;
   } else {
     std::cerr << "TEST 5 failed, found " << solution_sets.size() << " solutions" << std::endl;
@@ -135,12 +135,12 @@ int main() {
   }
 
   //TEST 8 - unit_sum_error must not reach the decomposition test. 0.15+0.30=0.45
-  //is 0.03 from the 0.48 peak, so 0.48 is decomposable at SUBSET_SUM_ERROR (0.05)
+  //is 0.025 from the 0.475 peak, so 0.475 is decomposable at SUBSET_SUM_ERROR (0.03)
   //no matter how tight the argument gets. Merging the two tolerances back
   //together drops this to 0 solutions.
   means.clear();
   solution_sets.clear();
-  means = {0.15, 0.30, 0.48, 0.55};
+  means = {0.15, 0.30, 0.475, 0.55};
   subset_sum_solver solver7(means, 0.02);
   solution_status = solver7.solve();
   solution_sets = solver7.get_solution_sets();

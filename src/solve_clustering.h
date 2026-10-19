@@ -6,11 +6,6 @@
 //population frequency solutions. Never touches variants.
 class subset_sum_solver {
  private:
-  //decomposition tolerance, the counterpart to UNIT_SUM_ERROR. Gates find_subsets
-  //and account_for_inferred_means, and is never varied by a caller. TEST 8 exists to
-  //keep these two distinct - do not merge them.
-  static constexpr double SUBSET_SUM_ERROR = 0.05;
-
   std::vector<double> means;
   double unit_sum_error;
   std::vector<std::vector<double>> solution_sets;
@@ -25,6 +20,13 @@ class subset_sum_solver {
   //the production unit sum tolerance, named so call sites don't hardcode it. Still
   //passed explicitly, since callers needing another value must be able to say so
   static constexpr double UNIT_SUM_ERROR = 0.10;
+  //decomposition tolerance, the counterpart to UNIT_SUM_ERROR: how close a sum of
+  //populations must land to a peak to explain it. Gates find_subsets,
+  //account_for_inferred_means and variant_assigner::find_combination_peaks, so the
+  //solver and the assigner always agree on which peaks a solution explains. Never
+  //varied by a caller. TEST 8 exists to keep it distinct from UNIT_SUM_ERROR - do
+  //not merge them.
+  static constexpr double SUBSET_SUM_ERROR = 0.03;
 
   subset_sum_solver(std::vector<double> means, double unit_sum_error);
   bool solve();
@@ -36,11 +38,6 @@ class subset_sum_solver {
 //Never does solution search.
 class variant_assigner {
  private:
-  //how close two solution sums must land to collide with a peak
-  static constexpr double PEAK_COLLISION_TOLERANCE = 0.03;
-  //means below this are excluded from combination enumeration
-  static constexpr double COMBINATION_MIN_MEAN = 0.05;
-
   std::vector<double> solution;
   std::vector<double> means;
   double threshold;
