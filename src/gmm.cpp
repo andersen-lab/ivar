@@ -535,7 +535,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //when non-zero, takes precedence over min_cluster_fraction
   model.set_min_cluster_points(min_cluster_points);
 
-  std::vector<int> labels = model.predict(model_freqs);
+  std::vector<int> labels = model.drop_small_clusters();
 
   std::cerr << "All means: ";
   for(auto x: model.get_means()){

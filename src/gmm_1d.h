@@ -85,11 +85,15 @@ class gmm_1d {
   void initialize(const std::vector<double>& x, const Matrix& resp);
   void compute_final_weights();
 
+  Matrix fit_scores_;
+
  public:
 
   explicit gmm_1d(int n_components = 2, unsigned int seed = std::random_device{}()) : n_components(n_components), seed(seed), rng(seed) {}
   bool fit(const std::vector<double>& x);
   std::vector<int> predict(const std::vector<double> &x) const;
+  //labels of the fit data after small clusters are dropped; call after fit
+  std::vector<int> drop_small_clusters() const;
   //restricted to allowed_component_ids plus the half normals. ignores min_cluster_fraction_
   std::vector<int> predict(const std::vector<double> &x, const std::vector<int> &allowed_component_ids, bool include_half_normals = true) const;
   std::vector<std::vector<double>> predict_proba(const std::vector<double> &x) const;

@@ -467,6 +467,7 @@ bool gmm_1d::fit(const std::vector<double>& x) {
   n_iter = 0;
   elbo_history.clear();
   labels_.clear();
+  fit_scores_.clear();
 
   if (use_half_normal_for_noise_) {
     for (double xi : x) {
@@ -546,6 +547,7 @@ bool gmm_1d::fit(const std::vector<double>& x) {
 
   compute_final_weights();
   e_step(x, log_prob_norm, log_resp);
+  fit_scores_ = log_resp;
 
   labels_.clear();
   labels_.resize(N);
@@ -617,6 +619,13 @@ std::vector<int> gmm_1d::predict(const std::vector<double>& x) const {
     labels[i] = best;
   }
 
+  return labels;
+}
+
+std::vector<int> gmm_1d::drop_small_clusters() const {
+  std::vector<int> labels = labels_;
+  int n_data_points = labels.size();
+
   if (min_cluster_fraction_ <= 0.0 && min_cluster_points_ == 0) return labels;
 
   std::vector<bool> low_weight_clusters(n_components, false);
@@ -661,8 +670,8 @@ std::vector<int> gmm_1d::predict(const std::vector<double>& x) const {
         int best = -1;
         double best_score = -std::numeric_limits<double>::infinity();
         for (int k = 0; k < n_components; k++) {
-          if (!low_weight_clusters[k] && w[i][k] > best_score) {
-            best_score = w[i][k];
+          if (!low_weight_clusters[k] && fit_scores_[i][k] > best_score) {
+            best_score = fit_scores_[i][k];
             best = k;
           }
         }
