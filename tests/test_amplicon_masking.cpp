@@ -111,7 +111,7 @@ gmm_1d fit_bimodal_model(std::vector<int> &component_indices) {
   model.set_mean_precision_prior(0.5);
   model.fit(x);
   model.set_min_cluster_fraction(0.1);
-  component_indices = model.get_effective_components(model.predict(x));
+  component_indices = model.get_effective_components(model.drop_small_clusters());
   return model;
 }
 

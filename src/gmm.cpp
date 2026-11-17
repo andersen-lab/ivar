@@ -19,6 +19,8 @@ const double DEFAULT_AMPLICON_STDEV = 2.0;
 
 const double DEFAULT_FREQ_OUTLIER_THRESHOLD = 3.0;
 
+const double DEFAULT_CLOSE_CLUSTER_THRESHOLD = 2.0;
+
 static double weighted_standard_deviation(const std::vector<double> &values, const std::vector<uint32_t> &weights){
   double weighted_sum = 0.0, total_weight = 0.0;
   for(uint32_t i=0; i < values.size(); i++){
@@ -595,7 +597,9 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   //mostly reference alleles, so a point count threshold over it is meaningless
   //solver_components, not component_indices: adding the half normals here would widen the
   //candidate set and let the heavier one win on weight rather than on distance
-  std::vector<int> all_labels = model.predict(all_freqs, solver_components);
+  std::vector<std::vector<uint32_t>> close;
+  std::vector<int> all_labels = model.predict(all_freqs, solver_components, true,
+                                              DEFAULT_CLOSE_CLUSTER_THRESHOLD, &close);
   
   //gets the posterior probability per variant
   std::vector<std::vector<double>> proba = model.predict_proba(all_freqs);
@@ -609,6 +613,7 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
   for(uint32_t i=0; i < all_labels.size(); i++){
     base_variants[i].cluster_assigned = all_labels[i];
     base_variants[i].probabilities = proba[i];
+    base_variants[i].close_clusters = close[i];
     //inclusive, to match how parse_internal_variants sets outside_freq_range
     if(base_variants[i].gapped_freq >= invariant_threshold){
       base_variants[i].half_normal_upper = true;
@@ -650,32 +655,17 @@ std::vector<variant> gmm_model(std::string prefix, std::string output_prefix, ui
       for(auto &v : base_variants){
         if(v.probabilities.empty()) continue;
         std::vector<double> eff_proba;
-        double sum = 0.0;
+        bool any_nonzero = false;
         for(int ci : component_indices){
           eff_proba.push_back(v.probabilities[ci]);
-          sum += v.probabilities[ci];
+          if(v.probabilities[ci] > 0.0) any_nonzero = true;
         }
-        if(sum > 0.0){
-          for(auto &p : eff_proba) p /= sum;
-        } else {
-          //an all zero row is non empty, so assign() would take neither the probability path
-          //nor the cluster_assigned fallback and the variant would reach no genome
-          eff_proba.clear();
-        }
+        //an all zero row is non empty, so assign() would take neither the probability path
+        //nor the cluster_assigned fallback and the variant would reach no genome
+        if(!any_nonzero) eff_proba.clear();
         v.probabilities = eff_proba;
       }
-      //a variant inside the invariant band can be won by a half normal. outside the band the
-      //frequency test above has already decided, and must keep precedence: the half normals
-      //carry no density there (gmm_1d.cpp:206)
-      for(auto &v : base_variants){
-        if(v.half_normal_upper || v.half_normal_lower || v.probabilities.empty()) continue;
-        size_t best = std::distance(v.probabilities.begin(),
-                                    std::max_element(v.probabilities.begin(), v.probabilities.end()));
-        if(best < solver_means.size()) continue;
-        if(eff_means[best] > 0.5) v.half_normal_upper = true;
-        else                      v.half_normal_lower = true;
-      }
-      variant_assigner(solution_sets[0], solver_means, 2.0).assign(base_variants);
+      variant_assigner(solution_sets[0], solver_means).assign(base_variants);
       flag_freq_outlier_variants(base_variants, eff_means, eff_vars, freq_outlier_threshold);
 
       //collect the ambiguous positions per genome. deletions span several

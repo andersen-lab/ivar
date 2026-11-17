@@ -477,7 +477,7 @@ int main() {
     {
       model.set_min_cluster_points(3);
       model.set_min_cluster_fraction(0.0);
-      std::vector<int> labels = model.predict(x);
+      std::vector<int> labels = model.drop_small_clusters();
       bool pass = true;
       pass &= check_flag(4, "0.5", "joined a big group", labels[i05] == labels[i03] || labels[i05] == labels[i07], true);
       pass &= check_flag(4, "0.3 and 0.7", "distinct", labels[i03] != labels[i07], true);
@@ -490,7 +490,7 @@ int main() {
     {
       model.set_min_cluster_points(0);
       model.set_min_cluster_fraction(0.10);
-      std::vector<int> labels = model.predict(x);
+      std::vector<int> labels = model.drop_small_clusters();
       bool pass = true;
       pass &= check_flag(4, "0.5", "joined a big group", labels[i05] == labels[i03] || labels[i05] == labels[i07], true);
       pass &= check_flag(4, "0.3 and 0.7", "distinct", labels[i03] != labels[i07], true);
@@ -503,7 +503,7 @@ int main() {
     {
       model.set_min_cluster_points(3);
       model.set_min_cluster_fraction(0.5);
-      std::vector<int> labels = model.predict(x);
+      std::vector<int> labels = model.drop_small_clusters();
       bool pass = true;
       pass &= check_flag(4, "0.5", "joined a big group", labels[i05] == labels[i03] || labels[i05] == labels[i07], true);
       pass &= check_flag(4, "0.3 and 0.7", "distinct", labels[i03] != labels[i07], true);
@@ -595,19 +595,19 @@ int main() {
     variant v_upper;
     v_upper.half_normal_upper = true;
     v_upper.cluster_assigned = 0;
-    v_upper.probabilities = {0.9, 0.1}; //would reach genome 0 only without the flag
+    v_upper.close_clusters = {0}; //would reach genome 0 only without the flag
 
     variant v_lower;
     v_lower.half_normal_lower = true;
     v_lower.cluster_assigned = 1;
-    v_lower.probabilities = {0.1, 0.9}; //would reach genome 1 only without the flag
+    v_lower.close_clusters = {1}; //would reach genome 1 only without the flag
 
     variant v_normal;
     v_normal.cluster_assigned = 0;
-    v_normal.probabilities = {0.9, 0.1}; //control, routed by its posteriors
+    v_normal.close_clusters = {0}; //control, routed by its posteriors
 
     std::vector<variant> assign_variants = {v_upper, v_lower, v_normal};
-    variant_assigner(solution, means, 2.0).assign(assign_variants);
+    variant_assigner(solution, means).assign(assign_variants);
 
     //TEST 27 - the upper half normal variant reaches every genome, while the control with the same
     //posteriors reaches genome 0 only

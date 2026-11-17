@@ -84,6 +84,7 @@ class gmm_1d {
   void initialize_parameters(const std::vector<double>& x);
   void initialize(const std::vector<double>& x, const Matrix& resp);
   void compute_final_weights();
+  std::vector<uint32_t> close_clusters(const std::vector<double>& scores, const std::vector<int>& candidates, int best, double threshold) const;
 
   Matrix fit_scores_;
 
@@ -95,7 +96,8 @@ class gmm_1d {
   //labels of the fit data after small clusters are dropped; call after fit
   std::vector<int> drop_small_clusters() const;
   //restricted to allowed_component_ids plus the half normals. ignores min_cluster_fraction_
-  std::vector<int> predict(const std::vector<double> &x, const std::vector<int> &allowed_component_ids, bool include_half_normals = true) const;
+  std::vector<int> predict(const std::vector<double> &x, const std::vector<int> &allowed_component_ids, bool include_half_normals = true,
+                           double threshold = 0.0, std::vector<std::vector<uint32_t>> *close = nullptr) const;
   std::vector<std::vector<double>> predict_proba(const std::vector<double> &x) const;
   void set_use_half_normal_for_noise(bool use_half_normal_for_noise, double invariant_threshold = 0.97) { use_half_normal_for_noise_ = use_half_normal_for_noise; invariant_threshold_ = invariant_threshold; }
   bool get_use_half_normal_for_noise() const { return use_half_normal_for_noise_; }

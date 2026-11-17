@@ -149,8 +149,8 @@ bool subset_sum_solver::solve(){
 
 // ----------------------------------------------------------------- variant_assigner
 
-variant_assigner::variant_assigner(std::vector<double> solution, std::vector<double> means, double threshold)
-  : solution(solution), means(means), threshold(threshold) {}
+variant_assigner::variant_assigner(std::vector<double> solution, std::vector<double> means)
+  : solution(solution), means(means) {}
 
 std::vector<uint32_t> variant_assigner::members_of(const std::vector<double> &subset) const {
   std::vector<uint32_t> members;
@@ -302,15 +302,8 @@ void variant_assigner::assign(std::vector<variant> &variants) const {
   for(uint32_t i=0; i < variants.size(); i++){
     if(variants[i].half_normal_upper || variants[i].half_normal_lower) continue;
 
-    std::vector<uint32_t> top_clusters;
-    if(!variants[i].probabilities.empty()){
-      double best_probability = *std::max_element(variants[i].probabilities.begin(), variants[i].probabilities.end());
-      for(uint32_t c=0; c < variants[i].probabilities.size() && c < means.size(); c++){
-        if(variants[i].probabilities[c] > best_probability / threshold){
-          top_clusters.push_back(c);
-        }
-      }
-    } else {
+    std::vector<uint32_t> top_clusters = variants[i].close_clusters;
+    if(top_clusters.empty()){
       top_clusters.push_back(variants[i].cluster_assigned);
     }
 

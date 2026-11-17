@@ -102,7 +102,7 @@ int main() {
     v_private.cluster_assigned = 1; //index of the 0.20 peak in peak_means
 
     std::vector<variant> variants = {v_collision, v_private};
-    variant_assigner(solution, peak_means, 2.0).assign(variants);
+    variant_assigner(solution, peak_means).assign(variants);
 
     std::set<uint32_t> collision_confirmed(variants[0].consensus_numbers.begin(), variants[0].consensus_numbers.end());
     std::set<uint32_t> collision_ambiguous(variants[0].ambiguous_numbers.begin(), variants[0].ambiguous_numbers.end());

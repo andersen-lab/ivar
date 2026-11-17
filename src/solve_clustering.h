@@ -40,14 +40,13 @@ class variant_assigner {
  private:
   std::vector<double> solution;
   std::vector<double> means;
-  double threshold;
 
   std::vector<uint32_t> members_of(const std::vector<double> &subset) const;
   std::vector<std::vector<uint32_t>> find_combination_peaks(std::vector<double> &unresolved, std::vector<std::vector<uint32_t>> &ambiguous_indexes) const;
   void collect_matches(const std::vector<std::vector<uint32_t>> &inverse_groups, const std::vector<uint32_t> &top_clusters, std::vector<uint32_t> &out) const;
 
  public:
-  variant_assigner(std::vector<double> solution, std::vector<double> means, double threshold);
+  variant_assigner(std::vector<double> solution, std::vector<double> means);
   void assign(std::vector<variant> &variants) const;
 
   //remaps cluster_assigned out of model_means index space into eff_means space, a

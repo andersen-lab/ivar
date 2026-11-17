@@ -562,7 +562,18 @@ bool gmm_1d::fit(const std::vector<double>& x) {
   return true;
 }
 
-std::vector<int> gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& allowed_component_ids, bool include_half_normals) const {
+std::vector<uint32_t> gmm_1d::close_clusters(const std::vector<double>& scores, const std::vector<int>& candidates, int best, double threshold) const {
+  std::vector<uint32_t> out;
+  double cutoff = scores[best] - std::log(threshold);
+  for (uint32_t c = 0; c < candidates.size(); c++) {
+    int k = candidates[c];
+    if (k >= 0 && k < this->n_components && scores[k] > cutoff) out.push_back(c);
+  }
+  return out;
+}
+
+std::vector<int> gmm_1d::predict(const std::vector<double>& x, const std::vector<int>& allowed_component_ids, bool include_half_normals,
+                                 double threshold, std::vector<std::vector<uint32_t>> *close) const {
   std::vector<bool> allowed(this->n_components, false);
   for (int k : allowed_component_ids)
     if (k >= 0 && k < this->n_components) allowed[k] = true;
@@ -602,6 +613,7 @@ std::vector<int> gmm_1d::predict(const std::vector<double>& x, const std::vector
         if (w[i][k] > w[i][best]) best = k;
     }
     labels[i] = best;
+    if (close) close->push_back(close_clusters(w[i], allowed_component_ids, best, threshold));
   }
   return labels;
 }

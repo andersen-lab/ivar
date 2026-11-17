@@ -46,6 +46,7 @@ struct variant {
   bool ref_allele=false; //REF == ALT row
   bool deletion_span_duplicate=false; //reference row inside an accepted deletion, left out of the fit so the deletion counts once
   std::vector<double> probabilities;
+  std::vector<uint32_t> close_clusters;
 
 };
 
